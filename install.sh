@@ -190,7 +190,11 @@ render_template() {
     for key in ${(k)templates}; do
         local value="${templates[$key]}"
         if grep -q "$key" "$generated_path"; then
-            sed -i "" "s|$key|$value|g" "$generated_path" 
+            if [[ "$OS" == "macos" ]]; then
+                sed -i "" "s|$key|$value|g" "$generated_path"
+            else
+                sed -i "s|$key|$value|g" "$generated_path"
+            fi
             rendered_templates["$key"]="$value"
         fi
     done
@@ -218,19 +222,19 @@ post_process() {
 
 main() {
     info "开始安装 dotfiles..."
-    os="$(detect_os)"
-    info "当前系统 os: $os"
-    [[ "$os" == "other" ]] && error_exit "unsupported operating system"
+    export OS="$(detect_os)"
+    info "当前系统 os: $OS"
+    [[ "$OS" == "other" ]] && error_exit "unsupported operating system"
 
     mkdir -p "$BACKUP_DIR"
 
     info "安装 general dotfiles..."
     process_directory "$DOTFILES_DIR/general"
 
-    if [[ "$os" == "macos" ]]; then
+    if [[ "$OS" == "macos" ]]; then
         info "安装 macos-specific dotfiles..."
         process_directory "$DOTFILES_DIR/macos"
-    elif [[ "$os" == "linux" ]]; then
+    elif [[ "$OS" == "linux" ]]; then
         info "安装 linux-specific dotfiles..."
         process_directory "$DOTFILES_DIR/linux"
     fi
