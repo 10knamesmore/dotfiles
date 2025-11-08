@@ -1,0 +1,114 @@
+# ================================
+# 🧰 通用命令替代 & 默认行为增强
+# ================================
+alias activate="source ./.venv/bin/activate"
+alias chmod='chmod -v'
+alias chown='chown -v'
+alias cp='cp -v'
+alias df="df -hT"
+alias free="free -hw --si"
+alias ln='ln -v'
+alias mkdir='mkdir -pv'
+alias mount='mount -v'
+alias mv='mv -v'
+alias remove='rm -Iv' # 更强交互模式
+alias rm='rm -iv'     # 删除确认
+alias sed="sed -E"
+alias sudoed='sudo nvim'
+alias tt="taskwarrior-tui"
+alias umount='umount -v'
+alias venv="python -m venv .venv"
+alias vim='nvim -V1'
+alias grep="rg"
+alias rg="rg -i"
+# alias grep="grep --color=auto"
+
+# ================================
+# 🧠  系统信息
+# ================================
+alias how='tldr'
+alias lsblk='lsblk -o NAME,FSTYPE,UUID,MOUNTPOINT,FSAVAIL'
+alias showPath="echo \$PATH | sed 's/:/\\n/g'"
+
+# ================================
+# 🗂️ 目录/配置文件 快捷打开
+# ================================
+alias zsh_config="nvim ~/.zshrc"
+alias nvim_config="nvim ~/.config/nvim/init.lua"
+alias neo_config='neo ~/.config/nvim/init.lua'
+
+# ================================
+# 🖥️ GUI 程序快捷启动（后台）
+# ================================
+alias neo="neovide"
+alias nread="neo -- -c 'set nomodifiable'"
+function fe() {
+    local file
+    file=$(fzf "$@")
+    if [ -n "$file" ]; then
+        neo "$file"
+    fi
+}
+
+# ================================
+# 📁 文件/目录显示增强（使用 eza）
+# ================================
+alias ls="eza --icons --git --group-directories-first"
+alias la='eza -lahHiM --icons --git --group-directories-first'
+alias l='eza -lh --icons --git --group-directories-first'
+alias ll='eza -lh --icons --git --group-directories-first'
+# alias tree="eza -T --icons --git --level=2"
+tree() {
+    local level=${1:-2}
+    eza -T --icons --git --level="${level}"
+}
+
+# # ================================
+# # 🧪 Git 快捷命令
+# # ================================
+alias lg="lazygit"
+alias g="git"
+alias ga='git add'
+alias gaa='git add -A'
+alias gc='git commit -m'
+alias gst='git status'
+alias gco='git checkout'
+alias gcb='git checkout -b'
+alias gp='git push'
+alias gl='git pull'
+alias gb='git branch'
+alias glo='git log --oneline --graph --decorate'
+alias gloa='git log --oneline --graph --decorate --all'
+alias gla="git log --graph --decorate --all"
+gline() {
+    git log --since=midnight --author="$(git config user.name)" --pretty=tformat: --numstat |
+        awk '{ added += $1; removed += $2 } END { print "Added:", added, "Removed:", removed }'
+}
+
+# # ================================
+# # 🦀 Rust / C++ 开发相关
+# # ================================
+alias cwarn="RUSTFLAGS=\"-Awarnings\" cargo check"
+
+function proxy() {
+    export http_proxy="http://127.0.0.1:7897"
+    export https_proxy="http://127.0.0.1:7897"
+    export ftp_proxy="http://127.0.0.1:7897"
+    #     echo 启动代理
+}
+
+function no_proxy() {
+    unset http_proxy
+    unset https_proxy
+    unset ftp_proxy
+    echo 关闭代理
+}
+
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+    yazi "$@" --cwd-file="$tmp"
+    if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+        builtin cd -- "$cwd"
+    fi
+    \rm -f -- "$tmp"
+}
