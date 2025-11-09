@@ -21,12 +21,22 @@ setopt localoptions nullglob dotglob
 
 set -e
 
-# SCRIPT_PATH="${%):-%x}"
+# install.sh 的绝对路径
 SCRIPT_PATH="${0:A}"
+
+# dotfiles 项目路径
 DOTFILES_DIR="$(dirname "$SCRIPT_PATH")"
+
+# 备份路径
 BACKUP_DIR="$DOTFILES_DIR/backup"
-TIMESTAMP="$(date +%y%m%d_%h%m%s)"
+
+# 时间戳
+TIMESTAMP="$(date +%Y-%m-%dT%H:%M:%S)"
+
+# generated 目录路径
 GENERATE_DIR="$DOTFILES_DIR/generated"
+
+# scripts 路径 
 SCRIPTS_DIR="$GENERATE_DIR/scripts"
 
 mkdir -p "$GENERATE_DIR"
