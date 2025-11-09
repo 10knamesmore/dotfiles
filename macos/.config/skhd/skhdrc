@@ -5,10 +5,10 @@ cmd - k : yabai -m window --focus north || yabai -m display --focus north
 cmd - l : yabai -m window --focus east  || yabai -m display --focus east
 
 # move by direction
-cmd + shift - h : yabai -m window --swap west
-cmd + shift - j : yabai -m window --swap south
-cmd + shift - k : yabai -m window --swap north
-cmd + shift - l : yabai -m window --swap east
+cmd + shift - h : yabai -m window --warp west
+cmd + shift - j : yabai -m window --warp south
+cmd + shift - k : yabai -m window --warp north
+cmd + shift - l : yabai -m window --warp east
 
 # resize windows
 cmd + ctrl - h : yabai -m window --resize right:-50:0   || yabai -m window --resize left:-50:0
@@ -29,6 +29,8 @@ cmd + ctrl - l : yabai -m window --resize right:75:0    || yabai -m window --res
 # cmd + shift - 4 : SPACES=($(yabai -m query --displays --display | jq '.spaces[]')) && [[ -n $SPACES[4] ]] \
 #                   && yabai -m window --space $SPACES[4]
 
+cmd + shift - 0 : yabai -m space --balance
+
 # toggle float
 alt - v : yabai -m window --toggle float
 
@@ -36,6 +38,8 @@ alt - v : yabai -m window --toggle float
 # zoom-fullscreen: 占据所有窗口空间, 保留padding
 # windowed-fullscreen: 占据全屏, 但不是native全屏
 cmd - f : yabai -m window --toggle windowed-fullscreen
+
+cmd - w : yabai -m window --toggle native-fullscreen
 
 # toggle splist
 cmd - s : yabai -m window --toggle split
