@@ -27,12 +27,14 @@ DOTFILES_DIR="$(dirname "$SCRIPT_PATH")"
 BACKUP_DIR="$DOTFILES_DIR/backup"
 TIMESTAMP="$(date +%y%m%d_%h%m%s)"
 GENERATE_DIR="$DOTFILES_DIR/generated"
+SCRIPTS_DIR="$GENERATE_DIR/scripts"
 
 mkdir -p "$GENERATE_DIR"
 
 declare -A templates
 templates[ZSH_CUSTOM_TEMPLATE]="$DOTFILES_DIR/static/omz_custom"
 templates[DOT_TEMPLATE]="cd $DOTFILES_DIR"
+templates[SCRIPTS_DIR_TEMPLATE]="$SCRIPTS_DIR"
 
 info() {
     echo -e "\033[0;32m[info]\033[0m: $1"
@@ -161,6 +163,14 @@ process_directory() {
 
                 create_symlink "$sub_source_path" "$sub_target_path"
             done
+        elif [[ "$source_entry" = "scripts" && -d "$source_dir" ]]; then
+            for script_path in "$source_path"/*; do
+                [[ ! -f "$script_path" ]] && continue
+                local script_entry="$(basename "$script_path")"
+                local script_target_path="$SCRIPTS_DIR/$script_entry"
+
+                create_symlink "$script_path" "$script_target_path"
+            done
         else
             create_symlink "$source_path" "$target_path"
         fi
@@ -174,7 +184,7 @@ declare -A rendered_templates
 # globals:
 #   template_path 模板替换全局变量
 # arguments:
-#   "$1" .template 的绝对路径 如 ~/dotfiles/general/.zshrc.template
+#   "$1" .template 的绝对路径 如 ~/dotfiles/general/.zshrc.template, basename应当唯一
 #   "$2" 在哪个路径(k)建软链接到模版渲染后的结果 如 ~/.zshrc
 #######################################
 render_template() {

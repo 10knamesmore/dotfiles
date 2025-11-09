@@ -1,0 +1,175 @@
+{
+    "layer": "top",
+    "position": "top",
+    "exclusive": true,
+    "height": 20,
+    "spacing": 4,
+    "margin-top": 6,
+    "margin-right": 2,
+    "margin-left": 2,
+    "margin-bottom": 0,
+    "reload_style_on_change": true,
+    "modules-left": [
+        "hyprland/workspaces",
+        "hyprland/window",
+        "systemd-failed-units",
+        "tray"
+    ],
+    "modules-center": [
+        "clock"
+    ],
+    "modules-right": [
+        "cpu",
+        "memory",
+        "custom/media",
+        "pulseaudio",
+        "network",
+        "battery"
+    ],
+    "hyprland/workspaces": {
+        "format": "{id}: {icon}",
+        "format-icons": {
+            "active": "",
+            "default": ""
+        }
+    },
+    "hyprland/window": {
+        "format": "{title}",
+        "max-length": 50,
+        "rewrite": {
+            "(.*) — Mozilla Firefox": "  $1",
+            "(.*) - zsh": " [$1]",
+            ".*@.*:(.*)": ": $1",
+            "(.*)vim(.*)": " $2",
+            "(.*)nvim(.*)": " $2",
+            "(.*)Neovide(.*)": "󱐋 $2",
+            "(.*) - (.*) - Visual Studio Code": "󰨞 :  $2 -> $1",
+            "Yazi: (.*)": "🐤: $1"
+        },
+        "separate-outputs": true
+    },
+    "systemd-failed-units": {
+        "hide-on-ok": true,
+        "format": "✗ {nr_failed}",
+        "format-ok": "✓",
+        "system": true,
+        "user": false
+    },
+    "wlr/taskbar": {
+        "format": "{icon}",
+        "all-outputs": true,
+        "icon-size": 22,
+        "icon-theme": "Numix-Circle",
+        "tooltip-format": "{title}",
+        "on-click": "activate",
+        "on-click-middle": "close",
+        "ignore-list": [
+            "kitty"
+        ],
+        "app_ids-mapping": {
+            "firefoxdeveloperedition": "firefox-developer-edition"
+        },
+        "rewrite": {
+            "Firefox Web Browser": "Firefox",
+            "Foot Server": "Terminal"
+        }
+    },
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    },
+    "clock": {
+        "interval": 1,
+        "format": "{:%H:%M:%S}  ",
+        "format-alt": "{:%A, %B %d, %Y (%R)} 󰃰",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "year",
+            "mode-mon-col": 3,
+            "weeks-pos": "right",
+            "on-scroll": 1,
+            "format": {
+                "months": "<span color='#ffead3'><b>{}</b></span>",
+                "days": "<span color='#ecc6d9'><b>{}</b></span>",
+                "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+                "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
+            }
+        },
+        "actions": {
+            "on-click-right": "mode",
+            "on-scroll-up": "shift_up",
+            "on-scroll-down": "shift_down"
+        }
+    },
+    "cpu": {
+        "interval": 1,
+        "on-click": "plasma-systemmonitor",
+        "format": "  {usage}% {icon0}{icon1}{icon2}{icon3}{icon4}{icon5}{icon6}{icon7}{icon8}{icon9}{icon10}{icon11}{icon12}{icon13}{icon14}{icon15}",
+        "format-icons": [
+            "<span color='#69ff94'>▁</span>", // green
+            "<span color='#2aa9ff'>▂</span>", // blue
+            "<span color='#f8f8f2'>▃</span>", // white
+            "<span color='#f8f8f2'>▄</span>", // white
+            "<span color='#ffffa5'>▅</span>", // yellow
+            "<span color='#ffffa5'>▆</span>", // yellow
+            "<span color='#ff9977'>▇</span>", // orange
+            "<span color='#dd532e'>█</span>" // red
+        ]
+    },
+    "memory": {
+        "format": "  {}%",
+        "interval": 1,
+        "on-click": "plasma-systemmonitor",
+        "tooltip-format": "------- Memory -------\rTotal:     {total:0.1f}GiB\rUsed:      {used:0.1f}GiB | {percentage}%\rAvailable: {avail:0.1f}GiB\r\r-------- Swap --------\rTotal:     {swapTotal:0.1f}GiB\rUsed:      {swapUsed:0.1f}GiB | {swapPercentage}%\rAvailable: {swapAvail:0.1f}GiB\r"
+    },
+    "battery": {
+        "format": "{capacity}% {icon}",
+        "interval": 10,
+        "tooltip-format": "🔋 剩余时间 : {time}\n⚡ 当前功率 : {power}W\n🔄 循环次数 : {cycles}",
+        "format-icons": [
+            "",
+            "",
+            "",
+            "",
+            ""
+        ],
+        "format-charging": "{capacity}% ⚡",
+        "format-full": "{capacity}% ✔"
+    },
+    "network": {
+        "format-wifi": "  {essid} ({signalStrength}%)",
+        "format-ethernet": "󰈁 {ipaddr}/{cidr}",
+        "format-disconnected": "󰤮  Disconnected",
+        "tooltip": true,
+        "tooltip-format": "󰌢 IP地址:     {ipaddr}\r󰩠 子网掩码:   {netmask}\r󰍹 接口名称:   {ifname}\r󰩇 网关地址:   {gwaddr}",
+        "tooltip-format-disconnected": "Disconnected",
+        "on-click": "kitty nmtui"
+    },
+    "custom/media": {
+        "exec": "~/.local/bin/media_volume.sh",
+        "return-type": "json",
+        "interval": 1,
+        "format": "{text}",
+        "on-click": "playerctl play-pause",
+        "on-scroll-up": "pactl set-sink-volume @DEFAULT_SINK@ +2%",
+        "on-scroll-down": "pactl set-sink-volume @DEFAULT_SINK@ -2%",
+        "tooltip": true
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-bluetooth": "{volume}% {icon}",
+        "format-muted": " ",
+        "max-volume": 100,
+        "format-icons": {
+            "default": [
+                " ",
+                " "
+            ]
+        },
+        "on-click": "pavucontrol",
+        "ignored-sinks": [
+            "Easy Effects Sink"
+        ]
+    }
+}
