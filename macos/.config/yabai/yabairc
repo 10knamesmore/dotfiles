@@ -45,12 +45,10 @@ yabai -m config \
     mouse_drop_action swap
 
 yabai -m rule --add app="^系统设置$" manage=off
-yabai -m rule --add app="^访达$" manage=off
+yabai -m rule --add app="小米互联服务" manage=off
 
 # JankyBorder settings, 用来给窗口加边框
 # https://github.com/FelixKratz/JankyBorders/wiki/Man-Page
 borders active_color=0xff5ac8fa inactive_color=0xff3c3c3c width=5.0 hidpi=on &
-
-# borders active_color=0xff5e81ac inactive_color=0xff2e3440 width=5.0 hidpi=on &
 
 echo "yabai configuration loaded.."
