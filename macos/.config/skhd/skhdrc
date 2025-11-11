@@ -39,7 +39,7 @@ alt - v : yabai -m window --toggle float
 # windowed-fullscreen: 占据全屏, 但不是native全屏
 cmd - f : yabai -m window --toggle windowed-fullscreen
 
-cmd - w : yabai -m window --toggle native-fullscreen
+# cmd - w : yabai -m window --toggle native-fullscreen
 
 # toggle splist
 cmd - s : yabai -m window --toggle split
