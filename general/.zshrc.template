@@ -54,6 +54,8 @@ elif [[ -f "$HOME/.zshrc_macos" ]]; then
     source "$HOME/.zshrc_macos"
 fi
 
+eval "$(uv generate-shell-completion zsh)"
+
 proxy
 
 # -------------------------------
