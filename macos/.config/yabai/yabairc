@@ -1,15 +1,9 @@
 #!/usr/bin/env sh
 
-#
-# for this to work you must configure sudo such that
-# it will be able to run the command without password
-#
-# see this wiki page for information:
-#  - https://github.com/koekeishiya/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition
-#
-# yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
-# sudo yabai --load-sa
-#
+if csrutil status | grep -q 'disabled'; then
+    yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+    sudo yabai --load-sa
+fi
 
 # global settings
 yabai -m config \
@@ -24,7 +18,7 @@ yabai -m config \
     window_zoom_persist on \
     window_shadow on \
     window_animation_duration 0.0 \
-    window_animation_easing ease_out_circ \
+    window_animation_easing ease_in_out_quint \
     window_opacity_duration 0.0 \
     active_window_opacity 1.0 \
     normal_window_opacity 0.90 \
@@ -46,6 +40,8 @@ yabai -m config \
 
 yabai -m rule --add app="^系统设置$" manage=off
 yabai -m rule --add app="小米互联服务" manage=off
+
+yabai -m signal --add event=window_destroyed active=yes action="yabai -m query --windows --window &> /dev/null || yabai -m window --focus mouse &> /dev/null || yabai -m window --focus recent &> /dev/null"
 
 # JankyBorder settings, 用来给窗口加边框
 # https://github.com/FelixKratz/JankyBorders/wiki/Man-Page

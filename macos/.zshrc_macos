@@ -1,1 +1,18 @@
 # MacOS-specific settings
+function remote() {
+    local OLD_TERM="$TERM"
+    export TERM=xterm-256color
+
+    ssh wangyuming@sfijnfnepo-public.bastionhost.aliyuncs.com -p60022
+
+    export TERM="$OLD_TERM"
+}
+
+function xz14() {
+    local OLD_TERM="$TERM"
+    export TERM=xterm-256color
+
+    ssh -p 13431 z@xz14
+
+    export TERM="$OLD_TERM"
+}

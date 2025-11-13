@@ -17,17 +17,34 @@ cmd + ctrl - k : yabai -m window --resize bottom:0:-50  || yabai -m window --res
 cmd + ctrl - l : yabai -m window --resize right:75:0    || yabai -m window --resize left:50:0
 
 # move window to spacea,  不可用因为系统完整性保护未禁用
+# spaces都是提前分配了六个,所以这里不做检查
 # cmd + shift - 1 : SPACES=($(yabai -m query --displays --display | jq '.spaces[]')) && [[ -n $SPACES[1] ]] \
-#                   && yabai -m window --space $SPACES[1]
-#
-# cmd + shift - 2 : SPACES=($(yabai -m query --displays --display | jq '.spaces[]')) && [[ -n $SPACES[2] ]] \
-#                   && yabai -m window --space $SPACES[2]
-#
-# cmd + shift - 3 : SPACES=($(yabai -m query --displays --display | jq '.spaces[]')) && [[ -n $SPACES[3] ]] \
-#                   && yabai -m window --space $SPACES[3]
-#
-# cmd + shift - 4 : SPACES=($(yabai -m query --displays --display | jq '.spaces[]')) && [[ -n $SPACES[4] ]] \
-#                   && yabai -m window --space $SPACES[4]
+#                   && yabai -m window --space $SPACES[1] && yabai -m space --focus $SPACES[1]
+cmd + shift - 1 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[0].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+cmd + shift - 2 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[1].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+cmd + shift - 3 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[2].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+cmd + shift - 4 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[3].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+cmd + shift - 5 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[4].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+cmd + shift - 6 : WINDOW_ID=$(yabai -m query --windows --window | jq '.id'); \
+                    SPACE_ID=$(yabai -m query --spaces | jq '.[5].index'); \
+                    yabai -m window --space $SPACE_ID && yabai -m space --focus $SPACE_ID && yabai -m window --focus $WINDOW_ID
+
+
 
 cmd + shift - 0 : yabai -m space --balance
 
@@ -39,8 +56,6 @@ alt - v : yabai -m window --toggle float
 # windowed-fullscreen: 占据全屏, 但不是native全屏
 cmd - f : yabai -m window --toggle windowed-fullscreen
 
-# cmd - w : yabai -m window --toggle native-fullscreen
-
 # toggle splist
 cmd - s : yabai -m window --toggle split
 
@@ -48,3 +63,5 @@ cmd - s : yabai -m window --toggle split
 cmd - d : yabai -m window --close
 
 cmd - q : /Applications/kitty.app/Contents/MacOS/kitty --single-instance -d ~
+
+cmd - e : open -a Finder
