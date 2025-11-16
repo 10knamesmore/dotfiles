@@ -163,12 +163,19 @@ process_directory() {
         [[ ! -e "$source_path" ]] && continue
 
         local source_entry="$(basename "$source_path")"
+        # 忽略 DS_Store
+        [[ "$source_entry" == ".DS_Store" ]] && continue
+
         local target_path="$target_base/$source_entry"
 
         if [[ "$source_entry" == ".config" && -d "$source_path" ]]; then
             for sub_source_path in "$source_path"/* "$source_path"/.[!.]* "$source_path"/..?*; do
                 [[ ! -e "$sub_source_path" ]] && continue
+
                 local sub_entry="$(basename "$sub_source_path")"
+                # 忽略 DS_Store
+                [[ "$sub_entry" == ".DS_Store" ]] && continue
+
                 local sub_target_path="$target_path/$sub_entry"
 
                 create_symlink "$sub_source_path" "$sub_target_path"
@@ -176,7 +183,11 @@ process_directory() {
         elif [[ "$source_entry" = "scripts" && -d "$source_dir" ]]; then
             for script_path in "$source_path"/*; do
                 [[ ! -f "$script_path" ]] && continue
+
                 local script_entry="$(basename "$script_path")"
+                # 忽略 DS_Store
+                [[ "$script_entry" == ".DS_Store" ]] && continue
+
                 local script_target_path="$SCRIPTS_DIR/$script_entry"
 
                 create_symlink "$script_path" "$script_target_path"
