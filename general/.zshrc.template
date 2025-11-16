@@ -33,7 +33,6 @@ plugins=(
     cd-ls                   # cd 后自动 ls
     you-should-use          # 命令 alias 提示
 )
-eval "$(thefuck --alias)"
 
 export YSU_MESSAGE_POSITION="after"
 
