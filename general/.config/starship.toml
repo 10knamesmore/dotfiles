@@ -1,0 +1,231 @@
+"$schema"             = 'https://starship.rs/config-schema.json'
+
+format                = """
+[╭─](fg:overlay2)$os$username$hostname\
+$directory\
+$git_branch$git_state$git_status\
+$fill\
+$status$cmd_duration$python$rust$nodejs$memory_usage[─╮](fg:overlay2)
+[╰─](fg:overlay2)$character
+"""
+
+right_format          = """
+$localip$custom[─╯](fg:overlay2)
+"""
+
+add_newline           = true
+
+palette               = 'catppuccin_mocha'
+
+[profiles]
+transient             = """
+$time[> ](fg:green)
+"""
+
+rtransient            = """
+$directory$time[ <](fg:green)
+"""
+
+[os]
+disabled              = false
+format                = '[ $symbol]($style)'
+style                 = "bg:red fg:crust"
+
+[os.symbols]
+Windows               = ""
+Ubuntu                = "󰕈"
+SUSE                  = ""
+Raspbian              = "󰐿"
+Mint                  = "󰣭"
+Macos                 = "󰀵"
+Manjaro               = ""
+Linux                 = "󰌽"
+Gentoo                = "󰣨"
+Fedora                = "󰣛"
+Alpine                = ""
+Amazon                = ""
+Android               = ""
+AOSC                  = ""
+Arch                  = "󰣇"
+Artix                 = "󰣇"
+CentOS                = ""
+Debian                = "󰣚"
+Redhat                = "󱄛"
+RedHatEnterprise      = "󱄛"
+
+
+[hostname]
+ssh_only              = true
+style                 = "bg:red fg:crust"
+ssh_symbol            = ''
+format                = "[$ssh_symbol on $hostname ]($style)"
+aliases               = { "FtWangYuMing" = "编译机" }
+[username]
+show_always           = true
+style_user            = "italic bg:red fg:crust"
+style_root            = "bg:red fg:crust"
+format                = '[ $user ]($style)'
+
+
+
+[directory]
+style                 = "bg:peach fg:crust"
+format                = "[$read_only]($read_only_style)[ $path ]($style)"
+read_only             = " "
+truncate_to_repo      = false
+read_only_style       = "bg:yellow fg:crust"
+home_symbol           = " ~"
+truncation_length     = 8
+truncation_symbol     = "…/"
+
+[directory.substitutions]
+"Downloads"           = ""
+"Music"               = "󰝚"
+"Pictures"            = ""
+"Documents"           = "󰲋"
+
+
+[git_branch]
+symbol                = "[](fg:peach bg:yellow) on  "
+style                 = "bg:yellow fg:crust"
+format                = '[$symbol$branch]($style)'
+always_show_remote    = true
+
+[git_state]
+style                 = "bg:yellow fg:crust"
+
+[git_metrics]
+disabled              = false
+added_style           = "bold italic fg:dark_green bg:yellow"
+deleted_style         = "bold italic fg:dark_red bg:yellow"
+format                = "[ +$added]($added_style)[ ](bg:yellow)[-$deleted ]($deleted_style)"
+
+[git_status]
+format                = '[ $all_status$ahead_behind](bold italic fg:crust bg:yellow)[](fg:yellow)'
+conflicted            = "[👎$cound](fg:dark_red bg:yellow)"
+ahead                 = "⇡$cound"
+behind                = "⇣$count"
+diverged              = "⇕⇡${ahead_count }⇣${behind_count}"
+stashed               = '[&$count ](bold                  fg:crust      bg:yellow)'
+untracked             = "[?$count ](bold underline italic fg:crust      bg:yellow)"
+modified              = "[!$count ](bold underline italic fg:dark_blue  bg:yellow)"
+staged                = "[$count ](bold underline italic fg:dark_green bg:yellow)"
+renamed               = "[»$count ](bold underline italic fg:crust      bg:yellow)"
+deleted               = "[✘$count ](bold underline italic fg:dark_red   bg:yellow)"
+
+
+[fill]
+symbol                = "─"
+style                 = "fg:overlay2"
+
+
+[memory_usage]
+threshold             = 0
+disabled              = false
+symbol                = ""
+format                = "[ $ram_pct | $swap $symbol ]($style)"
+style                 = "italic bg:sky fg:crust"
+
+
+[localip]
+ssh_only              = false
+disabled              = false
+style                 = "italic bold bg:blue fg:crust"
+format                = "[](fg:blue)[ $localipv4 󰍸 ]($style)"
+
+[character]
+disabled              = false
+success_symbol        = '😎 👉'
+error_symbol          = '🤣 👉'
+format                = "$symbol "
+
+[cmd_duration]
+show_milliseconds     = true
+min_time              = 1000
+format                = "[ took $duration  ]($style)"
+style                 = "bg:green fg:crust"
+disabled              = false
+show_notifications    = true
+min_time_to_notify    = 45000
+
+[python]
+symbol                = ""
+format                = "[ $symbol ($version) $virtualenv ]($style)"
+version_format        = "${raw}"
+style                 = "bg:blue fg:crust"
+python_binary         = ["python3", "python"]
+detect_folders        = ["venv", ".venv", "env", ".env"]
+detect_files          = ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"]
+disabled              = false
+
+[nodejs]
+format                = "[ $symbol ($version) ]($style)"
+version_format        = "${raw}"
+style                 = "bold bg:green fg:crust"
+
+[rust]
+symbol                = ""
+format                = "[ $version $symbol ]($style)"
+version_format        = "${raw}"
+style                 = "bg:rust fg:crust"
+
+
+[time]
+disabled              = false
+format                = '[\[$time\]]($style) '
+time_format           = '%T'
+utc_time_offset       = '+8'
+
+[status]
+style                 = 'bold bg:red fg:curst'
+format                = '[$symbol$signal_name ]($style)'
+success_symbol        = '[](fg:overlay0)[ ](bg:overlay0)✔'
+success_style         = 'bold fg:green bg:overlay0'
+symbol                = '[](fg:red)[ ](bg:red)✘ \[\]'
+failure_style         = 'italic bold bg:red fg:crust'
+sigint_symbol         = "[](fg:red)[ ](bg:red)✘ "
+signal_symbol         = "[](fg:red)[ ](bg:red)SIG "
+not_found_symbol      = '[](fg:red)[ ](bg:red) \[$common_meaning|$int\]'
+not_executable_symbol = "[](fg:red)[ ](bg:red)😡 not executable"
+pipestatus            = true
+recognize_signal_code = true
+map_symbol            = true
+disabled              = false
+
+[custom.proxy]
+command               = 'echo $http_proxy | sed "s/http:\/\///"'
+when                  = '''! test -z "$http_proxy"'''
+style                 = "italic bold fg:crust bg:lavender"
+format                = "[](fg:lavender bg:blue)[ $output  ]($style)"
+
+[palettes.catppuccin_mocha]
+rosewater             = "#f5e0dc"
+flamingo              = "#f2cdcd"
+pink                  = "#f5c2e7"
+mauve                 = "#cba6f7"
+red                   = "#f38ba8"
+dark_red              = "#c01b1b"
+rust                  = "#dea584"
+maroon                = "#eba0ac"
+peach                 = "#fab387"
+yellow                = "#f9e2af"
+green                 = "#a6e3a1"
+dark_green            = "#009900"
+teal                  = "#94e2d5"
+sky                   = "#89dceb"
+sapphire              = "#74c7ec"
+blue                  = "#89b4fa"
+dark_blue             = "#0959d3"
+lavender              = "#b4befe"
+text                  = "#cdd6f4"
+subtext1              = "#bac2de"
+subtext0              = "#a6adc8"
+overlay2              = "#9399b2"
+overlay1              = "#7f849c"
+overlay0              = "#6c7086"
+surface2              = "#585b70"
+surface1              = "#45475a"
+surface0              = "#313244"
+base                  = "#1e1e2e"
+mantle                = "#181825"
+crust                 = "#11111b"

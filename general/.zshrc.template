@@ -1,15 +1,7 @@
 # -------------------------------
-# 🧨 Powerlevel10k Instant Prompt
-# -------------------------------
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${USER}.zsh" ]]; then
-    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${USER}.zsh"
-fi
-
-# -------------------------------
 # 🎨 Oh My Zsh & Theme
 # -------------------------------
 export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="powerlevel10k/powerlevel10k"
 export ZSH_CUSTOM=ZSH_CUSTOM_TEMPLATE
 
 export PATH=SCRIPTS_DIR_TEMPLATE:$PATH
@@ -24,7 +16,6 @@ COMPLETION_WAITING_DOTS="true"
 # 🔌 Plugins
 # -------------------------------
 plugins=(
-    # git                      # Git 命令支持
     zsh-syntax-highlighting # 命令语法高亮
     z                       # 快速跳转历史目录
     copypath                # 复制路径命令
@@ -58,10 +49,41 @@ eval "$(uv generate-shell-completion zsh)"
 proxy
 
 export NVM_DIR="$HOME/.nvm"
-[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"                                       # This loads nvm
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" # This loads nvm bash_completion
 
-# -------------------------------
-# 💡 Powerlevel10k 主题设置
-# -------------------------------
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+# --------- starship prompt ---------
+eval "$(starship init zsh)"
+
+# Enable transient prompt - simplify historical prompts after accepting a command
+zle-line-init() {
+    emulate -L zsh
+    [[ $CONTEXT == start ]] || return 0
+
+    while true; do
+        zle .recursive-edit
+        local -i ret=$?
+        [[ $ret == 0 && $KEYS == $'\4' ]] || break
+        [[ -o ignore_eof ]] || exit 0
+    done
+
+    local saved_prompt=$PROMPT
+    local saved_rprompt=$RPROMPT
+    PROMPT="$(starship prompt --profile transient)"
+    # 用starship 的rtransient有点bug不能显示
+    RPROMPT=$'%{\e[38;2;180;190;254m%}[ %~]%{\e[0m%}'
+    zle .reset-prompt
+    PROMPT=$saved_prompt
+    RPROMPT=$saved_rprompt
+
+    if ((ret)); then
+        zle .send-break
+    else
+        zle .accept-line
+    fi
+    return ret
+}
+
+zle -N zle-line-init
+# ---------------------------------------
