@@ -112,3 +112,8 @@ function y() {
     fi
     \rm -f -- "$tmp"
 }
+
+alias f="fg"
+alias b="bg"
+alias j="jobs"
+alias jobs="jobs -l"

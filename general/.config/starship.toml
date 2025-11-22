@@ -5,7 +5,7 @@ format                = """
 $directory\
 $git_branch$git_state$git_status\
 $fill\
-$status$cmd_duration$python$rust$nodejs$memory_usage[─╮](fg:overlay2)
+$status$cmd_duration$python$rust$nodejs$memory_usage$jobs[─╮](fg:overlay2)
 [╰─](fg:overlay2)$character
 """
 
@@ -112,6 +112,13 @@ modified              = "[!$count ](bold underline italic fg:dark_blue  bg:yello
 staged                = "[$count ](bold underline italic fg:dark_green bg:yellow)"
 renamed               = "[»$count ](bold underline italic fg:crust      bg:yellow)"
 deleted               = "[✘$count ](bold underline italic fg:dark_red   bg:yellow)"
+
+[jobs]
+symbol                = '+'
+number_threshold      = 2
+symbol_threshold      = 1
+format                = "[ $number  ]($style)"
+style                 = "bg:green fg:crust"
 
 
 [fill]
