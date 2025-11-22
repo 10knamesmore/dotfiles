@@ -1,0 +1,5 @@
+# pacman.txt - Arch Linux 包管理器配置
+# 使用方法：
+#   导出当前安装的包: pacman -Qqe > ~/dotfiles/linux/pacman.txt
+#   安装包: sudo pacman -S --needed - < ~/dotfiles/linux/pacman.txt
+

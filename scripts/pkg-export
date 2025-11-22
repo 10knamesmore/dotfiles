@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+###############################################################################
+# 包管理器导出脚本
+#
+# 功能：导出当前系统已安装的包列表
+#
+# 用法：
+#   ./scripts/pkg-export
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+
+info() {
+    echo -e "\033[0;32m[info]\033[0m: $1"
+}
+
+error() {
+    echo -e "\033[0;31m[error]\033[0m: $1"
+}
+
+error_exit() {
+    error "$1"
+    exit 1
+}
+
+detect_os() {
+    local uname
+    uname="$(uname)"
+    if [[ "$uname" == "Darwin" ]]; then
+        echo "macos"
+    elif [[ "$uname" == "Linux" ]]; then
+        echo "linux"
+    else
+        echo "other"
+    fi
+}
+
+export_macos() {
+    info "导出 macOS 包列表..."
+
+    if ! command -v brew &>/dev/null; then
+        error_exit "Homebrew 未安装，请先安装 Homebrew"
+    fi
+
+    local brewfile="$DOTFILES_DIR/macos/Brewfile"
+
+    # 备份旧的 Brewfile
+    if [[ -f "$brewfile" ]]; then
+        local timestamp
+        timestamp=$(date +%Y%m%d_%H%M%S)
+        cp "$brewfile" "$brewfile.backup.$timestamp"
+        info "已备份旧的 Brewfile: $brewfile.backup.$timestamp"
+    fi
+
+    # 导出新的 Brewfile
+    brew bundle dump --force --file="$brewfile"
+    info "✓ 已导出到: $brewfile"
+
+    # 显示统计信息
+    local tap_count brew_count cask_count
+    tap_count=$(grep -c '^tap ' "$brewfile" 2>/dev/null || echo 0)
+    brew_count=$(grep -c '^brew ' "$brewfile" 2>/dev/null || echo 0)
+    cask_count=$(grep -c '^cask ' "$brewfile" 2>/dev/null || echo 0)
+
+    info "统计: $tap_count taps, $brew_count brews, $cask_count casks"
+}
+
+export_linux() {
+    info "导出 Linux 包列表..."
+
+    if command -v pacman &>/dev/null; then
+        export_pacman
+    elif command -v apt &>/dev/null; then
+        export_apt
+    elif command -v dnf &>/dev/null; then
+        export_dnf
+    else
+        error_exit "未检测到支持的包管理器 (pacman/apt/dnf)"
+    fi
+}
+
+export_pacman() {
+    info "使用 pacman 导出包列表..."
+
+    local pacman_file="$DOTFILES_DIR/linux/pacman.txt"
+    local pacman_explicit="$DOTFILES_DIR/linux/pacman-explicit.txt"
+    local pacman_aur="$DOTFILES_DIR/linux/pacman-aur.txt"
+
+    # 备份
+    for file in "$pacman_file" "$pacman_explicit" "$pacman_aur"; do
+        if [[ -f "$file" ]]; then
+            local timestamp
+            timestamp=$(date +%Y%m%d_%H%M%S)
+            cp "$file" "$file.backup.$timestamp"
+        fi
+    done
+
+    # 导出所有显式安装的包
+    pacman -Qqe >"$pacman_explicit"
+    info "✓ 已导出显式安装的包到: $pacman_explicit"
+
+    # 导出官方仓库的包
+    pacman -Qqe | grep -vxFf <(pacman -Qqm) >"$pacman_file" 2>/dev/null || true
+    info "✓ 已导出官方包到: $pacman_file"
+
+    # 导出 AUR 包
+    if command -v yay &>/dev/null || command -v paru &>/dev/null; then
+        pacman -Qqm >"$pacman_aur"
+        info "✓ 已导出 AUR 包到: $pacman_aur"
+    fi
+
+    # 统计
+    local pkg_count aur_count
+    pkg_count=$(wc -l <"$pacman_file")
+    aur_count=$(wc -l <"$pacman_aur" 2>/dev/null || echo 0)
+    info "统计: $pkg_count 官方包, $aur_count AUR 包"
+}
+
+export_apt() {
+    info "使用 apt 导出包列表..."
+
+    local apt_file="$DOTFILES_DIR/linux/apt.txt"
+
+    # 备份
+    if [[ -f "$apt_file" ]]; then
+        local timestamp
+        timestamp=$(date +%Y%m%d_%H%M%S)
+        cp "$apt_file" "$apt_file.backup.$timestamp"
+    fi
+
+    # 导出显式安装的包
+    apt-mark showmanual >"$apt_file"
+    info "✓ 已导出到: $apt_file"
+
+    local pkg_count
+    pkg_count=$(wc -l <"$apt_file")
+    info "统计: $pkg_count 个包"
+}
+
+main() {
+    local os
+    os=$(detect_os)
+
+    info "检测到系统: $os"
+
+    case "$os" in
+    macos)
+        export_macos
+        ;;
+    linux)
+        export_linux
+        ;;
+    *)
+        error_exit "不支持的操作系统"
+        ;;
+    esac
+
+    info "✓ 导出完成！"
+}
+
+main "$@"
