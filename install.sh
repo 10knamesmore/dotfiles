@@ -181,8 +181,9 @@ process_directory() {
                 create_symlink "$sub_source_path" "$sub_target_path"
             done
         elif [[ "$source_entry" = "scripts" && -d "$source_dir" ]]; then
+            # 复制脚本目录的一切, 包括目录到generated/scripts
             for script_path in "$source_path"/*; do
-                [[ ! -f "$script_path" ]] && continue
+                # [[ ! -f "$script_path" ]]  && continue
 
                 local script_entry="$(basename "$script_path")"
                 # 忽略 DS_Store

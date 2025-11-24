@@ -5,6 +5,7 @@ export ZSH="$HOME/.oh-my-zsh"
 export ZSH_CUSTOM=ZSH_CUSTOM_TEMPLATE
 
 export PATH=SCRIPTS_DIR_TEMPLATE:$PATH
+export scripts_dir="SCRIPTS_DIR_TEMPLATE"
 
 # -------------------------------
 # ⚙️ Shell Behavior Enhancements
