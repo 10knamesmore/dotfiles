@@ -118,7 +118,7 @@ symbol                = '+'
 number_threshold      = 2
 symbol_threshold      = 1
 format                = "[ $number  ]($style)"
-style                 = "bg:green fg:crust"
+style                 = "bg:lavender fg:crust"
 
 
 [fill]
