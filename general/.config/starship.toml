@@ -148,7 +148,7 @@ format                = "$symbol "
 
 [cmd_duration]
 show_milliseconds     = true
-min_time              = 1000
+min_time              = 1
 format                = "[ took $duration  ]($style)"
 style                 = "bg:green fg:crust"
 disabled              = false
