@@ -147,7 +147,7 @@
         "on-click": "kitty nmtui"
     },
     "custom/media": {
-        "exec": "~/.local/bin/media_volume.sh",
+        "exec": "$scripts_dir/media_volume.sh",
         "return-type": "json",
         "interval": 1,
         "format": "{text}",

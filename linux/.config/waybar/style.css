@@ -1,188 +1,4 @@
-/* ===================== 全局样式 ===================== */
-* {
-  font-family: "Hack Nerd Font", monospace;
-  font-size: 14px;
-  border-radius: 10px;
-}
-
-/* ===================== 主窗口样式（背景+毛玻璃） ===================== */
-window#waybar {
-  background: rgba(30, 30, 46, 0.4);
-  /* background: transparent; */
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  color: @text;
-  margin: 0px 0px;
-}
-
-/* ===================== 通用模块样式 ===================== */
-#window,
-#cpu,
-#memory,
-#clock,
-#battery,
-#network,
-#custom-media,
-#pulseaudio,
-#tray,
-#user,
-#systemd-failed-units {
-  padding: 0.5rem 1rem;
-  margin: 3px 0;
-
-  border-radius: 10px;
-  background-color: @surface0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* ===================== 各模块配色 ===================== */
-#cpu,
-#memory {
-  color: @blue; /* 蓝色 */
-}
-
-#battery.charging {
-  color: @green;
-}
-
-#battery.warning:not(.charging) {
-  color: @red;
-}
-
-#network {
-  color: @red; /* 粉红色 */
-}
-
-#custom-media {
-  margin-right: 0;
-}
-
-#custom-media,
-#pulseaudio {
-  color: @peach; /* 橙色 */
-}
-
-#clock {
-  color: @text; /* 白色 */
-}
-
-#systemd-failed-units {
-  color: @maroon; /* 粉红色/红色 */
-}
-
-/* ===================== 窗口标题样式 ===================== */
-#window {
-  font-weight: bold;
-  font-size: 14px;
-  color: #cdd6f4; /* 绿色 */
-}
-
-/* ===================== 工作区按钮样式 ===================== */
-#workspaces {
-  margin: 0 10px;
-}
-
-#workspaces button {
-  color: @lavender;
-  padding: 6px 10px;
-  /* margin: 2px; */
-  border-radius: 10px;
-  transition: all 0.2s ease-in-out;
-}
-
-#workspaces button:hover {
-  color: @sapphire;
-}
-
-#workspaces button.active {
-  background: @sky;
-  color: black;
-  font-weight: bold;
-}
-
-/* ===================== 系统托盘样式 ===================== */
-#tray {
-  padding: 4px 8px;
-}
-
-#tray > .passive {
-  -gtk-icon-effect: dim;
-}
-
-#tray > .needs-attention {
-  -gtk-icon-effect: highlight;
-  background-color: #f38ba8;
-}
-
-/* ===================== 电池状态样式 ===================== */
-#battery.warning {
-  color: #f9e2af; /* 黄色警告 */
-}
-
-#battery.critical {
-  color: #f38ba8; /* 红色警告 */
-  animation: blink 1s infinite alternate;
-}
-
-@keyframes blink {
-  to {
-    background-color: rgba(243, 139, 168, 0.5);
-  }
-}
-
-/* ===================== 网络状态样式 ===================== */
-#network.disconnected {
-  color: #f38ba8; /* 红色表示断开连接 */
-}
-
-/* ===================== 任务栏样式 (wlr/taskbar) ===================== */
-#taskbar {
-  background: transparent;
-  margin: 2px 0px;
-}
-
-#taskbar button {
-  background: rgba(30, 30, 46, 0.4);
-  border-radius: 10px;
-  margin: 0 2px;
-  padding: 2px 8px;
-}
-
-#taskbar button.active {
-  background: rgba(137, 180, 250, 0.3);
-  box-shadow: inset 0 0 0 2px #89b4fa;
-}
-
-/* ===================== 音频状态样式 ===================== */
-#pulseaudio.muted {
-  color: #7f849c; /* 静音时显示灰色 */
-}
-
-/* ===================== 日历弹出框样式 ===================== */
-tooltip {
-  background: rgba(30, 30, 46, 0.95);
-  border: 1px solid rgba(137, 180, 250, 0.3);
-  border-radius: 8px;
-}
-
-tooltip label {
-  color: #cdd6f4;
-  margin: 6px;
-}
-
-/* ===================== 鼠标悬停效果 ===================== */
-#cpu:hover,
-#memory:hover,
-#clock:hover,
-#battery:hover,
-#network:hover,
-#custom-media:hover,
-#pulseaudio:hover,
-#user:hover {
-  background: rgba(49, 50, 68, 0.7);
-}
-
-/* =================== macchiato =================== */
+/* =================== Catppuccin Macchiato Colors =================== */
 @define-color rosewater #f4dbd6;
 @define-color flamingo #f0c6c6;
 @define-color pink #f5bde6;
@@ -209,3 +25,296 @@ tooltip label {
 @define-color base #24273a;
 @define-color mantle #1e2030;
 @define-color crust #181926;
+
+/* =================== Global Styles =================== */
+* {
+  font-family: "JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Symbols Nerd Font", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+
+/* =================== Waybar Window =================== */
+window#waybar {
+  background: transparent;
+  color: @text;
+}
+
+/* =================== Module Base Styles =================== */
+#workspaces,
+#window,
+#cpu,
+#memory,
+#clock,
+#battery,
+#network,
+#custom-media,
+#pulseaudio,
+#tray,
+#systemd-failed-units {
+  padding: 4px 14px;
+  margin: 4px 3px;
+  border-radius: 16px;
+  background: @surface0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* =================== Workspaces =================== */
+#workspaces {
+  background: @base;
+  padding: 2px 4px;
+  border-radius: 18px;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.25);
+}
+
+#workspaces button {
+  color: @overlay1;
+  padding: 4px 10px;
+  margin: 2px 3px;
+  border-radius: 12px;
+  background: transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 700;
+  min-width: 24px;
+}
+
+#workspaces button:hover {
+  background: @surface1;
+  color: @lavender;
+  box-shadow: 0 2px 10px rgba(183, 189, 248, 0.15);
+}
+
+#workspaces button.active {
+  background: linear-gradient(145deg, @mauve 0%, @blue 100%);
+  color: @base;
+  font-weight: 800;
+  box-shadow: 0 4px 15px rgba(198, 160, 246, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+#workspaces button.urgent {
+  background: linear-gradient(145deg, @red 0%, @maroon 100%);
+  color: @base;
+}
+
+/* =================== Window Title =================== */
+#window {
+  background: @mantle;
+  color: @lavender;
+  font-weight: 600;
+  border-left: 4px solid @mauve;
+  padding-left: 16px;
+  font-style: italic;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(198, 160, 246, 0.15);
+}
+
+#window:hover {
+  background: @surface0;
+  border-left-color: @blue;
+  color: @blue;
+}
+
+/* =================== Clock =================== */
+#clock {
+  background: linear-gradient(145deg, @blue 0%, @sapphire 50%, @sky 100%);
+  color: @base;
+  font-weight: 800;
+  padding: 4px 18px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(138, 173, 244, 0.4), inset 0 1px 3px rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.5px;
+}
+
+#clock:hover {
+  background: linear-gradient(145deg, @sapphire 0%, @sky 50%, @teal 100%);
+  box-shadow: 0 5px 20px rgba(138, 173, 244, 0.6);
+}
+
+/* =================== System Resources =================== */
+#cpu {
+  background: @surface0;
+  color: @blue;
+  border-left: 4px solid @blue;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(138, 173, 244, 0.12);
+}
+
+#cpu:hover {
+  background: @surface1;
+  color: @sapphire;
+  box-shadow: 0 4px 14px rgba(138, 173, 244, 0.3);
+}
+
+#memory {
+  background: @surface0;
+  color: @mauve;
+  border-left: 4px solid @mauve;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(198, 160, 246, 0.12);
+}
+
+#memory:hover {
+  background: @surface1;
+  color: @pink;
+  box-shadow: 0 4px 14px rgba(198, 160, 246, 0.3);
+}
+
+/* =================== Battery =================== */
+#battery {
+  background: @surface0;
+  color: @green;
+  border-left: 4px solid @green;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(166, 218, 149, 0.12);
+}
+
+#battery:hover {
+  background: @surface1;
+  box-shadow: 0 4px 14px rgba(166, 218, 149, 0.3);
+}
+
+#battery.charging {
+  color: @teal;
+  border-left-color: @teal;
+  background: linear-gradient(135deg, @surface0 0%, rgba(139, 213, 202, 0.08) 100%);
+}
+
+#battery.warning:not(.charging) {
+  color: @yellow;
+  border-left-color: @yellow;
+  background: linear-gradient(135deg, @surface0 0%, rgba(238, 212, 159, 0.12) 100%);
+}
+
+#battery.critical:not(.charging) {
+  color: @red;
+  border-left-color: @red;
+  background: linear-gradient(135deg, @surface0 0%, rgba(237, 135, 150, 0.18) 100%);
+}
+
+/* =================== Network =================== */
+#network {
+  background: @surface0;
+  color: @sky;
+  border-left: 4px solid @sky;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(145, 215, 227, 0.12);
+}
+
+#network:hover {
+  background: @surface1;
+  color: @sapphire;
+  box-shadow: 0 4px 14px rgba(145, 215, 227, 0.3);
+}
+
+#network.disconnected {
+  color: @red;
+  border-left-color: @red;
+  background: linear-gradient(135deg, @surface0 0%, rgba(237, 135, 150, 0.15) 100%);
+}
+
+/* =================== Audio =================== */
+#pulseaudio {
+  background: @surface0;
+  color: @peach;
+  border-left: 4px solid @peach;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(245, 169, 127, 0.12);
+}
+
+#pulseaudio:hover {
+  background: @surface1;
+  color: @yellow;
+  box-shadow: 0 4px 14px rgba(245, 169, 127, 0.3);
+}
+
+#pulseaudio.muted {
+  color: @overlay0;
+  border-left-color: @overlay0;
+  background: @mantle;
+  opacity: 0.7;
+}
+
+#custom-media {
+  background: @surface0;
+  color: @pink;
+  border-left: 4px solid @pink;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(245, 189, 230, 0.12);
+}
+
+#custom-media:hover {
+  background: @surface1;
+  color: @rosewater;
+  box-shadow: 0 4px 14px rgba(245, 189, 230, 0.3);
+}
+
+/* =================== System Tray =================== */
+#tray {
+  background: @surface0;
+  padding: 4px 12px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+#tray > .passive {
+  -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+  -gtk-icon-effect: highlight;
+  background-color: @red;
+  border-radius: 10px;
+  padding: 2px 6px;
+}
+
+/* =================== System Failed Units =================== */
+#systemd-failed-units {
+  background: linear-gradient(135deg, @mantle 0%, rgba(237, 135, 150, 0.25) 100%);
+  color: @red;
+  border-left: 4px solid @red;
+  padding-left: 16px;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(237, 135, 150, 0.4);
+}
+
+/* =================== Taskbar =================== */
+#taskbar {
+  background: transparent;
+  margin: 3px 0;
+}
+
+#taskbar button {
+  background: @surface0;
+  border-radius: 14px;
+  margin: 0 3px;
+  padding: 4px 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+#taskbar button:hover {
+  background: @surface1;
+  box-shadow: 0 3px 12px rgba(183, 189, 248, 0.25);
+}
+
+#taskbar button.active {
+  background: linear-gradient(135deg, rgba(138, 173, 244, 0.35), rgba(198, 160, 246, 0.35));
+  border: 2px solid @blue;
+  box-shadow: 0 4px 16px rgba(138, 173, 244, 0.4), inset 0 1px 2px rgba(183, 189, 248, 0.2);
+}
+
+/* =================== Tooltips =================== */
+tooltip {
+  background: @base;
+  border: 2px solid @surface2;
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+tooltip label {
+  color: @text;
+  font-weight: 600;
+}
