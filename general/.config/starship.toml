@@ -184,9 +184,9 @@ time_format           = '%T'
 utc_time_offset       = '+8'
 
 [status]
-style                 = 'bold bg:red fg:curst'
+style                 = 'bold bg:red fg:crust'
 format                = '[$symbol$signal_name ]($style)'
-success_symbol        = '[](fg:overlay0)[ ](bg:overlay0)✔'
+success_symbol        = '[](fg:overlay0)[ ](bg:overlay0)✔ '
 success_style         = 'bold fg:green bg:overlay0'
 symbol                = '[](fg:red)[ ](bg:red)✘ \[\]'
 failure_style         = 'italic bold bg:red fg:crust'
