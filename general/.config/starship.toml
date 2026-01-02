@@ -152,8 +152,8 @@ min_time              = 1
 format                = "[ took $duration  ]($style)"
 style                 = "bg:green fg:crust"
 disabled              = false
-show_notifications    = true
-min_time_to_notify    = 45000
+# show_notifications    = true
+# min_time_to_notify    = 45000
 
 [python]
 symbol                = ""
