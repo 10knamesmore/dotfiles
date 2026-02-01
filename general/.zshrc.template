@@ -39,6 +39,8 @@ if [[ -f "$HOME/.cargo/bin" ]]; then
     export PATH=$HOME/.cargo/bin:$PATH
 fi
 
+export PATH=$HOME/.local/bin:$PATH
+
 if [[ -f "$HOME/.zshrc_linux" ]]; then
     source "$HOME/.zshrc_linux"
 elif [[ -f "$HOME/.zshrc_macos" ]]; then
