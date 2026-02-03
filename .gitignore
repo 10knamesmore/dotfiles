@@ -22,7 +22,7 @@ macos/Brewfile.backup.*
 linux/*.backup.*
 
 # codex自动创建的
-skills/.system
+**/skills/.system/
 
 # 随时更改, 这个不需要
 btop/
