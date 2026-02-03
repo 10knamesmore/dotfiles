@@ -1,0 +1,4 @@
+interface:
+  display_name: "文档注释添加器"
+  short_description: "为 Rust/TypeScript 代码批量补全文档注释并保持风格一致"
+  default_prompt: "使用 $doc-comment-adder 为指定文件或目录添加符合语言规范的文档注释。"
