@@ -115,6 +115,7 @@ cd ~/dotfiles
 | 命令 | 功能 |
 |------|------|
 | `dot` | 快速 cd 到 dotfiles 项目目录 |
+| `skill` | 快速 cd 到 skills 目录 |
 
 ## 🔄 日常工作流程
 

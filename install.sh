@@ -47,6 +47,7 @@ declare -A templates
 templates[ZSH_CUSTOM_TEMPLATE]="$DOTFILES_DIR/static/omz_custom"
 templates[DOT_TEMPLATE]="cd $DOTFILES_DIR"
 templates[SCRIPTS_DIR_TEMPLATE]="$SCRIPTS_DIR"
+templates[SKILLS_DIR_TEMPLATE]="$SKILLS_DIR"
 
 info() {
     echo -e "\033[0;32m[info]\033[0m: $1"
