@@ -50,9 +50,10 @@ description: 从 React/类 React 前端源码中抽取页面级业务语义交�
 ### 7) 输出结构化结果
 
 - 用 `references/output-schema.md` 的字段规范。
-- 默认输出 YAML；若用户要阅读视图，再补 Markdown。
+- 默认输出 JSON；若用户要阅读视图，再补 Markdown。
 - 可丢弃、非事实源：不保证 100% 正确。
-- 输出的文件放到 page_behavior_index目录, 这个目录可能是一个软链接, 写入前需要向用户确认
+- 输出路径改为 `ai_index/pages/<page>/page_behavior.json`。
+- ai_index 这个目录可能是一个软链接, 写入前需要向用户确认
 
 ## 输出要求
 

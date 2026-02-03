@@ -1,30 +1,41 @@
 # 输出 Schema
 
-结构化输出使用此字段规范，默认 YAML。
+结构化输出使用此字段规范，默认 JSON。
 
 ## 顶层
 
-```yaml
-page: <string>                # 页面名或路由
-source:
-  - <path>                    # 分析的主要文件
-interactions:
-  - id: <snake_case>          # 业务语义名称
-    type: <interaction_type>  # 见 interaction-types.md
-    trigger:
-      event: <click|submit|confirm|auto>
-      element: <string>       # UI 元素，例如 Button "Create"
-      handler: <string>       # 可选，handler/function 名称
-    params:
-      - name: <string>
-        source: <string>      # form.field | url.param | selection | state | context
-        required: <true|false|unknown>
-        notes: <string>
-    result:
-      ui: <string>            # 可观察 UI 变化
-      business: <string>      # 明确可见的业务结果
-    confidence: <high|medium|low>
-    notes: <string>
+```json
+{
+  "page": "<string>",
+  "source": [
+    "<path>"
+  ],
+  "interactions": [
+    {
+      "id": "<snake_case>",
+      "type": "<interaction_type>",
+      "trigger": {
+        "event": "<click|submit|confirm|auto>",
+        "element": "<string>",
+        "handler": "<string>"
+      },
+      "params": [
+        {
+          "name": "<string>",
+          "source": "<string>",
+          "required": "<true|false|unknown>",
+          "notes": "<string>"
+        }
+      ],
+      "result": {
+        "ui": "<string>",
+        "business": "<string>"
+      },
+      "confidence": "<high|medium|low>",
+      "notes": "<string>"
+    }
+  ]
+}
 ```
 
 ## 字段说明
@@ -39,25 +50,36 @@ interactions:
 
 ## 最小示例
 
-```yaml
-page: OrderCreate
-source:
-  - src/pages/order/Create.tsx
-interactions:
-  - id: create_order
-    type: primary_action
-    trigger:
-      event: submit
-      element: Form "Create Order"
-      handler: handleSubmit
-    params:
-      - name: symbol
-        source: form.field
-        required: true
-        notes: "from input symbol"
-    result:
-      ui: "toast success + list refresh"
-      business: "POST /orders"
-    confidence: high
-    notes: "explicit submit handler"
+```json
+{
+  "page": "OrderCreate",
+  "source": [
+    "src/pages/order/Create.tsx"
+  ],
+  "interactions": [
+    {
+      "id": "create_order",
+      "type": "primary_action",
+      "trigger": {
+        "event": "submit",
+        "element": "Form \"Create Order\"",
+        "handler": "handleSubmit"
+      },
+      "params": [
+        {
+          "name": "symbol",
+          "source": "form.field",
+          "required": "true",
+          "notes": "from input symbol"
+        }
+      ],
+      "result": {
+        "ui": "toast success + list refresh",
+        "business": "POST /orders"
+      },
+      "confidence": "high",
+      "notes": "explicit submit handler"
+    }
+  ]
+}
 ```
