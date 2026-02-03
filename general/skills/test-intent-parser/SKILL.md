@@ -33,7 +33,7 @@ description: 从前端已解析的测试用例 JSON 生成结构化 JSON 测试�
     "steps": [
       {
         "step": "<string>",
-        "expected": ["<string>"]
+        "expected"?: ["<string>"]
       }
     ]
   }
