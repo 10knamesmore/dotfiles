@@ -38,6 +38,8 @@ GENERATE_DIR="$DOTFILES_DIR/generated"
 
 # scripts 路径 
 SCRIPTS_DIR="$GENERATE_DIR/scripts"
+# skills 目录路径
+SKILLS_DIR="$DOTFILES_DIR/general/skills"
 
 mkdir -p "$GENERATE_DIR"
 
@@ -165,6 +167,8 @@ process_directory() {
         local source_entry="$(basename "$source_path")"
         # 忽略 DS_Store
         [[ "$source_entry" == ".DS_Store" ]] && continue
+        # skills 目录不直接链接到 $HOME
+        [[ "$source_entry" == "skills" ]] && continue
 
         local target_path="$target_base/$source_entry"
 
@@ -252,6 +256,33 @@ post_process() {
     done
 }
 
+#######################################
+# 配置 Codex / Copilot skills 软链接
+#######################################
+link_skills() {
+    local codex_skills="$HOME/.codex/skills"
+    local codex_dir="$HOME/.codex"
+    local copilot_dir="$HOME/.copilot"
+    local copilot_skills="$copilot_dir/skills"
+
+    if [[ -d "$SKILLS_DIR" ]]; then
+        info "配置 skills 软链接..."
+        if [[ -d "$codex_dir" ]]; then
+            create_symlink "$SKILLS_DIR" "$codex_skills"
+        else
+            warn "  未找到 ~/.codex, 跳过"
+        fi
+
+        if [[ -d "$copilot_dir" ]]; then
+            create_symlink "$SKILLS_DIR" "$copilot_skills"
+        else
+            warn "  未找到 ~/.copilot, 跳过"
+        fi
+    else
+        warn "skills 目录不存在: $SKILLS_DIR"
+    fi
+}
+
 main() {
     info "开始安装 dotfiles..."
     export OS="$(detect_os)"
@@ -270,6 +301,8 @@ main() {
         info "安装 linux-specific dotfiles..."
         process_directory "$DOTFILES_DIR/linux"
     fi
+
+    link_skills
 
     post_process
 
