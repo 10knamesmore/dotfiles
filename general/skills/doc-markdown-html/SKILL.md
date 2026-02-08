@@ -25,6 +25,7 @@ description: 使用 Markdown 编写结构化文档，并基于固定 HTML 模板
 - 默认始终使用 `assets/doc-template.html`。
 - 模板结构保持稳定；只有用户明确要求改版时才调整模板。
 - 生成的 HTML 必须支持代码高亮（fenced code block）。
+- 生成的 HTML 代码块必须支持一键复制。
 
 ## 渲染脚本
 

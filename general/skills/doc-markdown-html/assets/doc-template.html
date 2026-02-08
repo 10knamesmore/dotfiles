@@ -68,12 +68,13 @@
     }
 
     .content .codehilite {
+      position: relative;
       margin: 0.9em 0;
       background: var(--code-bg);
       color: var(--code-fg);
       border: 1px solid #1f3655;
       border-radius: 10px;
-      padding: 12px;
+      padding: 40px 12px 12px;
       overflow: auto;
     }
 
@@ -94,6 +95,41 @@
       border-radius: 0;
       color: inherit;
       font-size: inherit;
+    }
+
+    .code-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      border: 1px solid #2b4a71;
+      background: #183252;
+      color: #d9e9ff;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .code-copy-btn:hover {
+      background: #255182;
+      color: #ffffff;
+    }
+
+    .code-copy-btn:active {
+      transform: translateY(1px);
+    }
+
+    .code-copy-btn.copied {
+      background: #1f6b4f;
+      border-color: #2a8663;
+      color: #e9fff4;
+    }
+
+    .code-copy-btn.failed {
+      background: #7a2c35;
+      border-color: #96404b;
+      color: #ffe9ec;
     }
 
     /* Injected from pygments HtmlFormatter */
@@ -151,5 +187,90 @@
       {{TOC}}
     </aside>
   </div>
+
+  <script>
+    (function () {
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try {
+          ok = document.execCommand('copy');
+        } catch (e) {
+          ok = false;
+        }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
+      function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(text).then(function () {
+            return true;
+          }).catch(function () {
+            return fallbackCopy(text);
+          });
+        }
+        return Promise.resolve(fallbackCopy(text));
+      }
+
+      function setBtnState(btn, stateText, stateClass) {
+        var original = btn.getAttribute('data-original-text') || '复制';
+        btn.textContent = stateText;
+        btn.classList.remove('copied', 'failed');
+        if (stateClass) {
+          btn.classList.add(stateClass);
+        }
+        window.setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('copied', 'failed');
+        }, 1200);
+      }
+
+      function mountCopyButton(block) {
+        if (!block || block.getAttribute('data-copy-ready') === '1') {
+          return;
+        }
+        var pre = block.querySelector('pre');
+        if (!pre) {
+          return;
+        }
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'code-copy-btn';
+        btn.textContent = '复制';
+        btn.setAttribute('data-original-text', '复制');
+        btn.setAttribute('aria-label', '复制代码');
+
+        btn.addEventListener('click', function () {
+          var text = pre.innerText || pre.textContent || '';
+          text = text.replace(/\n$/, '');
+          copyText(text).then(function (ok) {
+            if (ok) {
+              setBtnState(btn, '已复制', 'copied');
+            } else {
+              setBtnState(btn, '复制失败', 'failed');
+            }
+          });
+        });
+
+        block.appendChild(btn);
+        block.setAttribute('data-copy-ready', '1');
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        var blocks = document.querySelectorAll('.content .codehilite');
+        for (var i = 0; i < blocks.length; i++) {
+          mountCopyButton(blocks[i]);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
