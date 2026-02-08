@@ -1,0 +1,4 @@
+interface:
+  display_name: "文档 Markdown HTML"
+  short_description: "用 Markdown 编写文档并生成固定模板高亮 HTML 页面"
+  default_prompt: "使用 $doc-markdown-html 先生成 Markdown 文档，再输出最终可发布 HTML 文件。"
