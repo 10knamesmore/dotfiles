@@ -258,13 +258,15 @@ post_process() {
 }
 
 #######################################
-# 配置 Codex / Copilot skills 软链接
+# 配置 Codex / Copilot / Claude skills 软链接
 #######################################
 link_skills() {
     local codex_skills="$HOME/.codex/skills"
     local codex_dir="$HOME/.codex"
     local copilot_dir="$HOME/.copilot"
     local copilot_skills="$copilot_dir/skills"
+    local claude_dir="$HOME/.claude"
+    local claude_skills="$claude_dir/skills"
 
     if [[ -d "$SKILLS_DIR" ]]; then
         info "配置 skills 软链接..."
@@ -278,6 +280,12 @@ link_skills() {
             create_symlink "$SKILLS_DIR" "$copilot_skills"
         else
             warn "  未找到 ~/.copilot, 跳过"
+        fi
+
+        if [[ -d "$claude_dir" ]]; then
+            create_symlink "$SKILLS_DIR" "$claude_skills"
+        else
+            warn "  未找到 ~/.claude, 跳过"
         fi
     else
         warn "skills 目录不存在: $SKILLS_DIR"
