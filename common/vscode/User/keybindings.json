@@ -1,0 +1,395 @@
+// 将键绑定放在此文件中以覆盖默认值
+[
+    // ========== Esc 多功能配置 ==========
+    // Esc 在编辑器中：清除搜索高亮、关闭查找框、关闭提示
+    {
+        "key": "escape",
+        "command": "closeFindWidget",
+        "when": "editorFocus && findWidgetVisible && !isComposing",
+    },
+    {
+        "key": "escape",
+        "command": "closeParameterHints",
+        "when": "editorFocus && parameterHintsVisible",
+    },
+    {
+        "key": "escape",
+        "command": "hideSuggestWidget",
+        "when": "suggestWidgetVisible && textInputFocus",
+    },
+    {
+        "key": "escape",
+        "command": "vscode-neovim.escape",
+        "when": "editorTextFocus && neovim.mode == 'insert'",
+    },
+
+    // ========== Jumplist 导航 (H/L) ==========
+    // 注意：H/L 必须在这里配置，因为需要调用 VSCode 的 navigateBack/Forward
+    {
+        "key": "shift+h",
+        "command": "workbench.action.navigateBack",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "shift+l",
+        "command": "workbench.action.navigateForward",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+
+    // ========== Vim 多键序列（需要显式配置）==========
+    // 注意：多键序列（如 gg, zz, gc）需要显式配置，VSCode 才知道等待第二个键
+    // 单键命令（j/k/h/l）和 Ctrl 组合键（ctrl+d/u/f/b）由 vscode-neovim 自动处理
+
+    // zz - 视图居中
+    {
+        "key": "z z",
+        "command": "vscode-neovim.send",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+        "args": "zz",
+    },
+
+    // ========== gg - 跳到文件开头 ==========
+    // 注意：虽然是 Vim 原生功能，但在 VSCode 中需要显式配置
+    {
+        "key": "g g",
+        "command": "vscode-neovim.send",
+        "when": "editorTextFocus && neovim.mode != 'insert'",
+        "args": "gg",
+    },
+
+    // ========== 注释 (gc) ==========
+    // 注意：gc 调用 VSCode 注释命令，需要在这里配置
+    {
+        "key": "g c",
+        "command": "editor.action.commentLine",
+        "when": "editorTextFocus && neovim.mode != 'insert'",
+    },
+
+    // ========== Alt+j/k 移动行 ==========
+    {
+        "key": "alt+k",
+        "command": "editor.action.moveLinesUpAction",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "alt+j",
+        "command": "editor.action.moveLinesDownAction",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "alt+k",
+        "command": "vscode-neovim.send",
+        "when": "editorTextFocus && neovim.mode == 'visual'",
+        "args": "<a-k>",
+    },
+    {
+        "key": "alt+j",
+        "command": "vscode-neovim.send",
+        "when": "editorTextFocus && neovim.mode == 'visual'",
+        "args": "<a-j>",
+    },
+
+    // ========== Smart Select (类似 treesitter) ==========
+    // S - 智能扩展选择（基于语法树）
+    {
+        "key": "shift+s",
+        "command": "editor.action.smartSelect.expand",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "shift+s",
+        "command": "editor.action.smartSelect.expand",
+        "when": "editorTextFocus && neovim.mode == 'visual'",
+    },
+    // Alt+S - 收缩选择
+    {
+        "key": "alt+s",
+        "command": "editor.action.smartSelect.shrink",
+        "when": "editorTextFocus && neovim.mode == 'visual'",
+    },
+
+    // ========== LSP 功能 ==========
+    // gd - 跳转到定义
+    {
+        "key": "g d",
+        "command": "editor.action.revealDefinition",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // gr - 查找引用
+    {
+        "key": "g r",
+        "command": "editor.action.goToReferences",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // gi - 跳转到实现
+    {
+        "key": "g i",
+        "command": "editor.action.goToImplementation",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // gy - 跳转到类型定义
+    {
+        "key": "g y",
+        "command": "editor.action.goToTypeDefinition",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // gb - 已废弃，使用 H 代替 navigate back
+
+    // ========== 窗口管理 ==========
+    // Ctrl+hjkl 切换窗口焦点
+    {
+        "key": "ctrl+h",
+        "command": "workbench.action.focusLeftGroup",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "ctrl+l",
+        "command": "workbench.action.focusRightGroup",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "ctrl+k",
+        "command": "workbench.action.focusAboveGroup",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    {
+        "key": "ctrl+j",
+        "command": "workbench.action.focusBelowGroup",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // W - 切换到侧边栏
+    {
+        "key": "shift+w",
+        "command": "workbench.action.focusSideBar",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // leader+wv - 纵向分屏
+    {
+        "key": "space w v",
+        "command": "workbench.action.splitEditor",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // leader+ws - 横向分屏
+    {
+        "key": "space w s",
+        "command": "workbench.action.splitEditorOrthogonal",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+    // leader+wd - 关闭当前编辑器
+    {
+        "key": "space w d",
+        "command": "workbench.action.closeActiveEditor",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+
+    // ========== Buffer/文件管理 ==========
+    // leader+e - 聚焦文件树（侧边栏）
+    {
+        "key": "space e",
+        "command": "workbench.files.action.focusFilesExplorer",
+        "when": "neovim.mode == 'normal' && editorTextFocus",
+    },
+    {
+        "key": "space e",
+        "command": "workbench.action.toggleSidebarVisibility",
+        "when": "neovim.mode == 'normal' && sideBarFocus",
+    },
+
+    // ========== 文件树导航（类似 mini.files）==========
+    // l - 在文件树中：打开文件并关闭文件树（如果是目录则只展开）
+    {
+        "key": "l",
+        "command": "runCommands",
+        "when": "sideBarFocus && activeViewlet == 'workbench.view.explorer' && !inputFocus && !explorerResourceIsFolder",
+        "args": {
+            "commands": [
+                "list.select",
+                "workbench.action.toggleSidebarVisibility",
+            ],
+        },
+    },
+    {
+        "key": "l",
+        "command": "list.toggleExpand",
+        "when": "sideBarFocus && activeViewlet == 'workbench.view.explorer' && !inputFocus && explorerResourceIsFolder",
+    },
+    // q/esc - 在文件树中：关闭侧边栏并返回编辑器
+    {
+        "key": "q",
+        "command": "runCommands",
+        "when": "sideBarFocus && activeViewlet == 'workbench.view.explorer'",
+        "args": {
+            "commands": [
+                "workbench.action.toggleSidebarVisibility",
+                "workbench.action.focusActiveEditorGroup",
+            ],
+        },
+    },
+    {
+        "key": "escape",
+        "command": "runCommands",
+        "when": "sideBarFocus && (activeViewlet == 'workbench.view.explorer' || activeViewlet == 'workbench.view.search')",
+        "args": {
+            "commands": [
+                "workbench.action.toggleSidebarVisibility",
+                "workbench.action.focusActiveEditorGroup",
+            ],
+        },
+    },
+    // 禁用输出面板的 q 键
+    {
+        "key": "q",
+        "command": "-vscode-neovim.send",
+        "when": "editorTextFocus && neovim.init && focusedView == 'workbench.panel.output' && neovim.mode != 'insert'",
+    },
+
+    // ========== 辅助栏导航 ==========
+    // leader+a - 切换辅助栏并聚焦
+    {
+        "key": "space a",
+        "command": "runCommands",
+        "when": "neovim.mode == 'normal' && editorTextFocus",
+        "args": {
+            "commands": [
+                "workbench.action.toggleAuxiliaryBar",
+                "workbench.action.focusAuxiliaryBar",
+            ],
+        },
+    },
+    // Esc - 在辅助栏中：关闭辅助栏并返回编辑器
+    {
+        "key": "escape",
+        "command": "runCommands",
+        "when": "auxiliaryBarFocus",
+        "args": {
+            "commands": [
+                "workbench.action.toggleAuxiliaryBar",
+                "workbench.action.focusActiveEditorGroup",
+            ],
+        },
+    },
+
+    // leader+b - Buffer Picker (显示所有已打开编辑器)
+    {
+        "key": "space b",
+        "command": "workbench.action.showAllEditors",
+        "when": "neovim.mode == 'normal' && editorTextFocus",
+    },
+
+    // ========== 文件和搜索 ==========
+    // leader+space - 查找文件
+    {
+        "key": "space space",
+        "command": "workbench.action.quickOpen",
+        "when": "neovim.mode == 'normal' && editorTextFocus",
+    },
+    // leader+/ - 全局搜索
+    {
+        "key": "space /",
+        "command": "workbench.action.findInFiles",
+        "when": "neovim.mode == 'normal' && editorTextFocus",
+    },
+    // s - 当前文件内搜索 (VSCode Find)
+    {
+        "key": "s",
+        "command": "editor.actions.findWithArgs",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+        "args": {
+            "searchString": "",
+            "replaceString": "",
+            "isRegex": false,
+            "isCaseSensitive": false,
+            "matchWholeWord": false,
+            "preserveCase": false,
+            "findInSelection": false,
+        },
+    },
+    // f - 当前文件内搜索 (Vim 原生 / 搜索)
+    {
+        "key": "f",
+        "command": "vscode-neovim.send",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+        "args": "/",
+    },
+
+    // ========== 编辑操作 ==========
+    // space c r - 重命名
+    {
+        "key": "space c r",
+        "command": "editor.action.rename",
+        "when": "editorHasRenameProvider && editorTextFocus && !editorReadonly && neovim.mode == 'normal'",
+    },
+    // Ctrl+c - 快速修复/代码操作
+    {
+        "key": "ctrl+c",
+        "command": "editor.action.quickFix",
+        "when": "editorHasCodeActionsProvider && editorTextFocus && !editorReadonly && neovim.mode != 'insert'",
+    },
+    // space c a - 快速修复/代码操作（兼容 Vim 模式）
+    {
+        "key": "space c a",
+        "command": "editor.action.codeAction",
+        "when": "editorHasCodeActionsProvider && editorTextFocus && !editorReadonly && neovim.mode != 'insert'",
+    },
+    // za - 折叠切换
+    {
+        "key": "z a",
+        "command": "editor.toggleFold",
+        "when": "editorTextFocus && foldingEnabled && neovim.mode != 'insert'",
+    },
+
+    // ========== 调试 ==========
+    // leader+db - 切换断点
+    {
+        "key": "space d b",
+        "command": "editor.debug.action.toggleBreakpoint",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+    },
+
+    // ========== 终端 ==========
+    {
+        "key": "ctrl+/",
+        "command": "-terminalSuggestToggleExplainMode",
+        "when": "terminalFocus && terminalHasBeenCreated && terminalIsOpen && terminalSuggestWidgetVisible || terminalFocus && terminalIsOpen && terminalProcessSupported && terminalSuggestWidgetVisible",
+    },
+    {
+        "key": "ctrl+/",
+        "command": "workbench.action.terminal.toggleTerminal",
+        "when": "terminal.active",
+    },
+
+    // ========== 其他 ==========
+    // Tab 补全和建议导航
+    {
+        "key": "tab",
+        "command": "selectNextSuggestion",
+        "when": "editorTextFocus && suggestWidgetVisible",
+    },
+    {
+        "key": "shift+tab",
+        "command": "selectPrevSuggestion",
+        "when": "editorTextFocus && suggestWidgetVisible",
+    },
+    {
+        "key": "tab",
+        "command": "editor.action.inlineSuggest.commit",
+        "when": "inlineEditIsVisible && tabShouldAcceptInlineEdit && !editorHoverFocused && !editorTabMovesFocus && !suggestWidgetVisible || inlineSuggestionHasIndentationLessThanTabSize && inlineSuggestionVisible && !editorHoverFocused && !editorTabMovesFocus && !suggestWidgetVisible || inlineEditIsVisible && inlineSuggestionHasIndentationLessThanTabSize && inlineSuggestionVisible && !editorHoverFocused && !editorTabMovesFocus && !suggestWidgetVisible || inlineEditIsVisible && inlineSuggestionVisible && tabShouldAcceptInlineEdit && !editorHoverFocused && !editorTabMovesFocus && !suggestWidgetVisible",
+    },
+    // Ctrl+Shift+r - 切换只读模式
+    {
+        "key": "ctrl+shift+r",
+        "command": "workbench.action.files.toggleActiveEditorReadonlyInSession",
+    },
+    // leader u z - 切换居中布局(Zen Mode)
+    {
+        "key": "space u z",
+        "command": "runCommands",
+        "when": "editorTextFocus && neovim.mode == 'normal'",
+        "args": {
+            "commands": [
+                "workbench.action.toggleZenMode",
+                "workbench.action.toggleCenteredLayout",
+            ],
+        },
+    },
+]

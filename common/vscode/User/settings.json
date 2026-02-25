@@ -1,0 +1,408 @@
+{
+    // ============================================================
+    // 窗口和工作台 (Window & Workbench)
+    // ============================================================
+    "window.customTitleBarVisibility": "windowed",
+    "window.controlsStyle": "hidden",
+
+    // 工作台外观
+    "workbench.colorTheme": "One Dark Modern",
+    "workbench.iconTheme": "material-icon-theme",
+    "workbench.externalBrowser": "firefox",
+    "workbench.tips.enabled": false,
+    "workbench.startupEditor": "none",
+
+    // 编辑器标签页管理 (Buffer Picker 工作流)
+    "workbench.editor.showTabs": "single",
+    "workbench.editor.highlightModifiedTabs": true,
+    "workbench.editor.scrollToSwitchTabs": true,
+    "workbench.editor.pinnedTabsOnSeparateRow": true,
+    "workbench.editor.enablePreview": false,
+
+    // 其他工作台设置
+    "workbench.experimental.share.enabled": true,
+    "workbench.list.smoothScrolling": true,
+    "workbench.editorAssociations": {
+        "*.copilotmd": "vscode.markdown.preview.editor",
+        "{hexdiff}:/**/*.*": "hexEditor.hexedit",
+        "*.csv": "default",
+    },
+
+    // 主题颜色自定义 (Vira Theme)
+    "workbench.colorCustomizations": {
+        "[Vira*]": {
+            "toolbar.activeBackground": "#64FFDA26",
+            "activityBarBadge.background": "#64FFDA",
+            "activityBar.activeBorder": "#64FFDA",
+            "activityBarTop.activeBorder": "#64FFDA",
+            "list.inactiveSelectionIconForeground": "#64FFDA",
+            "list.activeSelectionForeground": "#64FFDA",
+            "list.inactiveSelectionForeground": "#64FFDA",
+            "list.highlightForeground": "#64FFDA",
+            "sash.hoverBorder": "#64FFDA80",
+            "list.activeSelectionIconForeground": "#64FFDA",
+            "scrollbarSlider.activeBackground": "#64FFDA80",
+            "editorSuggestWidget.highlightForeground": "#64FFDA",
+            "textLink.foreground": "#64FFDA",
+            "progressBar.background": "#64FFDA",
+            "pickerGroup.foreground": "#64FFDA",
+            "tab.activeBorder": "#64FFDA",
+            "notificationLink.foreground": "#64FFDA",
+            "editorWidget.resizeBorder": "#64FFDA",
+            "editorWidget.border": "#64FFDA",
+            "settings.modifiedItemIndicator": "#64FFDA",
+            "panelTitle.activeBorder": "#64FFDA",
+            "breadcrumb.activeSelectionForeground": "#64FFDA",
+            "menu.selectionForeground": "#64FFDA",
+            "menubar.selectionForeground": "#64FFDA",
+            "editor.findMatchBorder": "#64FFDA",
+            "selection.background": "#64FFDA40",
+            "statusBarItem.remoteBackground": "#64FFDA14",
+            "notebook.inactiveFocusedCellBorder": "#64FFDA80",
+            "commandCenter.activeBorder": "#64FFDA80",
+            "editorGroupHeader.tabsBackground": "#ffffff0a",
+            "tab.border": "#ffffff01",
+            "titleBar.border": "#ffffff0f",
+            "statusBar.border": "#ffffff0f",
+            "sideBar.border": "#ffffff0f",
+            "sideBarSectionHeader.border": "#ffffff0f",
+            "panel.border": "#ffffff0f",
+            "activityBar.border": "#ffffff0f",
+            "sideBarActivityBarTop.border": "#ffffff0f",
+            "button.background": "#64FFDA",
+            "button.hoverBackground": "#64FFDAcc",
+            "extensionButton.separator": "#64FFDA33",
+            "extensionButton.background": "#64FFDA14",
+            "extensionButton.foreground": "#64FFDA",
+            "extensionButton.hoverBackground": "#64FFDA33",
+            "extensionButton.prominentForeground": "#64FFDA",
+            "extensionButton.prominentBackground": "#64FFDA14",
+            "extensionButton.prominentHoverBackground": "#64FFDA33",
+            "statusBarItem.remoteHoverBackground": "#64FFDA",
+            "statusBarItem.remoteForeground": "#64FFDA",
+            "chat.slashCommandForeground": "#64FFDA",
+            "chat.avatarForeground": "#64FFDA",
+            "tab.inactiveBackground": "#ffffff01",
+            "activityBarBadge.foreground": "#000000",
+            "button.foreground": "#000000",
+            "statusBarItem.remoteHoverForeground": "#000000",
+        },
+    },
+
+    // ============================================================
+    // 编辑器核心设置 (Editor Core)
+    // ============================================================
+    // 字体和外观
+    "editor.fontFamily": "VictorMono Nerd Font",
+    "editor.fontLigatures": true,
+    "editor.fontVariations": true,
+    "editor.fontWeight": 1000,
+    "editor.lineNumbers": "relative",
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "meta.function",
+                "settings": {
+                    "fontStyle": "italic bold",
+                },
+            },
+            {
+                "scope": "comment",
+                "settings": {
+                    "fontStyle": "italic bold",
+                },
+            },
+            {
+                "scope": "keyword",
+                "settings": {
+                    "fontStyle": "italic bold",
+                },
+            },
+            {
+                "scope": "string",
+                "settings": {
+                    "fontStyle": "italic",
+                },
+            },
+            {
+                "scope": "constant",
+                "settings": {
+                    "fontStyle": "italic bold",
+                },
+            },
+        ],
+    },
+
+    // 滚动和导航
+    "editor.smoothScrolling": true,
+    "editor.mouseWheelZoom": true,
+    "editor.cursorSmoothCaretAnimation": "on",
+    "editor.scrollbar.vertical": "hidden",
+
+    // Minimap
+    "editor.minimap.autohide": "none",
+    "editor.minimap.maxColumn": 180,
+
+    // 代码编辑
+    "editor.wordWrap": "on",
+    "editor.wordWrapColumn": 120,
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+    "editor.foldingImportsByDefault": true,
+
+    // 查找行为（避免 f/s 后进入 visual 模式）
+    "editor.find.seedSearchStringFromSelection": "never",
+    "editor.find.autoFindInSelection": "never",
+    "editor.find.addExtraSpaceOnTop": false,
+
+    // Inlay Hints
+    "editor.inlayHints.fontSize": 1,
+
+    // 其他编辑器设置
+    "editor.accessibilitySupport": "off",
+    "editor.experimental.treeSitterTelemetry": true,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+
+    // ============================================================
+    // VSCode Neovim 插件配置 (核心配置)
+    // ============================================================
+    "extensions.experimental.affinity": {
+        "asvetliakov.vscode-neovim": 1,
+    },
+    "vscode-neovim.neovimInitVimPaths.linux": "/home/wanger/Documents/temp/nvim/init.lua",
+    "vscode-neovim.compositeKeys": {
+        "jk": {
+            "command": "vscode-neovim.escape",
+        },
+        "kj": {
+            "command": "vscode-neovim.escape",
+        },
+    },
+    "vscode-neovim.compositeTimeout": 250,
+    "vscode-neovim.afterInitConfig": [""],
+
+    // ============================================================
+    // 文件管理 (Files)
+    // ============================================================
+    "files.autoSave": "afterDelay",
+    "files.autoSaveWorkspaceFilesOnly": true,
+    "files.autoGuessEncoding": true,
+    "files.readonlyFromPermissions": true,
+    "files.simpleDialog.enable": true,
+    "files.associations": {
+        "*.md": "markdown",
+    },
+    "files.watcherExclude": {
+        "**/.bloop": true,
+        "**/.metals": true,
+    },
+
+    // ============================================================
+    // 终端 (Terminal)
+    // ============================================================
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.copyOnSelection": true,
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.enableImages": true,
+    "terminal.integrated.gpuAcceleration": "on",
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.external.linuxExec": "kitty",
+    "terminal.explorerKind": "external",
+
+    // ============================================================
+    // Diff 编辑器 (Diff Editor)
+    // ============================================================
+    "diffEditor.experimental.showMoves": true,
+    "diffEditor.experimental.useTrueInlineView": true,
+    "diffEditor.codeLens": true,
+    "diffEditor.ignoreTrimWhitespace": true,
+
+    // ============================================================
+    // 资源管理器 (Explorer)
+    // ============================================================
+    "explorer.confirmDragAndDrop": false,
+    "explorer.confirmDelete": false,
+
+    // ============================================================
+    // Zen 模式 (Zen Mode)
+    // ============================================================
+    "zenMode.hideLineNumbers": false,
+    "zenMode.silentNotifications": false,
+    "zenMode.centerLayout": false,
+    "zenMode.showTabs": "single",
+
+    // ============================================================
+    // 调试 (Debug)
+    // ============================================================
+    "debug.allowBreakpointsEverywhere": true,
+
+    // ============================================================
+    // 安全和隐私 (Security & Privacy)
+    // ============================================================
+    "security.workspace.trust.startupPrompt": "never",
+    "security.workspace.trust.enabled": false,
+    "telemetry.feedback.enabled": false,
+    "update.mode": "manual",
+
+    // ============================================================
+    // 辅助功能 (Accessibility)
+    // ============================================================
+    "accessibility.underlineLinks": true,
+
+    // ============================================================
+    // 语言特定配置 (Language Specific)
+    // ============================================================
+    // Python
+    "[python]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.defaultColorDecorators": "auto",
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnType": true,
+        "editor.wordBasedSuggestions": "off",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit",
+        },
+    },
+    "python.languageServer": "Pylance",
+    "python.defaultInterpreterPath": "/bin/python",
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.generateWithTypeAnnotation": true,
+    "python.analysis.cacheLSPData": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUnusedVariable": "warning",
+        "reportUnusedImport": "information",
+        "reportMissingTypeStubs": "none",
+    },
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.analysis.inlayHints.callArgumentNames": "partial",
+
+    // Rust
+    "rust-analyzer.showSyntaxTree": true,
+    "rust-analyzer.semanticHighlighting.punctuation.separate.macro.bang": true,
+    "rust-analyzer.diagnostics.previewRustcOutput": true,
+    "rust-analyzer.diagnostics.styleLints.enable": true,
+    "rust-analyzer.highlightRelated.closureCaptures.enable": false,
+    "rust-analyzer.inlayHints.bindingModeHints.enable": true,
+    "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "always",
+    "rust-analyzer.inlayHints.lifetimeElisionHints.useParameterNames": true,
+
+    // Lua
+    "[lua]": {
+        "editor.defaultFormatter": "sumneko.lua",
+    },
+
+    // JSON / JSONC
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+
+    // TypeScript
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+
+    // HTML
+    "[html]": {
+        "editor.defaultFormatter": "vscode.html-language-features",
+    },
+
+    // Markdown
+    "[markdown]": {
+        "editor.defaultFormatter": "yzhang.markdown-all-in-one",
+    },
+    "markdown.extension.completion.enabled": true,
+    "markdown.extension.preview.autoShowPreviewToSide": true,
+
+    // ============================================================
+    // 插件特定配置 (Plugin Specific)
+    // ============================================================
+    // GitHub Copilot
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": true,
+        "scminput": false,
+        "python": false,
+        "rust": true,
+    },
+    "github.copilot.nextEditSuggestions.enabled": true,
+
+    // Prettier
+    "prettier.configPath": "/home/wanger/.prettierrc",
+
+    // Path Intellisense
+    "path-intellisense.autoSlashAfterDirectory": true,
+    "path-intellisense.autoTriggerNextSuggestion": true,
+
+    // Indent Rainbow
+    "indentRainbow.indicatorStyle": "light",
+    "indentRainbow.lightIndicatorStyleLineWidth": 0,
+    "indentRainbow.excludedLanguages": ["scala", "plaintext"],
+
+    // Indenticator
+    "indenticator.inner.showIndentGuide": true,
+    "indenticator.width": 2,
+
+    // Syntax Highlighting
+    "syntax.debugHover": true,
+    "syntax.highlightLanguages": [
+        "c",
+        "cpp",
+        "python",
+        "typescript",
+        "typescriptreact",
+        "javascript",
+        "go",
+        "rust",
+        "php",
+        "ruby",
+        "shellscript",
+        "ocaml",
+        "lua",
+    ],
+
+    // CodeSnap
+    "codesnap.showWindowTitle": true,
+
+    // Catppuccin
+    "catppuccin.extraBordersEnabled": true,
+
+    // LLDB
+    "lldb.suppressUpdateNotifications": true,
+
+    // Live Server
+    "liveServer.settings.donotShowInfoMsg": true,
+
+    // VSCode Office
+    "vscode-office.editorLanguage": "zh_CN",
+
+    // Tinymist (Typst)
+    "tinymist.preview.scrollSync": "onSelectionChange",
+    "tinymist.projectResolution": "lockDatabase",
+    "workbench.editor.editorActionsLocation": "hidden",
+    "window.menuBarVisibility": "toggle",
+    "json.schemaDownload.trustedDomains": {
+        "https://schemastore.azurewebsites.net/": true,
+        "https://raw.githubusercontent.com/": true,
+        "https://www.schemastore.org/": true,
+        "https://json.schemastore.org/": true,
+        "https://json-schema.org/": true,
+        "https://esm.sh": true,
+    },
+    "editor.inlayHints.padding": true,
+    "workbench.activityBar.location": "top",
+    "editor.experimental.preferTreeSitter.typescript": true,
+    "chat.viewSessions.orientation": "stacked",
+}
