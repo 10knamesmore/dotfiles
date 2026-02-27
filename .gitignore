@@ -26,3 +26,9 @@ linux/*.backup.*
 
 # 随时更改, 这个不需要
 btop/
+
+# opencode 自动生成的文件
+general/.config/opencode/node_modules/
+general/.config/opencode/package.json
+general/.config/opencode/bun.lock
+general/.config/opencode/.gitignore
