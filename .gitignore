@@ -32,3 +32,5 @@ general/.config/opencode/node_modules/
 general/.config/opencode/package.json
 general/.config/opencode/bun.lock
 general/.config/opencode/.gitignore
+
+__pycache__

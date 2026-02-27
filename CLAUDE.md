@@ -8,7 +8,10 @@
 
 ```bash
 # 安装 dotfiles（创建符号链接、渲染模板）
-./install.sh
+python install.py
+
+# 预览模式（不实际执行操作）
+python install.py --dry-run
 
 # 导出当前系统的包列表（更新 Brewfile 或 pacman.txt）
 ./scripts/pkg-export
@@ -104,8 +107,8 @@ skill
 当修改配置文件时：
 
 1. **直接修改已链接的文件**: 编辑 `$HOME/.zshrc` 等价于编辑源文件（因为是符号链接）
-2. **修改模板文件**: 编辑 `general/.zshrc.template` 后必须运行 `./install.sh` 重新渲染
-3. **添加新配置**: 在对应平台目录添加文件后运行 `./install.sh` 创建符号链接
+2. **修改模板文件**: 编辑 `general/.zshrc.template` 后必须运行 `python install.py` 重新渲染
+3. **添加新配置**: 在对应平台目录添加文件后运行 `python install.py` 创建符号链接
 
 ## 特殊处理
 
