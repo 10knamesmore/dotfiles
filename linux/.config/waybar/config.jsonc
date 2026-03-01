@@ -19,6 +19,7 @@
         "clock"
     ],
     "modules-right": [
+        "custom/netspeed",
         "cpu",
         "memory",
         "custom/media",
@@ -145,6 +146,12 @@
         "tooltip-format": "󰌢 IP地址:     {ipaddr}\r󰩠 子网掩码:   {netmask}\r󰍹 接口名称:   {ifname}\r󰩇 网关地址:   {gwaddr}",
         "tooltip-format-disconnected": "Disconnected",
         "on-click": "kitty nmtui"
+    },
+    "custom/netspeed": {
+        "exec": "$HOME/.config/waybar/scripts/netspeed.sh",
+        "return-type": "json",
+        "interval": 1,
+        "tooltip": true
     },
     "custom/media": {
         "exec": "$scripts_dir/media_volume.sh",

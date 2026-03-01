@@ -51,6 +51,7 @@ window#waybar {
 #battery,
 #network,
 #custom-media,
+#custom-netspeed,
 #pulseaudio,
 #tray,
 #systemd-failed-units {
@@ -248,6 +249,21 @@ window#waybar {
   background: @surface1;
   color: @rosewater;
   box-shadow: 0 4px 14px rgba(245, 189, 230, 0.3);
+}
+
+#custom-netspeed {
+  background: @surface0;
+  color: @teal;
+  border-left: 4px solid @teal;
+  padding-left: 16px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(139, 213, 202, 0.12);
+}
+
+#custom-netspeed:hover {
+  background: @surface1;
+  color: @sky;
+  box-shadow: 0 4px 14px rgba(139, 213, 202, 0.3);
 }
 
 /* =================== System Tray =================== */
