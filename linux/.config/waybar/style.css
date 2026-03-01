@@ -51,7 +51,8 @@ window#waybar {
 #battery,
 #network,
 #custom-media,
-#custom-netspeed,
+#custom-net-down,
+#custom-net-up,
 #pulseaudio,
 #tray,
 #systemd-failed-units {
@@ -251,16 +252,18 @@ window#waybar {
   box-shadow: 0 4px 14px rgba(245, 189, 230, 0.3);
 }
 
-#custom-netspeed {
+#custom-net-down,
+#custom-net-up {
   background: @surface0;
   color: @teal;
   border-left: 4px solid @teal;
   padding-left: 16px;
-  min-width: 180px;
+  min-width: 110px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(139, 213, 202, 0.12);
 }
 
-#custom-netspeed:hover {
+#custom-net-down:hover,
+#custom-net-up:hover {
   background: @surface1;
   color: @sky;
   box-shadow: 0 4px 14px rgba(139, 213, 202, 0.3);

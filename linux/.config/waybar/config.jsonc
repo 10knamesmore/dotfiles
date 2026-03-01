@@ -16,10 +16,11 @@
         "tray"
     ],
     "modules-center": [
-        "clock"
+        "custom/net-up",
+        "clock",
+        "custom/net-down"
     ],
     "modules-right": [
-        "custom/netspeed",
         "cpu",
         "memory",
         "custom/media",
@@ -147,8 +148,14 @@
         "tooltip-format-disconnected": "Disconnected",
         "on-click": "kitty nmtui"
     },
-    "custom/netspeed": {
-        "exec": "$HOME/.config/waybar/scripts/netspeed.sh",
+    "custom/net-down": {
+        "exec": "$HOME/.config/waybar/scripts/netspeed.sh down",
+        "return-type": "json",
+        "interval": 1,
+        "tooltip": true
+    },
+    "custom/net-up": {
+        "exec": "$HOME/.config/waybar/scripts/netspeed.sh up",
         "return-type": "json",
         "interval": 1,
         "tooltip": true

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mode="${1:-both}"
+if [[ "${mode}" != "down" ]] && [[ "${mode}" != "up" ]] && [[ "${mode}" != "both" ]]; then
+  mode="both"
+fi
+
 # Prefer the interface on default route; fallback to first active non-lo interface.
 iface="$(ip route 2>/dev/null | awk '/^default/ {print $5; exit}' || true)"
 if [[ -z "${iface}" ]]; then
@@ -8,7 +13,13 @@ if [[ -z "${iface}" ]]; then
 fi
 
 if [[ -z "${iface}" ]] || [[ ! -d "/sys/class/net/${iface}" ]]; then
-  echo '{"text":"󰤮 N/A", "tooltip":"No active interface"}'
+  if [[ "${mode}" == "up" ]]; then
+    echo '{"text":"󰕒 N/A", "tooltip":"No active interface"}'
+  elif [[ "${mode}" == "down" ]]; then
+    echo '{"text":"󰁅 N/A", "tooltip":"No active interface"}'
+  else
+    echo '{"text":"󰤮 N/A", "tooltip":"No active interface"}'
+  fi
   exit 0
 fi
 
@@ -16,7 +27,7 @@ rx_now="$(cat "/sys/class/net/${iface}/statistics/rx_bytes")"
 tx_now="$(cat "/sys/class/net/${iface}/statistics/tx_bytes")"
 ts_now="$(date +%s)"
 
-state_file="/tmp/waybar-netspeed-${iface}.state"
+state_file="/tmp/waybar-netspeed-${iface}-${mode}.state"
 if [[ -f "${state_file}" ]]; then
   read -r ts_prev rx_prev tx_prev < "${state_file}" || true
 else
@@ -53,10 +64,16 @@ human_rate() {
   fi
 }
 
-rx_h="$(human_rate "$rx_rate")"
-tx_h="$(human_rate "$tx_rate")"
+rx_h="$(human_rate "${rx_rate}")"
+tx_h="$(human_rate "${tx_rate}")"
 
-text="󰁅 ${rx_h} 󰕒 ${tx_h}"
+if [[ "${mode}" == "down" ]]; then
+  text="󰁅 ${rx_h}"
+elif [[ "${mode}" == "up" ]]; then
+  text="󰕒 ${tx_h}"
+else
+  text="󰁅 ${rx_h} 󰕒 ${tx_h}"
+fi
 tooltip="Interface: ${iface}&#10;Download: ${rx_h}&#10;Upload: ${tx_h}"
 
 printf '{"text":"%s", "tooltip":"%s"}\n' "$text" "$tooltip"
