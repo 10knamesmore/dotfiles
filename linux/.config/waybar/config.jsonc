@@ -12,6 +12,7 @@
   "modules-left": [
     "hyprland/workspaces",
     "hyprland/window",
+    "custom/scroll-status",
     "systemd-failed-units",
     "tray"
   ],
@@ -49,6 +50,14 @@
       "Yazi: (.*)": "🐤: $1"
     },
     "separate-outputs": true
+  },
+  "custom/scroll-status": {
+    "exec": "$HOME/.config/waybar/scripts/scroll_status.sh",
+    "return-type": "json",
+    "interval": 0.25,
+    "tooltip": true,
+    "on-scroll-up": "hyprctl dispatch layoutmsg 'colresize +0.05'",
+    "on-scroll-down": "hyprctl dispatch layoutmsg 'colresize -0.05'"
   },
   "systemd-failed-units": {
     "hide-on-ok": true,

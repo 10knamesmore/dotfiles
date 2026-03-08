@@ -45,6 +45,7 @@ window#waybar {
 /* =================== Module Base Styles =================== */
 #workspaces,
 #window,
+#custom-scroll-status,
 #cpu,
 #memory,
 #clock,
@@ -116,6 +117,23 @@ window#waybar {
   background: @surface0;
   border-left-color: @blue;
   color: @blue;
+}
+
+/* =================== Scroll Status =================== */
+#custom-scroll-status {
+  background: @surface0;
+  color: @yellow;
+  border-left: 4px solid @yellow;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25),
+              inset 2px 0 6px rgba(238, 212, 159, 0.12);
+  min-width: 60px;
+}
+
+#custom-scroll-status:hover {
+  background: @surface1;
+  color: @rosewater;
+  box-shadow: 0 4px 14px rgba(238, 212, 159, 0.3);
 }
 
 /* =================== Clock =================== */
