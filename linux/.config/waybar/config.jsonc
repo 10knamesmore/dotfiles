@@ -11,8 +11,8 @@
   "reload_style_on_change": true,
   "modules-left": [
     "hyprland/workspaces",
-    "hyprland/window",
     "custom/scroll-status",
+    "hyprland/window",
     "systemd-failed-units",
     "tray"
   ],

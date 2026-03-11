@@ -4,22 +4,21 @@
 
 # ── 配置 ────────────────────────────────────────────────
 # 特殊状态
-ICON_EMPTY="—"           # 无活动窗口
-ICON_FLOAT="  "        # 浮动窗口
-ICON_FULLSCREEN="  "   # 全屏窗口
+ICON_EMPTY="󰽥"         # nf-md-window_closed_variant
+ICON_FLOAT="󰹙"         # nf-md-dock_window
+ICON_FULLSCREEN="󰊓"    # nf-md-fullscreen
 
-# 列字符：focused 列（当前焦点所在列）
-COL_FOCUSED_SINGLE="█"  # 该列只有 1 个窗口
-COL_FOCUSED_TOP="▀"     # 焦点在列顶部
-COL_FOCUSED_MID="▬"     # 焦点在列中间
-COL_FOCUSED_BOT="▄"     # 焦点在列底部
+# focused 列
+COL_FOCUSED_SINGLE="◉"
+COL_FOCUSED_TOP="◠"
+COL_FOCUSED_MID="◉"
+COL_FOCUSED_BOT="◡"
 
-# 列字符：非 focused 列
-COL_OTHER_SINGLE="▢"    # 该列只有 1 个窗口
-COL_OTHER_MULTI="▣"     # 该列有多个窗口
+# 非 focused 列
+COL_OTHER_SINGLE="◌"
+COL_OTHER_MULTI="┆"
 
-# 列之间的分隔符
-COL_SEP=" "
+COL_SEP="-"
 # ────────────────────────────────────────────────────────
 
 clients=$(hyprctl -j clients 2>/dev/null)
