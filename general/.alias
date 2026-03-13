@@ -98,12 +98,17 @@ function proxy() {
     #     echo 启动代理
 }
 
-function no_proxy() {
-    unset http_proxy
-    unset https_proxy
-    unset ftp_proxy
-    echo 关闭代理
-}
+no_proxy() {
+    # 同时清理大小写代理变量，避免 requests/httpx/urllib 走代理
+    unset http_proxy https_proxy ftp_proxy all_proxy
+    unset HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY
+
+    # 可选：给内网和本地地址显式 no_proxy
+    export NO_PROXY="127.0.0.1,localhost,::1,xz07"
+    export no_proxy="$NO_PROXY"
+
+    echo "proxy disabled"
+  }
 
 function y() {
     local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
