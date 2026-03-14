@@ -59,6 +59,9 @@ cmd - f : yabai -m window --toggle windowed-fullscreen
 # toggle splist
 cmd - s : yabai -m window --toggle split
 
+# toggle sketchybar, mirrors Hyprland's SUPER+T -> waybar toggle
+cmd - t : /Users/wanger/.config/sketchybar/plugins/toggle_bar.sh
+
 # close window
 cmd - d : yabai -m window --close
 

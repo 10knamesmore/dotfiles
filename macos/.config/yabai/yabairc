@@ -7,7 +7,7 @@ fi
 
 # global settings
 yabai -m config \
-    external_bar off:40:0 \
+    external_bar all:42:0 \
     menubar_opacity 1.0 \
     mouse_follows_focus on \
     focus_follows_mouse autoraise \

@@ -1,0 +1,202 @@
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+
+BASE=0xff24273a
+MANTLE=0xff1e2030
+SURFACE0=0xff363a4f
+SURFACE1=0xff494d64
+TEXT=0xffcad3f5
+SUBTEXT=0xffb8c0e0
+OVERLAY=0xff8087a2
+BLUE=0xff8aadf4
+SAPPHIRE=0xff7dc4e4
+SKY=0xff91d7e3
+MAUVE=0xffc6a0f6
+GREEN=0xffa6da95
+YELLOW=0xffeed49f
+PEACH=0xfff5a97f
+RED=0xffed8796
+TEAL=0xff8bd5ca
+
+sketchybar --bar \
+  position=top \
+  height=36 \
+  y_offset=6 \
+  margin=6 \
+  blur_radius=24 \
+  corner_radius=16 \
+  color=0x00000000 \
+  border_width=0 \
+  padding_left=8 \
+  padding_right=8 \
+  topmost=window \
+  sticky=on
+
+default=(
+  icon.font="Hack Nerd Font:Bold:17.0"
+  label.font="Hack Nerd Font:Bold:15.0"
+  icon.color="$TEXT"
+  label.color="$TEXT"
+  icon.padding_left=10
+  icon.padding_right=6
+  label.padding_left=4
+  label.padding_right=12
+  padding_left=3
+  padding_right=3
+  background.height=28
+  background.corner_radius=14
+  background.color="$SURFACE0"
+  background.border_width=0
+  scroll_texts=on
+)
+sketchybar --default "${default[@]}"
+
+space_common=(
+  icon.highlight=off
+  label.drawing=off
+  icon.padding_left=10
+  icon.padding_right=10
+  background.height=22
+  background.corner_radius=12
+  background.drawing=off
+  script="$PLUGIN_DIR/space.sh"
+)
+
+SPACE_ICONS=("1: " "2: " "3: " "4: " "5: " "6: " "7: " "8: " "9: " "10: ")
+for i in "${!SPACE_ICONS[@]}"
+do
+  sid="$(($i+1))"
+  sketchybar --add space "space.$sid" left \
+             --set "space.$sid" "${space_common[@]}" \
+                                space="$sid" \
+                                icon="${SPACE_ICONS[i]}" \
+                                icon.color="$OVERLAY" \
+                                background.color="$MAUVE" \
+                                click_script="yabai -m space --focus $sid"
+done
+
+# layout=(
+#   icon=󰙀
+#   icon.color="$YELLOW"
+#   label.color="$YELLOW"
+#   background.color="$SURFACE0"
+#   update_freq=2
+#   script="$PLUGIN_DIR/layout.sh"
+#   click_script="yabai -m window --toggle split"
+# )
+# sketchybar --add item layout left \
+#            --set layout "${layout[@]}"
+
+window_title=(
+  icon=󰘔
+  icon.color="$MAUVE"
+  label.color="$MAUVE"
+  label.max_chars=52
+  scroll_texts=off
+  background.color="$MANTLE"
+  update_freq=2
+  script="$PLUGIN_DIR/window.sh"
+)
+sketchybar --add item window_title left \
+           --set window_title "${window_title[@]}" \
+           --subscribe window_title front_app_switched window_focus space_change
+
+net_up=(
+  icon=󰕒
+  icon.color="$GREEN"
+  label.color="$GREEN"
+  update_freq=1
+  script="$PLUGIN_DIR/netspeed.sh up"
+)
+sketchybar --add item net_up center \
+           --set net_up "${net_up[@]}"
+
+clock=(
+  icon=
+  icon.color="$BASE"
+  label.color="$BASE"
+  background.color="$BLUE"
+  background.height=26
+  background.corner_radius=16
+  update_freq=1
+  script="$PLUGIN_DIR/clock.sh"
+)
+sketchybar --add item clock center \
+           --set clock "${clock[@]}"
+
+net_down=(
+  icon=󰇚
+  icon.color="$SKY"
+  label.color="$SKY"
+  update_freq=1
+  script="$PLUGIN_DIR/netspeed.sh down"
+)
+sketchybar --add item net_down center \
+           --set net_down "${net_down[@]}"
+
+cpu=(
+  icon=
+  icon.color="$BLUE"
+  label.color="$BLUE"
+  update_freq=2
+  script="$PLUGIN_DIR/cpu.sh"
+)
+sketchybar --add item cpu right \
+           --set cpu "${cpu[@]}"
+
+memory=(
+  icon=
+  icon.color="$MAUVE"
+  label.color="$MAUVE"
+  update_freq=3
+  script="$PLUGIN_DIR/memory.sh"
+)
+sketchybar --add item memory right \
+           --set memory "${memory[@]}"
+
+# media=(
+#   icon=󰎈
+#   icon.color="$TEAL"
+#   label.color="$TEAL"
+#   label.max_chars=28
+#   update_freq=2
+#   script="$PLUGIN_DIR/media.sh"
+# )
+# sketchybar --add item media right \
+#            --set media "${media[@]}"
+
+volume=(
+  icon.color="$PEACH"
+  label.color="$PEACH"
+  script="$PLUGIN_DIR/volume.sh"
+)
+sketchybar --add item volume right \
+           --set volume "${volume[@]}" \
+           --subscribe volume volume_change
+
+network=(
+  icon=󰖩
+  icon.color="$SKY"
+  label.color="$SKY"
+  label.max_chars=24
+  update_freq=10
+  script="$PLUGIN_DIR/network.sh"
+)
+sketchybar --add item network right \
+           --set network "${network[@]}"
+
+battery=(
+  icon.color="$GREEN"
+  label.color="$GREEN"
+  update_freq=10
+  script="$PLUGIN_DIR/battery.sh"
+)
+sketchybar --add item battery right \
+           --set battery "${battery[@]}" \
+           --subscribe battery system_woke power_source_change
+
+sketchybar --add bracket workspaces '/space\..*/' layout \
+           --set workspaces background.color="$BASE" \
+                            background.corner_radius=16 \
+                            background.height=28
+
+sketchybar --update
