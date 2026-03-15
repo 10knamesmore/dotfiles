@@ -15,6 +15,28 @@
       --code-bg: #0f1c2e;
       --code-fg: #d9e9ff;
       --shadow: 0 10px 28px rgba(16, 42, 78, 0.08);
+      --blockquote-bg: #f3f8ff;
+      --blockquote-color: #344a63;
+      --inline-code-bg: #edf3fb;
+      --toc-hover-bg: #edf5ff;
+      --toc-link-color: #2f4e73;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --line: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --brand: #60a5fa;
+      --code-bg: #0f172a;
+      --code-fg: #cbd5e1;
+      --shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+      --blockquote-bg: #1e293b;
+      --blockquote-color: #cbd5e1;
+      --inline-code-bg: #334155;
+      --toc-hover-bg: #334155;
+      --toc-link-color: #cbd5e1;
     }
 
     * { box-sizing: border-box; }
@@ -24,6 +46,11 @@
       font-family: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
       line-height: 1.65;
       background: radial-gradient(circle at 100% -5%, #dcedff 0%, var(--bg) 42%, #f9fbff 100%);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    [data-theme="dark"] body {
+      background: radial-gradient(circle at 100% -5%, #1e293b 0%, var(--bg) 42%, #0f172a 100%);
     }
 
     .page {
@@ -42,9 +69,40 @@
       box-shadow: var(--shadow);
     }
 
-    .hero { padding: 20px; margin-bottom: 12px; }
+    .hero { 
+      padding: 20px; 
+      margin-bottom: 12px; 
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .hero-content { flex: 1; }
     .hero h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; }
     .meta { color: var(--muted); font-size: 14px; }
+    
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    
+    .theme-toggle:hover {
+      background: var(--toc-hover-bg);
+    }
+    
+    .theme-toggle svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
 
     .content { padding: 18px 20px; }
     .content h1, .content h2, .content h3, .content h4 { line-height: 1.3; margin: 1.1em 0 0.5em; }
@@ -54,17 +112,19 @@
       margin: 0.8em 0;
       padding: 0.55em 0.9em;
       border-left: 4px solid #8bb8e6;
-      background: #f3f8ff;
-      color: #344a63;
+      background: var(--blockquote-bg);
+      color: var(--blockquote-color);
       border-radius: 8px;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     .content code {
       font-family: "JetBrains Mono", "Fira Code", monospace;
-      background: #edf3fb;
+      background: var(--inline-code-bg);
       border-radius: 6px;
       padding: 0.1em 0.35em;
       font-size: 0.9em;
+      transition: background-color 0.3s ease;
     }
 
     .content .codehilite {
@@ -108,12 +168,22 @@
       padding: 4px 10px;
       font-size: 12px;
       cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.3s ease;
+    }
+
+    [data-theme="dark"] .code-copy-btn {
+      border-color: #475569;
+      background: #334155;
+      color: #e2e8f0;
     }
 
     .code-copy-btn:hover {
       background: #255182;
       color: #ffffff;
+    }
+
+    [data-theme="dark"] .code-copy-btn:hover {
+      background: #475569;
     }
 
     .code-copy-btn:active {
@@ -126,10 +196,20 @@
       color: #e9fff4;
     }
 
+    [data-theme="dark"] .code-copy-btn.copied {
+      background: #065f46;
+      border-color: #047857;
+    }
+
     .code-copy-btn.failed {
       background: #7a2c35;
       border-color: #96404b;
       color: #ffe9ec;
+    }
+
+    [data-theme="dark"] .code-copy-btn.failed {
+      background: #7f1d1d;
+      border-color: #991b1b;
     }
 
     /* Injected from pygments HtmlFormatter */
@@ -148,14 +228,15 @@
     .toc ul { list-style: none; padding: 0; margin: 0; }
     .toc li { margin: 4px 0; }
     .toc a {
-      color: #2f4e73;
+      color: var(--toc-link-color);
       text-decoration: none;
       font-size: 13px;
       display: block;
       padding: 3px 6px;
       border-radius: 6px;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
-    .toc a:hover { background: #edf5ff; }
+    .toc a:hover { background: var(--toc-hover-bg); }
     .toc li.lv3 a { padding-left: 18px; font-size: 12px; }
     .toc li.lv4 a { padding-left: 30px; font-size: 12px; }
 
@@ -175,8 +256,16 @@
   <div class="page">
     <main>
       <section class="card hero">
-        <h1>{{TITLE}}</h1>
-        <div class="meta">Updated at: {{UPDATED_AT}}</div>
+        <div class="hero-content">
+          <h1>{{TITLE}}</h1>
+          <div class="meta">Updated at: {{UPDATED_AT}}</div>
+        </div>
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+          <svg id="themeIcon" viewBox="0 0 24 24">
+            <path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z"/>
+          </svg>
+          <span id="themeText">黑暗模式</span>
+        </button>
       </section>
       <article class="card content">
         {{CONTENT}}
@@ -188,8 +277,57 @@
     </aside>
   </div>
 
-  <script>
+   <script>
     (function () {
+      // 主题切换功能
+      function initTheme() {
+        var themeToggle = document.getElementById('themeToggle');
+        var themeIcon = document.getElementById('themeIcon');
+        var themeText = document.getElementById('themeText');
+        var html = document.documentElement;
+        
+        // 检查本地存储的主题偏好
+        var savedTheme = localStorage.getItem('doc-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // 设置初始主题
+        var initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+        if (initialTheme === 'dark') {
+          html.setAttribute('data-theme', 'dark');
+          updateThemeUI('dark');
+        }
+        
+        // 主题切换按钮点击事件
+        themeToggle.addEventListener('click', function() {
+          var currentTheme = html.getAttribute('data-theme');
+          var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+          
+          html.setAttribute('data-theme', newTheme);
+          localStorage.setItem('doc-theme', newTheme);
+          updateThemeUI(newTheme);
+        });
+        
+        function updateThemeUI(theme) {
+          if (theme === 'dark') {
+            themeIcon.innerHTML = '<path d="M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-.46-.04-.92-.1-1.36c-.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,.89-3.42,2.26-4.4c-.44-.06-.9-.1-1.36-.1Z"/>';
+            themeText.textContent = '白天模式';
+          } else {
+            themeIcon.innerHTML = '<path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z"/>';
+            themeText.textContent = '黑暗模式';
+          }
+        }
+        
+        // 监听系统主题变化
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+          if (!localStorage.getItem('doc-theme')) {
+            var newTheme = e.matches ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            updateThemeUI(newTheme);
+          }
+        });
+      }
+
+      // 代码复制功能
       function fallbackCopy(text) {
         var ta = document.createElement('textarea');
         ta.value = text;
@@ -265,6 +403,8 @@
       }
 
       document.addEventListener('DOMContentLoaded', function () {
+        initTheme();
+        
         var blocks = document.querySelectorAll('.content .codehilite');
         for (var i = 0; i < blocks.length; i++) {
           mountCopyButton(blocks[i]);
