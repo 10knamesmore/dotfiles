@@ -117,11 +117,32 @@ clock=(
   background.color="$BLUE"
   background.height=26
   background.corner_radius=16
+  popup.background.color="$MANTLE"
+  popup.background.corner_radius=12
+  popup.blur_radius=16
   update_freq=1
   script="$PLUGIN_DIR/clock.sh"
 )
 sketchybar --add item clock center \
-           --set clock "${clock[@]}"
+           --set clock "${clock[@]}" \
+           --subscribe clock mouse.entered mouse.exited mouse.exited.global
+
+clock_details=(
+  icon.drawing=off
+  label.width=160
+  label.align=center
+  label.padding_left=12
+  label.padding_right=12
+  background.drawing=off
+)
+sketchybar --add item clock.details.date popup.clock \
+           --set clock.details.date "${clock_details[@]}" \
+                                     label.color="$TEXT" \
+                                     label.font="Hack Nerd Font:Bold:14.0"
+
+sketchybar --add item clock.details.weekday popup.clock \
+           --set clock.details.weekday "${clock_details[@]}" \
+                                        label.color="$BLUE"
 
 net_down=(
   icon=󰇚
@@ -147,11 +168,48 @@ memory=(
   icon=
   icon.color="$MAUVE"
   label.color="$MAUVE"
+  popup.background.color="$MANTLE"
+  popup.background.corner_radius=12
+  popup.blur_radius=16
   update_freq=3
   script="$PLUGIN_DIR/memory.sh"
 )
 sketchybar --add item memory right \
-           --set memory "${memory[@]}"
+           --set memory "${memory[@]}" \
+           --subscribe memory mouse.entered mouse.exited mouse.exited.global
+
+memory_details_common=(
+  icon.drawing=off
+  label.width=200
+  label.align=left
+  label.padding_left=12
+  label.padding_right=12
+  background.drawing=off
+)
+
+memory_details_title=(
+  "${memory_details_common[@]}"
+  label.color="$MAUVE"
+  label.font="Hack Nerd Font:Bold:14.0"
+)
+sketchybar --add item memory.details.title popup.memory \
+           --set memory.details.title "${memory_details_title[@]}"
+
+sketchybar --add item memory.details.used popup.memory \
+           --set memory.details.used "${memory_details_common[@]}" \
+                                     label.color="$TEXT"
+
+sketchybar --add item memory.details.cached popup.memory \
+           --set memory.details.cached "${memory_details_common[@]}" \
+                                       label.color="$TEXT"
+
+sketchybar --add item memory.details.compressed popup.memory \
+           --set memory.details.compressed "${memory_details_common[@]}" \
+                                           label.color="$TEXT"
+
+sketchybar --add item memory.details.swap popup.memory \
+           --set memory.details.swap "${memory_details_common[@]}" \
+                                     label.color="$TEXT"
 
 # media=(
 #   icon=󰎈
@@ -178,11 +236,46 @@ network=(
   icon.color="$SKY"
   label.color="$SKY"
   label.max_chars=24
+  popup.background.color="$MANTLE"
+  popup.background.corner_radius=12
+  popup.blur_radius=16
   update_freq=10
   script="$PLUGIN_DIR/network.sh"
 )
 sketchybar --add item network right \
-           --set network "${network[@]}"
+           --set network "${network[@]}" \
+           --subscribe network mouse.entered mouse.exited mouse.exited.global
+
+network_details_common=(
+  icon.drawing=off
+  label.max_chars=120
+  label.width=240
+  label.align=left
+  label.padding_left=12
+  label.padding_right=12
+  label.color="$TEXT"
+  background.drawing=off
+)
+
+network_details_title=(
+  "${network_details_common[@]}"
+  label.color="$SKY"
+  label.font="Hack Nerd Font:Bold:14.0"
+)
+sketchybar --add item network.details.title popup.network \
+           --set network.details.title "${network_details_title[@]}"
+
+sketchybar --add item network.details.interface popup.network \
+           --set network.details.interface "${network_details_common[@]}"
+
+sketchybar --add item network.details.ip popup.network \
+           --set network.details.ip "${network_details_common[@]}"
+
+sketchybar --add item network.details.gateway popup.network \
+           --set network.details.gateway "${network_details_common[@]}"
+
+sketchybar --add item network.details.dns popup.network \
+           --set network.details.dns "${network_details_common[@]}"
 
 battery=(
   icon.color="$GREEN"
