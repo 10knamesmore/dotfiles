@@ -40,7 +40,7 @@ alias neo_config='neo ~/.config/nvim/init.lua'
 # ================================
 # 🖥️ GUI 程序快捷启动（后台）
 # ================================
-alias neo="neovide & disown"
+alias neo="neovide >/dev/null 2>&1 & disown"
 alias nread="neo -- -c 'set nomodifiable'"
 function fe() {
     local file
