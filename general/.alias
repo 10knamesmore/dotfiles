@@ -125,3 +125,10 @@ alias f="fg"
 alias b="bg"
 alias j="jobs"
 alias jobs="jobs -l"
+
+# ================================
+# 🪟 Zellij
+# ================================
+alias zj="zellij"
+alias zjl="zellij list-sessions"
+alias zja="zellij attach"

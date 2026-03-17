@@ -1,0 +1,47 @@
+theme "catppuccin-mocha"
+default_shell "zsh"
+default_layout "default"
+
+pane_frames true
+simplified_ui false
+ui {
+    pane_frames {
+        rounded_corners true
+    }
+}
+
+options {
+    show_startup_tips false
+}
+
+scrollback_editor "nvim"
+
+keybinds clear-defaults=true {
+    shared_except "locked" {
+        bind "Alt h" { MoveFocusOrTab "Left"; }
+        bind "Alt l" { MoveFocusOrTab "Right"; }
+        bind "Alt j" { MoveFocus "Down"; }
+        bind "Alt k" { MoveFocus "Up"; }
+        bind "Alt n" { NewPane "Right"; }
+        bind "Alt N" { NewPane "Down"; }
+        bind "Alt x" { CloseFocus; }
+        bind "Alt f" { ToggleFocusFullscreen; }
+        bind "Alt t" { NewTab; }
+        bind "Alt r" { SwitchToMode "RenameTab"; }
+        bind "Alt d" { Detach; }
+        bind "Alt s" { LaunchOrFocusPlugin "session-manager" { floating true; }; }
+        bind "Alt 1" { GoToTab 1; }
+        bind "Alt 2" { GoToTab 2; }
+        bind "Alt 3" { GoToTab 3; }
+        bind "Alt 4" { GoToTab 4; }
+        bind "Alt 5" { GoToTab 5; }
+        bind "Alt H" { Resize "Increase Left"; }
+        bind "Alt L" { Resize "Increase Right"; }
+        bind "Alt J" { Resize "Increase Down"; }
+        bind "Alt K" { Resize "Increase Up"; }
+        bind "Alt q" { SwitchToMode "Locked"; }
+    }
+    locked {
+        bind "Alt q" { SwitchToMode "Normal"; }
+    }
+}

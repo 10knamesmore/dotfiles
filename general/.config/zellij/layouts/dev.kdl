@@ -1,0 +1,22 @@
+layout {
+    default_tab_template {
+        pane size=1 borderless=true { plugin location="zellij:tab-bar"; }
+        children
+        pane size=2 borderless=true { plugin location="zellij:status-bar"; }
+    }
+    tab name="dev" {
+        pane split_direction="horizontal" {
+            pane size="70%" command="nvim" { name "editor"; }
+            pane size="30%" { name "terminal"; }
+        }
+        floating_panes {
+            pane command="lazygit" {
+                name "lazygit"
+                width "80%"
+                height "80%"
+                x "10%"
+                y "10%"
+            }
+        }
+    }
+}
