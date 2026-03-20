@@ -43,7 +43,15 @@ DELTA_TIME=$(( NOW - PREV_TIME ))
 DELTA_VALUE=$(( CUR_VALUE - PREV_VALUE ))
 [ "$DELTA_VALUE" -lt 0 ] && DELTA_VALUE=0
 
-RATE_KB="$(awk -v bytes="$DELTA_VALUE" -v secs="$DELTA_TIME" 'BEGIN { printf "%.1f", bytes / 1024 / secs }')"
+RATE_LABEL="$(awk -v bytes="$DELTA_VALUE" -v secs="$DELTA_TIME" '
+BEGIN {
+  rate_kb = bytes / 1024 / secs
+  if (rate_kb >= 1024) {
+    printf "%.1f MB/s", rate_kb / 1024
+  } else {
+    printf "%.1f KB/s", rate_kb
+  }
+}')"
 printf '%s %s\n' "$NOW" "$CUR_VALUE" > "$STATE_FILE"
 
-sketchybar --set "$NAME" label="${RATE_KB} KB/s"
+sketchybar --set "$NAME" label="$RATE_LABEL"
