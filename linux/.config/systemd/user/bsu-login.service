@@ -1,0 +1,6 @@
+  [Unit]
+  Description=BSU Login
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/bin/python /home/wanger/dotfiles/generated/scripts/bsu_login.py --username 2022012630 --password qazwsx789456

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run BSu Login periodically
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=12h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Mihomo (from Clash Verge Rev)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/verge-mihomo -d /home/wanger/.local/share/io.github.clash-verge-rev.clash-verge-rev -f /home/wanger/.local/share/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml -ext-ctl-unix /tmp/verge/verge-mihomo.sock
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
