@@ -22,6 +22,7 @@ description: 为代码文件或目录批量添加/补全文档注释，支持 Ru
    - Rust 规范：读取 `references/rust_spec.md`。
    - TypeScript 规范：读取 `references/typescript_spec.md`。
    - Python 规范：读取 `references/python_spec.md`。
+   - Lua 规范: 读取 `references/lua_spec.md`
 3. 分析代码结构：识别需要文档注释的元素（模块、函数、结构体/类、字段/属性、类型别名、枚举、常量、接口等）。
 4. 决定策略：
    - 已有文档注释：保留并仅在明显缺失关键信息时补充。
