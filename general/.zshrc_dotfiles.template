@@ -30,6 +30,8 @@ export YSU_MESSAGE_POSITION="after"
 
 export EDITOR="nvim"
 
+export KITTY_SHELL_INTEGRATION="enabled no-cursor"
+
 source "$ZSH/oh-my-zsh.sh"
 source "$HOME/.alias"
 
