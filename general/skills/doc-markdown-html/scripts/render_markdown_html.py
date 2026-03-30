@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# dependencies = ["markdown"]
+# dependencies = ["markdown", "pyyaml"]
 # ///
 """将 Markdown 渲染为基于固定模板的 HTML 页面。
 
@@ -17,9 +17,51 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 BEIJING_TZ = dt.timezone(dt.timedelta(hours=8), name="CST")
+
+
+def split_frontmatter(md_text: str) -> tuple[Any | None, str]:
+    """拆分文档开头的 YAML frontmatter 与正文。
+
+    仅识别位于文件起始位置的 ``---`` 包裹块。
+
+    Args:
+        md_text: 原始 Markdown 文本。
+
+    Returns:
+        ``(frontmatter_data, markdown_body)``。若不存在 frontmatter，
+        ``frontmatter_data`` 为 ``None``，正文为原文。
+    """
+    if not md_text.startswith("---"):
+        return None, md_text
+
+    lines = md_text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        return None, md_text
+
+    closing_idx: int | None = None
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            closing_idx = idx
+            break
+
+    if closing_idx is None:
+        return None, md_text
+
+    raw_frontmatter = "".join(lines[1:closing_idx])
+    body = "".join(lines[closing_idx + 1 :])
+
+    try:
+        import yaml
+    except Exception as exc:
+        raise SystemExit(
+            "Missing dependency: pyyaml. Install with: pip install pyyaml"
+        ) from exc
+
+    parsed = yaml.safe_load(raw_frontmatter)
+    return parsed, body
 
 
 def parse_args() -> argparse.Namespace:
@@ -402,9 +444,10 @@ def main() -> None:
     )
 
     md_text = input_path.read_text(encoding="utf-8")
-    sections = extract_heading_sections(md_text)
+    frontmatter_data, body_md = split_frontmatter(md_text)
+    sections = extract_heading_sections(body_md)
     headings = [(section.level, section.title, section.anchor) for section in sections]
-    section_md_map = build_section_md_map(md_text, sections)
+    section_md_map = build_section_md_map(body_md, sections)
 
     title = args.title
     if not title:
@@ -415,7 +458,7 @@ def main() -> None:
     if not title:
         title = input_path.stem
 
-    content_html = markdown_to_html(md_text)
+    content_html = markdown_to_html(body_md)
     content_html = apply_heading_ids(content_html, headings)
     toc_html = render_toc(headings, args.toc_min_level, args.toc_max_level)
 
@@ -427,6 +470,10 @@ def main() -> None:
         .replace("{{MARKDOWN_SOURCE}}", json.dumps(md_text))
         .replace("{{SECTION_MD_MAP}}", json.dumps(section_md_map, ensure_ascii=False))
         .replace(
+            "{{FRONTMATTER_JSON}}",
+            json.dumps(frontmatter_data, ensure_ascii=False),
+        )
+        .replace(
             "{{UPDATED_AT}}",
             dt.datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M"),
         )
@@ -434,10 +481,15 @@ def main() -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _ = output_path.write_text(rendered, encoding="utf-8")
+    output_exists = output_path.exists()
 
     print(f"Markdown: {input_path}")
     print(f"Template: {template_path}")
     print(f"HTML: {output_path}")
+    print(f"HTML exists: {'yes' if output_exists else 'no'}")
+
+    if not output_exists:
+        raise SystemExit(f"Failed to create output HTML: {output_path}")
 
     if args.open:
         import webbrowser

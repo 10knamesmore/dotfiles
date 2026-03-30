@@ -233,6 +233,224 @@
     .theme-toggle:hover { background: var(--toc-hover-bg); }
     .theme-toggle svg { width: 16px; height: 16px; fill: currentColor; }
 
+    /* ── Frontmatter Metadata ── */
+    .metadata-panel {
+      display: none;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .metadata-panel.open {
+      display: block;
+    }
+    .metadata-panel-header {
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 0;
+      margin: 0;
+      padding: 14px 18px;
+      background: transparent;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .metadata-panel-header:hover {
+      background: color-mix(in srgb, var(--toc-hover-bg) 70%, transparent);
+    }
+    .metadata-panel-main {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+    .metadata-panel-title-group {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .metadata-panel-side {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .metadata-summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      background: transparent;
+    }
+    .metadata-toggle-indicator {
+      width: 1.7em;
+      height: 1.7em;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+    .metadata-panel-header:hover .metadata-toggle-indicator {
+      background: var(--toc-hover-bg);
+    }
+    .metadata-toggle-indicator::before {
+      content: '▾';
+      font-size: 0.82em;
+    }
+    .metadata-panel.collapsed .metadata-toggle-indicator {
+      transform: rotate(-90deg);
+    }
+    .metadata-panel-body {
+      display: grid;
+      grid-template-rows: 1fr;
+      transition: grid-template-rows 0.22s ease;
+      border-top: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 94%, var(--brand) 6%);
+      overflow: hidden;
+    }
+    .metadata-panel.collapsed .metadata-panel-body {
+      grid-template-rows: 0fr;
+      border-top-color: transparent;
+    }
+    .metadata-panel-body-inner {
+      min-height: 0;
+      overflow: hidden;
+      padding: 16px 18px 18px;
+      transition: padding 0.22s ease;
+    }
+    .metadata-panel.collapsed .metadata-panel-body-inner {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .metadata-tree,
+    .metadata-tree ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .metadata-tree {
+      display: grid;
+      gap: 12px;
+    }
+    .metadata-tree.root-level {
+      grid-template-columns: 1fr;
+    }
+    .metadata-tree ul {
+      margin-top: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .metadata-entry {
+      display: grid;
+      gap: 8px;
+    }
+    .metadata-card {
+      border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--brand) 8%);
+      padding: 14px 14px 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .metadata-entry.compact > .metadata-card {
+      padding: 12px;
+    }
+    .metadata-group {
+      display: grid;
+      gap: 10px;
+    }
+    .metadata-group-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .metadata-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .metadata-key {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .metadata-value {
+      color: var(--text);
+      word-break: break-word;
+      text-align: left;
+      min-width: 0;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    .metadata-value.kind-scalar-string {
+      font: inherit;
+    }
+    .metadata-value.kind-scalar-null {
+      color: var(--muted);
+      font-style: italic;
+    }
+    .metadata-value.kind-scalar-boolean,
+    .metadata-value.kind-scalar-number {
+      font: inherit;
+    }
+    .metadata-group-label {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .metadata-subgroup {
+      border-left: 2px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+      padding-left: 12px;
+    }
+    .metadata-pill-list {
+      display: grid;
+      gap: 8px;
+    }
+    .metadata-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 80%, var(--brand) 20%);
+      border: 1px solid color-mix(in srgb, var(--brand) 16%, var(--line));
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.2;
+      justify-self: start;
+    }
+    .metadata-object-list {
+      display: grid;
+      gap: 10px;
+    }
+    .metadata-object-item {
+      border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--surface) 95%, var(--brand) 5%);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .metadata-object-item-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
     /* ── Content ── */
     .content { padding: 18px 20px; }
     .content h1, .content h2, .content h3, .content h4,
@@ -909,6 +1127,25 @@
         </div>
       </section>
 
+      <section class="card metadata-panel collapsed" id="metadataPanel" aria-label="文档元数据">
+        <button class="metadata-panel-header" id="metadataToggle" type="button" aria-expanded="false" aria-controls="metadataBody">
+          <span class="metadata-panel-main">
+            <span class="metadata-panel-title-group">
+              <span class="metadata-panel-title">文档信息</span>
+            </span>
+          </span>
+          <span class="metadata-panel-side">
+            <span class="metadata-summary" id="metadataSummary">0 项</span>
+            <span class="metadata-toggle-indicator" aria-hidden="true"></span>
+          </span>
+        </button>
+        <div class="metadata-panel-body" id="metadataBody">
+          <div class="metadata-panel-body-inner">
+            <div id="metadataTree"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="card search-panel" id="searchPanel" aria-label="搜索结果">
         <div class="search-panel-header">
           <span id="searchPanelSummary">输入关键词开始搜索</span>
@@ -935,8 +1172,181 @@
 
   <script>var __mdSource = {{MARKDOWN_SOURCE}};</script>
   <script>var __sectionMdMap = {{SECTION_MD_MAP}};</script>
+  <script>var __frontmatter = {{FRONTMATTER_JSON}};</script>
   <script>
     (function () {
+      function initFrontmatterPanel() {
+        var panel = document.getElementById('metadataPanel');
+        var toggle = document.getElementById('metadataToggle');
+        var summary = document.getElementById('metadataSummary');
+        var root = document.getElementById('metadataTree');
+        if (!panel || !toggle || !summary || !root || __frontmatter == null) return;
+
+        function topLevelSummary(value) {
+          if (Array.isArray(value)) return '包含 ' + value.length + ' 项信息';
+          if (value && typeof value === 'object') return '包含 ' + Object.keys(value).length + ' 项信息';
+          return '包含 1 项信息';
+        }
+
+        function scalarKind(value) {
+          if (value === null) return 'null';
+          if (Array.isArray(value)) return 'array';
+          return typeof value;
+        }
+
+        function formatScalar(value) {
+          if (value === null) return 'null';
+          if (typeof value === 'boolean') return value ? 'true' : 'false';
+          return String(value);
+        }
+
+        function isScalar(value) {
+          return value === null || typeof value !== 'object';
+        }
+
+        function buildScalarField(key, value) {
+          var item = document.createElement('li');
+          item.className = 'metadata-entry compact';
+
+          var card = document.createElement('div');
+          card.className = 'metadata-card';
+
+          var field = document.createElement('div');
+          field.className = 'metadata-field';
+
+          if (key) {
+            var keyEl = document.createElement('div');
+            keyEl.className = 'metadata-key';
+            keyEl.textContent = key;
+            field.appendChild(keyEl);
+          }
+
+          var valueEl = document.createElement('span');
+          valueEl.className = 'metadata-value kind-scalar-' + scalarKind(value);
+          valueEl.textContent = formatScalar(value);
+          field.appendChild(valueEl);
+          card.appendChild(field);
+          item.appendChild(card);
+          return item;
+        }
+
+        function buildSubtree(value) {
+          var list = document.createElement('ul');
+          list.className = 'metadata-tree';
+
+          if (Array.isArray(value)) {
+            if (!value.length) {
+              list.appendChild(buildScalarField('', '无'));
+              return list;
+            }
+
+            var scalarOnly = value.every(isScalar);
+            if (scalarOnly) {
+              var pillItem = document.createElement('li');
+              pillItem.className = 'metadata-entry';
+              var pillWrap = document.createElement('div');
+              pillWrap.className = 'metadata-pill-list';
+              value.forEach(function (entry) {
+                var pill = document.createElement('span');
+                pill.className = 'metadata-pill';
+                pill.textContent = formatScalar(entry);
+                pillWrap.appendChild(pill);
+              });
+              pillItem.appendChild(pillWrap);
+              list.appendChild(pillItem);
+              return list;
+            }
+
+            var objectList = document.createElement('li');
+            objectList.className = 'metadata-entry';
+            var objectListWrap = document.createElement('div');
+            objectListWrap.className = 'metadata-object-list';
+            value.forEach(function (entry, index) {
+              var objectItem = document.createElement('div');
+              objectItem.className = 'metadata-object-item';
+
+              var title = document.createElement('div');
+              title.className = 'metadata-object-item-title';
+              title.textContent = '条目 ' + (index + 1);
+              objectItem.appendChild(title);
+
+              if (isScalar(entry)) {
+                var scalar = document.createElement('div');
+                scalar.className = 'metadata-value kind-scalar-' + scalarKind(entry);
+                scalar.textContent = formatScalar(entry);
+                objectItem.appendChild(scalar);
+              } else {
+                objectItem.appendChild(buildSubtree(entry));
+              }
+
+              objectListWrap.appendChild(objectItem);
+            });
+            objectList.appendChild(objectListWrap);
+            list.appendChild(objectList);
+            return list;
+          }
+
+          Object.keys(value).forEach(function (childKey) {
+            list.appendChild(buildNode(childKey, value[childKey]));
+          });
+
+          if (!list.children.length) {
+            list.appendChild(buildScalarField('', '无'));
+          }
+          return list;
+        }
+
+        function buildNode(key, value) {
+          if (isScalar(value)) {
+            return buildScalarField(key, value);
+          }
+
+          var item = document.createElement('li');
+          item.className = 'metadata-entry';
+
+          var card = document.createElement('div');
+          card.className = 'metadata-card';
+
+          var group = document.createElement('div');
+          group.className = 'metadata-group';
+
+          if (key) {
+            var title = document.createElement('div');
+            title.className = 'metadata-group-title';
+            title.textContent = key;
+            group.appendChild(title);
+          }
+
+          var subgroup = document.createElement('div');
+          subgroup.className = 'metadata-subgroup';
+          subgroup.appendChild(buildSubtree(value));
+          group.appendChild(subgroup);
+          card.appendChild(group);
+          item.appendChild(card);
+          return item;
+        }
+
+        var tree = document.createElement('ul');
+        tree.className = 'metadata-tree root-level';
+
+        if (__frontmatter && typeof __frontmatter === 'object' && !Array.isArray(__frontmatter)) {
+          Object.keys(__frontmatter).forEach(function (key) {
+            tree.appendChild(buildNode(key, __frontmatter[key]));
+          });
+        } else {
+          tree.appendChild(buildNode('', __frontmatter));
+        }
+
+        root.replaceChildren(tree);
+        summary.textContent = topLevelSummary(__frontmatter);
+        panel.classList.add('open');
+
+        toggle.addEventListener('click', function () {
+          var collapsed = panel.classList.toggle('collapsed');
+          toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        });
+      }
+
 
       /* ── 复制 MD 源文件 ── */
       function initMdCopy() {
@@ -1881,6 +2291,7 @@
       initMdCopy();
 
       document.addEventListener('DOMContentLoaded', function () {
+        initFrontmatterPanel();
         initReadingTime();
         initLatinStyleToggle();
         initTables();
