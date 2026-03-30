@@ -1,92 +1,39 @@
 ---
 name: doc-markdown-html
-description: 使用 Markdown 编写结构化文档，并基于固定 HTML 模板生成最终页面。适用于用户需要撰写技术文档、产品说明、操作手册、规范、教程，并要求同时产出 Markdown 源文件和可发布 HTML 文件的场景。
+description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用于撰写技术文档、产品说明、操作手册、规范、教程等场景。
 ---
 
 # Doc Markdown HTML
 
-## 概述
-
-先写 Markdown，再生成最终 HTML。
-使用 `scripts/render_markdown_html.py` 保持输出稳定和可复用。
-
 ## 工作流
 
 1. 确认文档主题和输出文件名。
-2. 完整撰写 Markdown 内容。
-3. 将 Markdown 文件保存到工作目录。
-4. 运行渲染脚本，使用固定模板生成 HTML。
-5. 确认 HTML 文件存在，并返回 Markdown 与 HTML 路径。
+2. 完整撰写 Markdown 内容，保存到工作目录。
+3. 运行渲染脚本生成 HTML。
+4. 返回 Markdown 与 HTML 路径，并简要说明核心章节。
 
-## 强制规则
+## 渲染命令
+
+```bash
+uv run scripts/render_markdown_html.py <input.md> --output <output.html>
+```
+
+参数：
+
+| 参数 | 简写 | 说明 | 默认值 |
+|---|---|---|---|
+| `<input>` | — | 输入 Markdown 文件路径（必填） | — |
+| `--output` | `-o` | 输出 HTML 文件路径 | 同输入路径，扩展名改为 `.html` |
+| `--template` | `-t` | HTML 模板文件路径 | `assets/doc-template.html` |
+| `--title` | — | 强制指定页面标题 | 取第一个 `# 标题`，无则用文件名 |
+| `--toc-min-level` | — | 目录包含的最小标题级别 | `2` |
+| `--toc-max-level` | — | 目录包含的最大标题级别 | `3` |
+| `--open` | `-O` | 渲染完成后在浏览器中打开 | 否 |
+
+脚本自动处理：代码高亮、目录生成、亮/暗主题、一键复制、阅读进度、回到顶部。
+
+## 规则
 
 - 始终以 Markdown 作为事实来源。
-- 除非用户明确要求，否则始终生成最终 HTML。
-- 默认始终使用 `assets/doc-template.html`。
-- 模板结构保持稳定；只有用户明确要求改版时才调整模板。
-- 生成的 HTML 必须支持代码高亮（fenced code block）。
-- 生成的 HTML 代码块必须支持一键复制。
-- 生成的 HTML 必须支持黑暗模式/白天模式切换。
-
-## 渲染脚本
-
-使用方式：
-
-```bash
-python3 scripts/render_markdown_html.py <input.md> --output <output.html>
-```
-
-依赖安装：
-
-```bash
-pip install markdown pygments
-```
-
-可选参数：
-
-- `--template <path>`：指定其他模板路径。
-- `--title "..."`：强制页面标题（默认使用第一个 `# Heading`）。
-- `--toc-min-level <n>`：目录最小标题级别（默认 `2`）。
-- `--toc-max-level <n>`：目录最大标题级别（默认 `3`）。
-
-## 模板变量
-
-渲染器会填充 `assets/doc-template.html` 中的占位符：
-
-- `{{TITLE}}`：HTML 标题与页面主标题。
-- `{{TOC}}`：自动生成的目录链接。
-- `{{CONTENT}}`：Markdown 渲染后的正文 HTML。
-- `{{UPDATED_AT}}`：UTC 渲染时间。
-
-详细规则见 `references/template-spec.md`。
-
-## 主题切换功能
-
-生成的 HTML 页面包含以下主题切换特性：
-
-### 功能特性
-- **一键切换**：页面右上角提供主题切换按钮
-- **自动检测**：自动检测系统主题偏好（prefers-color-scheme）
-- **本地存储**：用户选择会保存在 localStorage 中
-- **平滑过渡**：所有颜色变化都有平滑的 CSS 过渡效果
-
-### 支持的元素
-- 页面背景和文字颜色
-- 卡片、边框和阴影
-- 代码块和行内代码
-- 引用块
-- 目录链接
-- 复制按钮
-
-### 主题行为
-1. **默认**：跟随系统主题设置
-2. **用户选择**：点击按钮切换，保存到本地存储
-3. **系统变化**：如果用户未手动选择，会跟随系统主题变化
-
-## 输出约定
-
-完成文档任务时必须：
-
-1. 返回 Markdown 文件路径。
-2. 返回 HTML 文件路径。
-3. 简要说明文档覆盖的核心章节。
+- 除非用户明确要求，否则始终生成 HTML。
+- 不修改 `assets/doc-template.html`，除非用户明确要求。
