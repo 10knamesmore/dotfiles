@@ -8,7 +8,7 @@ description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用
 ## 工作流
 
 1. 确认文档主题和输出文件名。
-2. 完整撰写 Markdown 内容，保存到工作目录。
+2. 完整撰写 Markdown 内容，保存到工作目录(或者复用用户已有的md文件)。
 3. 运行渲染脚本生成 HTML。
 4. 返回 Markdown 与 HTML 路径，并简要说明核心章节。
 
@@ -30,10 +30,10 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 | `--toc-max-level` | — | 目录包含的最大标题级别 | `3` |
 | `--open` | `-O` | 渲染完成后在浏览器中打开 | 否 |
 
-脚本自动处理：代码高亮、目录生成、亮/暗主题、一键复制、阅读进度、回到顶部。
 
 ## 规则
 
 - 始终以 Markdown 作为事实来源。
 - 除非用户明确要求，否则始终生成 HTML。
-- 不修改 `assets/doc-template.html`，除非用户明确要求。
+- 若用户已提供现成 Markdown 文件路径，则不允许修改原有的 Markdown 文件。
+- 不允许修改 `assets/doc-template.html`

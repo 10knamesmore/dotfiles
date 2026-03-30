@@ -7,29 +7,29 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/victormono@latest/dist/index.css" />
   <style>
     :root {
-      --bg: #f5f8fc;
-      --surface: #ffffff;
-      --line: #d7e3f2;
-      --text: #1b2533;
-      --muted: #5f7088;
+      --bg: #eef2f6;
+      --surface: #f7f9fc;
+      --line: #d3dbe6;
+      --text: #233041;
+      --muted: #66778d;
       --brand: #0f6ab7;
-      --code-bg: #e1e2e7;
-      --code-fg: #3760bf;
-      --code-border: #d0d7de;
-      --copy-btn-bg: #eaeef2;
-      --copy-btn-border: #c8cdd3;
+      --code-bg: #eef1f6;
+      --code-fg: #35507a;
+      --code-border: #cfd7e2;
+      --copy-btn-bg: #edf1f5;
+      --copy-btn-border: #c5ceda;
       --copy-btn-fg: #24292e;
-      --shadow: 0 10px 28px rgba(16, 42, 78, 0.08);
-      --blockquote-bg: #f3f8ff;
-      --blockquote-color: #344a63;
-      --inline-code-bg: #edf3fb;
-      --code-toolbar-bg: #eef3fa;
-      --code-gutter-bg: rgba(226, 234, 246, 0.84);
-      --code-line-hover: rgba(15, 106, 183, 0.08);
+      --shadow: 0 10px 24px rgba(32, 49, 74, 0.06);
+      --blockquote-bg: #edf3f9;
+      --blockquote-color: #3d5066;
+      --inline-code-bg: #e7edf5;
+      --code-toolbar-bg: #e8edf4;
+      --code-gutter-bg: rgba(224, 231, 241, 0.92);
+      --code-line-hover: rgba(15, 106, 183, 0.06);
       --code-line-highlight: rgba(245, 158, 11, 0.16);
       --code-line-target: rgba(14, 165, 233, 0.16);
-      --toc-hover-bg: #edf5ff;
-      --toc-link-color: #2f4e73;
+      --toc-hover-bg: #e7eef7;
+      --toc-link-color: #3b536f;
       --body-font: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
       --latin-handwritten-font: "Victor Mono", "JetBrains Mono", monospace;
     }
@@ -79,7 +79,7 @@
       color: var(--text);
       font-family: var(--body-font);
       line-height: 1.65;
-      background: radial-gradient(circle at 100% -5%, #dcedff 0%, var(--bg) 42%, #f9fbff 100%);
+      background: radial-gradient(circle at 100% -5%, #d9e3ef 0%, var(--bg) 38%, #f3f6fa 100%);
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
@@ -163,6 +163,12 @@
       border: 1px solid var(--line);
       border-radius: 999px;
       background: transparent;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+    .hero-search:focus-within {
+      border-color: color-mix(in srgb, var(--brand) 55%, var(--line));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
+      background: color-mix(in srgb, var(--surface) 92%, var(--brand) 8%);
     }
     .hero-search input {
       width: 100%;
@@ -411,6 +417,13 @@
       min-width: 0;
       flex-wrap: wrap;
     }
+    .code-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .code-lang-chip,
     .code-title {
       display: inline-flex;
@@ -525,7 +538,11 @@
       color: var(--muted);
     }
 
-    .code-copy-btn {
+    .code-copy-btn,
+    .code-edit-btn,
+    .code-reset-btn {
+      appearance: none;
+      -webkit-appearance: none;
       border: 1px solid var(--copy-btn-border);
       background: var(--copy-btn-bg);
       color: var(--copy-btn-fg);
@@ -535,12 +552,102 @@
       cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     }
-    .code-copy-btn:hover { filter: brightness(0.92); }
-    .code-copy-btn:active { transform: translateY(1px); }
+    .code-copy-btn:hover,
+    .code-edit-btn:hover,
+    .code-reset-btn:hover { filter: brightness(0.92); }
+    .code-copy-btn:active,
+    .code-edit-btn:active,
+    .code-reset-btn:active { transform: translateY(1px); }
     .code-copy-btn.copied { background: #1f6b4f; border-color: #2a8663; color: #e9fff4; }
     [data-theme="dark"] .code-copy-btn.copied { background: #065f46; border-color: #047857; }
     .code-copy-btn.failed { background: #7a2c35; border-color: #96404b; color: #ffe9ec; }
     [data-theme="dark"] .code-copy-btn.failed { background: #7f1d1d; border-color: #991b1b; }
+    .code-edit-btn.active {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #f8fbff;
+    }
+    .code-reset-btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      filter: none !important;
+      transform: none !important;
+    }
+    .content .code-block.is-editing .code-scroll {
+      padding: 0;
+      overflow: visible;
+    }
+    .code-editor-overlay {
+      position: relative;
+      min-width: max-content;
+      min-height: 100%;
+      background: var(--code-bg);
+    }
+    .code-editor-active-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 20.8px;
+      background: rgba(96, 165, 250, 0.12);
+      pointer-events: none;
+      z-index: 1;
+      transition: top 0.08s linear;
+    }
+    .code-editor-highlight,
+    .code-editor-highlight .shiki,
+    .code-editor-highlight pre {
+      margin: 0;
+      min-width: 100%;
+      background: transparent !important;
+    }
+    .code-editor-highlight .shiki,
+    .code-editor-highlight pre {
+      padding: 12px 0;
+    }
+    .code-editor-input {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 56px;
+      display: block;
+      width: calc(100% - 56px);
+      min-height: 100%;
+      resize: none;
+      border: 0;
+      outline: none;
+      margin: 0;
+      padding: 12px 16px;
+      background: transparent;
+      color: transparent;
+      caret-color: var(--code-fg);
+      font: 13px/1.6 "Victor Mono", "JetBrains Mono", monospace;
+      white-space: pre;
+      tab-size: 2;
+      overflow: hidden;
+      -webkit-text-fill-color: transparent;
+      z-index: 2;
+    }
+    .code-editor-input::selection {
+      background: rgba(96, 165, 250, 0.35);
+    }
+    .code-editor-input::-moz-selection {
+      background: rgba(96, 165, 250, 0.35);
+    }
+    .content .code-block.is-editing .code-line:hover,
+    .content .code-block.is-editing .code-line.line-selected,
+    .content .code-block.is-editing .code-line.line-target {
+      background: transparent;
+      box-shadow: none;
+    }
+    [data-theme="dark"] .code-editor-active-line {
+      background: rgba(125, 211, 252, 0.12);
+    }
+    @media (max-width: 900px) {
+      .code-editor-input {
+        min-height: 220px;
+      }
+    }
 
     /* ── 表格 ── */
     .table-wrap { overflow-x: auto; margin: 0.9em 0; border-radius: 8px; }
@@ -1005,7 +1112,7 @@
         var latin = (text.match(/[a-zA-Z]+/g) || []).length;
         var words = cjk + latin;
         var mins = Math.max(1, Math.round(words / 300));
-        el.textContent = '约 ' + mins + ' 分钟';
+        el.textContent = '全文阅读约 ' + mins + ' 分钟';
       }
 
       /* ── 标题锚点链接 ── */
@@ -1088,7 +1195,7 @@
           if (!btn) return;
           btn.addEventListener('click', function () {
             var selected = window.getSelection ? String(window.getSelection()) : '';
-            var raw = block.getAttribute('data-raw-code') || '';
+            var raw = block.getAttribute('data-current-code') || block.getAttribute('data-raw-code') || '';
             var text = selected && block.contains(window.getSelection().anchorNode) ? selected : raw;
             if (!text) {
               var pre = block.querySelector('pre');
@@ -1103,6 +1210,228 @@
       }
       window.__docCopyText = copyText;
       window.__docSetBtnState = setBtnState;
+
+      function updateCodeResetButton(block) {
+        var btn = block.querySelector('.code-reset-btn');
+        if (!btn) return;
+        var original = block.getAttribute('data-original-code') || '';
+        var current = block.getAttribute('data-current-code') || '';
+        btn.disabled = original === current;
+      }
+
+      function updateEditorActiveLine(block) {
+        var textarea = block.querySelector('.code-editor-input');
+        var line = block.querySelector('.code-editor-active-line');
+        if (!textarea || !line) return;
+        var before = textarea.value.slice(0, textarea.selectionStart);
+        var lineIndex = before.split('\n').length - 1;
+        var lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight || '20.8') || 20.8;
+        var top = 12 + (lineIndex * lineHeight);
+        line.style.top = top + 'px';
+        line.style.height = lineHeight + 'px';
+      }
+
+      async function renderCodePreview(code, lang, previewRoot) {
+        if (!window.__docGetCodeToHtml || !window.__docNormalizeLang || !window.__docGetThemeName || !window.__docApplyVictorMonoItalic) {
+          throw new Error('Code preview helpers unavailable');
+        }
+        var codeToHtml = await window.__docGetCodeToHtml();
+        var rendered = await codeToHtml(code, { lang: window.__docNormalizeLang(lang), theme: window.__docGetThemeName() });
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(rendered, 'text/html');
+        var shikiRoot = doc.querySelector('.shiki');
+        if (!shikiRoot) {
+          previewRoot.textContent = code;
+          return;
+        }
+        window.__docApplyVictorMonoItalic(shikiRoot, window.__docGetThemeName());
+        var shikiCode = shikiRoot.querySelector('code');
+        var lines = shikiCode ? Array.from(shikiCode.querySelectorAll('.line')) : [];
+        if (shikiCode && !lines.length) {
+          var fallback = document.createElement('span');
+          fallback.className = 'line';
+          fallback.textContent = shikiCode.textContent || '';
+          shikiCode.replaceChildren(fallback);
+          lines.push(fallback);
+        }
+        lines.forEach(function (line, index) {
+          line.classList.add('code-line');
+          line.dataset.lineNumber = String(index + 1);
+
+          var gutter = document.createElement('span');
+          gutter.className = 'line-number';
+          gutter.textContent = String(index + 1);
+
+          var content = document.createElement('span');
+          content.className = 'line-content';
+          while (line.firstChild) content.appendChild(line.firstChild);
+
+          line.replaceChildren(gutter, content);
+        });
+        previewRoot.replaceChildren(shikiRoot);
+      }
+
+      async function updateEditPreview(block, code) {
+        var overlay = block.querySelector('.code-editor-overlay');
+        var highlight = block.querySelector('.code-editor-highlight');
+        var textarea = block.querySelector('.code-editor-input');
+        if (!overlay || !highlight || !textarea) return;
+        highlight.setAttribute('data-render-state', 'rendering');
+        try {
+          await renderCodePreview(code, block.getAttribute('data-lang') || '', highlight);
+          highlight.removeAttribute('data-render-state');
+        } catch (error) {
+          highlight.textContent = code;
+          highlight.setAttribute('data-render-state', 'failed');
+        }
+        requestAnimationFrame(function () {
+          var surface = highlight.querySelector('.shiki') || highlight.querySelector('pre');
+          var nextHeight = Math.max(
+            surface ? surface.scrollHeight : 0,
+            textarea.scrollHeight,
+            220
+          );
+          overlay.style.height = nextHeight + 'px';
+          textarea.style.height = nextHeight + 'px';
+          updateEditorActiveLine(block);
+        });
+      }
+      window.__docUpdateEditPreview = updateEditPreview;
+
+      async function enterCodeEditMode(block) {
+        if (block.classList.contains('is-editing')) return;
+        var scroll = block.querySelector('.code-scroll');
+        if (!scroll) return;
+
+        var current = block.getAttribute('data-current-code') || block.getAttribute('data-raw-code') || '';
+        block.classList.add('is-editing');
+        if (window.__docClearBlockSelection) {
+          window.__docClearBlockSelection(block, { clearNativeSelection: true });
+        }
+
+        var overlay = document.createElement('div');
+        overlay.className = 'code-editor-overlay';
+
+        var activeLine = document.createElement('div');
+        activeLine.className = 'code-editor-active-line';
+
+        var highlight = document.createElement('div');
+        highlight.className = 'code-editor-highlight';
+
+        var textarea = document.createElement('textarea');
+        textarea.className = 'code-editor-input';
+        textarea.spellcheck = false;
+        textarea.value = current;
+        overlay.appendChild(activeLine);
+        overlay.appendChild(highlight);
+        overlay.appendChild(textarea);
+        scroll.replaceChildren(overlay);
+
+        var editBtn = block.querySelector('.code-edit-btn');
+        if (editBtn) {
+          editBtn.classList.add('active');
+          editBtn.textContent = '完成';
+        }
+
+        var timer = null;
+        textarea.addEventListener('input', function () {
+          var next = textarea.value;
+          block.setAttribute('data-current-code', next);
+          updateCodeResetButton(block);
+          updateEditorActiveLine(block);
+          window.clearTimeout(timer);
+          timer = window.setTimeout(function () {
+            if (window.__docUpdateEditPreview) window.__docUpdateEditPreview(block, next);
+          }, 90);
+        });
+
+        textarea.addEventListener('keydown', function (event) {
+          if (event.key !== 'Tab') return;
+          event.preventDefault();
+
+          var value = textarea.value;
+          var start = textarea.selectionStart;
+          var end = textarea.selectionEnd;
+          var indent = '  ';
+
+          textarea.value = value.slice(0, start) + indent + value.slice(end);
+          textarea.selectionStart = textarea.selectionEnd = start + indent.length;
+          block.setAttribute('data-current-code', textarea.value);
+          updateCodeResetButton(block);
+          updateEditorActiveLine(block);
+
+          window.clearTimeout(timer);
+          timer = window.setTimeout(function () {
+            if (window.__docUpdateEditPreview) window.__docUpdateEditPreview(block, textarea.value);
+          }, 90);
+        });
+
+        textarea.addEventListener('click', function () { updateEditorActiveLine(block); });
+        textarea.addEventListener('keyup', function () { updateEditorActiveLine(block); });
+        textarea.addEventListener('select', function () { updateEditorActiveLine(block); });
+
+        if (window.__docUpdateEditPreview) await window.__docUpdateEditPreview(block, current);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        updateEditorActiveLine(block);
+      }
+
+      async function exitCodeEditMode(block) {
+        if (!block.classList.contains('is-editing')) return;
+        block.classList.remove('is-editing');
+        var editBtn = block.querySelector('.code-edit-btn');
+        if (editBtn) {
+          editBtn.classList.remove('active');
+          editBtn.textContent = '编辑';
+        }
+        if (window.__docRenderSingleCodeBlock) {
+          await window.__docRenderSingleCodeBlock(block, block.getAttribute('data-current-code') || '');
+        }
+        updateCodeResetButton(block);
+        if (window.__docRefreshSearchHighlights) window.__docRefreshSearchHighlights();
+      }
+
+      async function resetCodeBlock(block) {
+        var original = block.getAttribute('data-original-code') || '';
+        block.setAttribute('data-current-code', original);
+        if (block.classList.contains('is-editing')) {
+          var textarea = block.querySelector('.code-editor-input');
+          if (textarea) textarea.value = original;
+          if (window.__docUpdateEditPreview) await window.__docUpdateEditPreview(block, original);
+        } else {
+          if (window.__docRenderSingleCodeBlock) await window.__docRenderSingleCodeBlock(block, original);
+        }
+        updateCodeResetButton(block);
+        if (window.__docRefreshSearchHighlights) window.__docRefreshSearchHighlights();
+      }
+
+      function bindCodeEditorButtons() {
+        document.querySelectorAll('.content .code-block').forEach(function (block) {
+          if (block.getAttribute('data-editor-ready') === '1') {
+            updateCodeResetButton(block);
+            return;
+          }
+          var editBtn = block.querySelector('.code-edit-btn');
+          var resetBtn = block.querySelector('.code-reset-btn');
+          if (editBtn) {
+            editBtn.addEventListener('click', function () {
+              if (block.classList.contains('is-editing')) {
+                exitCodeEditMode(block);
+              } else {
+                enterCodeEditMode(block);
+              }
+            });
+          }
+          if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+              resetCodeBlock(block);
+            });
+          }
+          block.setAttribute('data-editor-ready', '1');
+          updateCodeResetButton(block);
+        });
+      }
+      window.__docBindCodeEditorButtons = bindCodeEditorButtons;
 
       function getHeadingSelector() {
         return '.content h1[id], .content h2[id], .content h3[id], .content h4[id], .content h5[id], .content h6[id]';
@@ -1339,7 +1668,7 @@
 
           searchableBlocks().forEach(function (element) {
             var text = element.classList.contains('code-block')
-              ? (element.getAttribute('data-raw-code') || '')
+              ? (element.getAttribute('data-current-code') || element.getAttribute('data-raw-code') || '')
               : (/^H[1-6]$/.test(element.tagName) ? getHeadingPlainText(element) : (element.innerText || element.textContent || ''));
             var lower = text.toLowerCase();
             if (lower.indexOf(query.toLowerCase()) === -1) return;
@@ -1562,6 +1891,7 @@
         initTocHighlight();
         initMobileToc();
         bindCodeCopyButtons();
+        bindCodeEditorButtons();
         revealHashTarget();
       });
 
@@ -1571,7 +1901,7 @@
   </script>
   <script type="module">
     const SHIKI_MODULE = 'https://esm.sh/shiki@3.0.0';
-    const SHIKI_THEMES = { light: 'github-light', dark: 'tokyo-night' };
+    const SHIKI_THEMES = { light: 'one-light', dark: 'tokyo-night' };
     const LANG_ALIAS = {
       ts: 'typescript',
       js: 'javascript',
@@ -1728,6 +2058,14 @@
       return Array.from(block.querySelectorAll('.code-line.line-selected')).map((line) => Number(line.dataset.lineNumber || '0')).filter(Boolean);
     }
 
+    function updateCodeResetButton(block) {
+      const btn = block.querySelector('.code-reset-btn');
+      if (!btn) return;
+      const original = block.getAttribute('data-original-code') || '';
+      const current = block.getAttribute('data-current-code') || '';
+      btn.disabled = original === current;
+    }
+
     function decorateCodeBlock(block, renderedHtml) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(renderedHtml, 'text/html');
@@ -1824,6 +2162,7 @@
 
       document.querySelectorAll('.content .code-block').forEach((block) => {
         block.addEventListener('pointerdown', (event) => {
+          if (block.classList.contains('is-editing')) return;
           if (event.button !== 0) return;
 
           const content = event.target.closest && event.target.closest('.line-content');
@@ -1910,39 +2249,68 @@
       document.addEventListener('pointerup', endGesture);
     }
 
-    async function renderCodeBlocks() {
-      const blocks = Array.from(document.querySelectorAll('.content .code-block'));
-      if (!blocks.length) return;
-
+    async function renderSingleCodeBlock(block, codeOverride) {
       let codeToHtml;
       try {
         codeToHtml = await getCodeToHtml();
       } catch (error) {
-        blocks.forEach((block) => block.classList.add('is-render-failed'));
+        block.classList.add('is-render-failed');
         return;
       }
 
-      const theme = getThemeName();
-      for (const block of blocks) {
-        const pre = block.querySelector('pre');
-        const code = typeof block.dataset.rawCode === 'string' && block.dataset.rawCode
-          ? block.dataset.rawCode
-          : (pre ? (pre.textContent || '').replace(/\n$/, '') : '');
-        const lang = normalizeLang(block.dataset.lang);
-        if (!block.dataset.rawCode) block.dataset.rawCode = code;
+      const pre = block.querySelector('pre');
+      const code = typeof codeOverride === 'string'
+        ? codeOverride
+        : (block.dataset.currentCode || block.dataset.rawCode || (pre ? (pre.textContent || '').replace(/\n$/, '') : ''));
+      const lang = normalizeLang(block.dataset.lang);
+      if (!block.dataset.rawCode) block.dataset.rawCode = code;
+      if (!block.dataset.originalCode) block.dataset.originalCode = block.dataset.rawCode;
+      block.dataset.currentCode = code;
 
-        try {
-          const rendered = await codeToHtml(code, { lang, theme });
-          decorateCodeBlock(block, rendered);
-        } catch (error) {
-          block.classList.add('is-render-failed');
+      try {
+        const rendered = await codeToHtml(code, { lang, theme: getThemeName() });
+        decorateCodeBlock(block, rendered);
+        updateCodeResetButton(block);
+      } catch (error) {
+        block.classList.add('is-render-failed');
+      }
+    }
+
+    async function renderCodeBlocks() {
+      const blocks = Array.from(document.querySelectorAll('.content .code-block'));
+      if (!blocks.length) return;
+      for (const block of blocks) {
+        if (!block.dataset.rawCode) {
+          const pre = block.querySelector('pre');
+          const initialCode = pre ? (pre.textContent || '').replace(/\n$/, '') : '';
+          block.dataset.rawCode = initialCode;
+        }
+        if (!block.dataset.originalCode) block.dataset.originalCode = block.dataset.rawCode || '';
+        if (!block.dataset.currentCode) block.dataset.currentCode = block.dataset.rawCode || '';
+
+        if (block.classList.contains('is-editing')) {
+          const textarea = block.querySelector('.code-editor-input');
+          const current = textarea ? textarea.value : (block.dataset.currentCode || '');
+          block.dataset.currentCode = current;
+          if (window.__docUpdateEditPreview) await window.__docUpdateEditPreview(block, current);
+          updateCodeResetButton(block);
+        } else {
+          await renderSingleCodeBlock(block, block.dataset.currentCode || '');
         }
       }
 
       syncLineTarget();
       initCodeLineSelection();
+      if (window.__docBindCodeEditorButtons) window.__docBindCodeEditorButtons();
       if (window.__docRefreshSearchHighlights) window.__docRefreshSearchHighlights();
     }
+
+    window.__docClearBlockSelection = clearBlockSelection;
+    window.__docGetCodeToHtml = getCodeToHtml;
+    window.__docNormalizeLang = normalizeLang;
+    window.__docGetThemeName = getThemeName;
+    window.__docApplyVictorMonoItalic = applyVictorMonoItalic;
+    window.__docRenderSingleCodeBlock = renderSingleCodeBlock;
 
     let rerenderTimer = null;
     document.addEventListener('doc-theme-change', () => {
