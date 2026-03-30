@@ -1,251 +1,172 @@
-# 🏠 Dotfiles
+# Dotfiles
 
-Personal dotfiles managed with symbolic links and package version management.
+跨平台个人 dotfiles 仓库，当前以 `install.py` 为安装入口。
 
-## 📂 目录结构
+它的职责很明确：
 
-```plaintext
+- 将 `general/`、`macos/`、`linux/` 中的配置链接到 `$HOME`
+- 渲染 `general/.zshrc_dotfiles.template` 到 `generated/.zshrc_dotfiles`
+- 生成一个受管的 `~/.zshrc` stub，并从中加载 `~/.zshrc_dotfiles`
+- 聚合 `general/scripts/` 和平台脚本到 `generated/scripts/`
+- 将 `general/skills/` 链接到 `~/.codex/skills`、`~/.copilot/skills`、`~/.claude/skills`
+
+## 仓库结构
+
+```text
 dotfiles/
+├── common/                 # 非 Home 目录映射的共享配置
+│   └── vscode/User/
+├── docs/                   # 文档
+├── general/                # 通用配置
+│   ├── .alias
+│   ├── .config/
+│   ├── .zshenv
+│   ├── .zshrc_dotfiles.template
+│   ├── scripts/
+│   └── skills/
 ├── macos/                  # macOS 专属配置
 │   ├── .config/
-│   │   ├── borders/       # Borders 窗口边框配置
-│   │   ├── skhd/          # SKHD 快捷键配置
-│   │   └── yabai/         # Yabai 窗口管理器配置
-│   ├── .zshrc_macos       # macOS 专属 zsh 配置
-│   └── Brewfile           # Homebrew 包列表
+│   └── .zshrc_macos
 ├── linux/                  # Linux 专属配置
 │   ├── .config/
-│   │   ├── i3/            # i3 窗口管理器配置
-│   │   └── kitty/         # Kitty 终端配置
-│   ├── .zshrc_linux       # Linux 专属 zsh 配置
-│   ├── pacman.txt         # Pacman 官方包列表
-│   ├── pacman-aur.txt     # AUR 包列表
-│   └── scripts/           # Linux 专属脚本
-├── general/                # 通用配置（跨平台）
-│   ├── .config/
-│   │   ├── nvim/          # Neovim 配置
-│   │   ├── kitty/         # Kitty 终端配置
-│   │   ├── yazi/          # Yazi 文件管理器配置
-│   │   └── starship.toml  # Starship 提示符配置
-│   ├── .alias             # Shell 别名
-│   ├── .p10k.zsh          # Powerlevel10k 配置
-│   └── .zshrc.template    # Zsh 配置模板
-├── static/                 # 静态资源（不创建软链接）
-│   └── omz_custom/        # Oh My Zsh 自定义插件和主题
-│       ├── plugins/
-│       └── themes/
-├── generated/              # 动态生成的配置
-│   ├── .zshrc             # 渲染后的 zsh 配置
-│   └── scripts/           # 符号链接的脚本集合
-├── scripts/                # 管理脚本
-│   ├── pkg-export         # 导出包列表脚本
-│   └── pkg-install        # 安装包脚本
-├── backup/                 # 配置备份目录
-│   └── 2024-11-22T16:00:00/  # 时间戳备份
-├── install.sh              # 主安装脚本
-├── PKG_MANAGEMENT.md       # 包管理详细文档
-└── README.md               # 本文档
+│   ├── .zshrc_linux
+│   └── scripts/
+├── static/                 # 被模板引用但不直接链接的静态资源
+│   └── omz_custom/
+├── generated/              # install.py 生成的文件与脚本聚合目录
+├── backup/                 # 安装时的备份
+├── install.py              # 主安装脚本
+├── README.md               # 指向 docs/README.md 的符号链接
+└── AGENTS.md               # 指向 CLAUDE.md 的符号链接
 ```
 
-### 目录说明
-
-| 目录 | 说明 |
-|------|------|
-| `macos/` `linux/` `general/` | 以 `~/` 为根目录的配置结构，会创建符号链接 |
-| `static/` | 不创建软链接的配置文件（如 Oh My Zsh 插件） |
-| `generated/` | 存放模板渲染后的配置，符号链接最终指向此目录 |
-| `scripts/` | 管理脚本（包管理、更新等） |
-| `backup/` | 安装时自动备份的旧配置 |
-
-## 🚀 快速开始
-
-### 新机器完整安装流程
+## 快速开始
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/yourname/dotfiles.git ~/dotfiles
+git clone <your-repo-url> ~/dotfiles
 cd ~/dotfiles
 
-# 2. （可选）预览将要安装的包
-./scripts/pkg-install --dry-run
-
-# 3. 安装系统包
-./scripts/pkg-install
-
-# 4. 安装 dotfiles 配置
-./install.sh
-
-# 5. 重新加载 shell
-source ~/.zshrc
-```
-
-### 仅安装 dotfiles（不安装包）
-
-```bash
-git clone https://github.com/yourname/dotfiles.git ~/dotfiles
-cd ~/dotfiles
-./install.sh
-```
-
-## 📦 包管理
-
-### 导出当前系统的包列表
-
-```bash
-# 导出包列表（会自动备份旧文件）
-./scripts/pkg-export
-```
-
-### 在新机器上安装包
-
-```bash
-# 预览（推荐先执行）
-./scripts/pkg-install --dry
+# 先看将要执行什么
+python install.py --dry-run
 
 # 实际安装
-./scripts/pkg-install
+python install.py
 ```
 
-更多详细说明请查看 [包管理文档](./PKG_MANAGEMENT.md)
-
-## 🛠️ 自定义命令
-
-安装后可用的自定义命令：
-
-| 命令 | 功能 |
-|------|------|
-| `dot` | 快速 cd 到 dotfiles 项目目录 |
-| `skill` | 快速 cd 到 skills 目录 |
-
-## 🔄 日常工作流程
-
-### 修改配置
+安装完成后建议重新加载 shell：
 
 ```bash
-# 1. 编辑配置文件
-vim ~/.zshrc          # 或直接编辑 ~/dotfiles/general/.zshrc.template
-
-# 2. 如果修改了模板文件，重新运行安装脚本
-cd ~/dotfiles
-./install.sh
-
-# 3. 重新加载配置
 source ~/.zshrc
 ```
 
-### 安装新软件后同步
+## 安装行为
+
+`install.py` 会按如下规则工作：
+
+1. 自动检测当前系统是 `macos` 还是 `linux`
+2. 先安装 `general/`，再安装对应平台目录
+3. 跳过 `.DS_Store`、`skills/` 和所有 `*.template`
+4. 将 `general/scripts/` 与平台 `scripts/` 链接到 `generated/scripts/`
+5. 渲染 `general/.zshrc_dotfiles.template`
+6. 创建或保留 `~/.zshrc` stub，使其他工具仍可安全向 `~/.zshrc` 末尾追加内容
+
+## Zsh 结构
+
+当前 Zsh 配置不是“直接把模板渲染成 `~/.zshrc`”，而是两层结构：
+
+- `~/.zshrc`
+  - 由 `install.py` 管理的 stub 文件
+  - 只负责 `source "$HOME/.zshrc_dotfiles"`
+- `~/.zshrc_dotfiles`
+  - 指向 `generated/.zshrc_dotfiles`
+  - 由 `general/.zshrc_dotfiles.template` 渲染而来
+- `~/.zshrc_linux` / `~/.zshrc_macos`
+  - 平台附加配置
+  - 在 `~/.zshrc_dotfiles` 中按平台加载
+
+这意味着：
+
+- 想改主配置时，编辑 `general/.zshrc_dotfiles.template`
+- 想改平台差异时，编辑 `linux/.zshrc_linux` 或 `macos/.zshrc_macos`
+- 不要把 `~/.zshrc` 当作主配置文件维护
+
+模板中目前使用的变量有：
+
+| 变量 | 作用 |
+| --- | --- |
+| `ZSH_CUSTOM_TEMPLATE` | 指向 `static/omz_custom` |
+| `DOT_TEMPLATE` | 生成 `dot` alias |
+| `SCRIPTS_DIR_TEMPLATE` | 指向 `generated/scripts` |
+| `SKILLS_DIR_TEMPLATE` | 生成 `skill` alias |
+
+## 修改配置的正确方式
+
+### 修改已有配置
+
+- 修改 `general/`、`macos/`、`linux/` 中的源文件
+- 如果改的是模板文件，执行一次 `python install.py`
+- 如果改的是普通已链接文件，通常重新执行 `python install.py` 也没问题
+
+### 添加新配置
+
+把文件放到对应目录后重新运行：
 
 ```bash
-# 1. 安装软件
-brew install neovim    # macOS
-# 或
-sudo pacman -S neovim  # Arch Linux
-
-# 2. 导出包列表
-cd ~/dotfiles
-./scripts/pkg-export
-
-# 3. 提交更改
-git add .
-git commit -m "brew: add neovim"
-git push
+python install.py
 ```
 
-### 同步到新机器
+例如：
+
+- 通用 CLI 配置放到 `general/`
+- macOS 专属配置放到 `macos/`
+- Linux 专属配置放到 `linux/`
+
+## AI Skills
+
+`general/skills/` 会在安装时链接到以下目录：
+
+- `~/.codex/skills`
+- `~/.copilot/skills`
+- `~/.claude/skills`
+
+因此这个仓库同时也是本地 AI skills 的来源仓库。
+
+## 备份与冲突处理
+
+安装时如果目标位置已经存在内容：
+
+- 如果是符号链接，直接删除后重建
+- 如果是普通文件或目录，移动到 `backup/<timestamp>/`
+
+查看预览：
 
 ```bash
-# 在新机器上
-cd ~/dotfiles
-git pull
-./scripts/pkg-install    # 安装新增的包
-./install.sh             # 更新配置
-source ~/.zshrc
+python install.py --dry-run
 ```
 
-## 📝 模板系统
-
-### 支持的模板变量
-
-在 `.template` 文件中可以使用以下变量：
-
-| 变量 | 说明 | 示例值 |
-|------|------|--------|
-| `ZSH_CUSTOM_TEMPLATE` | Oh My Zsh 自定义目录 | `/Users/wanger/dotfiles/static/omz_custom` |
-| `DOT_TEMPLATE` | cd 到 dotfiles 的命令 | `cd /Users/wanger/dotfiles` |
-| `SCRIPTS_DIR_TEMPLATE` | scripts 目录路径 | `/Users/wanger/dotfiles/generated/scripts` |
-
-### 模板示例
-
-**模板文件** (`general/.zshrc.template`):
-```bash
-export ZSH_CUSTOM=ZSH_CUSTOM_TEMPLATE
-export PATH=SCRIPTS_DIR_TEMPLATE:$PATH
-alias dot="DOT_TEMPLATE"
-```
-
-**渲染后** (`generated/.zshrc`):
-```bash
-export ZSH_CUSTOM=/Users/wanger/dotfiles/static/omz_custom
-export PATH=/Users/wanger/dotfiles/generated/scripts:$PATH
-alias dot="cd /Users/wanger/dotfiles"
-```
-
-## 🛠️ 故障排除
-
-### 符号链接冲突
-
-如果已存在配置文件，`install.sh` 会自动备份到 `backup/时间戳/` 目录。
+查看备份：
 
 ```bash
-# 查看备份
-ls -la ~/dotfiles/backup/
-
-# 手动恢复某个文件
-cp ~/dotfiles/backup/2024-11-22T16:00:00/.zshrc ~/.zshrc
+ls -la backup
 ```
 
-### Homebrew 未安装（macOS）
+## 当前仓库里实际存在的主要配置
 
-```bash
-# 安装 Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+- Shell: Zsh + Oh My Zsh
+- Editor: Neovim / Vim
+- Terminal: Kitty
+- File manager: Yazi
+- Multiplexer: Zellij
+- Prompt: Starship
+- macOS WM: Yabai + SketchyBar + skhd
+- Linux WM: Hyprland / Niri / Waybar
+- AI tooling: Codex / Copilot / Claude skills
 
-# 或者运行 pkg-install 脚本会自动安装
-./scripts/pkg-install
-```
+## 注意事项
 
-### 模板渲染问题
+- 顶层 `README.md` 是指向 `docs/README.md` 的符号链接
+- `AGENTS.md` 是指向 `CLAUDE.md` 的符号链接
+- 当前仓库没有顶层 `scripts/pkg-install` 或 `scripts/pkg-export`
+- 当前仓库也没有 `macos/Brewfile`、`linux/pacman.txt` 这类包清单文件
 
-如果修改了模板但没有生效：
-
-```bash
-# 删除旧的渲染文件
-rm -rf ~/dotfiles/generated/
-
-# 重新运行安装脚本
-./install.sh
-```
-
-### Oh My Zsh 未安装
-
-```bash
-# 安装 Oh My Zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-# 然后运行 dotfiles 安装
-./install.sh
-```
-
-### Starship 提示符不显示
-
-```bash
-# 检查 Starship 是否安装
-starship --version
-
-# 安装 Starship
-brew install starship    # macOS
-pacman -S starship       # Arch Linux
-
-# 或运行包安装脚本
-./scripts/pkg-install
-```
+如果将来重新引入包管理脚本或清单，文档应与实际文件结构一起更新。

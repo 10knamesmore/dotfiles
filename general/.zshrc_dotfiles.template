@@ -38,7 +38,7 @@ source "$HOME/.alias"
 alias dot="DOT_TEMPLATE"
 alias skill="cd SKILLS_DIR_TEMPLATE"
 
-if [[ -f "$HOME/.cargo/bin" ]]; then
+if [[ -d "$HOME/.cargo/bin" ]]; then
     export PATH=$HOME/.cargo/bin:$PATH
 fi
 
