@@ -281,7 +281,11 @@ def render_code_block(code: str, meta: CodeFenceMeta, index: int) -> str:
         f'      <span class="code-lang-chip">{lang_badge}</span>\n'
         f"      {title_html}\n"
         "    </div>\n"
-        '    <button type="button" class="code-copy-btn" data-original-text="复制" aria-label="复制代码">复制</button>\n'
+        '    <div class="code-toolbar-actions">\n'
+        '      <button type="button" class="code-edit-btn" data-original-text="编辑" aria-label="编辑代码">编辑</button>\n'
+        '      <button type="button" class="code-reset-btn" data-original-text="恢复原样" aria-label="恢复代码原样">恢复原样</button>\n'
+        '      <button type="button" class="code-copy-btn" data-original-text="复制" aria-label="复制代码">复制</button>\n'
+        "    </div>\n"
         "  </div>\n"
         '  <div class="code-scroll">\n'
         f"    <pre><code>{raw_code}</code></pre>\n"
