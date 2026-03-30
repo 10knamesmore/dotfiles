@@ -1,3 +1,28 @@
+---
+name: doc-markdown-html
+description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用于撰写技术文档、产品说明、操作手册、规范、教程等场景。
+tags:
+  - markdown
+  - html
+  - testing
+maintainers:
+  primary: wanger
+  reviewers:
+    - codex
+    - local-preview
+features:
+  frontmatter: true
+  search:
+    scope: content-only
+    supports_code_blocks: true
+examples:
+  - title: Minimal frontmatter
+    enabled: true
+  - title: Nested metadata
+    enabled: true
+notes: null
+---
+
 # 渲染测试文档
 
 本文件覆盖所有 Markdown 格式与渲染特性，用于回归测试。

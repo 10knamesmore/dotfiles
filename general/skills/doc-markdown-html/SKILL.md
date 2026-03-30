@@ -10,13 +10,16 @@ description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用
 1. 确认文档主题和输出文件名。
 2. 完整撰写 Markdown 内容，保存到工作目录(或者复用用户已有的md文件)。
 3. 运行渲染脚本生成 HTML。
-4. 返回 Markdown 与 HTML 路径，并简要说明核心章节。
+4. 返回 Markdown 与 HTML 从跟文件的绝对路径，并简要说明核心章节。
+ - 返回路径格式如: `file:///User/foo/bar.html`, `file:///User/foo/bar.md`
 
 ## 渲染命令
 
 ```bash
 uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 ```
+
+当你发现在沙箱环境下无法运行时， 你应当向用户要求提权运行uv， 而不是尝试用其他方式运行脚本
 
 参数：
 
@@ -35,5 +38,21 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 
 - 始终以 Markdown 作为事实来源。
 - 除非用户明确要求，否则始终生成 HTML。
+- 支持解析 Markdown 文件开头的 YAML frontmatter。
 - 若用户已提供现成 Markdown 文件路径，则不允许修改原有的 Markdown 文件。
 - 不允许修改 `assets/doc-template.html`
+
+frontmatter 示例(支持解析任意字段)：
+
+```yaml
+---
+name: Foo
+description: 一个用foo的brr
+biz:
+  - markdown
+  - html
+nested:
+  baz: true
+  boo: wanger
+---
+```
