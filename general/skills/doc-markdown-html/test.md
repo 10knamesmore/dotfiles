@@ -19,6 +19,8 @@
 > 单层引用：foo bar baz。
 >
 > > 嵌套引用：qux quux。
+> >
+> > > 嵌套引用：qux quux。
 
 ### 列表
 
@@ -257,5 +259,37 @@ Lorem ipsum dolor sit amet，连续段落用于撑开页面高度，以便测试
 ### 小节 C
 
 Lorem ipsum dolor sit amet，连续段落用于撑开页面高度，以便测试滚动时目录条目的联动高亮效果。
+
+## 英文字体切换测试
+
+这段内容用于测试 English phrases 在正文中切换为 Victor Mono italic，而中文保持原样；例如 product spec、render pipeline、runtime toggle 应该切换，`inline_code_should_not_change` 不应切换。
+
+### 混排段落
+
+在这段 mixed content 里，Hello world、font toggle、reading mode 应该切到手写英文，但这一整段里的中文、数字 2026 和符号不应该被错误处理。
+
+### 列表与引用
+
+- 第一项包含 English labels 和中文说明，用来观察 list item 中的英文切换。
+- 第二项带有 short phrase、multi word token 和 `inline code`，其中只有普通英文应该变化。
+
+> 这是一段引用。Quoted English sentence should become handwritten italic, 但 `quoted_inline_code` 仍然保持代码字体。
+
+### 表格
+
+| 场景 | 示例文本 |
+| ---- | -------- |
+| 按钮文案 | Switch English style |
+| 混排说明 | 中文 with English words |
+| 行内代码对照 | normal english vs `code_sample` |
+
+### 定义与脚注
+
+`Typography`
+:   用于观察 definition list 中的 English term 和中文解释是否只切换英文部分。
+
+这里再补一段 footnote reference with English words[^font-toggle-note]，用于观察脚注正文。
+
+[^font-toggle-note]: Footnote content should switch English words only，中文部分保持正常。
 
 Lorem ipsum dolor sit amet，连续段落用于撑开页面高度，以便测试滚动时目录条目的联动高亮效果。
