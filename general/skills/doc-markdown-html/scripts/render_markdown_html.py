@@ -1,11 +1,11 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# dependencies = ["markdown", "pygments"]
+# dependencies = ["markdown"]
 # ///
-"""将 Markdown 渲染为基于固定模板的带语法高亮 HTML 页面。
+"""将 Markdown 渲染为基于固定模板的 HTML 页面。
 
 提供从 Markdown 源文件到完整 HTML 的一站式转换，包含目录生成、
-标题锚点注入、代码块语言标注与 Pygments 语法高亮。
+标题锚点注入与代码块元信息保留。
 """
 
 from __future__ import annotations
@@ -15,8 +15,11 @@ import datetime as dt
 import html
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import cast, final
+from typing import cast
+
+BEIJING_TZ = dt.timezone(dt.timedelta(hours=8), name="CST")
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,6 +71,17 @@ def slugify(text: str) -> str:
     return s or "section"
 
 
+@dataclass(frozen=True)
+class HeadingSection:
+    """Markdown 标题及其对应章节范围。"""
+
+    level: int
+    title: str
+    anchor: str
+    start_line: int
+    end_line: int
+
+
 def extract_headings(md_text: str) -> list[tuple[int, str, str]]:
     """从 Markdown 文本中提取所有标题及其锚点。
 
@@ -80,10 +94,19 @@ def extract_headings(md_text: str) -> list[tuple[int, str, str]]:
     Returns:
         按出现顺序排列的列表，每项为 ``(级别, 标题文本, 锚点 slug)`` 三元组。
     """
-    headings: list[tuple[int, str, str]] = []
+    return [
+        (section.level, section.title, section.anchor)
+        for section in extract_heading_sections(md_text)
+    ]
+
+
+def extract_heading_sections(md_text: str) -> list[HeadingSection]:
+    """从 Markdown 文本中提取标题及其章节范围。"""
+    sections: list[HeadingSection] = []
     used: dict[str, int] = {}
     in_fence = False
-    for line in md_text.splitlines():
+    lines = md_text.splitlines()
+    for idx, line in enumerate(lines):
         if re.match(r"^```", line):
             in_fence = not in_fence
             continue
@@ -97,8 +120,46 @@ def extract_headings(md_text: str) -> list[tuple[int, str, str]]:
         base = slugify(title)
         used[base] = used.get(base, 0) + 1
         anchor = base if used[base] == 1 else f"{base}-{used[base]}"
-        headings.append((level, title, anchor))
-    return headings
+        sections.append(
+            HeadingSection(
+                level=level,
+                title=title,
+                anchor=anchor,
+                start_line=idx,
+                end_line=len(lines) - 1,
+            )
+        )
+
+    resolved: list[HeadingSection] = []
+    for idx, section in enumerate(sections):
+        end_line = len(lines) - 1
+        for next_section in sections[idx + 1 :]:
+            if next_section.level <= section.level:
+                end_line = next_section.start_line - 1
+                break
+        resolved.append(
+            HeadingSection(
+                level=section.level,
+                title=section.title,
+                anchor=section.anchor,
+                start_line=section.start_line,
+                end_line=end_line,
+            )
+        )
+    return resolved
+
+
+def build_section_md_map(
+    md_text: str, sections: list[HeadingSection]
+) -> dict[str, str]:
+    """构建标题 id 到原始 Markdown 章节文本的映射。"""
+    lines = md_text.splitlines()
+    result: dict[str, str] = {}
+    for section in sections:
+        result[section.anchor] = "\n".join(
+            lines[section.start_line : section.end_line + 1]
+        ).strip("\n")
+    return result
 
 
 def apply_heading_ids(html_text: str, headings: list[tuple[int, str, str]]) -> str:
@@ -160,222 +221,137 @@ def render_toc(
     return "<ul>\n" + "\n".join(rows) + "\n</ul>"
 
 
-def markdown_to_html(md_text: str) -> tuple[str, str]:
-    """将 Markdown 文本渲染为 HTML 正文与语法高亮 CSS。
+@dataclass(frozen=True)
+class CodeFenceMeta:
+    """围栏代码块的元信息。"""
 
-    启用 fenced_code、tables、sane_lists、codehilite、attr_list、
-    def_list、footnotes 扩展；输出亮色（default）与暗色（github-dark）
-    两套高亮 CSS，暗色部分以 ``[data-theme="dark"]`` 作用域限定。
+    lang: str
+    title: str
+    highlight_lines: str
 
-    Args:
-        md_text: Markdown 源文本。
 
-    Returns:
-        ``(content_html, highlight_css)`` 二元组：
-        前者为渲染后的正文 HTML，后者为 Pygments 注入所需的 CSS 字符串。
+def parse_fence_meta(info: str) -> CodeFenceMeta:
+    """解析围栏代码块首行的语言与附加元信息。"""
+    raw = info.strip()
+    if not raw:
+        return CodeFenceMeta(lang="", title="", highlight_lines="")
 
-    Raises:
-        SystemExit: 当 ``markdown`` 或 ``pygments`` 依赖未安装时。
-    """
+    parts = raw.split(maxsplit=1)
+    lang = parts[0]
+    rest = parts[1] if len(parts) > 1 else ""
+
+    title_match = re.search(r'title\s*=\s*"([^"]+)"', rest)
+    if not title_match:
+        title_match = re.search(r"title\s*=\s*'([^']+)'", rest)
+
+    line_match = re.search(r"\{([^}]+)\}", rest)
+
+    return CodeFenceMeta(
+        lang=lang,
+        title=title_match.group(1).strip() if title_match else "",
+        highlight_lines=line_match.group(1).strip() if line_match else "",
+    )
+
+
+def render_code_block(code: str, meta: CodeFenceMeta, index: int) -> str:
+    """将围栏代码块渲染为供前端 Shiki 接管的基础 DOM。"""
+    code_id = f"code-{index}"
+    attrs = [f'class="code-block"', f'id="{code_id}"', f'data-code-id="{code_id}"']
+    if meta.lang:
+        attrs.append(f'data-lang="{html.escape(meta.lang, quote=True)}"')
+    if meta.title:
+        attrs.append(f'data-title="{html.escape(meta.title, quote=True)}"')
+    if meta.highlight_lines:
+        attrs.append(
+            f'data-highlight-lines="{html.escape(meta.highlight_lines, quote=True)}"'
+        )
+
+    lang_badge = html.escape(meta.lang or "text")
+    title_html = (
+        f'<span class="code-title">{html.escape(meta.title)}</span>'
+        if meta.title
+        else ""
+    )
+    raw_code = html.escape(code.rstrip("\n"))
+
+    return (
+        f"<div {' '.join(attrs)}>\n"
+        '  <div class="code-toolbar">\n'
+        '    <div class="code-toolbar-meta">\n'
+        f'      <span class="code-lang-chip">{lang_badge}</span>\n'
+        f"      {title_html}\n"
+        "    </div>\n"
+        '    <button type="button" class="code-copy-btn" data-original-text="复制" aria-label="复制代码">复制</button>\n'
+        "  </div>\n"
+        '  <div class="code-scroll">\n'
+        f"    <pre><code>{raw_code}</code></pre>\n"
+        "  </div>\n"
+        "</div>"
+    )
+
+
+def preprocess_code_fences(md_text: str) -> str:
+    """将 Markdown 围栏代码块替换为带元信息的原始 HTML 块。"""
+    result: list[str] = []
+    lines = md_text.splitlines()
+    in_fence = False
+    fence_meta = CodeFenceMeta(lang="", title="", highlight_lines="")
+    buffer: list[str] = []
+    block_index = 0
+
+    for line in lines:
+        start = re.match(r"^```([^\s`]*)\s*(.*?)\s*$", line)
+        if not in_fence and start:
+            in_fence = True
+            info = (start.group(1) + " " + start.group(2)).strip()
+            fence_meta = parse_fence_meta(info)
+            buffer = []
+            continue
+
+        if in_fence and re.match(r"^```\s*$", line):
+            block_index += 1
+            result.append("")
+            result.append(render_code_block("\n".join(buffer), fence_meta, block_index))
+            result.append("")
+            in_fence = False
+            buffer = []
+            continue
+
+        if in_fence:
+            buffer.append(line)
+        else:
+            result.append(line)
+
+    if in_fence:
+        result.append("```" + fence_meta.lang)
+        result.extend(buffer)
+
+    return "\n".join(result)
+
+
+def markdown_to_html(md_text: str) -> str:
+    """将 Markdown 文本渲染为 HTML 正文。"""
     try:
         import markdown as md
     except Exception as exc:
         raise SystemExit(
-            "Missing dependency: markdown. Install with: pip install markdown pygments"
+            "Missing dependency: markdown. Install with: pip install markdown"
         ) from exc
 
-    try:
-        from pygments.formatters import HtmlFormatter
-        from pygments.style import Style
-        from pygments.token import (
-            Comment,
-            Error,
-            Generic,
-            Keyword,
-            Name,
-            Number,
-            Operator,
-            Punctuation,
-            String,
-            Token,
-        )
-    except Exception as exc:
-        raise SystemExit(
-            "Missing dependency: pygments. Install with: pip install markdown pygments"
-        ) from exc
-
-    @final
-    class TokyoNightDayStyle(Style):  # type: ignore[misc]
-        """Pygments 样式：Tokyo Night Day（亮色主题）。"""
-
-        background_color = "#e1e2e7"
-        default_style = ""
-        styles = {
-            Token: "#3760bf",
-            Comment: "italic #848cb5",
-            Comment.Special: "italic bold #848cb5",
-            Keyword: "italic bold #9854f1",
-            Keyword.Constant: "italic #9854f1",
-            Keyword.Type: "italic #0f4b6e",
-            Name.Builtin: "#007197",
-            Name.Builtin.Pseudo: "italic #9854f1",
-            Name.Class: "#0f4b6e",
-            Name.Decorator: "#2496be",
-            Name.Exception: "#c64343",
-            Name.Function: "#2496be",
-            Name.Function.Magic: "#2496be",
-            Name.Tag: "italic #9854f1",
-            Name.Variable: "#3760bf",
-            Number: "#b15c00",
-            Operator: "#3760bf",
-            Operator.Word: "italic bold #9854f1",
-            Punctuation: "#3760bf",
-            String: "italic #587539",
-            String.Doc: "italic #848cb5",
-            String.Escape: "#b15c00",
-            String.Interpol: "italic #2496be",
-            Generic.Deleted: "#c64343",
-            Generic.Emph: "italic",
-            Generic.Heading: "bold #3760bf",
-            Generic.Inserted: "#587539",
-            Generic.Output: "#848cb5",
-            Generic.Strong: "bold",
-            Generic.Subheading: "bold #2496be",
-            Error: "#c64343",
-        }
-
-    @final
-    class TokyoNightDarkStyle(Style):  # type: ignore[misc]
-        """Pygments 样式：Tokyo Night Dark（暗色主题）。"""
-
-        background_color = "#1a1b26"
-        default_style = ""
-        styles = {
-            Token: "#c0caf5",
-            Comment: "italic #565f89",
-            Comment.Special: "italic bold #565f89",
-            Keyword: "italic bold #bb9af7",
-            Keyword.Constant: "italic #bb9af7",
-            Keyword.Type: "italic #2ac3de",
-            Name.Builtin: "#7dcfff",
-            Name.Builtin.Pseudo: "italic #bb9af7",
-            Name.Class: "#2ac3de",
-            Name.Decorator: "#7aa2f7",
-            Name.Exception: "#f7768e",
-            Name.Function: "#7aa2f7",
-            Name.Function.Magic: "#7aa2f7",
-            Name.Tag: "italic #bb9af7",
-            Name.Variable: "#c0caf5",
-            Number: "#ff9e64",
-            Operator: "#89ddff",
-            Operator.Word: "italic bold #bb9af7",
-            Punctuation: "#c0caf5",
-            String: "italic #9ece6a",
-            String.Doc: "italic #565f89",
-            String.Escape: "#ff9e64",
-            String.Interpol: "italic #7aa2f7",
-            Generic.Deleted: "#f7768e",
-            Generic.Emph: "italic",
-            Generic.Heading: "bold #c0caf5",
-            Generic.Inserted: "#9ece6a",
-            Generic.Output: "#565f89",
-            Generic.Strong: "bold",
-            Generic.Subheading: "bold #7aa2f7",
-            Error: "#f7768e",
-        }
-
-    content_html = cast(
+    processed = preprocess_code_fences(md_text)
+    return cast(
         str,
         md.markdown(
-            md_text,
+            processed,
             extensions=[
-                "fenced_code",
                 "tables",
                 "sane_lists",
-                "codehilite",
                 "attr_list",
                 "def_list",
                 "footnotes",
             ],
-            extension_configs={
-                "codehilite": {
-                    "guess_lang": False,
-                    "linenums": False,
-                    "css_class": "codehilite",
-                    "use_pygments": True,
-                }
-            },
         ),
     )
-
-    light_css = cast(
-        str,
-        HtmlFormatter(style=TokyoNightDayStyle, cssclass="codehilite").get_style_defs(
-            ".codehilite"
-        ),
-    )  # pyright: ignore[reportUnknownMemberType]
-    dark_css = cast(
-        str,
-        HtmlFormatter(style=TokyoNightDarkStyle, cssclass="codehilite").get_style_defs(
-            ".codehilite"
-        ),
-    )  # pyright: ignore[reportUnknownMemberType]
-
-    # 暗色 CSS 以 [data-theme="dark"] 限定作用域，与主题切换联动
-    scoped_dark = "\n".join(
-        f'[data-theme="dark"] {line.strip()}'
-        for line in dark_css.splitlines()
-        if line.strip()
-    )
-    highlight_css = light_css + "\n" + scoped_dark
-
-    return content_html, highlight_css
-
-
-def extract_code_langs(md_text: str) -> list[str]:
-    """按顺序提取 Markdown 中所有围栏代码块的语言标识。
-
-    Args:
-        md_text: Markdown 源文本。
-
-    Returns:
-        语言标识列表，与文档中代码块出现顺序一致；未指定语言时对应项为空字符串。
-    """
-    langs: list[str] = []
-    in_block = False
-    for m in re.finditer(r"^```(\w*)", md_text, re.MULTILINE):
-        if not in_block:
-            langs.append(m.group(1) or "")
-            in_block = True
-        else:
-            in_block = False
-    return langs
-
-
-def inject_code_langs(html_text: str, langs: list[str]) -> str:
-    """按顺序将语言标识作为 ``data-lang`` 属性注入 ``.codehilite`` 容器。
-
-    与 ``extract_code_langs`` 配合使用，保证注入顺序与源码一致。
-    无语言或列表已耗尽时跳过对应块，不修改原始标签。
-
-    Args:
-        html_text: 由 ``markdown_to_html`` 生成的 HTML 字符串。
-        langs: ``extract_code_langs`` 返回的语言标识列表。
-
-    Returns:
-        注入 ``data-lang`` 后的 HTML 字符串。
-    """
-    idx = 0
-
-    def repl(match: re.Match[str]) -> str:
-        nonlocal idx
-        lang = langs[idx] if idx < len(langs) else ""
-        idx += 1
-        if lang:
-            return f'<div class="codehilite" data-lang="{html.escape(lang)}">'
-        return match.group(0)
-
-    return re.sub(r'<div class="codehilite">', repl, html_text)
 
 
 def resolve_template_path(explicit: str | None) -> Path:
@@ -422,7 +398,9 @@ def main() -> None:
     )
 
     md_text = input_path.read_text(encoding="utf-8")
-    headings = extract_headings(md_text)
+    sections = extract_heading_sections(md_text)
+    headings = [(section.level, section.title, section.anchor) for section in sections]
+    section_md_map = build_section_md_map(md_text, sections)
 
     title = args.title
     if not title:
@@ -433,10 +411,8 @@ def main() -> None:
     if not title:
         title = input_path.stem
 
-    code_langs = extract_code_langs(md_text)
-    content_html, highlight_css = markdown_to_html(md_text)
+    content_html = markdown_to_html(md_text)
     content_html = apply_heading_ids(content_html, headings)
-    content_html = inject_code_langs(content_html, code_langs)
     toc_html = render_toc(headings, args.toc_min_level, args.toc_max_level)
 
     template = template_path.read_text(encoding="utf-8")
@@ -444,11 +420,11 @@ def main() -> None:
         template.replace("{{TITLE}}", html.escape(title))
         .replace("{{TOC}}", toc_html)
         .replace("{{CONTENT}}", content_html)
-        .replace("{{HIGHLIGHT_CSS}}", highlight_css)
         .replace("{{MARKDOWN_SOURCE}}", json.dumps(md_text))
+        .replace("{{SECTION_MD_MAP}}", json.dumps(section_md_map, ensure_ascii=False))
         .replace(
             "{{UPDATED_AT}}",
-            dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            dt.datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M"),
         )
     )
 
