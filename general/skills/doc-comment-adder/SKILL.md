@@ -1,6 +1,6 @@
 ---
 name: doc-comment-adder
-description: 为代码文件或目录批量添加/补全文档注释，支持 Rust、TypeScript 与 Python。用于用户提出“给这个文件添加文档注释”“给这个目录下的每个文件添加文档注释”等需求时，按语言规范生成一致的文档注释并保持可读性。
+description: 当提到 `为代码文件或目录批量添加/补全文档注释` 之类的时候调用
 ---
 
 # 文档注释添加器
@@ -42,3 +42,4 @@ description: 为代码文件或目录批量添加/补全文档注释，支持 Ru
 - Rust 规范：`references/rust_spec.md`
 - TypeScript 规范：`references/typescript_spec.md`
 - Python 规范：`references/python_spec.md`
+- Lua 规范: `references/lua_spec.md`
