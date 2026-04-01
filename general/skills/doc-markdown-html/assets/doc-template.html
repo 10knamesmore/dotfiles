@@ -539,6 +539,7 @@
       font-synthesis: none;
     }
     .content blockquote {
+      position: relative;
       margin: 0.8em 0;
       padding: 0.55em 0.9em;
       border-left: 4px solid #8bb8e6;
@@ -547,6 +548,31 @@
       border-radius: 8px;
       transition: background-color 0.3s ease, color 0.3s ease;
     }
+    .table-wrap { position: relative; }
+    .block-copy-btn {
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      height: 1.6em;
+      min-width: 1.6em;
+      padding: 0 0.45em;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.78em;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+    }
+    .content blockquote:hover .block-copy-btn,
+    .table-wrap:hover > .block-copy-btn,
+    .block-copy-btn.copied,
+    .block-copy-btn.failed { opacity: 1; }
+    .block-copy-btn:hover { color: var(--brand); background: var(--toc-hover-bg); }
+    .block-copy-btn.copied { color: #1f9d6a; }
+    .block-copy-btn.failed { color: #c64343; }
 
     .content code {
       font-family: "Victor Mono", "JetBrains Mono", monospace;
@@ -1079,6 +1105,26 @@
       .card { box-shadow: none !important; border: none !important; }
       .content .code-block { border: 1px solid #ccc; box-shadow: none; }
       a { color: inherit; }
+    }
+    .copy-toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: var(--code-bg, #1e293b);
+      color: var(--code-fg, #e2e8f0);
+      padding: 0.5rem 1.2rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 10000;
+    }
+    .copy-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
   </style>
 </head>
@@ -1618,7 +1664,87 @@
           block.setAttribute('data-copy-ready', '1');
         });
       }
+      /* ── Blockquote / Table 复制 ── */
+      function getBlockTextWithoutControls(node) {
+        var clone = node.cloneNode(true);
+        clone.querySelectorAll('.block-copy-btn').forEach(function (el) {
+          el.remove();
+        });
+        return (clone.innerText || clone.textContent || '').trim();
+      }
+
+      function initBlockquoteCopy() {
+        document.querySelectorAll('.content blockquote').forEach(function (bq) {
+          if (bq.querySelector('.block-copy-btn')) return;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'block-copy-btn';
+          btn.textContent = '复制';
+          btn.setAttribute('data-original-text', '复制');
+          btn.addEventListener('click', function () {
+            var text = getBlockTextWithoutControls(bq);
+            copyText(text).then(function (ok) {
+              setBtnState(btn, ok ? '已复制' : '失败', ok ? 'copied' : 'failed');
+            });
+          });
+          bq.appendChild(btn);
+        });
+      }
+
+      function tableToCsv(table) {
+        var rows = table.querySelectorAll('tr');
+        var lines = [];
+        rows.forEach(function (row) {
+          var cells = row.querySelectorAll('th, td');
+          var fields = [];
+          cells.forEach(function (cell) {
+            var val = (cell.innerText || cell.textContent || '').trim();
+            if (/[,"\n\r]/.test(val)) {
+              val = '"' + val.replace(/"/g, '""') + '"';
+            }
+            fields.push(val);
+          });
+          lines.push(fields.join(','));
+        });
+        return lines.join('\n');
+      }
+
+      function initTableCopy() {
+        document.querySelectorAll('.content .table-wrap').forEach(function (wrap) {
+          if (wrap.querySelector('.block-copy-btn')) return;
+          var table = wrap.querySelector('table');
+          if (!table) return;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'block-copy-btn';
+          btn.textContent = '复制';
+          btn.setAttribute('data-original-text', '复制');
+          btn.addEventListener('click', function () {
+            var csv = tableToCsv(table);
+            copyText(csv).then(function (ok) {
+              setBtnState(btn, ok ? '已复制' : '失败', ok ? 'copied' : 'failed');
+            });
+          });
+          wrap.appendChild(btn);
+        });
+      }
+
+      var _toastEl = null;
+      var _toastTimer = null;
+      function showToast(msg) {
+        if (!_toastEl) {
+          _toastEl = document.createElement('div');
+          _toastEl.className = 'copy-toast';
+          document.body.appendChild(_toastEl);
+        }
+        _toastEl.textContent = msg;
+        clearTimeout(_toastTimer);
+        void _toastEl.offsetWidth;
+        _toastEl.classList.add('show');
+        _toastTimer = setTimeout(function () { _toastEl.classList.remove('show'); }, 1500);
+      }
       window.__docCopyText = copyText;
+      window.__docShowToast = showToast;
       window.__docSetBtnState = setBtnState;
 
       function updateCodeResetButton(block) {
@@ -2295,6 +2421,8 @@
         initReadingTime();
         initLatinStyleToggle();
         initTables();
+        initBlockquoteCopy();
+        initTableCopy();
         initAnchors();
         initCollapsible();
         initSectionControls();
@@ -2636,10 +2764,12 @@
             || block.querySelector(`.code-line[data-line-number="${gesture.currentLine}"]`);
           const lineNo = line ? Number(line.dataset.lineNumber || '0') : gesture.currentLine;
 
+          var shouldCopy = true;
           if (!gesture.moved) {
             const selected = getSelectedLineNumbers(block);
             if (selected.length === 1 && selected[0] === lineNo) {
               clearBlockSelection(block, { clearNativeSelection: true });
+              shouldCopy = false;
             } else {
               applyBlockSelection(block, lineNo, lineNo, {
                 syncNativeSelection: gesture.suppressTextSelection,
@@ -2649,6 +2779,17 @@
             applyBlockSelection(block, gesture.startLine, lineNo, {
               syncNativeSelection: gesture.suppressTextSelection,
             });
+          }
+
+          if (shouldCopy && window.__docCopyText) {
+            var selectedLines = Array.from(block.querySelectorAll('.code-line.line-selected .line-content'));
+            var text = selectedLines.map(function (el) { return el.textContent || ''; }).join('\n');
+            if (text) {
+              var count = selectedLines.length;
+              window.__docCopyText(text).then(function (ok) {
+                if (ok && window.__docShowToast) window.__docShowToast('已复制 ' + count + ' 行');
+              });
+            }
           }
 
           endGesture();
