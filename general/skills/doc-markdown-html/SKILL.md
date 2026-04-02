@@ -9,9 +9,10 @@ description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用
 
 1. 确认文档主题和输出文件名。
 2. 完整撰写 Markdown 内容，保存到工作目录(或者复用用户已有的md文件)。
-3. 运行渲染脚本生成 HTML。
-4. 返回 Markdown 与 HTML 从跟文件的绝对路径，并简要说明核心章节。
- - 返回路径格式如: `file:///User/foo/bar.html`, `file:///User/foo/bar.md`
+3. 运行渲染脚本生成 HTML（默认会删除源 .md 文件，仅保留 HTML）。
+4. 返回 HTML 文件的绝对路径，并简要说明核心章节。
+ - 返回路径格式如: `file:///User/foo/bar.html`
+ - 若用户要求保留 md 文件，使用 `--keep-md` 参数，同时返回 md 路径
 
 ## 渲染命令
 
@@ -32,6 +33,7 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 | `--toc-min-level` | — | 目录包含的最小标题级别 | `2` |
 | `--toc-max-level` | — | 目录包含的最大标题级别 | `3` |
 | `--open` | `-O` | 渲染完成后在浏览器中打开 | 否 |
+| `--keep-md` | — | 保留源 Markdown 文件（默认渲染后删除） | 否 |
 
 
 ## 规则

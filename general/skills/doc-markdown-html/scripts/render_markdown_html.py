@@ -90,6 +90,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Open output HTML in browser after rendering",
     )
+    _ = parser.add_argument(
+        "--keep-md",
+        action="store_true",
+        help="Keep the source Markdown file after rendering (default: delete it)",
+    )
     return parser.parse_args()
 
 
@@ -490,6 +495,10 @@ def main() -> None:
 
     if not output_exists:
         raise SystemExit(f"Failed to create output HTML: {output_path}")
+
+    if not args.keep_md:
+        input_path.unlink()
+        print(f"Markdown deleted: {input_path}")
 
     if args.open:
         import webbrowser
