@@ -43,6 +43,7 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 - 支持解析 Markdown 文件开头的 YAML frontmatter。
 - 若用户已提供现成 Markdown 文件路径，则不允许修改原有的 Markdown 文件。
 - 不允许修改 `assets/doc-template.html`
+- frontmatter 中的日期值必须加引号（如 `date: "2026-04-01"`），否则 YAML 会将其解析为 `datetime.date` 对象导致 JSON 序列化失败。
 
 frontmatter 示例(支持解析任意字段)：
 

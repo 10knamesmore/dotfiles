@@ -1,0 +1,4 @@
+interface:
+  display_name: "测试计划"
+  short_description: "编写结构化测试计划并生成 HTML 页面"
+  default_prompt: "使用 $doc-test-plan 编写测试计划文档，生成可发布的 HTML 文件。"
