@@ -1,0 +1,54 @@
+// Hyprland screen effects shader
+// 由 screen_effects.sh 动态生成，请勿手动编辑
+
+precision highp float;
+varying vec2 v_texcoord;
+uniform sampler2D tex;
+
+// ── 胶片颗粒噪声 ──
+float hash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float filmGrain(vec2 uv, float intensity, float freq) {
+    // 细颗粒：高频像素级噪声（银盐基底）
+    float fine = hash(uv * freq) * 2.0 - 1.0;
+    // 中颗粒：团簇感（银盐聚集），频率为细颗粒的 ~0.4x
+    float cluster = hash(floor(uv * freq * 0.38) + fract(uv * freq) * 0.3) * 2.0 - 1.0;
+    // 低频明暗起伏（胶片乳剂层厚度不均匀），频率为细颗粒的 ~0.1x
+    float undulation = hash(floor(uv * freq * 0.1)) * 2.0 - 1.0;
+
+    float grain = fine * 0.55 + cluster * 0.35 + undulation * 0.10;
+    return grain * intensity;
+}
+
+void main() {
+    vec4 color = texture2D(tex, v_texcoord);
+
+    // ── 护眼色温调节 ──
+    float w = __WARMTH__;
+    color.r *= (1.0 + w * 0.1);
+    color.g *= (1.0 - w * 0.1);
+    color.b *= (1.0 - w * 0.3);
+
+    // ── 胶片颗粒效果 ──
+    float g = __GRAIN__;
+    if (g > 0.0) {
+        // grain_size: 0.0=极细(6000x) → 1.0=粗颗粒(800x)
+        float freq = mix(6000.0, 800.0, __GRAIN_SIZE__);
+
+        float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+        // shadow_boost: 暗部颗粒增强程度
+        float sb = __SHADOW_BOOST__;
+        float shadow = 1.0 - smoothstep(0.0, 0.5, luma);
+        float strength = g * 0.12 * (1.0 - sb * 0.4 + shadow * sb * 0.8);
+
+        float grain = filmGrain(v_texcoord, strength, freq);
+        color.rgb += grain;
+    }
+
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    gl_FragColor = color;
+}

@@ -1,0 +1,10 @@
+# 外接键盘插入时禁用笔记本内置键盘，拔出时恢复
+# 安装：sudo cp 99-keyboard-inhibit.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules
+
+# Telink Wireless Gaming Keyboard (320f:5088)
+ACTION=="add",    SUBSYSTEM=="input", ATTRS{idVendor}=="320f", ATTRS{idProduct}=="5088", RUN+="/home/wanger/dotfiles/linux/scripts/hypr/keyboard_manager.sh disable"
+ACTION=="remove", SUBSYSTEM=="input", ATTRS{idVendor}=="320f", ATTRS{idProduct}=="5088", RUN+="/home/wanger/dotfiles/linux/scripts/hypr/keyboard_manager.sh enable"
+
+# Redox Customized (1313:4122)
+ACTION=="add",    SUBSYSTEM=="input", ATTRS{idVendor}=="1313", ATTRS{idProduct}=="4122", RUN+="/home/wanger/dotfiles/linux/scripts/hypr/keyboard_manager.sh disable"
+ACTION=="remove", SUBSYSTEM=="input", ATTRS{idVendor}=="1313", ATTRS{idProduct}=="4122", RUN+="/home/wanger/dotfiles/linux/scripts/hypr/keyboard_manager.sh enable"
