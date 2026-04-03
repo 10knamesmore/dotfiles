@@ -133,7 +133,7 @@ uv run ../doc-markdown-html/scripts/render_markdown_html.py <input.md> --output 
 
 ## 参考文档
 
-同目录下的 `reference.md` 是一份完整的标准测试计划示例，可直接渲染为 HTML 查看效果。
+**重要：在编写任何测试计划之前，必须先用 Read 工具阅读同目录下的 `reference.md`。** 这是一份完整的标准测试计划示例，定义了章节结构、Fixture 写法、测试用例格式等所有细节。你的输出必须在结构和风格上与该参考文档保持一致。
 
 ## 规则
 

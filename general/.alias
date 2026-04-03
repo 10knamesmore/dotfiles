@@ -18,6 +18,7 @@ alias sudoed='sudo nvim'
 alias tt="taskwarrior-tui"
 alias umount='umount -v'
 alias venv="python -m venv .venv"
+alias bim='vim'
 alias vim='nvim -V1'
 alias grep="rg"
 alias rg="rg -i"
