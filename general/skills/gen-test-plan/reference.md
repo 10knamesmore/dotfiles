@@ -216,18 +216,191 @@ PAYMENT_CALLBACK_BASE_URL=http://localhost:3001
 
 ## 测试用例
 
-| ID | 模块 | 描述 | 前置条件 / Fixture | 步骤 | 预期结果 | 优先级 |
-|---|---|---|---|---|---|---|
-| TC-001 | 订单创建 | 正常创建订单 | auth-tokens (customer), seed-products, create-order-request (normal) | 1. 以 customer 身份调用 POST /api/v2/orders 2. 传入 normal 请求体 | 返回 201，订单状态为 pending_payment，库存扣减 | P0 |
-| TC-002 | 订单查询 | 查询订单详情 | auth-tokens (customer), TC-001 已执行 | 1. 以 customer 身份调用 GET /api/v2/orders/:id | 返回 200，包含完整订单信息和商品明细 | P0 |
-| TC-003 | 订单创建 | 库存不足时创建订单 | auth-tokens (customer), seed-products, create-order-request (outOfStock) | 1. 以 customer 身份调用 POST /api/v2/orders 2. 传入 outOfStock 请求体 | 返回 409，错误信息包含库存不足提示，库存不变 | P0 |
-| TC-004 | 支付回调 | 微信支付成功回调 | payment-callback-mock (wechatPaySuccess), TC-001 已执行 | 1. 模拟微信支付回调 POST 2. 查询订单状态 | 订单状态变为 paid，支付记录已创建 | P0 |
-| TC-005 | 订单取消 | 用户取消未支付订单 | auth-tokens (customer), TC-001 已执行 | 1. 以 customer 身份调用 PUT /api/v2/orders/:id/cancel | 返回 200，订单状态为 cancelled，库存已释放 | P1 |
-| TC-006 | 支付回调 | 重复支付回调幂等性 | payment-callback-mock (wechatPaySuccess), TC-004 已执行 | 1. 再次发送相同的微信支付回调 | 返回 200，订单状态仍为 paid，不产生重复支付记录 | P1 |
-| TC-007 | 权限控制 | 普通用户无法查看他人订单 | auth-tokens (customer + merchant) | 1. 以 customer 身份查询 merchant 的订单 | 返回 403 Forbidden | P1 |
-| TC-008 | 权限控制 | 管理员可查看所有订单 | auth-tokens (admin) | 1. 以 admin 身份调用 GET /api/v2/admin/orders | 返回 200，包含分页订单列表 | P1 |
-| TC-009 | 订单创建 | 购买已下架商品 | auth-tokens (customer), seed-products, create-order-request (inactiveProduct) | 1. 以 customer 身份下单已下架商品 | 返回 400，错误信息包含商品已下架 | P2 |
-| TC-010 | 订单列表 | 订单列表分页与筛选 | auth-tokens (customer), 多条已有订单 | 1. 调用 GET /api/v2/orders?page=1&size=10&status=paid | 返回 200，分页信息正确，仅包含 paid 状态订单 | P2 |
+### TC-001 正常创建订单
+
+- **模块**: 订单创建
+- **优先级**: P0
+- **前置条件**: auth-tokens (customer), seed-products, create-order-request (normal)
+
+**步骤：**
+
+1. 以 customer 身份调用：
+
+```
+POST /api/v2/orders
+```
+
+2. 传入 normal 请求体
+
+**预期结果：** 返回 201，订单状态为 pending_payment，库存扣减
+
+---
+
+### TC-002 查询订单详情
+
+- **模块**: 订单查询
+- **优先级**: P0
+- **前置条件**: auth-tokens (customer), TC-001 已执行
+
+**步骤：**
+
+1. 以 customer 身份调用：
+
+```
+GET /api/v2/orders/:id
+```
+
+**预期结果：** 返回 200，包含完整订单信息和商品明细
+
+---
+
+### TC-003 库存不足时创建订单
+
+- **模块**: 订单创建
+- **优先级**: P0
+- **前置条件**: auth-tokens (customer), seed-products, create-order-request (outOfStock)
+
+**步骤：**
+
+1. 以 customer 身份调用：
+
+```
+POST /api/v2/orders
+```
+
+2. 传入 outOfStock 请求体
+
+**预期结果：** 返回 409，错误信息包含库存不足提示，库存不变
+
+---
+
+### TC-004 微信支付成功回调
+
+- **模块**: 支付回调
+- **优先级**: P0
+- **前置条件**: payment-callback-mock (wechatPaySuccess), TC-001 已执行
+
+**步骤：**
+
+1. 模拟微信支付回调：
+
+```
+POST /api/v2/payment/callback/wechat
+```
+
+2. 查询订单状态
+
+**预期结果：** 订单状态变为 paid，支付记录已创建
+
+---
+
+### TC-005 用户取消未支付订单
+
+- **模块**: 订单取消
+- **优先级**: P1
+- **前置条件**: auth-tokens (customer), TC-001 已执行
+
+**步骤：**
+
+1. 以 customer 身份调用：
+
+```
+PUT /api/v2/orders/:id/cancel
+```
+
+**预期结果：** 返回 200，订单状态为 cancelled，库存已释放
+
+---
+
+### TC-006 重复支付回调幂等性
+
+- **模块**: 支付回调
+- **优先级**: P1
+- **前置条件**: payment-callback-mock (wechatPaySuccess), TC-004 已执行
+
+**步骤：**
+
+1. 再次发送相同的微信支付回调：
+
+```
+POST /api/v2/payment/callback/wechat
+```
+
+**预期结果：** 返回 200，订单状态仍为 paid，不产生重复支付记录
+
+---
+
+### TC-007 普通用户无法查看他人订单
+
+- **模块**: 权限控制
+- **优先级**: P1
+- **前置条件**: auth-tokens (customer + merchant)
+
+**步骤：**
+
+1. 以 customer 身份查询 merchant 的订单：
+
+```
+GET /api/v2/orders/:merchantOrderId
+```
+
+**预期结果：** 返回 403 Forbidden
+
+---
+
+### TC-008 管理员可查看所有订单
+
+- **模块**: 权限控制
+- **优先级**: P1
+- **前置条件**: auth-tokens (admin)
+
+**步骤：**
+
+1. 以 admin 身份调用：
+
+```
+GET /api/v2/admin/orders
+```
+
+**预期结果：** 返回 200，包含分页订单列表
+
+---
+
+### TC-009 购买已下架商品
+
+- **模块**: 订单创建
+- **优先级**: P2
+- **前置条件**: auth-tokens (customer), seed-products, create-order-request (inactiveProduct)
+
+**步骤：**
+
+1. 以 customer 身份下单已下架商品：
+
+```
+POST /api/v2/orders
+```
+
+2. 传入 inactiveProduct 请求体
+
+**预期结果：** 返回 400，错误信息包含商品已下架
+
+---
+
+### TC-010 订单列表分页与筛选
+
+- **模块**: 订单列表
+- **优先级**: P2
+- **前置条件**: auth-tokens (customer), 多条已有订单
+
+**步骤：**
+
+1. 调用：
+
+```
+GET /api/v2/orders?page=1&size=10&status=paid
+```
+
+**预期结果：** 返回 200，分页信息正确，仅包含 paid 状态订单
 
 ## 进入/退出标准
 
