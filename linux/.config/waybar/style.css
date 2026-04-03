@@ -54,6 +54,7 @@ window#waybar {
 #custom-media,
 #custom-net-down,
 #custom-net-up,
+#custom-screen-effects,
 #pulseaudio,
 #tray,
 #systemd-failed-units {
@@ -232,6 +233,21 @@ window#waybar {
   color: @red;
   border-left-color: @red;
   background: linear-gradient(135deg, @surface0 0%, rgba(237, 135, 150, 0.15) 100%);
+}
+
+/* =================== Screen Effects =================== */
+#custom-screen-effects {
+  background: @surface0;
+  color: @yellow;
+  border-left: 4px solid @yellow;
+  padding-left: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 2px 0 6px rgba(238, 212, 159, 0.12);
+}
+
+#custom-screen-effects:hover {
+  background: @surface1;
+  color: @peach;
+  box-shadow: 0 4px 14px rgba(238, 212, 159, 0.3);
 }
 
 /* =================== Audio =================== */

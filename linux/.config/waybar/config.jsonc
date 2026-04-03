@@ -27,6 +27,7 @@
     "custom/media",
     "pulseaudio",
     "network",
+    "custom/screen-effects",
     "battery"
   ],
   "hyprland/workspaces": {
@@ -179,6 +180,16 @@
     "on-scroll-down": "pactl set-sink-volume @DEFAULT_SINK@ -2%",
     "tooltip": true
   },
+  "custom/screen-effects": {
+    "exec": "$scripts_dir/hypr/screen_effects.sh status",
+    "return-type": "json",
+    "interval": 1,
+    "tooltip": true,
+    "on-scroll-up": "$scripts_dir/hypr/screen_effects.sh brightness +5",
+    "on-scroll-down": "$scripts_dir/hypr/screen_effects.sh brightness -5",
+    "on-click": "hyprctl dispatch global quickshell:screenEffects",
+    "on-click-right": "$scripts_dir/hypr/screen_effects.sh toggle"
+  },
   "pulseaudio": {
     "format": "{icon} {volume}%",
     "format-bluetooth": "{volume}% {icon}",
@@ -190,7 +201,7 @@
         " "
       ]
     },
-    "on-click": "pavucontrol",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
     "ignored-sinks": [
       "Easy Effects Sink"
     ]
