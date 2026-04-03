@@ -360,10 +360,15 @@ def preprocess_code_fences(md_text: str) -> str:
             continue
 
         if in_fence and re.match(r"^```\s*$", line):
-            block_index += 1
-            result.append("")
-            result.append(render_code_block("\n".join(buffer), fence_meta, block_index))
-            result.append("")
+            if fence_meta.lang == "mermaid":
+                result.append("")
+                result.append(f'<div class="mermaid">\n{chr(10).join(buffer)}\n</div>')
+                result.append("")
+            else:
+                block_index += 1
+                result.append("")
+                result.append(render_code_block("\n".join(buffer), fence_meta, block_index))
+                result.append("")
             in_fence = False
             buffer = []
             continue
@@ -403,6 +408,28 @@ def markdown_to_html(md_text: str) -> str:
             ],
         ),
     )
+
+
+def embed_local_images(html_text: str, base_dir: Path) -> str:
+    """将 HTML 中本地图片路径替换为 base64 data URI，使 HTML 自包含。"""
+    import base64
+    import mimetypes
+
+    def replace_src(m: re.Match[str]) -> str:
+        before, src, after = m.group(1), m.group(2), m.group(3)
+        if src.startswith(("data:", "http://", "https://", "//")):
+            return m.group(0)
+        img_path = (base_dir / src).resolve()
+        if not img_path.exists():
+            print(f"Warning: image not found: {img_path}", flush=True)
+            return m.group(0)
+        mime, _ = mimetypes.guess_type(str(img_path))
+        if not mime:
+            mime = "application/octet-stream"
+        b64 = base64.b64encode(img_path.read_bytes()).decode()
+        return f'{before}data:{mime};base64,{b64}{after}'
+
+    return re.sub(r'(<img[^>]+src=")([^"]+)(")', replace_src, html_text)
 
 
 def resolve_template_path(explicit: str | None) -> Path:
@@ -483,6 +510,8 @@ def main() -> None:
             dt.datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M"),
         )
     )
+
+    rendered = embed_local_images(rendered, input_path.parent)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _ = output_path.write_text(rendered, encoding="utf-8")

@@ -36,6 +36,23 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 | `--keep-md` | — | 保留源 Markdown 文件（默认渲染后删除） | 否 |
 
 
+## Markdown 支持范围
+
+渲染脚本支持以下内容：
+
+| 类型 | 说明 |
+|---|---|
+| 标准 Markdown | 标题、段落、粗斜体、行内代码、链接、图片 |
+| 表格 | GFM 风格，支持列对齐 |
+| 有序/无序列表 | 含嵌套 |
+| 代码块 | 围栏代码块，支持语言标注、`title="…"` 和 `{行号}` 高亮元信息 |
+| Mermaid 图表 | ` ```mermaid ` 块自动渲染为 SVG，跟随亮/暗主题切换 |
+| 本地图片 | `![](相对路径)` 自动 base64 内嵌，生成的 HTML 完全自包含 |
+| 块引用 | 单层与嵌套 |
+| 定义列表 | `term\n: definition` 格式 |
+| 脚注 | `[^key]` / `[^key]: …` 格式 |
+| YAML frontmatter | 文件开头 `---` 块，任意字段，渲染为文档信息面板 |
+
 ## 规则
 
 - 始终以 Markdown 作为事实来源。
