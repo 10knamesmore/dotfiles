@@ -498,7 +498,7 @@ def main() -> None:
 
     if not args.keep_md:
         input_path.unlink()
-        print(f"Markdown deleted: {input_path}")
+        print("md文件已删除, 可在html内复制")
 
     if args.open:
         import webbrowser
