@@ -318,3 +318,28 @@ Lorem ipsum dolor sit amet，连续段落用于撑开页面高度，以便测试
 [^font-toggle-note]: Footnote content should switch English words only，中文部分保持正常。
 
 Lorem ipsum dolor sit amet，连续段落用于撑开页面高度，以便测试滚动时目录条目的联动高亮效果。
+
+## Mermaid 图表测试
+
+```mermaid
+flowchart LR
+    A[开始] --> B{判断}
+    B -- 是 --> C[处理]
+    B -- 否 --> D[跳过]
+    C --> E[结束]
+    D --> E
+```
+
+```mermaid
+sequenceDiagram
+    participant 用户
+    participant 服务器
+    用户->>服务器: 发送请求
+    服务器-->>用户: 返回响应
+```
+
+## 图片渲染测试
+
+本地图片（应被 base64 内嵌）：
+
+![测试图片](test-image.png)

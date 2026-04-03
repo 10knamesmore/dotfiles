@@ -1126,6 +1126,48 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+
+    /* ── lightbox ── */
+    .doc-lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9000;
+      cursor: zoom-out;
+      padding: 24px;
+      animation: lightbox-in 0.15s ease;
+    }
+    @keyframes lightbox-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .doc-lightbox-inner {
+      max-width: 95vw;
+      max-height: 92vh;
+      overflow: visible;
+      border-radius: 10px;
+      background: var(--surface);
+      padding: 16px;
+      cursor: grab;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+      user-select: none;
+    }
+    .doc-lightbox-inner svg {
+      display: block;
+      height: auto;
+    }
+    .doc-lightbox-inner img {
+      display: block;
+      max-width: 85vw;
+      max-height: 85vh;
+      object-fit: contain;
+    }
+    .mermaid, .content img {
+      cursor: zoom-in;
+    }
   </style>
 </head>
 <body>
@@ -2871,6 +2913,114 @@
     });
     window.addEventListener('hashchange', syncLineTarget);
     document.addEventListener('DOMContentLoaded', () => { renderCodeBlocks(); });
+  </script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+    const mermaidSources = new Map();
+
+    function getMermaidTheme() {
+      return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+    }
+
+    async function renderMermaid() {
+      mermaidSources.forEach((src, el) => {
+        el.innerHTML = src;
+        el.removeAttribute('data-processed');
+      });
+      mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() });
+      await mermaid.run({ querySelector: '.mermaid' });
+      bindMermaidZoom();
+    }
+
+    /* ── lightbox ── */
+    const lightboxStateMap = new WeakMap();
+
+    function openLightbox(sourceEl, content) {
+      const overlay = document.createElement('div');
+      overlay.className = 'doc-lightbox';
+      const inner = document.createElement('div');
+      inner.className = 'doc-lightbox-inner';
+      inner.appendChild(content);
+      overlay.appendChild(inner);
+
+      const saved = lightboxStateMap.get(sourceEl) || { scale: 1, tx: 0, ty: 0 };
+      let { scale, tx, ty } = saved;
+
+      function applyTransform() {
+        inner.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+        inner.style.transformOrigin = 'center center';
+      }
+      applyTransform();
+
+      const close = () => {
+        lightboxStateMap.set(sourceEl, { scale, tx, ty });
+        overlay.remove();
+      };
+      let moved = false;
+      overlay.addEventListener('mousedown', () => { moved = false; });
+      overlay.addEventListener('mousemove', () => { moved = true; });
+      overlay.addEventListener('click', () => { if (!moved) close(); });
+      inner.addEventListener('click', e => e.stopPropagation());
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+      });
+
+      overlay.addEventListener('wheel', e => {
+        e.preventDefault();
+        scale *= e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        scale = Math.min(Math.max(scale, 0.2), 10);
+        applyTransform();
+      }, { passive: false });
+
+      let dragging = false, startX = 0, startY = 0, startTx = 0, startTy = 0;
+      inner.addEventListener('mousedown', e => {
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        startTx = tx; startTy = ty;
+        inner.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        tx = startTx + e.clientX - startX;
+        ty = startTy + e.clientY - startY;
+        applyTransform();
+      });
+      window.addEventListener('mouseup', () => {
+        dragging = false;
+        inner.style.cursor = '';
+      });
+
+      document.body.appendChild(overlay);
+    }
+
+    function bindMermaidZoom() {
+      document.querySelectorAll('.mermaid svg').forEach(svg => {
+        svg.style.cursor = 'zoom-in';
+        svg.onclick = () => openLightbox(svg, svg.cloneNode(true));
+      });
+    }
+
+    function bindImageZoom() {
+      document.querySelectorAll('.content img').forEach(img => {
+        img.onclick = () => {
+          const clone = img.cloneNode(true);
+          clone.style.cursor = 'default';
+          openLightbox(img, clone);
+        };
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.mermaid').forEach(el => {
+        mermaidSources.set(el, el.textContent.trim());
+      });
+      renderMermaid();
+      bindImageZoom();
+    });
+
+    document.addEventListener('doc-theme-change', () => { renderMermaid(); });
   </script>
 </body>
 </html>
