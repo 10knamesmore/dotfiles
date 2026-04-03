@@ -1,6 +1,6 @@
 ---
 name: doc-markdown-html
-description: 使用 Markdown 编写结构化文档并生成 HTML 页面。适用于撰写技术文档、产品说明、操作手册、规范、教程等场景。
+description: 需要编写文档时使用
 ---
 
 # Doc Markdown HTML
