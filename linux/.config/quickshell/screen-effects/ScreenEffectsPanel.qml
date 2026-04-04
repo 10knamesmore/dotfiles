@@ -4,6 +4,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import "../theme"
 
 // 屏幕效果控制面板 — 作为 layer-shell overlay 显示在右上角
 PanelWindow {
@@ -15,7 +16,11 @@ PanelWindow {
     anchors.left: true
     anchors.right: true
 
-    visible: false
+    // 双阶段可见性
+    property bool showing: PanelState.screenEffectsOpen
+    property bool animating: _opacityAnim.running || _slideAnim.running
+    visible: showing || animating
+
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
@@ -32,14 +37,17 @@ PanelWindow {
     property int brightness: 100
     property bool effectsActive: warmth > 0 || grain > 0
 
-    function togglePanel() {
-        if (visible) {
-            visible = false;
-        } else {
+    onShowingChanged: {
+        if (showing) {
             loadState();
             readBrightness();
-            visible = true;
         }
+    }
+
+    function togglePanel() {
+        PanelState.calendarOpen = false;
+        PanelState.mediaOpen = false;
+        PanelState.toggleScreenEffects();
     }
 
     function loadState() {
@@ -113,10 +121,18 @@ PanelWindow {
 
     // ── UI ──
 
+    // 半透明遮罩
+    Rectangle {
+        anchors.fill: parent
+        color: "#000000"
+        opacity: root.showing ? 0.15 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+    }
+
     // 点击面板外部关闭
     MouseArea {
         anchors.fill: parent
-        onClicked: root.visible = false
+        onClicked: PanelState.screenEffectsOpen = false
     }
 
     Rectangle {
@@ -124,13 +140,22 @@ PanelWindow {
         width: 320
         height: col.implicitHeight + 32
         radius: 16
-        color: "#363a4f"
-        border.color: "#494d64"
+        color: Qt.rgba(0.212, 0.227, 0.310, 0.85)
+        border.color: Qt.rgba(0.286, 0.302, 0.392, 0.9)
         border.width: 1
         anchors.top: parent.top
         anchors.right: parent.right
-        anchors.topMargin: 54
+        anchors.topMargin: root.showing ? 54 : 34
         anchors.rightMargin: 10
+
+        opacity: root.showing ? 1.0 : 0.0
+
+        Behavior on anchors.topMargin {
+            NumberAnimation { id: _slideAnim; duration: 250; easing.type: Easing.OutCubic }
+        }
+        Behavior on opacity {
+            NumberAnimation { id: _opacityAnim; duration: 250; easing.type: Easing.OutCubic }
+        }
 
         // 阻止点击面板内部时触发背景 MouseArea
         MouseArea {
