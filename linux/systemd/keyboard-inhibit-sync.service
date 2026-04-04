@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync laptop keyboard inhibit state on boot
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/wanger/dotfiles/linux/scripts/hypr/keyboard_manager.sh sync
+
+[Install]
+WantedBy=multi-user.target

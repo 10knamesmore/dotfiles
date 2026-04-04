@@ -8,15 +8,43 @@ set -euo pipefail
 #   sudo cp /path/to/99-keyboard-inhibit.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules
 
-LAPTOP_KB_NAME="AT Translated Set 2 keyboard"
+# 需要 inhibit 的所有内置键盘设备名（完整匹配）
+LAPTOP_KB_NAMES=(
+  "AT Translated Set 2 keyboard"
+  "ITE Tech. Inc. ITE Device(8296) Keyboard"
+)
 
-# 通过设备名动态查找 sysfs inhibited 路径
-find_inhibit_path() {
-  for name_file in /sys/class/input/input*/name; do
-    if [[ "$(cat "$name_file" 2>/dev/null)" == "$LAPTOP_KB_NAME" ]]; then
-      local p="$(dirname "$name_file")/inhibited"
-      [[ -f "$p" ]] && echo "$p" && return 0
-    fi
+# 对所有匹配的内置键盘执行 enable/disable
+set_inhibit() {
+  local val="$1"  # 0 或 1
+  for kb_name in "${LAPTOP_KB_NAMES[@]}"; do
+    for name_file in /sys/class/input/input*/name; do
+      if [[ "$(cat "$name_file" 2>/dev/null)" == "$kb_name" ]]; then
+        local p="$(dirname "$name_file")/inhibited"
+        [[ -f "$p" ]] && echo "$val" > "$p"
+      fi
+    done
+  done
+}
+
+# 已知外接键盘 vendor:product 列表
+EXTERNAL_KEYBOARDS=(
+  "320f:5088"  # Telink Wireless Gaming Keyboard
+  "1313:4122"  # Redox Customized
+)
+
+# 检查是否有已知外接键盘当前已连接
+external_connected() {
+  for id in "${EXTERNAL_KEYBOARDS[@]}"; do
+    local vendor="${id%%:*}"
+    local product="${id##*:}"
+    for v_file in /sys/bus/usb/devices/*/idVendor; do
+      local dir="$(dirname "$v_file")"
+      if [[ "$(cat "$v_file" 2>/dev/null)" == "$vendor" ]] && \
+         [[ "$(cat "$dir/idProduct" 2>/dev/null)" == "$product" ]]; then
+        return 0
+      fi
+    done
   done
   return 1
 }
@@ -24,16 +52,17 @@ find_inhibit_path() {
 action="${1:-}"
 
 case "$action" in
-  disable)
-    path="$(find_inhibit_path)" || exit 0
-    echo 1 > "$path"
-    ;;
-  enable)
-    path="$(find_inhibit_path)" || exit 0
-    echo 0 > "$path"
+  disable) set_inhibit 1 ;;
+  enable)  set_inhibit 0 ;;
+  sync)
+    if external_connected; then
+      set_inhibit 1
+    else
+      set_inhibit 0
+    fi
     ;;
   *)
-    echo "usage: $0 <enable|disable>" >&2
+    echo "usage: $0 <enable|disable|sync>" >&2
     exit 2
     ;;
 esac
