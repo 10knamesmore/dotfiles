@@ -16,6 +16,8 @@ QtObject {
     property bool launcherOpen: false
     property bool settingsOpen: false
     property bool clipboardOpen: false
+    property bool keybindingsOpen: false
+    property bool networkOpen: false
 
     function toggleScreenEffects() { screenEffectsOpen = !screenEffectsOpen }
     function toggleCalendar()      { calendarOpen = !calendarOpen }
@@ -25,6 +27,8 @@ QtObject {
     function toggleLauncher()      { launcherOpen = !launcherOpen }
     function toggleSettings()      { settingsOpen = !settingsOpen }
     function toggleClipboard()     { clipboardOpen = !clipboardOpen }
+    function toggleKeybindings()   { keybindingsOpen = !keybindingsOpen }
+    function toggleNetwork()       { networkOpen = !networkOpen }
 
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
@@ -36,6 +40,8 @@ QtObject {
         launcherOpen = false
         settingsOpen = false
         clipboardOpen = false
+        keybindingsOpen = false
+        networkOpen = false
     }
 
     // ── 勿扰 ──

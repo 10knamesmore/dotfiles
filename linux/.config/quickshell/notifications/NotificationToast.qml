@@ -22,24 +22,24 @@ PanelWindow {
     color: "transparent"
     visible: toastModel.count > 0
 
-    ListModel { id: toastModel }
+    ListModel {
+        id: toastModel
+    }
 
     Connections {
         target: root.notifServer
         function onNotification(notification) {
             // 勿扰模式或面板打开时不弹 toast
-            if (PanelState.dndEnabled || PanelState.notificationOpen) return
-
-            let timeout = notification.expireTimeout > 0
-                ? notification.expireTimeout * 1000
-                : 5000
+            if (PanelState.dndEnabled || PanelState.notificationOpen)
+                return;
+            let timeout = notification.expireTimeout > 0 ? notification.expireTimeout : 5000;
             toastModel.append({
                 notifId: notification.id,
                 appName: notification.appName || "",
                 summary: notification.summary || "",
                 body: notification.body || "",
                 timeout: timeout
-            })
+            });
         }
     }
 
@@ -64,28 +64,35 @@ PanelWindow {
                 border.width: 1
                 opacity: 0
                 x: 50
+                clip: true
 
                 Component.onCompleted: {
-                    opacity = 1
-                    x = 0
-                    dismissTimer.interval = model.timeout
-                    dismissTimer.start()
+                    opacity = 1;
+                    x = 0;
+                    dismissTimer.interval = model.timeout;
+                    dismissTimer.start();
                 }
 
                 Behavior on opacity {
                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                 }
                 Behavior on x {
-                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
+                Behavior on height {
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
+
+                function dismissToast() {
+                    toast.opacity = 0;
+                    toast.x = 50;
+                    toast.height = 0;
+                    removeTimer.start();
                 }
 
                 Timer {
                     id: dismissTimer
-                    onTriggered: {
-                        toast.opacity = 0
-                        toast.x = 50
-                        removeTimer.start()
-                    }
+                    onTriggered: toast.dismissToast()
                 }
 
                 Timer {
@@ -93,11 +100,11 @@ PanelWindow {
                     interval: 250
                     onTriggered: {
                         // 按 notifId 查找并移除，避免索引漂移
-                        let targetId = model.notifId
+                        let targetId = model.notifId;
                         for (let i = 0; i < toastModel.count; i++) {
                             if (toastModel.get(i).notifId === targetId) {
-                                toastModel.remove(i)
-                                break
+                                toastModel.remove(i);
+                                break;
                             }
                         }
                     }
@@ -105,7 +112,10 @@ PanelWindow {
 
                 ColumnLayout {
                     id: toastContent
-                    anchors { fill: parent; margins: 8 }
+                    anchors {
+                        fill: parent
+                        margins: 8
+                    }
                     spacing: 2
 
                     Text {
@@ -142,11 +152,7 @@ PanelWindow {
                 // 点击关闭 toast
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: {
-                        toast.opacity = 0
-                        toast.x = 50
-                        removeTimer.start()
-                    }
+                    onClicked: toast.dismissToast()
                 }
             }
         }

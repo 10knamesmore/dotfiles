@@ -30,6 +30,13 @@ PanelWindow {
     property int brightnessValue: 100
     property int volumePct: 0
     property bool volumeMuted: false
+    property bool nightLightEnabled: false
+    property bool caffeineEnabled: false
+
+    // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
+    property string _home: Quickshell.env("HOME")
+    property string _effectsState: _home + "/.cache/hypr/screen-effects.json"
+    property string _effectsScript: _home + "/dotfiles/generated/scripts/hypr/screen_effects.sh"
 
     onShowingChanged: {
         if (showing)
@@ -41,6 +48,8 @@ PanelWindow {
         btPowerProc.running = true;
         btDeviceProc.running = true;
         brightnessProc.running = true;
+        nightLightReader.running = true;
+        caffeineCheckProc.running = true;
     }
 
     // ── 进程 ──
@@ -108,6 +117,61 @@ PanelWindow {
     }
     Process {
         id: actionProc
+    }
+
+    // 夜灯状态读取
+    Process {
+        id: nightLightReader
+        command: ["cat", root._effectsState]
+        stdout: SplitParser {
+            onRead: data => {
+                try {
+                    let obj = JSON.parse(data);
+                    root.nightLightEnabled = (obj.warmth > 0 || obj.grain > 0);
+                } catch (e) {}
+            }
+        }
+    }
+
+    // 夜灯写入 + 应用
+    Process { id: nightLightWriter }
+    Process { id: nightLightApplier }
+
+    function toggleNightLight() {
+        let json;
+        if (root.nightLightEnabled) {
+            json = JSON.stringify({warmth: 0, grain: 0, grain_size: 50, shadow_boost: 40});
+        } else {
+            json = JSON.stringify({warmth: 60, grain: 85, grain_size: 10, shadow_boost: 40});
+        }
+        nightLightWriter.command = ["sh", "-c", "echo '" + json + "' > " + root._effectsState];
+        nightLightWriter.running = true;
+        nightLightApplier.command = [root._effectsScript, "apply"];
+        nightLightApplier.running = true;
+        root.nightLightEnabled = !root.nightLightEnabled;
+    }
+
+    // 咖啡因 — systemd-inhibit (通过 PID 文件管理)
+    Process { id: caffeineStartProc }
+    Process { id: caffeineStopProc }
+    Process {
+        id: caffeineCheckProc
+        command: ["sh", "-c", "kill -0 $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null && echo 1 || echo 0"]
+        stdout: SplitParser {
+            onRead: data => root.caffeineEnabled = data.trim() === "1"
+        }
+    }
+
+    function toggleCaffeine() {
+        if (root.caffeineEnabled) {
+            caffeineStopProc.command = ["sh", "-c", "kill $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null; rm -f /tmp/quickshell-caffeine.pid"];
+            caffeineStopProc.running = true;
+            root.caffeineEnabled = false;
+        } else {
+            caffeineStartProc.command = ["sh", "-c", "systemd-inhibit --what=idle --who=quickshell --why=caffeine sleep infinity & echo $! > /tmp/quickshell-caffeine.pid"];
+            caffeineStartProc.running = true;
+            root.caffeineEnabled = true;
+        }
     }
 
     Timer {
@@ -192,13 +256,9 @@ PanelWindow {
                 width: parent.width
                 spacing: 12
 
-                // ── 标题 ──
-                Text {
-                    text: "快捷设置"
-                    color: Colors.text
-                    font.family: "Hack Nerd Font"
-                    font.pixelSize: 16
-                    font.weight: Font.Bold
+                // ── 用户头像 ──
+                ProfileHeader {
+                    Layout.fillWidth: true
                 }
 
                 Rectangle {
@@ -257,6 +317,10 @@ PanelWindow {
                             actionProc.running = true;
                             root.wifiEnabled = !root.wifiEnabled;
                         }
+                        onRightClicked: {
+                            PanelState.settingsOpen = false
+                            PanelState.toggleNetwork()
+                        }
                     }
                     QuickToggle {
                         icon: root.btEnabled ? "󰂯" : "󰂲"
@@ -286,6 +350,31 @@ PanelWindow {
                             actionProc.running = true;
                         }
                     }
+                    QuickToggle {
+                        icon: root.nightLightEnabled ? "󰛨" : "󰹏"
+                        label: "夜灯"
+                        status: root.nightLightEnabled ? "已开启" : "已关闭"
+                        toggled: root.nightLightEnabled
+                        onClicked: root.toggleNightLight()
+                    }
+                    QuickToggle {
+                        icon: root.caffeineEnabled ? "󰅶" : "󰾪"
+                        label: "咖啡因"
+                        status: root.caffeineEnabled ? "保持唤醒" : "已关闭"
+                        toggled: root.caffeineEnabled
+                        onClicked: root.toggleCaffeine()
+                    }
+                    QuickToggle {
+                        icon: "󰈋"
+                        label: "取色器"
+                        status: "hyprpicker"
+                        toggled: false
+                        onClicked: {
+                            PanelState.settingsOpen = false;
+                            actionProc.command = ["hyprpicker", "-a"];
+                            actionProc.running = true;
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -295,103 +384,171 @@ PanelWindow {
                     opacity: 0.5
                 }
 
-                // ── 系统信息 ──
-                property bool infoExpanded: false
+                // ── 媒体卡片 ──
+                MediaCard {
+                    Layout.fillWidth: true
+                }
 
+                // ── 天气卡片 ──
+                WeatherCard {
+                    Layout.fillWidth: true
+                }
+
+                // ── 电池卡片 ──
+                BatteryCard {
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Colors.surface1
+                    opacity: 0.5
+                }
+
+                // ── 截图 ──
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 10
-
-                    Text {
-                        text: "󰍹"
-                        color: Colors.overlay1
-                        font.family: "Hack Nerd Font"
-                        font.pixelSize: 14
+                    spacing: 8
+                    ToolButton {
+                        icon: "󰹑"
+                        label: "区域截图"
+                        command: "hyprshot -m region"
                     }
-                    Text {
-                        id: uptimeText
-                        color: Colors.subtext0
-                        font.family: "Hack Nerd Font"
-                        font.pixelSize: 11
-                        text: "uptime..."
-                        Timer {
-                            running: root.showing
-                            interval: 60000
-                            repeat: true
-                            triggeredOnStart: true
-                            onTriggered: uptimeProc.running = true
-                        }
-                        Process {
-                            id: uptimeProc
-                            command: ["sh", "-c", "uptime -p | sed 's/up //'"]
-                            stdout: SplitParser {
-                                onRead: data => uptimeText.text = data
-                            }
-                        }
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-
-                    // 展开/折叠按钮
-                    Rectangle {
-                        width: 40
-                        height: 40
-                        radius: 20
-                        color: expandHover.containsMouse ? Colors.surface1 : "transparent"
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            text: mainCol.infoExpanded ? "󰅃" : "󰅀"
-                            color: Colors.subtext0
-                            font.family: "Hack Nerd Font"
-                            font.pixelSize: 18
-                        }
-                        MouseArea {
-                            id: expandHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mainCol.infoExpanded = !mainCol.infoExpanded
-                        }
-                    }
-
-                    // 重载按钮
-                    Rectangle {
-                        width: 40
-                        height: 40
-                        radius: 20
-                        color: reloadHover.containsMouse ? Colors.surface1 : "transparent"
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰑓"
-                            color: Colors.subtext0
-                            font.family: "Hack Nerd Font"
-                            font.pixelSize: 18
-                        }
-                        MouseArea {
-                            id: reloadHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: Quickshell.reload(true)
-                        }
+                    ToolButton {
+                        icon: "󰖯"
+                        label: "窗口截图"
+                        command: "hyprshot -m window"
                     }
                 }
 
-                // 折叠的系统信息
-                SystemInfo {
+                // ── 显示器切换 ──
+                RowLayout {
                     Layout.fillWidth: true
-                    expanded: mainCol.infoExpanded
+                    spacing: 8
+                    ToolButton {
+                        icon: "󰍹"
+                        label: "双屏"
+                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh dual"
+                        closeOnClick: false
+                    }
+                    ToolButton {
+                        icon: "󰶐"
+                        label: "外接"
+                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh external"
+                        closeOnClick: false
+                    }
+                    ToolButton {
+                        icon: "󰌢"
+                        label: "笔记本"
+                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh laptop"
+                        closeOnClick: false
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Colors.surface1
+                    opacity: 0.5
+                }
+
+                // ── 系统信息（可点击展开）──
+                property bool infoExpanded: false
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: sysInfoCol.implicitHeight + 20
+                    radius: 10
+                    color: sysHover.containsMouse ? Colors.surface1 : Colors.surface0
+                    border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(1, 1, 1, 0.04)
+                    border.width: 1
+                    clip: true
+
+                    Behavior on color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    Behavior on border.color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                    MouseArea {
+                        id: sysHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: mainCol.infoExpanded = !mainCol.infoExpanded
+                    }
+
+                    ColumnLayout {
+                        id: sysInfoCol
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.top: parent.top; anchors.margins: 10
+                        spacing: 8
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Text {
+                                text: "󰍹"
+                                color: Colors.overlay1
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 14
+                            }
+                            Text {
+                                id: uptimeText
+                                color: Colors.subtext0
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 11
+                                text: "uptime..."
+                                Timer {
+                                    running: root.showing
+                                    interval: 60000
+                                    repeat: true
+                                    triggeredOnStart: true
+                                    onTriggered: uptimeProc.running = true
+                                }
+                                Process {
+                                    id: uptimeProc
+                                    command: ["sh", "-c", "uptime -p | sed 's/up //'"]
+                                    stdout: SplitParser {
+                                        onRead: data => uptimeText.text = data
+                                    }
+                                }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Text {
+                                text: mainCol.infoExpanded ? "󰅃" : "󰅀"
+                                color: Colors.overlay1
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 14
+                            }
+
+                            // 重载按钮（阻止点击穿透到卡片）
+                            Rectangle {
+                                width: 28; height: 28; radius: 14
+                                color: reloadHover.containsMouse ? Colors.surface2 : "transparent"
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰑓"
+                                    color: Colors.subtext0
+                                    font.family: "Hack Nerd Font"; font.pixelSize: 14
+                                }
+                                MouseArea {
+                                    id: reloadHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: mouse => { mouse.accepted = true; Quickshell.reload(true) }
+                                }
+                            }
+                        }
+
+                        // 折叠的系统信息
+                        SystemInfo {
+                            Layout.fillWidth: true
+                            expanded: mainCol.infoExpanded
+                        }
+                    }
                 }
 
                 Rectangle {

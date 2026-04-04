@@ -11,14 +11,17 @@ Rectangle {
     property string status: ""
     property bool toggled: false
     signal clicked()
+    signal rightClicked()
 
     Layout.fillWidth: true
     implicitHeight: toggleCol.implicitHeight + 16
     radius: 12
     color: toggled
-        ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+        ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.25 : 0.15)
         : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.3) : "transparent"
+    border.color: toggled
+        ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : 0.3)
+        : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: 200 } }
@@ -57,6 +60,12 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton)
+                root.rightClicked()
+            else
+                root.clicked()
+        }
     }
 }

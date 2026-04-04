@@ -1,37 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 录屏 toggle：使用 wl-screenrec，支持 --region 选区录制
+# 录屏 toggle：使用 OBS Studio
+# OBS 通过 obs-cli 或直接启动控制
 
 pid_file="/tmp/hypr-screenrec.pid"
-output_dir="$HOME/Videos"
-mkdir -p "$output_dir"
 
-# 如果正在录制 → 停止
+# 如果正在录制 → 停止 OBS 录制
 if [[ -f "$pid_file" ]]; then
-  pid="$(cat "$pid_file")"
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -INT "$pid"
-    wait "$pid" 2>/dev/null || true
-    rm -f "$pid_file"
-    notify-send -t 3000 "Screen Record" "录制已停止"
-    exit 0
+  # 用 obs-cli 停止录制，或直接关 OBS
+  if command -v obs-cli &>/dev/null; then
+    obs-cli recording stop 2>/dev/null || true
   else
-    # PID 已失效，清理
-    rm -f "$pid_file"
+    pkill -f "obs" 2>/dev/null || true
   fi
+  rm -f "$pid_file"
+  notify-send -t 3000 "Screen Record" "录制已停止"
+  exit 0
 fi
 
-# 开始录制
-output_file="$output_dir/screenrec-$(date +%Y%m%d-%H%M%S).mp4"
-
-if [[ "${1:-}" == "--region" ]]; then
-  # 选区录制：先用 slurp 选区
-  geometry="$(slurp 2>/dev/null)" || exit 0
-  wl-screenrec -g "$geometry" -f "$output_file" &
-else
-  wl-screenrec -f "$output_file" &
-fi
-
-echo $! > "$pid_file"
-notify-send -t 3000 "Screen Record" "录制中... → $output_file"
+# 开始录制：启动 OBS（最小化到托盘并自动录制）
+touch "$pid_file"
+notify-send -t 3000 "Screen Record" "正在启动 OBS..."
+obs --startrecording --minimize-to-tray &
