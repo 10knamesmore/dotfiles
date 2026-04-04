@@ -15,16 +15,10 @@ Rectangle {
     implicitHeight: 36
     implicitWidth: row.implicitWidth + 8
 
-    // 阴影
-    Rectangle {
+    // 柔和阴影
+    SoftShadow {
         anchors.fill: parent
-        anchors.margins: -1
-        anchors.topMargin: 0
-        anchors.bottomMargin: -3
-        z: -1
-        radius: root.radius + 2
-        color: "#000000"
-        opacity: 0.15
+        radius: root.radius
     }
 
     RowLayout {

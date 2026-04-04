@@ -43,13 +43,11 @@ PanelWindow {
                 barScreen: root.modelData
             }
 
-            WindowTitleModule {
-            }
+            WindowTitleModule {}
 
             TrayModule {
                 barWindow: root
             }
-
         }
 
         // ── 中区：媒体 · 上行速度 · 时钟 · 下行速度 ──
@@ -58,20 +56,17 @@ PanelWindow {
             spacing: 6
             height: parent.height
 
-            MediaModule {
-            }
+            MediaModule {}
 
             NetSpeedModule {
                 direction: "up"
             }
 
-            ClockModule {
-            }
+            ClockModule {}
 
             NetSpeedModule {
                 direction: "down"
             }
-
         }
 
         // ── 右区：CPU · 内存 · 音量 · 网络 · 屏幕效果 · 电量 · 托盘 ──
@@ -82,32 +77,22 @@ PanelWindow {
             spacing: 6
             height: parent.height
 
-            CpuModule {
-            }
+            CpuModule {}
 
-            MemoryModule {
-            }
+            MemoryModule {}
 
-            AudioModule {
-            }
+            AudioModule {}
 
-            NetworkModule {
-            }
+            NetworkModule {}
 
-            ClipboardModule {
-            }
+            ClipboardModule {}
 
-            NotificationModule {
-            }
+            NotificationModule {}
 
-            ScreenEffectsModule {
-            }
+            ScreenEffectsModule {}
 
-            BatteryModule {
-            }
-
+            BatteryModule {}
         }
-
     }
 
     Behavior on margins.top {
@@ -115,7 +100,5 @@ PanelWindow {
             duration: 150
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

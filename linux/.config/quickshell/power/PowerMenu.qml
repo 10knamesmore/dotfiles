@@ -105,8 +105,9 @@ PanelWindow {
 
         Behavior on scale {
             NumberAnimation {
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animSlow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.decelerate
             }
 
         }
@@ -125,7 +126,7 @@ PanelWindow {
         width: 100
         height: 110
         radius: 16
-        color: btnArea.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.9) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
+        color: btnArea.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.7) : Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: btnArea.containsMouse ? Colors.blue : Colors.surface1
         border.width: 1
 

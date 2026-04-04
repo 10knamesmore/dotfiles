@@ -56,11 +56,34 @@ ColumnLayout {
             radius: 4
             color: Colors.surface1
 
+            // 渐变填充（accent 浅→深）
             Rectangle {
                 width: parent.width * slider.visualPosition
                 height: parent.height
                 radius: parent.radius
-                color: root.accentColor
+
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.6)
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: root.accentColor
+                    }
+
+                }
+
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 80
+                    }
+
+                }
+
             }
 
         }
@@ -74,11 +97,31 @@ ColumnLayout {
             color: slider.pressed ? Colors.text : slider.hovered ? Colors.subtext1 : Colors.subtext0
             border.color: root.accentColor
             border.width: 2
-            scale: slider.pressed ? 1.1 : slider.hovered ? 1.05 : 1
+            scale: slider.pressed ? 1.15 : slider.hovered ? 1.08 : 1
+
+            // Hover 外圈发光
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width + 8
+                height: parent.height + 8
+                radius: width / 2
+                color: "transparent"
+                border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, slider.hovered ? 0.2 : 0)
+                border.width: 2
+
+                Behavior on border.color {
+                    ColorAnimation {
+                        duration: 200
+                    }
+
+                }
+
+            }
 
             Behavior on scale {
                 NumberAnimation {
-                    duration: 100
+                    duration: 150
+                    easing.type: Easing.OutBack
                 }
 
             }

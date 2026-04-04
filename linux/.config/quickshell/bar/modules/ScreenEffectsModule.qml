@@ -26,15 +26,13 @@ BarModule {
         command: ["cat", Quickshell.env("HOME") + "/.cache/hypr/screen-effects.json"]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 try {
                     let obj = JSON.parse(data);
                     root.effectsActive = (obj.warmth > 0 || obj.grain > 0);
-                } catch (e) {
-                }
+                } catch (e) {}
             }
         }
-
     }
 
     Timer {
@@ -57,5 +55,4 @@ BarModule {
         font.pixelSize: Fonts.title
         font.weight: Font.DemiBold
     }
-
 }
