@@ -14,6 +14,9 @@ import "./media"
 import "./power"
 import "./osd"
 import "./notifications"
+import "./launcher"
+import "./settings"
+import "./clipboard"
 import "./theme"
 
 ShellRoot {
@@ -62,6 +65,26 @@ ShellRoot {
         name: "osdBrightness"
         description: "Show brightness OSD"
         onPressed: brightnessProc.running = true
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "launcher"
+        description: "Toggle app launcher"
+        onPressed: {
+            PanelState.closeAll()
+            PanelState.toggleLauncher()
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "settings"
+        description: "Toggle quick settings"
+        onPressed: {
+            PanelState.closeAll()
+            PanelState.toggleSettings()
+        }
     }
 
     // ── OSD: 音量变化检测（Pipewire 响应式）──
@@ -150,4 +173,7 @@ ShellRoot {
     OsdPanel           {}
     NotificationPanel  { notifServer: notifServer }
     NotificationToast  { notifServer: notifServer }
+    AppLauncher        {}
+    QuickSettings      {}
+    ClipboardPanel     {}
 }

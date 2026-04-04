@@ -13,12 +13,18 @@ QtObject {
     property bool mediaOpen: false
     property bool notificationOpen: false
     property bool powerMenuOpen: false
+    property bool launcherOpen: false
+    property bool settingsOpen: false
+    property bool clipboardOpen: false
 
     function toggleScreenEffects() { screenEffectsOpen = !screenEffectsOpen }
     function toggleCalendar()      { calendarOpen = !calendarOpen }
     function toggleMedia()         { mediaOpen = !mediaOpen }
     function toggleNotification()  { notificationOpen = !notificationOpen }
     function togglePowerMenu()     { powerMenuOpen = !powerMenuOpen }
+    function toggleLauncher()      { launcherOpen = !launcherOpen }
+    function toggleSettings()      { settingsOpen = !settingsOpen }
+    function toggleClipboard()     { clipboardOpen = !clipboardOpen }
 
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
@@ -27,7 +33,13 @@ QtObject {
         mediaOpen = false
         notificationOpen = false
         powerMenuOpen = false
+        launcherOpen = false
+        settingsOpen = false
+        clipboardOpen = false
     }
+
+    // ── 勿扰 ──
+    property bool dndEnabled: false
 
     // ── 通知 ──
     property int notificationCount: 0

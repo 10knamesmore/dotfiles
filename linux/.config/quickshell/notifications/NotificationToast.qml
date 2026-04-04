@@ -27,8 +27,8 @@ PanelWindow {
     Connections {
         target: root.notifServer
         function onNotification(notification) {
-            // 面板打开时不弹 toast
-            if (PanelState.notificationOpen) return
+            // 勿扰模式或面板打开时不弹 toast
+            if (PanelState.dndEnabled || PanelState.notificationOpen) return
 
             let timeout = notification.expireTimeout > 0
                 ? notification.expireTimeout * 1000

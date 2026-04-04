@@ -82,6 +82,7 @@ PanelWindow {
             MemoryModule {}
             AudioModule {}
             NetworkModule {}
+            ClipboardModule {}
             NotificationModule {}
             ScreenEffectsModule {}
             BatteryModule {}
