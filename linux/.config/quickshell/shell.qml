@@ -218,6 +218,9 @@ ShellRoot {
     QuickSettings {
     }
 
+    HotEdge {
+    }
+
     ClipboardPanel {
     }
 
