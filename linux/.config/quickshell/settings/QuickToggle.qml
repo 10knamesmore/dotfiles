@@ -16,10 +16,11 @@ Rectangle {
 
     Layout.fillWidth: true
     implicitHeight: toggleCol.implicitHeight + 16
-    radius: 12
+    radius: Tokens.radiusM
     color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.25 : 0.15) : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : 0.3) : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : 0.3) : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
     border.width: 1
+    scale: toggleHover.containsMouse ? 1.03 : 1
 
     ColumnLayout {
         id: toggleCol
@@ -33,6 +34,14 @@ Rectangle {
             color: root.toggled ? Colors.blue : Colors.overlay1
             font.family: Fonts.family
             font.pixelSize: Fonts.iconLarge
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 200
+                }
+
+            }
+
         }
 
         Text {
@@ -72,6 +81,21 @@ Rectangle {
     Behavior on color {
         ColorAnimation {
             duration: 200
+        }
+
+    }
+
+    Behavior on border.color {
+        ColorAnimation {
+            duration: 200
+        }
+
+    }
+
+    Behavior on scale {
+        NumberAnimation {
+            duration: 250
+            easing.type: Easing.OutBack
         }
 
     }

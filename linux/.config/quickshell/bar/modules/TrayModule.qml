@@ -18,27 +18,30 @@ Rectangle {
     visible: trayRepeater.count > 0
     clip: false
 
-    // 阴影
-    Rectangle {
+    // 柔和阴影
+    SoftShadow {
         anchors.fill: parent
-        anchors.margins: -1
-        anchors.topMargin: 0
-        anchors.bottomMargin: -3
-        z: -1
-        radius: root.radius + 2
-        color: "#000000"
-        opacity: 0.15
+        radius: root.radius
     }
 
-    // 左侧彩色边框
-    Rectangle {
-        width: 4
-        height: parent.height * 0.6
+    // 左侧弧形指示器
+    Item {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        radius: 2
-        color: Colors.overlay1
-        opacity: 0.7
+        width: 4
+        height: parent.height * 0.5
+        clip: true
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: root.radius * 2
+            radius: root.radius
+            color: Colors.overlay1
+            opacity: 0.6
+        }
+
     }
 
     RowLayout {

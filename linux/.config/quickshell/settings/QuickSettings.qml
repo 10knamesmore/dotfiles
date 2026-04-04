@@ -39,18 +39,18 @@ PanelWindow {
         let json;
         if (root.nightLightEnabled)
             json = JSON.stringify({
-                "warmth": 0,
-                "grain": 0,
-                "grain_size": 50,
-                "shadow_boost": 40
-            });
+            "warmth": 0,
+            "grain": 0,
+            "grain_size": 50,
+            "shadow_boost": 40
+        });
         else
             json = JSON.stringify({
-                "warmth": 60,
-                "grain": 85,
-                "grain_size": 10,
-                "shadow_boost": 40
-            });
+            "warmth": 60,
+            "grain": 85,
+            "grain_size": 10,
+            "shadow_boost": 40
+        });
         nightLightWriter.command = ["sh", "-c", "echo '" + json + "' > " + root._effectsState];
         nightLightWriter.running = true;
         nightLightApplier.command = [root._effectsScript, "apply"];
@@ -272,8 +272,8 @@ PanelWindow {
         width: 340
         anchors.leftMargin: root.showing ? 10 : -360
         radius: 16
-        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
-        border.color: Qt.rgba(1, 1, 1, 0.08)
+        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
+        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
         clip: true
         opacity: root.showing ? 1 : 0
@@ -313,14 +313,20 @@ PanelWindow {
                     Layout.fillWidth: true
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 // ── 滑块区 ──
+                Text {
+                    text: "调节"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    font.letterSpacing: 2
+                    font.weight: Font.Medium
+                }
+
                 SettingsSlider {
                     Layout.fillWidth: true
                     icon: root.brightnessValue > 50 ? "󰃠" : "󰃞"
@@ -346,14 +352,20 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 // ── 开关区 ──
+                Text {
+                    text: "快捷开关"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    font.letterSpacing: 2
+                    font.weight: Font.Medium
+                }
+
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 3
@@ -437,11 +449,8 @@ PanelWindow {
 
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 // ── 媒体卡片 ──
@@ -459,14 +468,20 @@ PanelWindow {
                     Layout.fillWidth: true
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 // ── 截图 ──
+                Text {
+                    text: "工具"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    font.letterSpacing: 2
+                    font.weight: Font.Medium
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -513,19 +528,16 @@ PanelWindow {
 
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: sysInfoCol.implicitHeight + 20
-                    radius: 10
-                    color: sysHover.containsMouse ? Colors.surface1 : Colors.surface0
-                    border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(1, 1, 1, 0.04)
+                    radius: Tokens.radiusM
+                    color: sysHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
+                    border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(1, 1, 1, 0.06)
                     border.width: 1
                     clip: true
 
@@ -672,14 +684,20 @@ PanelWindow {
 
                 }
 
-                Rectangle {
+                Divider {
                     Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                    opacity: 0.5
                 }
 
                 // ── 电源操作 ──
+                Text {
+                    text: "电源"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    font.letterSpacing: 2
+                    font.weight: Font.Medium
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -720,12 +738,48 @@ PanelWindow {
 
         }
 
+        // 内发光（毛玻璃顶部光源）
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            z: 1
+
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+
+                GradientStop {
+                    position: 0
+                    color: "transparent"
+                }
+
+                GradientStop {
+                    position: 0.3
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 0.7
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+
+            }
+
+        }
+
         Behavior on anchors.leftMargin {
             NumberAnimation {
                 id: _slideAnim
 
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animSlow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.decelerate
             }
 
         }
@@ -734,7 +788,7 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 250
+                duration: 300
                 easing.type: Easing.OutCubic
             }
 

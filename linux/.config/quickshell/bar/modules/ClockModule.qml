@@ -37,7 +37,6 @@ Rectangle {
                 position: 1
                 color: Colors.teal
             }
-
         }
 
         Behavior on opacity {
@@ -45,30 +44,15 @@ Rectangle {
                 duration: 300
                 easing.type: Easing.OutCubic
             }
-
         }
-
     }
 
-    // 阴影
-    Rectangle {
+    // 柔和蓝色阴影
+    SoftShadow {
         anchors.fill: parent
-        anchors.margins: -1
-        anchors.topMargin: 0
-        anchors.bottomMargin: -3
-        z: -1
-        radius: root.radius + 2
-        color: Colors.blue
-        opacity: root.hovered ? 0.35 : 0.25
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 300
-                easing.type: Easing.OutCubic
-            }
-
-        }
-
+        radius: root.radius
+        shadowColor: Colors.blue
+        strength: root.hovered ? 0.35 : 0.25
     }
 
     SystemClock {
@@ -102,7 +86,6 @@ Rectangle {
             font.weight: Font.ExtraBold
             visible: root.showDate
         }
-
     }
 
     MouseArea {
@@ -112,7 +95,7 @@ Rectangle {
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-        onClicked: (mouse) => {
+        onClicked: mouse => {
             if (mouse.button === Qt.RightButton) {
                 root.showDate = !root.showDate;
             } else {
@@ -141,7 +124,5 @@ Rectangle {
             position: 1
             color: Colors.sky
         }
-
     }
-
 }

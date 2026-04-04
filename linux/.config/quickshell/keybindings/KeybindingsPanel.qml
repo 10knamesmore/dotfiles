@@ -248,18 +248,35 @@ PanelWindow {
         height: root.height * 0.8
         anchors.centerIn: parent
         radius: 16
-        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.92)
-        border.color: Qt.rgba(1, 1, 1, 0.08); border.width: 1
+        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
+        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha); border.width: 1
         clip: true
 
         scale: root.showing ? 1.0 : 0.95
         opacity: root.showing ? 1.0 : 0.0
 
+        // 内发光（毛玻璃顶部光源）
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            z: 1
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+
+                GradientStop { position: 0; color: "transparent" }
+                GradientStop { position: 0.3; color: Qt.rgba(1, 1, 1, 0.06) }
+                GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 0.06) }
+                GradientStop { position: 1; color: "transparent" }
+            }
+        }
+
         Behavior on scale {
-            NumberAnimation { id: _scaleAnim; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation { id: _scaleAnim; duration: Tokens.animSlow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.decelerate }
         }
         Behavior on opacity {
-            NumberAnimation { id: _opacityAnim; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation { id: _opacityAnim; duration: 300; easing.type: Easing.OutCubic }
         }
 
         MouseArea { anchors.fill: parent; onClicked: mouse => mouse.accepted = true }

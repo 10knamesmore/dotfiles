@@ -104,8 +104,8 @@ PanelWindow {
         width: 300
         height: col.implicitHeight + 32
         radius: 16
-        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
-        border.color: Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.9)
+        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
+        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -305,12 +305,48 @@ PanelWindow {
 
         }
 
+        // 内发光（毛玻璃顶部光源）
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            z: 1
+
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+
+                GradientStop {
+                    position: 0
+                    color: "transparent"
+                }
+
+                GradientStop {
+                    position: 0.3
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 0.7
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+
+            }
+
+        }
+
         Behavior on anchors.topMargin {
             NumberAnimation {
                 id: _slideAnim
 
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animSlow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.decelerate
             }
 
         }
@@ -319,7 +355,7 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 250
+                duration: 300
                 easing.type: Easing.OutCubic
             }
 

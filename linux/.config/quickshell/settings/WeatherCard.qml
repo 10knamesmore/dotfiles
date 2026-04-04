@@ -31,6 +31,9 @@ Rectangle {
 
     function parseData() {
         try {
+            // "HH:MM"
+            // "MM-DD"
+
             let obj = JSON.parse(_buf);
             // 当前天气
             root.temperature = obj.current.temperature_2m;
@@ -40,8 +43,6 @@ Rectangle {
             // 逐时
             let h = [];
             for (let i = 0; i < obj.hourly.time.length; i++) {
-                // "HH:MM"
-
                 let t = obj.hourly.time[i];
                 h.push({
                     "time": t.substring(11, 16),
@@ -54,8 +55,6 @@ Rectangle {
             let d = [];
             let weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
             for (let i = 0; i < obj.daily.time.length; i++) {
-                // "MM-DD"
-
                 let date = new Date(obj.daily.time[i]);
                 d.push({
                     "day": i === 0 ? "今天" : weekdays[date.getDay()],
@@ -75,31 +74,40 @@ Rectangle {
     function wmoIcon(code) {
         if (code === 0)
             return "󰖙";
- // 晴
+
+        // 晴
         if (code <= 3)
             return "󰖐";
- // 多云
+
+        // 多云
         if (code <= 49)
             return "󰖑";
- // 雾
+
+        // 雾
         if (code <= 59)
             return "󰖗";
- // 毛毛雨
+
+        // 毛毛雨
         if (code <= 69)
             return "󰖗";
- // 雨
+
+        // 雨
         if (code <= 79)
             return "󰖘";
- // 雪
+
+        // 雪
         if (code <= 84)
             return "󰖗";
- // 阵雨
+
+        // 阵雨
         if (code <= 86)
             return "󰖘";
- // 阵雪
+
+        // 阵雪
         if (code <= 99)
             return "󰖖";
- // 雷暴
+
+        // 雷暴
         return "󰖐";
     }
 

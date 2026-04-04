@@ -85,19 +85,19 @@ PanelWindow {
             let best = Math.max(idScore, nameScore, genericScore, commentScore, keywordScore);
             if (best > 0)
                 results.push({
-                    "entry": app,
-                    "score": best
-                });
+                "entry": app,
+                "score": best
+            });
 
         }
         if (q.length > 0)
             results.sort((a, b) => {
-                return b.score - a.score;
-            });
+            return b.score - a.score;
+        });
         else
             results.sort((a, b) => {
-                return (a.entry.name || "").localeCompare(b.entry.name || "");
-            });
+            return (a.entry.name || "").localeCompare(b.entry.name || "");
+        });
         resultModel.clear();
         for (let r = 0; r < results.length; r++) {
             resultModel.append({
@@ -194,8 +194,8 @@ PanelWindow {
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.2
         radius: 20
-        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
-        border.color: Qt.rgba(1, 1, 1, 0.08)
+        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
+        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
         opacity: root.showing ? 1 : 0
         scale: root.showing ? 1 : 0.95
@@ -269,7 +269,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 height: 1
                 color: Colors.surface1
-                visible: root.filteredApps.length > 0
+                visible: root._results.length > 0
             }
 
             // ── 结果列表（可滚动）──
@@ -383,11 +383,46 @@ PanelWindow {
 
         }
 
+        // 内发光（毛玻璃顶部光源）
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            z: 1
+
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+
+                GradientStop {
+                    position: 0
+                    color: "transparent"
+                }
+
+                GradientStop {
+                    position: 0.3
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 0.7
+                    color: Qt.rgba(1, 1, 1, 0.06)
+                }
+
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+
+            }
+
+        }
+
         Behavior on opacity {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 200
+                duration: 300
                 easing.type: Easing.OutCubic
             }
 
@@ -397,8 +432,9 @@ PanelWindow {
             NumberAnimation {
                 id: _scaleAnim
 
-                duration: 200
-                easing.type: Easing.OutCubic
+                duration: Tokens.animSlow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.decelerate
             }
 
         }
