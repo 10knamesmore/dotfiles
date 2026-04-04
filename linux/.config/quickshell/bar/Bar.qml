@@ -10,14 +10,26 @@ PanelWindow {
     id: root
 
     required property var modelData
+    property bool revealed: PanelState.isBarVisibleForScreen(root.modelData.name)
+    property bool transientReveal: !PanelState.barPinnedVisible && PanelState.barHoverRevealScreen === root.modelData.name
+    property int barHeight: 44
+    property int trackingBandHeight: 44
+
+    function queueAutoHide() {
+        if (!root.transientReveal || PanelState.anyPanelOpen || barHover.hovered || trackingHover.hovered)
+            return;
+
+        hideTimer.stop();
+        hideTimer.start();
+    }
 
     screen: modelData
     anchors.top: true
     anchors.left: true
     anchors.right: true
-    implicitHeight: 44
-    exclusiveZone: PanelState.barVisible ? 50 : 0
-    margins.top: PanelState.barVisible ? 6 : -56
+    implicitHeight: root.barHeight + (root.transientReveal ? root.trackingBandHeight : 0)
+    exclusiveZone: root.revealed ? 50 : 0
+    margins.top: root.revealed ? 6 : -(root.implicitHeight + 12)
     margins.left: 2
     margins.right: 2
     color: "transparent"
@@ -25,7 +37,14 @@ PanelWindow {
     Item {
         id: barContent
 
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: root.barHeight
+
+        HoverHandler {
+            id: barHover
+        }
 
         // ── 左区：工作区 · 布局状态 · 窗口标题 · systemd ──
         RowLayout {
@@ -92,6 +111,63 @@ PanelWindow {
             ScreenEffectsModule {}
 
             BatteryModule {}
+        }
+    }
+
+    Item {
+        id: trackingZone
+
+        anchors.top: barContent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: root.trackingBandHeight
+        visible: root.transientReveal
+
+        HoverHandler {
+            id: trackingHover
+        }
+    }
+
+    Timer {
+        id: hideTimer
+
+        interval: 180
+        onTriggered: {
+            if (root.transientReveal && !PanelState.anyPanelOpen && !barHover.hovered && !trackingHover.hovered)
+                PanelState.hideHoverBar();
+        }
+    }
+
+    Connections {
+        target: PanelState
+
+        function onAnyPanelOpenChanged() {
+            if (PanelState.anyPanelOpen)
+                hideTimer.stop();
+            else
+                root.queueAutoHide();
+        }
+    }
+
+    Connections {
+        target: barHover
+
+        function onHoveredChanged() {
+            if (barHover.hovered)
+                hideTimer.stop();
+            else
+                root.queueAutoHide();
+        }
+    }
+
+    Connections {
+        target: trackingHover
+
+        function onHoveredChanged() {
+            if (trackingHover.hovered)
+                hideTimer.stop();
+            else
+                root.queueAutoHide();
         }
     }
 

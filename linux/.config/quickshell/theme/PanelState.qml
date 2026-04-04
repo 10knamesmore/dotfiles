@@ -4,7 +4,9 @@ pragma Singleton
 // 全局面板状态单例 — 用于 bar 模块与弹出面板之间的跨组件通信
 QtObject {
     // ── Bar ──
-    property bool barVisible: true
+    property bool barPinnedVisible: true
+    property string barHoverRevealScreen: ""
+    readonly property bool barVisible: barPinnedVisible
     // ── 面板 ──
     property bool screenEffectsOpen: false
     property bool calendarOpen: false
@@ -25,11 +27,29 @@ QtObject {
     property string osdType: "" // "volume" | "brightness"
     property int osdValue: 0 // 0-100
     property string osdIcon: ""
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen
 
     signal clearAllNotifications()
 
     function toggleBar() {
-        barVisible = !barVisible;
+        barPinnedVisible = !barPinnedVisible;
+        if (barPinnedVisible)
+            barHoverRevealScreen = "";
+    }
+
+    function showBarForScreen(screenName) {
+        if (!screenName || barPinnedVisible)
+            return;
+
+        barHoverRevealScreen = screenName;
+    }
+
+    function hideHoverBar() {
+        barHoverRevealScreen = "";
+    }
+
+    function isBarVisibleForScreen(screenName) {
+        return barPinnedVisible || barHoverRevealScreen === screenName;
     }
 
     function toggleScreenEffects() {
