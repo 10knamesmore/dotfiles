@@ -167,12 +167,13 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.4 : 0
+        opacity: root.showing ? Tokens.backdropMedium : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 200
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -193,12 +194,17 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.2
-        radius: 20
+        radius: Tokens.radiusXL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
         opacity: root.showing ? 1 : 0
         scale: root.showing ? 1 : 0.95
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -211,8 +217,8 @@ PanelWindow {
             id: col
 
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 8
+            anchors.margins: Tokens.spaceL
+            spacing: Tokens.spaceS
 
             // ── 搜索栏 ──
             RowLayout {
@@ -295,14 +301,14 @@ PanelWindow {
 
                     width: resultList.width
                     height: 44
-                    radius: 10
+                    radius: Tokens.radiusMS
                     color: index === root.selectedIndex ? Colors.surface1 : appHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : "transparent"
 
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
-                        spacing: 12
+                        spacing: Tokens.spaceM
 
                         // 应用图标
                         Image {
@@ -360,7 +366,7 @@ PanelWindow {
 
                     Behavior on color {
                         ColorAnimation {
-                            duration: 100
+                            duration: Tokens.animFast
                         }
 
                     }
@@ -383,47 +389,15 @@ PanelWindow {
 
         }
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop {
-                    position: 0
-                    color: "transparent"
-                }
-
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "transparent"
-                }
-
-            }
-
-        }
+        InnerGlow {}
 
         Behavior on opacity {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }

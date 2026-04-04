@@ -235,8 +235,8 @@ PanelWindow {
     // ── UI ──
     Rectangle {
         anchors.fill: parent; color: "#000000"
-        opacity: root.showing ? 0.3 : 0.0
-        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+        opacity: root.showing ? Tokens.backdropMedium : 0.0
+        Behavior on opacity { NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
     }
 
     Item { focus: root.showing; Keys.onEscapePressed: PanelState.keybindingsOpen = false }
@@ -247,7 +247,7 @@ PanelWindow {
         width: Math.min(700, root.width - 40)
         height: root.height * 0.8
         anchors.centerIn: parent
-        radius: 16
+        radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha); border.width: 1
         clip: true
@@ -255,38 +255,28 @@ PanelWindow {
         scale: root.showing ? 1.0 : 0.95
         opacity: root.showing ? 1.0 : 0.0
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop { position: 0; color: "transparent" }
-                GradientStop { position: 0.3; color: Qt.rgba(1, 1, 1, 0.06) }
-                GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 0.06) }
-                GradientStop { position: 1; color: "transparent" }
-            }
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
         }
+
+        InnerGlow {}
 
         Behavior on scale {
             NumberAnimation { id: _scaleAnim; duration: Tokens.animSlow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.decelerate }
         }
         Behavior on opacity {
-            NumberAnimation { id: _opacityAnim; duration: 300; easing.type: Easing.OutCubic }
+            NumberAnimation { id: _opacityAnim; duration: Tokens.animNormal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard }
         }
 
         MouseArea { anchors.fill: parent; onClicked: mouse => mouse.accepted = true }
 
         ColumnLayout {
-            anchors.fill: parent; anchors.margins: 20; spacing: 12
+            anchors.fill: parent; anchors.margins: 20; spacing: Tokens.spaceM
 
             // 标题 + 搜索
             RowLayout {
-                Layout.fillWidth: true; spacing: 12
+                Layout.fillWidth: true; spacing: Tokens.spaceM
 
                 Text {
                     text: "󰌌 快捷键速查"
@@ -298,7 +288,7 @@ PanelWindow {
 
                 // 搜索框
                 Rectangle {
-                    Layout.preferredWidth: 200; height: 32; radius: 10
+                    Layout.preferredWidth: 200; height: 32; radius: Tokens.radiusMS
                     color: Colors.surface1
 
                     RowLayout {
@@ -332,7 +322,7 @@ PanelWindow {
                 ColumnLayout {
                     id: sectionsCol
                     width: parent.width
-                    spacing: 12
+                    spacing: Tokens.spaceM
 
                     // 空状态
                     Text {
@@ -352,12 +342,12 @@ PanelWindow {
 
                             Layout.fillWidth: true
                             implicitHeight: cardCol.implicitHeight + 20
-                            radius: 10
+                            radius: Tokens.radiusMS
                             color: sectionHover.containsMouse ? Colors.surface1 : Colors.surface0
-                            border.color: sectionHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(1, 1, 1, 0.04)
+                            border.color: sectionHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
                             border.width: 1
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                            Behavior on border.color { ColorAnimation { duration: 200 } }
+                            Behavior on color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
+                            Behavior on border.color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
 
                             MouseArea {
                                 id: sectionHover
@@ -390,11 +380,11 @@ PanelWindow {
                                     delegate: RowLayout {
                                         required property var modelData
                                         Layout.fillWidth: true
-                                        spacing: 12
+                                        spacing: Tokens.spaceM
 
                                         // 按键 badge
                                         Row {
-                                            spacing: 4
+                                            spacing: Tokens.spaceXS
                                             Layout.preferredWidth: 200
                                             Layout.alignment: Qt.AlignTop
 
@@ -404,7 +394,7 @@ PanelWindow {
                                                     required property var modelData
                                                     width: keyLabel.implicitWidth + 12
                                                     height: 22
-                                                    radius: 4
+                                                    radius: Tokens.radiusXS
                                                     color: Colors.surface1
                                                     border.color: Qt.rgba(1, 1, 1, 0.08)
                                                     border.width: 1

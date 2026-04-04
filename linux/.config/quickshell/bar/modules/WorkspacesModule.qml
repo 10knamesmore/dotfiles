@@ -10,7 +10,7 @@ Rectangle {
 
     property var barScreen: null
 
-    radius: 16
+    radius: Tokens.radiusL
     color: Colors.base
     implicitHeight: 36
     implicitWidth: row.implicitWidth + 8
@@ -46,7 +46,7 @@ Rectangle {
 
                 width: 35
                 height: 28
-                radius: 14
+                radius: Tokens.radiusFull
                 color: isActive ? "transparent" : (wsHover.containsMouse ? Colors.surface1 : "transparent")
 
                 // 激活态渐变 mauve → blue
@@ -83,7 +83,9 @@ Rectangle {
 
                     Behavior on color {
                         ColorAnimation {
-                            duration: 200
+                            duration: Tokens.animFast
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Anim.standard
                         }
 
                     }
@@ -102,7 +104,9 @@ Rectangle {
 
                 Behavior on color {
                     ColorAnimation {
-                        duration: 200
+                        duration: Tokens.animFast
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.standard
                     }
 
                 }

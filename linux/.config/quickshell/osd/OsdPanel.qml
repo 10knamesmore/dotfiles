@@ -48,16 +48,18 @@ PanelWindow {
             target: osdWidget
             property: "opacity"
             to: 1
-            duration: 150
-            easing.type: Easing.OutCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.decelerate
         }
 
         NumberAnimation {
             target: osdWidget
             property: "scale"
             to: 1
-            duration: 150
-            easing.type: Easing.OutCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.decelerate
         }
 
     }
@@ -69,16 +71,18 @@ PanelWindow {
             target: osdWidget
             property: "opacity"
             to: 0
-            duration: 200
-            easing.type: Easing.InCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.accelerate
         }
 
         NumberAnimation {
             target: osdWidget
             property: "scale"
             to: 0.95
-            duration: 200
-            easing.type: Easing.InCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.accelerate
         }
 
     }
@@ -91,11 +95,16 @@ PanelWindow {
         anchors.bottom: parent.bottom
         width: 240
         height: 80
-        radius: 20
+        radius: Tokens.radiusXL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.toastAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
         opacity: 0
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         Row {
             anchors.centerIn: parent

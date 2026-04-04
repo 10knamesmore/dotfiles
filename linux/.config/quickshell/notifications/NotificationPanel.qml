@@ -32,12 +32,13 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.15 : 0
+        opacity: root.showing ? Tokens.backdropDim : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -54,7 +55,7 @@ PanelWindow {
 
         width: 380
         height: Math.min(col.implicitHeight + 32, root.height - 80)
-        radius: 16
+        radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
@@ -64,6 +65,11 @@ PanelWindow {
         anchors.rightMargin: 10
         clip: true
         opacity: root.showing ? 1 : 0
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -76,8 +82,8 @@ PanelWindow {
             id: col
 
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 8
+            anchors.margins: Tokens.spaceL
+            spacing: Tokens.spaceS
 
             // ── 标题栏 ──
             RowLayout {
@@ -116,7 +122,7 @@ PanelWindow {
                     visible: PanelState.notificationCount > 0
                     width: clearText.implicitWidth + 16
                     height: 26
-                    radius: 13
+                    radius: Tokens.radiusFull
                     color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
 
                     Text {
@@ -189,7 +195,7 @@ PanelWindow {
 
                     width: ListView.view.width
                     height: notifRow.implicitHeight + 16
-                    radius: 10
+                    radius: Tokens.radiusMS
                     color: notifHover.containsMouse ? Colors.surface2 : Colors.surface1
 
                     // hover 检测（底层）
@@ -204,13 +210,13 @@ PanelWindow {
                     RowLayout {
                         id: notifRow
 
-                        spacing: 8
+                        spacing: Tokens.spaceS
 
                         anchors {
                             left: parent.left
                             right: parent.right
                             top: parent.top
-                            margins: 8
+                            margins: Tokens.spaceS
                         }
 
                         // 通知内容
@@ -253,7 +259,7 @@ PanelWindow {
                         Rectangle {
                             width: 28
                             height: 28
-                            radius: 14
+                            radius: Tokens.radiusFull
                             color: copyArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
 
                             Text {
@@ -298,7 +304,7 @@ PanelWindow {
                         Rectangle {
                             width: 28
                             height: 28
-                            radius: 14
+                            radius: Tokens.radiusFull
                             color: dismissArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
 
                             Text {
@@ -350,40 +356,7 @@ PanelWindow {
 
         }
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop {
-                    position: 0
-                    color: "transparent"
-                }
-
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "transparent"
-                }
-
-            }
-
-        }
+        InnerGlow {}
 
         Behavior on anchors.topMargin {
             NumberAnimation {
@@ -400,8 +373,9 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }

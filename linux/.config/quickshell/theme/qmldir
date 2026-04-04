@@ -4,4 +4,5 @@ singleton Fonts 1.0 Fonts.qml
 singleton PanelState 1.0 PanelState.qml
 singleton Tokens 1.0 Tokens.qml
 Divider 1.0 Divider.qml
+InnerGlow 1.0 InnerGlow.qml
 SoftShadow 1.0 SoftShadow.qml

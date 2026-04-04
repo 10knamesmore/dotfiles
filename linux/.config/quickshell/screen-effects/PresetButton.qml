@@ -12,10 +12,16 @@ Rectangle {
 
     Layout.fillWidth: true
     height: 28
-    radius: 8
-    color: mouseArea.containsMouse ? "#494d64" : "#363a4f"
-    border.color: "#5b6078"
+    radius: Tokens.radiusS
+    color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
+    border.color: Colors.surface2
     border.width: 1
+
+    Behavior on color {
+        ColorAnimation {
+            duration: Tokens.animFast
+        }
+    }
 
     Text {
         id: label
@@ -24,7 +30,13 @@ Rectangle {
         font.family: Fonts.family
         font.pixelSize: Fonts.body
         font.bold: true
-        color: mouseArea.containsMouse ? "#cad3f5" : "#a5adcb"
+        color: mouseArea.containsMouse ? Colors.text : Colors.subtext0
+
+        Behavior on color {
+            ColorAnimation {
+                duration: Tokens.animFast
+            }
+        }
     }
 
     MouseArea {

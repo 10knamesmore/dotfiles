@@ -18,7 +18,7 @@ InfoCard {
         Rectangle {
             Layout.preferredWidth: 48
             Layout.preferredHeight: 48
-            radius: 8
+            radius: Tokens.radiusS
             color: Colors.surface1
             clip: true
 
@@ -88,7 +88,7 @@ InfoCard {
 
                         width: 28
                         height: 28
-                        radius: 14
+                        radius: Tokens.radiusFull
                         color: btnArea.containsMouse ? Colors.surface1 : "transparent"
 
                         Text {

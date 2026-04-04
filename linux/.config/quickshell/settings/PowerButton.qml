@@ -13,7 +13,7 @@ Rectangle {
 
     Layout.fillWidth: true
     implicitHeight: 48
-    radius: 10
+    radius: Tokens.radiusMS
     color: pwrHover.containsMouse ? Colors.surface1 : Colors.surface0
 
     Process {

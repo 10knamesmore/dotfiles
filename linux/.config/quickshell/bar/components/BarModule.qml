@@ -63,20 +63,20 @@ Rectangle {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 300
+                    duration: Tokens.animNormal
                 }
             }
 
             Behavior on width {
                 NumberAnimation {
-                    duration: 400
+                    duration: Tokens.animSlow
                     easing.type: Easing.OutCubic
                 }
             }
 
             Behavior on height {
                 NumberAnimation {
-                    duration: 500
+                    duration: Tokens.animElaborate
                     easing {
                         type: Easing.OutBack
                         overshoot: 1.5
@@ -86,7 +86,7 @@ Rectangle {
 
             Behavior on radius {
                 NumberAnimation {
-                    duration: 400
+                    duration: Tokens.animSlow
                     easing.type: Easing.OutCubic
                 }
             }
@@ -94,7 +94,7 @@ Rectangle {
 
         Behavior on width {
             NumberAnimation {
-                duration: 300
+                duration: Tokens.animSlow
                 easing.type: Easing.OutCubic
             }
         }
@@ -133,15 +133,17 @@ Rectangle {
 
     Behavior on color {
         ColorAnimation {
-            duration: 300
-            easing.type: Easing.OutCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
     }
 
     Behavior on scale {
         NumberAnimation {
-            duration: 300
-            easing.type: Easing.OutBack
+            duration: Tokens.animNormal
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.elastic
         }
     }
 }

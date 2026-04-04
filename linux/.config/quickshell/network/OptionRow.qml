@@ -22,9 +22,9 @@ RowLayout {
 
             Layout.fillWidth: true
             height: root.compact ? 28 : 32
-            radius: root.compact ? 6 : 8
+            radius: root.compact ? Tokens.radiusXS : Tokens.radiusS
             color: root.current === modelData.value ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : (optHover.containsMouse ? Colors.surface1 : Colors.surface0)
-            border.color: root.current === modelData.value ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.3) : "transparent"
+            border.color: root.current === modelData.value ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : "transparent"
             border.width: 1
 
             Text {

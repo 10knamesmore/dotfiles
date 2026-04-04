@@ -7,8 +7,12 @@ QtObject {
     // 深色遮罩（power menu）
 
     // ── 圆角 ──
+    readonly property int radiusXS: 4
+    // slider track、key badge
     readonly property int radiusS: 8
     // 小按钮、徽章
+    readonly property int radiusMS: 10
+    // search box、list item、tool button
     readonly property int radiusM: 12
     // 卡片、toggle
     readonly property int radiusL: 16
@@ -31,6 +35,8 @@ QtObject {
     // Toast/OSD（需要快速阅读）
     readonly property real backdropDim: 0.2
     // 遮罩层
+    readonly property real backdropMedium: 0.35
+    // launcher、keybindings
     readonly property real backdropDark: 0.55
     // ── 边框 ──
     readonly property real borderAlpha: 0.12
@@ -38,6 +44,10 @@ QtObject {
     readonly property real borderHoverAlpha: 0.25
     // hover 边框
     readonly property int borderWidth: 1
+    // ── 发光 ──
+    readonly property real glowAlpha: 0.06
+    // 面板顶部内发光
+
     // ── 阴影 ──
     readonly property real shadowOpacity: 0.2
     readonly property real shadowHoverOpacity: 0.3

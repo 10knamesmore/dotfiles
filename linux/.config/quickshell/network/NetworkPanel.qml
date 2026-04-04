@@ -493,12 +493,13 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.15 : 0
+        opacity: root.showing ? Tokens.backdropDim : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -520,7 +521,7 @@ PanelWindow {
 
         width: 380
         height: root.height * 0.6
-        radius: 16
+        radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
@@ -530,6 +531,11 @@ PanelWindow {
         anchors.rightMargin: 10
         clip: true
         opacity: root.showing ? 1 : 0
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -545,8 +551,8 @@ PanelWindow {
             id: listView
 
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 8
+            anchors.margins: Tokens.spaceL
+            spacing: Tokens.spaceS
             visible: root.editingSsid === ""
 
             // ── 标题栏 ──
@@ -576,7 +582,7 @@ PanelWindow {
                 Rectangle {
                     width: 28
                     height: 28
-                    radius: 14
+                    radius: Tokens.radiusFull
                     color: refreshArea.containsMouse ? Colors.surface2 : "transparent"
 
                     Text {
@@ -617,7 +623,7 @@ PanelWindow {
                 Rectangle {
                     width: wifiToggleText.implicitWidth + 16
                     height: 26
-                    radius: 13
+                    radius: Tokens.radiusFull
                     color: root.wifiEnabled ? (wifiToggleArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)) : (wifiToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
 
                     Text {
@@ -662,7 +668,7 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true
                 height: 36
-                radius: 10
+                radius: Tokens.radiusMS
                 color: Colors.surface1
                 visible: root.wifiEnabled
 
@@ -670,7 +676,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
-                    spacing: 8
+                    spacing: Tokens.spaceS
 
                     Text {
                         text: ""
@@ -719,7 +725,7 @@ PanelWindow {
                 visible: !root.wifiEnabled
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 8
+                spacing: Tokens.spaceS
 
                 Item {
                     Layout.fillHeight: true
@@ -764,7 +770,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 model: filteredModel
-                spacing: 4
+                spacing: Tokens.spaceXS
                 clip: true
                 visible: root.wifiEnabled
 
@@ -780,9 +786,9 @@ PanelWindow {
 
                     width: ListView.view.width
                     height: netRow.implicitHeight + 12
-                    radius: 10
+                    radius: Tokens.radiusMS
                     color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, netHover.containsMouse ? 0.2 : 0.1) : (netHover.containsMouse ? Colors.surface1 : "transparent")
-                    border.color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3) : "transparent"
+                    border.color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, Tokens.borderHoverAlpha) : "transparent"
                     border.width: inUse ? 1 : 0
 
                     MouseArea {
@@ -816,7 +822,7 @@ PanelWindow {
                     RowLayout {
                         id: netRow
 
-                        spacing: 8
+                        spacing: Tokens.spaceS
 
                         anchors {
                             left: parent.left
@@ -915,14 +921,14 @@ PanelWindow {
                 Layout.fillWidth: true
                 visible: root.selectedSsid !== ""
                 height: passwordCol.implicitHeight + 16
-                radius: 10
+                radius: Tokens.radiusMS
                 color: Colors.surface1
 
                 ColumnLayout {
                     id: passwordCol
 
                     anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.margins: Tokens.spaceS
                     spacing: 6
 
                     Text {
@@ -935,12 +941,12 @@ PanelWindow {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 8
+                        spacing: Tokens.spaceS
 
                         Rectangle {
                             Layout.fillWidth: true
                             height: 32
-                            radius: 8
+                            radius: Tokens.radiusS
                             color: Colors.surface0
 
                             TextInput {
@@ -979,7 +985,7 @@ PanelWindow {
                         Rectangle {
                             width: connectBtnText.implicitWidth + 20
                             height: 32
-                            radius: 8
+                            radius: Tokens.radiusS
                             color: connectBtnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
 
                             Text {
@@ -1019,7 +1025,7 @@ PanelWindow {
                         Rectangle {
                             width: 32
                             height: 32
-                            radius: 8
+                            radius: Tokens.radiusS
                             color: cancelArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
 
                             Text {
@@ -1067,45 +1073,12 @@ PanelWindow {
         // ── 编辑视图 ──
         NetworkEditView {
             anchors.fill: parent
-            anchors.margins: 16
+            anchors.margins: Tokens.spaceL
             visible: root.editingSsid !== ""
             panel: root
         }
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop {
-                    position: 0
-                    color: "transparent"
-                }
-
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "transparent"
-                }
-
-            }
-
-        }
+        InnerGlow {}
 
         Behavior on anchors.topMargin {
             NumberAnimation {
@@ -1122,8 +1095,9 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
