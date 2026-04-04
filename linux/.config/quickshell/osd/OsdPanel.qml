@@ -1,12 +1,15 @@
+import "../theme"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
-import "../theme"
 
 // OSD 浮层 — 音量/亮度变化时在屏幕底部居中显示
 PanelWindow {
     id: root
+
+    // 双阶段可见性
+    property bool showing: PanelState.osdVisible
 
     anchors.bottom: true
     anchors.left: true
@@ -16,45 +19,74 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     focusable: false
     color: "transparent"
-
-    // 双阶段可见性
-    property bool showing: PanelState.osdVisible
     visible: showing || _hideAnim.running
+    onShowingChanged: {
+        if (showing) {
+            _hideAnim.stop();
+            osdWidget.opacity = 0;
+            osdWidget.scale = 0.95;
+            _showAnim.start();
+            dismissTimer.restart();
+        } else {
+            _showAnim.stop();
+            _hideAnim.start();
+        }
+    }
 
     // 自动关闭定时器
     Timer {
         id: dismissTimer
+
         interval: 1500
         onTriggered: PanelState.osdVisible = false
     }
 
     ParallelAnimation {
         id: _showAnim
-        NumberAnimation { target: osdWidget; property: "opacity"; to: 1; duration: 150; easing.type: Easing.OutCubic }
-        NumberAnimation { target: osdWidget; property: "scale"; to: 1.0; duration: 150; easing.type: Easing.OutCubic }
-    }
-    ParallelAnimation {
-        id: _hideAnim
-        NumberAnimation { target: osdWidget; property: "opacity"; to: 0; duration: 200; easing.type: Easing.InCubic }
-        NumberAnimation { target: osdWidget; property: "scale"; to: 0.95; duration: 200; easing.type: Easing.InCubic }
+
+        NumberAnimation {
+            target: osdWidget
+            property: "opacity"
+            to: 1
+            duration: 150
+            easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+            target: osdWidget
+            property: "scale"
+            to: 1
+            duration: 150
+            easing.type: Easing.OutCubic
+        }
+
     }
 
-    onShowingChanged: {
-        if (showing) {
-            _hideAnim.stop()
-            osdWidget.opacity = 0
-            osdWidget.scale = 0.95
-            _showAnim.start()
-            dismissTimer.restart()
-        } else {
-            _showAnim.stop()
-            _hideAnim.start()
+    ParallelAnimation {
+        id: _hideAnim
+
+        NumberAnimation {
+            target: osdWidget
+            property: "opacity"
+            to: 0
+            duration: 200
+            easing.type: Easing.InCubic
         }
+
+        NumberAnimation {
+            target: osdWidget
+            property: "scale"
+            to: 0.95
+            duration: 200
+            easing.type: Easing.InCubic
+        }
+
     }
 
     // OSD 主体
     Rectangle {
         id: osdWidget
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         width: 240
@@ -72,8 +104,8 @@ PanelWindow {
             Text {
                 text: PanelState.osdIcon
                 color: Colors.text
-                font.family: "Hack Nerd Font"
-                font.pixelSize: 24
+                font.family: Fonts.family
+                font.pixelSize: Fonts.h1
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -89,23 +121,41 @@ PanelWindow {
                     color: Colors.surface1
 
                     Rectangle {
-                        width: Math.max(0, Math.min(1, PanelState.osdValue / 100.0)) * parent.width
+                        width: Math.max(0, Math.min(1, PanelState.osdValue / 100)) * parent.width
                         height: parent.height
                         radius: parent.radius
                         color: PanelState.osdType === "brightness" ? Colors.yellow : Colors.blue
-                        Behavior on width { NumberAnimation { duration: 100 } }
-                        Behavior on color { ColorAnimation { duration: 200 } }
+
+                        Behavior on width {
+                            NumberAnimation {
+                                duration: 100
+                            }
+
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 200
+                            }
+
+                        }
+
                     }
+
                 }
 
                 Text {
                     text: PanelState.osdValue + "%"
                     color: Colors.subtext0
-                    font.family: "Hack Nerd Font"
-                    font.pixelSize: 11
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
+
             }
+
         }
+
     }
+
 }

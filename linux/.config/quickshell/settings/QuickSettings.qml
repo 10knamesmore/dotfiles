@@ -1,27 +1,16 @@
+import "../theme"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import "../theme"
 
 // Quick Settings — 左侧滑出面板
 PanelWindow {
     id: root
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-
     property bool showing: PanelState.settingsOpen
     property bool animating: _opacityAnim.running || _slideAnim.running
-    visible: showing || animating
-
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
-
     // ── 系统状态 ──
     property bool wifiEnabled: true
     property bool btEnabled: true
@@ -32,16 +21,10 @@ PanelWindow {
     property bool volumeMuted: false
     property bool nightLightEnabled: false
     property bool caffeineEnabled: false
-
     // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
     property string _home: Quickshell.env("HOME")
     property string _effectsState: _home + "/.cache/hypr/screen-effects.json"
     property string _effectsScript: _home + "/dotfiles/generated/scripts/hypr/screen_effects.sh"
-
-    onShowingChanged: {
-        if (showing)
-            refreshStatus();
-    }
 
     function refreshStatus() {
         wifiProc.running = true;
@@ -52,114 +35,27 @@ PanelWindow {
         caffeineCheckProc.running = true;
     }
 
-    // ── 进程 ──
-    Process {
-        id: wifiProc
-        command: ["nmcli", "radio", "wifi"]
-        stdout: SplitParser {
-            onRead: data => root.wifiEnabled = data.trim() === "enabled"
-        }
-    }
-    Process {
-        id: wifiNameProc
-        command: ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"]
-        stdout: SplitParser {
-            onRead: data => {
-                if (data.startsWith("yes:"))
-                    root.wifiName = data.substring(4);
-            }
-        }
-    }
-    Process {
-        id: btPowerProc
-        command: ["bluetoothctl", "show"]
-        stdout: SplitParser {
-            onRead: data => {
-                if (data.includes("Powered:"))
-                    root.btEnabled = data.includes("yes");
-            }
-        }
-    }
-    Process {
-        id: btDeviceProc
-        command: ["bluetoothctl", "devices", "Connected"]
-        stdout: SplitParser {
-            onRead: data => {
-                let parts = data.split(" ");
-                if (parts.length >= 3)
-                    root.btDevice = parts.slice(2).join(" ");
-            }
-        }
-    }
-    Process {
-        id: brightnessProc
-        command: ["brightnessctl", "-m"]
-        stdout: SplitParser {
-            onRead: data => {
-                let parts = data.split(",");
-                if (parts.length >= 4)
-                    root.brightnessValue = parseInt(parts[3]) || 0;
-            }
-        }
-    }
-    Process {
-        id: volProc
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: SplitParser {
-            onRead: data => {
-                let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
-                if (m) {
-                    root.volumePct = Math.round(parseFloat(m[1]) * 100);
-                    root.volumeMuted = m[2] !== undefined;
-                }
-            }
-        }
-    }
-    Process {
-        id: actionProc
-    }
-
-    // 夜灯状态读取
-    Process {
-        id: nightLightReader
-        command: ["cat", root._effectsState]
-        stdout: SplitParser {
-            onRead: data => {
-                try {
-                    let obj = JSON.parse(data);
-                    root.nightLightEnabled = (obj.warmth > 0 || obj.grain > 0);
-                } catch (e) {}
-            }
-        }
-    }
-
-    // 夜灯写入 + 应用
-    Process { id: nightLightWriter }
-    Process { id: nightLightApplier }
-
     function toggleNightLight() {
         let json;
-        if (root.nightLightEnabled) {
-            json = JSON.stringify({warmth: 0, grain: 0, grain_size: 50, shadow_boost: 40});
-        } else {
-            json = JSON.stringify({warmth: 60, grain: 85, grain_size: 10, shadow_boost: 40});
-        }
+        if (root.nightLightEnabled)
+            json = JSON.stringify({
+                "warmth": 0,
+                "grain": 0,
+                "grain_size": 50,
+                "shadow_boost": 40
+            });
+        else
+            json = JSON.stringify({
+                "warmth": 60,
+                "grain": 85,
+                "grain_size": 10,
+                "shadow_boost": 40
+            });
         nightLightWriter.command = ["sh", "-c", "echo '" + json + "' > " + root._effectsState];
         nightLightWriter.running = true;
         nightLightApplier.command = [root._effectsScript, "apply"];
         nightLightApplier.running = true;
         root.nightLightEnabled = !root.nightLightEnabled;
-    }
-
-    // 咖啡因 — systemd-inhibit (通过 PID 文件管理)
-    Process { id: caffeineStartProc }
-    Process { id: caffeineStopProc }
-    Process {
-        id: caffeineCheckProc
-        command: ["sh", "-c", "kill -0 $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null && echo 1 || echo 0"]
-        stdout: SplitParser {
-            onRead: data => root.caffeineEnabled = data.trim() === "1"
-        }
     }
 
     function toggleCaffeine() {
@@ -172,6 +68,166 @@ PanelWindow {
             caffeineStartProc.running = true;
             root.caffeineEnabled = true;
         }
+    }
+
+    anchors.top: true
+    anchors.bottom: true
+    anchors.left: true
+    anchors.right: true
+    visible: showing || animating
+    focusable: root.showing
+    exclusionMode: ExclusionMode.Ignore
+    color: "transparent"
+    onShowingChanged: {
+        if (showing)
+            refreshStatus();
+
+    }
+
+    // ── 进程 ──
+    Process {
+        id: wifiProc
+
+        command: ["nmcli", "radio", "wifi"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                return root.wifiEnabled = data.trim() === "enabled";
+            }
+        }
+
+    }
+
+    Process {
+        id: wifiNameProc
+
+        command: ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                if (data.startsWith("yes:"))
+                    root.wifiName = data.substring(4);
+
+            }
+        }
+
+    }
+
+    Process {
+        id: btPowerProc
+
+        command: ["bluetoothctl", "show"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                if (data.includes("Powered:"))
+                    root.btEnabled = data.includes("yes");
+
+            }
+        }
+
+    }
+
+    Process {
+        id: btDeviceProc
+
+        command: ["bluetoothctl", "devices", "Connected"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                let parts = data.split(" ");
+                if (parts.length >= 3)
+                    root.btDevice = parts.slice(2).join(" ");
+
+            }
+        }
+
+    }
+
+    Process {
+        id: brightnessProc
+
+        command: ["brightnessctl", "-m"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                let parts = data.split(",");
+                if (parts.length >= 4)
+                    root.brightnessValue = parseInt(parts[3]) || 0;
+
+            }
+        }
+
+    }
+
+    Process {
+        id: volProc
+
+        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
+                if (m) {
+                    root.volumePct = Math.round(parseFloat(m[1]) * 100);
+                    root.volumeMuted = m[2] !== undefined;
+                }
+            }
+        }
+
+    }
+
+    Process {
+        id: actionProc
+    }
+
+    // 夜灯状态读取
+    Process {
+        id: nightLightReader
+
+        command: ["cat", root._effectsState]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                try {
+                    let obj = JSON.parse(data);
+                    root.nightLightEnabled = (obj.warmth > 0 || obj.grain > 0);
+                } catch (e) {
+                }
+            }
+        }
+
+    }
+
+    // 夜灯写入 + 应用
+    Process {
+        id: nightLightWriter
+    }
+
+    Process {
+        id: nightLightApplier
+    }
+
+    // 咖啡因 — systemd-inhibit (通过 PID 文件管理)
+    Process {
+        id: caffeineStartProc
+    }
+
+    Process {
+        id: caffeineStopProc
+    }
+
+    Process {
+        id: caffeineCheckProc
+
+        command: ["sh", "-c", "kill -0 $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null && echo 1 || echo 0"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                return root.caffeineEnabled = data.trim() === "1";
+            }
+        }
+
     }
 
     Timer {
@@ -188,13 +244,16 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.15 : 0.0
+        opacity: root.showing ? 0.15 : 0
+
         Behavior on opacity {
             NumberAnimation {
                 duration: 250
                 easing.type: Easing.OutCubic
             }
+
         }
+
     }
 
     Item {
@@ -209,7 +268,16 @@ PanelWindow {
 
     Rectangle {
         id: panel
+
         width: 340
+        anchors.leftMargin: root.showing ? 10 : -360
+        radius: 16
+        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
+        border.color: Qt.rgba(1, 1, 1, 0.08)
+        border.width: 1
+        clip: true
+        opacity: root.showing ? 1 : 0
+
         anchors {
             top: parent.top
             bottom: parent.bottom
@@ -217,32 +285,12 @@ PanelWindow {
             topMargin: 54
             bottomMargin: 10
         }
-        anchors.leftMargin: root.showing ? 10 : -360
-        radius: 16
-        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
-        border.color: Qt.rgba(1, 1, 1, 0.08)
-        border.width: 1
-        clip: true
-
-        Behavior on anchors.leftMargin {
-            NumberAnimation {
-                id: _slideAnim
-                duration: 250
-                easing.type: Easing.OutCubic
-            }
-        }
-        opacity: root.showing ? 1.0 : 0.0
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
-                duration: 250
-                easing.type: Easing.OutCubic
-            }
-        }
 
         MouseArea {
             anchors.fill: parent
-            onClicked: mouse => mouse.accepted = true
+            onClicked: (mouse) => {
+                return mouse.accepted = true;
+            }
         }
 
         Flickable {
@@ -253,6 +301,10 @@ PanelWindow {
 
             ColumnLayout {
                 id: mainCol
+
+                // ── 系统信息（可点击展开）──
+                property bool infoExpanded: false
+
                 width: parent.width
                 spacing: 12
 
@@ -272,22 +324,23 @@ PanelWindow {
                 SettingsSlider {
                     Layout.fillWidth: true
                     icon: root.brightnessValue > 50 ? "󰃠" : "󰃞"
-                    value: root.brightnessValue / 100.0
+                    value: root.brightnessValue / 100
                     label: "亮度 " + root.brightnessValue + "%"
                     accentColor: Colors.yellow
-                    onMoved: val => {
+                    onMoved: (val) => {
                         root.brightnessValue = Math.round(val * 100);
                         actionProc.command = [Quickshell.env("HOME") + "/dotfiles/generated/scripts/hypr/screen_effects.sh", "brightness", String(root.brightnessValue)];
                         actionProc.running = true;
                     }
                 }
+
                 SettingsSlider {
                     Layout.fillWidth: true
                     icon: root.volumeMuted ? "" : (root.volumePct < 50 ? "" : "")
-                    value: root.volumePct / 100.0
+                    value: root.volumePct / 100
                     label: "音量 " + root.volumePct + "%"
                     accentColor: Colors.blue
-                    onMoved: val => {
+                    onMoved: (val) => {
                         actionProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", Math.round(val * 100) + "%"];
                         actionProc.running = true;
                     }
@@ -318,10 +371,11 @@ PanelWindow {
                             root.wifiEnabled = !root.wifiEnabled;
                         }
                         onRightClicked: {
-                            PanelState.settingsOpen = false
-                            PanelState.toggleNetwork()
+                            PanelState.settingsOpen = false;
+                            PanelState.toggleNetwork();
                         }
                     }
+
                     QuickToggle {
                         icon: root.btEnabled ? "󰂯" : "󰂲"
                         label: "蓝牙"
@@ -333,6 +387,7 @@ PanelWindow {
                             root.btEnabled = !root.btEnabled;
                         }
                     }
+
                     QuickToggle {
                         icon: PanelState.dndEnabled ? "󰂛" : "󰂚"
                         label: "勿扰"
@@ -340,6 +395,7 @@ PanelWindow {
                         toggled: PanelState.dndEnabled
                         onClicked: PanelState.dndEnabled = !PanelState.dndEnabled
                     }
+
                     QuickToggle {
                         icon: root.volumeMuted ? "" : "󰕾"
                         label: "静音"
@@ -350,6 +406,7 @@ PanelWindow {
                             actionProc.running = true;
                         }
                     }
+
                     QuickToggle {
                         icon: root.nightLightEnabled ? "󰛨" : "󰹏"
                         label: "夜灯"
@@ -357,6 +414,7 @@ PanelWindow {
                         toggled: root.nightLightEnabled
                         onClicked: root.toggleNightLight()
                     }
+
                     QuickToggle {
                         icon: root.caffeineEnabled ? "󰅶" : "󰾪"
                         label: "咖啡因"
@@ -364,6 +422,7 @@ PanelWindow {
                         toggled: root.caffeineEnabled
                         onClicked: root.toggleCaffeine()
                     }
+
                     QuickToggle {
                         icon: "󰈋"
                         label: "取色器"
@@ -375,6 +434,7 @@ PanelWindow {
                             actionProc.running = true;
                         }
                     }
+
                 }
 
                 Rectangle {
@@ -410,40 +470,47 @@ PanelWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
+
                     ToolButton {
                         icon: "󰹑"
                         label: "区域截图"
                         command: "hyprshot -m region"
                     }
+
                     ToolButton {
                         icon: "󰖯"
                         label: "窗口截图"
                         command: "hyprshot -m window"
                     }
+
                 }
 
                 // ── 显示器切换 ──
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
+
                     ToolButton {
                         icon: "󰍹"
                         label: "双屏"
                         command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh dual"
                         closeOnClick: false
                     }
+
                     ToolButton {
                         icon: "󰶐"
                         label: "外接"
                         command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh external"
                         closeOnClick: false
                     }
+
                     ToolButton {
                         icon: "󰌢"
                         label: "笔记本"
                         command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh laptop"
                         closeOnClick: false
                     }
+
                 }
 
                 Rectangle {
@@ -452,9 +519,6 @@ PanelWindow {
                     color: Colors.surface1
                     opacity: 0.5
                 }
-
-                // ── 系统信息（可点击展开）──
-                property bool infoExpanded: false
 
                 Rectangle {
                     Layout.fillWidth: true
@@ -465,12 +529,9 @@ PanelWindow {
                     border.width: 1
                     clip: true
 
-                    Behavior on color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    Behavior on border.color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-
                     MouseArea {
                         id: sysHover
+
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -479,8 +540,11 @@ PanelWindow {
 
                     ColumnLayout {
                         id: sysInfoCol
-                        anchors.left: parent.left; anchors.right: parent.right
-                        anchors.top: parent.top; anchors.margins: 10
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 10
                         spacing: 8
 
                         RowLayout {
@@ -490,15 +554,18 @@ PanelWindow {
                             Text {
                                 text: "󰍹"
                                 color: Colors.overlay1
-                                font.family: "Hack Nerd Font"
-                                font.pixelSize: 14
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.icon
                             }
+
                             Text {
                                 id: uptimeText
+
                                 color: Colors.subtext0
-                                font.family: "Hack Nerd Font"
-                                font.pixelSize: 11
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.small
                                 text: "uptime..."
+
                                 Timer {
                                     running: root.showing
                                     interval: 60000
@@ -506,41 +573,69 @@ PanelWindow {
                                     triggeredOnStart: true
                                     onTriggered: uptimeProc.running = true
                                 }
+
                                 Process {
                                     id: uptimeProc
+
                                     command: ["sh", "-c", "uptime -p | sed 's/up //'"]
+
                                     stdout: SplitParser {
-                                        onRead: data => uptimeText.text = data
+                                        onRead: (data) => {
+                                            return uptimeText.text = data;
+                                        }
                                     }
+
                                 }
+
                             }
-                            Item { Layout.fillWidth: true }
+
+                            Item {
+                                Layout.fillWidth: true
+                            }
+
                             Text {
                                 text: mainCol.infoExpanded ? "󰅃" : "󰅀"
                                 color: Colors.overlay1
-                                font.family: "Hack Nerd Font"
-                                font.pixelSize: 14
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.icon
                             }
 
                             // 重载按钮（阻止点击穿透到卡片）
                             Rectangle {
-                                width: 28; height: 28; radius: 14
+                                width: 28
+                                height: 28
+                                radius: 14
                                 color: reloadHover.containsMouse ? Colors.surface2 : "transparent"
-                                Behavior on color { ColorAnimation { duration: 150 } }
+
                                 Text {
                                     anchors.centerIn: parent
                                     text: "󰑓"
                                     color: Colors.subtext0
-                                    font.family: "Hack Nerd Font"; font.pixelSize: 14
+                                    font.family: Fonts.family
+                                    font.pixelSize: Fonts.icon
                                 }
+
                                 MouseArea {
                                     id: reloadHover
+
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: mouse => { mouse.accepted = true; Quickshell.reload(true) }
+                                    onClicked: (mouse) => {
+                                        mouse.accepted = true;
+                                        Quickshell.reload(true);
+                                    }
                                 }
+
+                                Behavior on color {
+                                    ColorAnimation {
+                                        duration: 150
+                                    }
+
+                                }
+
                             }
+
                         }
 
                         // 折叠的系统信息
@@ -548,7 +643,33 @@ PanelWindow {
                             Layout.fillWidth: true
                             expanded: mainCol.infoExpanded
                         }
+
                     }
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 200
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                    Behavior on border.color {
+                        ColorAnimation {
+                            duration: 200
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                    Behavior on implicitHeight {
+                        NumberAnimation {
+                            duration: 200
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
                 }
 
                 Rectangle {
@@ -562,33 +683,63 @@ PanelWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
+
                     PowerButton {
                         icon: "󰌾"
                         label: "锁屏"
                         command: "hyprlock"
                     }
+
                     PowerButton {
                         icon: "󰍃"
                         label: "注销"
                         command: "hyprctl dispatch exit"
                     }
+
                     PowerButton {
                         icon: "󰤄"
                         label: "挂起"
                         command: "systemctl suspend"
                     }
+
                     PowerButton {
                         icon: "󰜉"
                         label: "重启"
                         command: "systemctl reboot"
                     }
+
                     PowerButton {
                         icon: "󰐥"
                         label: "关机"
                         command: "systemctl poweroff"
                     }
+
                 }
+
             }
+
         }
+
+        Behavior on anchors.leftMargin {
+            NumberAnimation {
+                id: _slideAnim
+
+                duration: 250
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                id: _opacityAnim
+
+                duration: 250
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
     }
+
 }
