@@ -8,8 +8,20 @@ BarModule {
 
     property int volumePct: 0
     property bool muted: false
+    property bool pendingOsd: false
+
+    function osdIcon() {
+        if (muted)
+            return "󰝟";
+        if (volumePct <= 0)
+            return "󰕿";
+        if (volumePct < 50)
+            return "󰖀";
+        return "󰕾";
+    }
 
     function applyAndRefresh(proc) {
+        root.pendingOsd = true;
         proc.running = true;
         Qt.callLater(() => {
             volReader.running = false;
@@ -52,6 +64,13 @@ BarModule {
                 if (m) {
                     root.volumePct = Math.round(parseFloat(m[1]) * 100);
                     root.muted = m[2] !== undefined;
+                    if (root.pendingOsd) {
+                        PanelState.osdType = "volume";
+                        PanelState.osdValue = root.volumePct;
+                        PanelState.osdIcon = root.osdIcon();
+                        PanelState.osdVisible = true;
+                        root.pendingOsd = false;
+                    }
                 }
             }
         }

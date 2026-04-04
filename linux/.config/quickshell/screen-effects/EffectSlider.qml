@@ -39,7 +39,6 @@ RowLayout {
             function onValueChanged() {
                 if (!slider.pressed)
                     slider.value = root.value;
-
             }
 
             target: root
@@ -49,34 +48,47 @@ RowLayout {
             x: slider.leftPadding
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
             implicitWidth: 120
-            implicitHeight: 4
+            implicitHeight: 10
             width: slider.availableWidth
-            height: 4
-            radius: 2
+            height: 6
+            radius: 3
             color: Colors.surface2
 
             Rectangle {
                 width: slider.visualPosition * parent.width
                 height: parent.height
-                radius: 2
+                radius: parent.radius
                 color: Colors.mauve
             }
-
         }
 
         handle: Rectangle {
             x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
-            implicitWidth: 18
-            implicitHeight: 18
-            width: 18
-            height: 18
-            radius: 9
-            color: slider.pressed ? Colors.pink : Colors.text
-            border.color: Colors.mauve
-            border.width: 2
+            implicitWidth: 30
+            implicitHeight: 30
+            width: 30
+            height: 30
+            radius: 15
+            color: "transparent"
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                radius: 9
+                color: slider.pressed ? Colors.pink : Colors.text
+                border.color: Colors.mauve
+                border.width: 2
+            }
         }
 
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.NoButton
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+        }
     }
 
     Text {
@@ -87,5 +99,4 @@ RowLayout {
         Layout.preferredWidth: 28
         horizontalAlignment: Text.AlignRight
     }
-
 }

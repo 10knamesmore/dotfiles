@@ -11,6 +11,11 @@ PanelWindow {
     // 双阶段可见性
     property bool showing: PanelState.osdVisible
 
+    function refreshDismissTimer() {
+        if (root.showing)
+            dismissTimer.restart();
+    }
+
     anchors.bottom: true
     anchors.left: true
     anchors.right: true
@@ -26,10 +31,26 @@ PanelWindow {
             osdWidget.opacity = 0;
             osdWidget.scale = 0.95;
             _showAnim.start();
-            dismissTimer.restart();
+            refreshDismissTimer();
         } else {
             _showAnim.stop();
             _hideAnim.start();
+        }
+    }
+
+    Connections {
+        target: PanelState
+
+        function onOsdValueChanged() {
+            root.refreshDismissTimer();
+        }
+
+        function onOsdIconChanged() {
+            root.refreshDismissTimer();
+        }
+
+        function onOsdTypeChanged() {
+            root.refreshDismissTimer();
         }
     }
 

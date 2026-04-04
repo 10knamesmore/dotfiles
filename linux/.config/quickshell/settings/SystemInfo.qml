@@ -1,6 +1,7 @@
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Io
 
 // 可折叠系统信息面板
@@ -24,6 +25,10 @@ ColumnLayout {
     property int packages: 0
     property string hostName: ""
     property string wmVersion: ""
+    property string nvimVersion: ""
+    property string nodeVersion: ""
+    property string pythonVersion: ""
+    property string rustVersion: ""
     property var monitors: [] // [{name, res}]
     property real loadAvg1: 0
     property real loadAvg5: 0
@@ -32,12 +37,22 @@ ColumnLayout {
     property var _diskBuf: []
 
     function fetchAll() {
+        monitors = [];
         staticProc.running = true;
         fetchDynamic();
     }
 
     function fetchDynamic() {
         dynamicProc.running = true;
+    }
+
+    function homeMountLabel(mount) {
+        let homePrefix = "/home/" + Quickshell.env("USER");
+        if (mount === homePrefix)
+            return "~";
+        if (mount.startsWith(homePrefix + "/"))
+            return "~" + mount.slice(homePrefix.length);
+        return mount;
     }
 
     function tempColor(t) {
@@ -54,15 +69,15 @@ ColumnLayout {
         let ratio = loadAvg1 / cpuCores;
         if (ratio < 0.5)
             return {
-            "text": "低",
-            "color": Colors.green
-        };
+                "text": "低",
+                "color": Colors.green
+            };
 
         if (ratio < 1)
             return {
-            "text": "中",
-            "color": Colors.yellow
-        };
+                "text": "中",
+                "color": Colors.yellow
+            };
 
         return {
             "text": "高",
@@ -76,7 +91,6 @@ ColumnLayout {
     onExpandedChanged: {
         if (expanded)
             fetchAll();
-
     }
 
     Timer {
@@ -94,15 +108,16 @@ ColumnLayout {
         // Hostname
         // Packages
         // WM version
+        // Language runtimes
         // Monitors
         // CPU cores
 
         id: staticProc
 
-        command: ["sh", "-c", ["echo \"CPU:$(grep 'model name' /proc/cpuinfo | head -1 | sed 's/.*: //')\"", "echo \"GPU:$(nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null || echo N/A)\"", "echo \"KERNEL:$(uname -r)\"", "echo \"HOST:$(hostname)\"", "echo \"PKG:$(pacman -Q 2>/dev/null | wc -l)\"", "echo \"WM:Hyprland $(hyprctl version -j 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin).get(\"tag\",\"?\"))' 2>/dev/null)\"", "hyprctl monitors -j 2>/dev/null | python3 -c \"import sys,json;[print(f'MON:{m[\\\"name\\\"]} {m[\\\"width\\\"]}x{m[\\\"height\\\"]}@{int(m[\\\"refreshRate\\\"])}Hz') for m in json.load(sys.stdin)]\"", "echo \"CORES:$(nproc)\""].join(" && ")]
+        command: ["sh", "-c", ["norm(){ if ! command -v \"$1\" >/dev/null 2>&1; then echo N/A; return; fi; raw=$(\"$@\" 2>/dev/null | grep -oE '[0-9]+(\\.[0-9]+){1,2}' | head -n1); if [ -z \"$raw\" ]; then echo N/A; return; fi; echo \"$raw\" | awk -F. '{printf \"%d.%d.%d\\n\", $1, ($2==\"\"?0:$2), ($3==\"\"?0:$3)}'; }", "echo \"CPU:$(grep 'model name' /proc/cpuinfo | head -1 | sed 's/.*: //')\"", "echo \"GPU:$(nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null || echo N/A)\"", "echo \"KERNEL:$(uname -r)\"", "echo \"HOST:$(hostname)\"", "echo \"PKG:$(pacman -Q 2>/dev/null | wc -l)\"", "echo \"WM:$(hyprctl version -j 2>/dev/null | python3 -c 'import sys,json,re; tag=json.load(sys.stdin).get(\"tag\",\"\"); m=re.search(r\"(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?\", tag); print(f\"{int(m.group(1))}.{int(m.group(2) or 0)}.{int(m.group(3) or 0)}\" if m else \"N/A\")' 2>/dev/null)\"", "echo \"NVIM:$(norm nvim --version)\"", "echo \"NODE:$(norm node --version)\"", "echo \"PYTHON:$(norm python3 --version || norm python --version)\"", "echo \"RUST:$(norm rustc --version)\"", "hyprctl monitors -j 2>/dev/null | python3 -c \"import sys,json;[print(f'MON:{m[\\\"name\\\"]} {m[\\\"width\\\"]}x{m[\\\"height\\\"]}@{int(m[\\\"refreshRate\\\"])}Hz') for m in json.load(sys.stdin)]\"", "echo \"CORES:$(nproc)\""].join(" && ")]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 if (data.startsWith("CPU:")) {
                     root.cpuModel = data.substring(4).trim();
                 } else if (data.startsWith("GPU:")) {
@@ -115,6 +130,14 @@ ColumnLayout {
                     root.packages = parseInt(data.substring(4)) || 0;
                 } else if (data.startsWith("WM:")) {
                     root.wmVersion = data.substring(3).trim();
+                } else if (data.startsWith("NVIM:")) {
+                    root.nvimVersion = data.substring(5).trim();
+                } else if (data.startsWith("NODE:")) {
+                    root.nodeVersion = data.substring(5).trim();
+                } else if (data.startsWith("PYTHON:")) {
+                    root.pythonVersion = data.substring(7).trim();
+                } else if (data.startsWith("RUST:")) {
+                    root.rustVersion = data.substring(5).trim();
                 } else if (data.startsWith("MON:")) {
                     let m = root.monitors.slice();
                     m.push(data.substring(4).trim());
@@ -124,7 +147,6 @@ ColumnLayout {
                 }
             }
         }
-
     }
 
     // 动态信息（每 5 秒刷新）
@@ -145,7 +167,7 @@ ColumnLayout {
         onExited: root.disks = root._diskBuf
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 if (data.startsWith("CPUT:")) {
                     root.cpuTemp = parseInt(data.substring(5)) || 0;
                 } else if (data.startsWith("GPUT:")) {
@@ -174,7 +196,6 @@ ColumnLayout {
                 }
             }
         }
-
     }
 
     // ── 硬件 Card ──
@@ -210,9 +231,7 @@ ColumnLayout {
                 label: "负载: " + loadLabel().text + " (" + root.loadAvg1.toFixed(1) + "  " + root.loadAvg5.toFixed(1) + "  " + root.loadAvg15.toFixed(1) + ")"
                 valueColor: loadLabel().color
             }
-
         }
-
     }
 
     // ── 存储 Card ──
@@ -229,18 +248,15 @@ ColumnLayout {
                     required property var modelData
 
                     icon: "󰋊"
-                    label: modelData.mount + " : " + modelData.used + " / " + modelData.size + " - " + modelData.fstype
+                    label: root.homeMountLabel(modelData.mount) + " : " + modelData.used + " / " + modelData.size + " - " + modelData.fstype
                     value: modelData.pct
                     valueColor: {
                         let n = parseInt(modelData.pct) || 0;
                         return n > 90 ? Colors.red : n > 80 ? Colors.yellow : Colors.text;
                     }
                 }
-
             }
-
         }
-
     }
 
     // ── 系统 Card ──
@@ -256,11 +272,6 @@ ColumnLayout {
             }
 
             InfoRow {
-                icon: ""
-                label: root.wmVersion
-            }
-
-            InfoRow {
                 icon: "󰌘"
                 label: root.kernel
             }
@@ -270,8 +281,36 @@ ColumnLayout {
                 label: root.packages + " (pacman)"
             }
 
-        }
+            InfoRow {
+                icon: ""
+                label: "Hyprland"
+                value: root.wmVersion || "N/A"
+            }
 
+            InfoRow {
+                icon: ""
+                label: "Neovim"
+                value: root.nvimVersion || "N/A"
+            }
+
+            InfoRow {
+                icon: "󰎙"
+                label: "Node"
+                value: root.nodeVersion || "N/A"
+            }
+
+            InfoRow {
+                icon: "󰌠"
+                label: "Python"
+                value: root.pythonVersion || "N/A"
+            }
+
+            InfoRow {
+                icon: "󱘗"
+                label: "Rust"
+                value: root.rustVersion || "N/A"
+            }
+        }
     }
 
     // ── 网络 & 显示器 Card ──
@@ -295,11 +334,7 @@ ColumnLayout {
                     icon: "󰍹"
                     label: modelData
                 }
-
             }
-
         }
-
     }
-
 }

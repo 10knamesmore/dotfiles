@@ -24,9 +24,26 @@ import Quickshell.Services.Pipewire
 ShellRoot {
     id: root
 
-    // ── OSD: 音量变化检测（Pipewire 响应式）──
+    // ── OSD: 音量读取与图标选择 ──
     property var _sink: Pipewire.defaultAudioSink
     property real _lastVolume: -1
+
+    function volumeIcon(vol, muted) {
+        if (muted)
+            return "󰝟";
+        if (vol <= 0)
+            return "󰕿";
+        if (vol < 50)
+            return "󰖀";
+        return "󰕾";
+    }
+
+    function showVolumeOsd(vol, muted) {
+        PanelState.osdType = "volume";
+        PanelState.osdValue = vol;
+        PanelState.osdIcon = volumeIcon(vol, muted);
+        PanelState.osdVisible = true;
+    }
 
     // ── 每个显示器生成一个 Bar ──
     Variants {
@@ -82,6 +99,13 @@ ShellRoot {
 
     GlobalShortcut {
         appid: "quickshell"
+        name: "osdVolume"
+        description: "Show volume OSD"
+        onPressed: volumeProc.running = true
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
         name: "launcher"
         description: "Toggle app launcher"
         onPressed: {
@@ -114,23 +138,35 @@ ShellRoot {
         function onVolumesChanged() {
             let vol = Math.round(root._sink.audio.volume * 100);
             if (root._lastVolume >= 0 && vol !== root._lastVolume) {
-                PanelState.osdType = "volume";
-                PanelState.osdValue = vol;
-                PanelState.osdIcon = root._sink.audio.muted ? "" : (vol < 50 ? "" : "");
-                PanelState.osdVisible = true;
+                root.showVolumeOsd(vol, root._sink.audio.muted);
             }
             root._lastVolume = vol;
         }
 
         function onMutedChanged() {
             let vol = Math.round(root._sink.audio.volume * 100);
-            PanelState.osdType = "volume";
-            PanelState.osdValue = vol;
-            PanelState.osdIcon = root._sink.audio.muted ? "" : "";
-            PanelState.osdVisible = true;
+            root.showVolumeOsd(vol, root._sink.audio.muted);
         }
 
         target: root._sink ? root._sink.audio : null
+    }
+
+    Process {
+        id: volumeProc
+
+        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
+
+        stdout: SplitParser {
+            onRead: data => {
+                let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
+                if (m) {
+                    let vol = Math.round(parseFloat(m[1]) * 100);
+                    let muted = m[2] !== undefined;
+                    root._lastVolume = vol;
+                    root.showVolumeOsd(vol, muted);
+                }
+            }
+        }
     }
 
     // ── OSD: 亮度检测 ──
