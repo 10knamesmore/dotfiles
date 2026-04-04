@@ -1,7 +1,7 @@
+import "../theme"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import "../theme"
 
 // 用户头像 + 用户名 + 签名
 RowLayout {
@@ -21,6 +21,7 @@ RowLayout {
 
         Image {
             id: avatar
+
             anchors.fill: parent
             source: "file://" + Quickshell.env("HOME") + "/Pictures/avatar.jpg"
             fillMode: Image.PreserveAspectCrop
@@ -32,10 +33,11 @@ RowLayout {
             anchors.centerIn: parent
             text: "󰀄"
             color: Colors.overlay1
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 22
+            font.family: Fonts.family
+            font.pixelSize: Fonts.h2
             visible: avatar.status !== Image.Ready
         }
+
     }
 
     // 用户名 + 签名
@@ -46,18 +48,20 @@ RowLayout {
         Text {
             text: Quickshell.env("USER")
             color: Colors.text
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 15
+            font.family: Fonts.family
+            font.pixelSize: Fonts.title
             font.weight: Font.Bold
         }
 
         Text {
             text: root.motto
             color: Colors.subtext0
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 11
+            font.family: Fonts.family
+            font.pixelSize: Fonts.small
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
+
     }
+
 }

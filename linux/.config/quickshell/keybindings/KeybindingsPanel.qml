@@ -274,8 +274,7 @@ PanelWindow {
                 Text {
                     text: "󰌌 快捷键速查"
                     color: Colors.text
-                    font.family: "Hack Nerd Font"
-                    font.pixelSize: 16
+                    font.family: Fonts.family; font.pixelSize: Fonts.heading
                     font.weight: Font.Bold
                 }
                 Item { Layout.fillWidth: true }
@@ -287,11 +286,11 @@ PanelWindow {
 
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 6
-                        Text { text: ""; color: Colors.overlay1; font.family: "Hack Nerd Font"; font.pixelSize: 13 }
+                        Text { text: ""; color: Colors.overlay1; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
                         TextInput {
                             id: searchInput
                             Layout.fillWidth: true
-                            color: Colors.text; font.family: "Hack Nerd Font"; font.pixelSize: 12
+                            color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.body
                             clip: true; selectByMouse: true
                             onTextChanged: { root.searchQuery = text; root.applyFilter() }
                             Keys.onEscapePressed: PanelState.keybindingsOpen = false
@@ -323,7 +322,7 @@ PanelWindow {
                         visible: filteredModel.count === 0
                         text: "未找到匹配的快捷键"
                         color: Colors.overlay0
-                        font.family: "Hack Nerd Font"; font.pixelSize: 13
+                        font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 40
                     }
@@ -361,8 +360,7 @@ PanelWindow {
                                 Text {
                                     text: sectionTitle
                                     color: Colors.blue
-                                    font.family: "Hack Nerd Font"
-                                    font.pixelSize: 12
+                                    font.family: Fonts.family; font.pixelSize: Fonts.body
                                     font.weight: Font.Bold
                                 }
 
@@ -399,8 +397,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: modelData
                                                         color: Colors.text
-                                                        font.family: "Hack Nerd Font"
-                                                        font.pixelSize: 10
+                                                        font.family: Fonts.family; font.pixelSize: Fonts.caption
                                                         font.weight: Font.DemiBold
                                                     }
                                                 }
@@ -411,8 +408,7 @@ PanelWindow {
                                         Text {
                                             text: modelData.desc
                                             color: Colors.subtext0
-                                            font.family: "Hack Nerd Font"
-                                            font.pixelSize: 11
+                                            font.family: Fonts.family; font.pixelSize: Fonts.small
                                             elide: Text.ElideRight
                                             Layout.fillWidth: true
                                         }

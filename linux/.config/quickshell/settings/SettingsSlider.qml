@@ -1,7 +1,7 @@
-import QtQuick
-import QtQuick.Layouts
-import QtQuick.Controls
 import "../theme"
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
 
 // 可复用的设置滑块组件
 ColumnLayout {
@@ -11,30 +11,36 @@ ColumnLayout {
     property string label: ""
     property real value: 0
     property color accentColor: Colors.blue
+
     signal moved(real val)
 
     spacing: 4
 
     RowLayout {
         spacing: 8
+
         Text {
             text: root.icon
             color: root.accentColor
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 16
+            font.family: Fonts.family
+            font.pixelSize: Fonts.heading
         }
+
         Text {
             text: root.label
             color: Colors.subtext0
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 11
+            font.family: Fonts.family
+            font.pixelSize: Fonts.small
         }
+
     }
 
     Slider {
         id: slider
+
         Layout.fillWidth: true
-        from: 0; to: 1
+        from: 0
+        to: 1
         value: root.value
         onMoved: root.moved(value)
 
@@ -56,6 +62,7 @@ ColumnLayout {
                 radius: parent.radius
                 color: root.accentColor
             }
+
         }
 
         handle: Rectangle {
@@ -67,9 +74,24 @@ ColumnLayout {
             color: slider.pressed ? Colors.text : slider.hovered ? Colors.subtext1 : Colors.subtext0
             border.color: root.accentColor
             border.width: 2
-            scale: slider.pressed ? 1.1 : slider.hovered ? 1.05 : 1.0
-            Behavior on scale { NumberAnimation { duration: 100 } }
-            Behavior on color { ColorAnimation { duration: 150 } }
+            scale: slider.pressed ? 1.1 : slider.hovered ? 1.05 : 1
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: 100
+                }
+
+            }
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+
+            }
+
         }
+
     }
+
 }

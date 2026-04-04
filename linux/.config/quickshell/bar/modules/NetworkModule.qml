@@ -1,24 +1,32 @@
+import "../../theme"
+import "../components"
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "../components"
-import "../../theme"
 
 BarModule {
     id: root
-    accentColor: Colors.sky
-    implicitWidth: label.implicitWidth + 32
 
     property string iconText: "󰤮"
     property string valueText: "…"
     property string tooltipText: ""
     property bool disconnected: false
 
+    accentColor: Colors.sky
+    implicitWidth: label.implicitWidth + 32
+    Component.onCompleted: reader.running = true
+    onClicked: {
+        PanelState.closeAll();
+        PanelState.toggleNetwork();
+    }
+
     Process {
         id: reader
+
         command: [Quickshell.env("scripts_dir") + "/network_status.sh"]
+
         stdout: SplitParser {
-            onRead: data => {
+            onRead: (data) => {
                 try {
                     let obj = JSON.parse(data);
                     root.iconText = obj.icon ?? "󰤮";
@@ -30,9 +38,8 @@ BarModule {
                 }
             }
         }
-    }
 
-    Component.onCompleted: reader.running = true
+    }
 
     Timer {
         interval: 5000
@@ -46,14 +53,15 @@ BarModule {
 
     Row {
         id: label
+
         anchors.centerIn: parent
         spacing: 5
 
         Text {
             text: root.iconText
             color: root.disconnected ? Colors.red : Colors.sky
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 14
+            font.family: Fonts.family
+            font.pixelSize: Fonts.icon
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -61,20 +69,20 @@ BarModule {
         Text {
             text: root.valueText
             color: root.disconnected ? Colors.red : Colors.text
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 13
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
+
             Behavior on color {
                 ColorAnimation {
                     duration: 300
                 }
+
             }
+
         }
+
     }
 
-    onClicked: {
-        PanelState.closeAll()
-        PanelState.toggleNetwork()
-    }
 }

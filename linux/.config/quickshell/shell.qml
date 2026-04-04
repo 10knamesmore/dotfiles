@@ -1,33 +1,40 @@
 //@ pragma IconTheme breeze-dark
 //@ pragma UseQApplication
 
-import QtQuick
-import Quickshell
-import Quickshell.Io
-import Quickshell.Hyprland._GlobalShortcuts
-import Quickshell.Services.Pipewire
-import Quickshell.Services.Notifications
-import "./screen-effects"
 import "./bar"
 import "./calendar"
-import "./media"
-import "./power"
-import "./osd"
-import "./notifications"
-import "./launcher"
-import "./settings"
 import "./clipboard"
 import "./keybindings"
+import "./launcher"
+import "./media"
 import "./network"
+import "./notifications"
+import "./osd"
+import "./power"
+import "./screen-effects"
+import "./settings"
 import "./theme"
+import QtQuick
+import Quickshell
+import Quickshell.Hyprland._GlobalShortcuts
+import Quickshell.Io
+import Quickshell.Services.Notifications
+import Quickshell.Services.Pipewire
 
 ShellRoot {
     id: root
 
+    // ── OSD: 音量变化检测（Pipewire 响应式）──
+    property var _sink: Pipewire.defaultAudioSink
+    property real _lastVolume: -1
+
     // ── 每个显示器生成一个 Bar ──
     Variants {
         model: Quickshell.screens
-        delegate: Bar {}
+
+        delegate: Bar {
+        }
+
     }
 
     // ── 全局快捷键 ──
@@ -99,12 +106,7 @@ ShellRoot {
         }
     }
 
-    // ── OSD: 音量变化检测（Pipewire 响应式）──
-    property var _sink: Pipewire.defaultAudioSink
-    property real _lastVolume: -1
-
     Connections {
-        target: root._sink ? root._sink.audio : null
         function onVolumesChanged() {
             let vol = Math.round(root._sink.audio.volume * 100);
             if (root._lastVolume >= 0 && vol !== root._lastVolume) {
@@ -115,6 +117,7 @@ ShellRoot {
             }
             root._lastVolume = vol;
         }
+
         function onMutedChanged() {
             let vol = Math.round(root._sink.audio.volume * 100);
             PanelState.osdType = "volume";
@@ -122,14 +125,18 @@ ShellRoot {
             PanelState.osdIcon = root._sink.audio.muted ? "" : "";
             PanelState.osdVisible = true;
         }
+
+        target: root._sink ? root._sink.audio : null
     }
 
     // ── OSD: 亮度检测 ──
     Process {
         id: brightnessProc
+
         command: ["brightnessctl", "-m"]
+
         stdout: SplitParser {
-            onRead: data => {
+            onRead: (data) => {
                 let parts = data.split(",");
                 if (parts.length >= 4) {
                     let pct = parseInt(parts[3]) || 0;
@@ -140,58 +147,84 @@ ShellRoot {
                 }
             }
         }
+
     }
 
     // ── 通知服务 ──
     NotificationServer {
         id: notifServer
+
         keepOnReload: true
         bodySupported: true
         bodyMarkupSupported: true
         imageSupported: true
         actionsSupported: true
         persistenceSupported: true
-
-        onNotification: notification => {
+        onNotification: (notification) => {
             notification.tracked = true;
         }
     }
 
     Connections {
-        target: notifServer.trackedNotifications
         function onObjectInsertedPost() {
             PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
         }
+
         function onObjectRemovedPost() {
             PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
         }
+
+        target: notifServer.trackedNotifications
     }
 
     Connections {
-        target: PanelState
         function onClearAllNotifications() {
             let notifs = notifServer.trackedNotifications;
             for (let i = notifs.count - 1; i >= 0; i--) {
                 notifs.values[i].dismiss();
             }
         }
+
+        target: PanelState
     }
 
     // ── 全局面板（唯一实例）──
-    ScreenEffectsPanel {}
-    CalendarPanel {}
-    MediaPanel {}
-    PowerMenu {}
-    OsdPanel {}
+    ScreenEffectsPanel {
+    }
+
+    CalendarPanel {
+    }
+
+    MediaPanel {
+    }
+
+    PowerMenu {
+    }
+
+    OsdPanel {
+    }
+
     NotificationPanel {
         notifServer: notifServer
     }
+
     NotificationToast {
         notifServer: notifServer
     }
-    AppLauncher {}
-    QuickSettings {}
-    ClipboardPanel {}
-    KeybindingsPanel {}
-    NetworkPanel {}
+
+    AppLauncher {
+    }
+
+    QuickSettings {
+    }
+
+    ClipboardPanel {
+    }
+
+    KeybindingsPanel {
+    }
+
+    NetworkPanel {
+    }
+
 }
