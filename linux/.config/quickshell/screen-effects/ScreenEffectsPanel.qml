@@ -9,16 +9,16 @@ import Quickshell.Io
 PanelWindow {
     id: root
 
+    // 铺满全屏，背景透明，点击面板外部关闭
     anchors.top: true
+    anchors.bottom: true
+    anchors.left: true
     anchors.right: true
-    margins.top: 54
-    margins.right: 10
 
     visible: false
-    focusable: true
+    focusable: false
     exclusionMode: ExclusionMode.Ignore
-    implicitWidth: panel.width
-    implicitHeight: panel.height
+    color: "transparent"
 
     // ── 状态管理 ──
     property string home: Quickshell.env("HOME")
@@ -112,6 +112,13 @@ PanelWindow {
     }
 
     // ── UI ──
+
+    // 点击面板外部关闭
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.visible = false
+    }
+
     Rectangle {
         id: panel
         width: 320
@@ -120,6 +127,16 @@ PanelWindow {
         color: "#363a4f"
         border.color: "#494d64"
         border.width: 1
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 54
+        anchors.rightMargin: 10
+
+        // 阻止点击面板内部时触发背景 MouseArea
+        MouseArea {
+            anchors.fill: parent
+            onClicked: mouse => mouse.accepted = true
+        }
 
         ColumnLayout {
             id: col

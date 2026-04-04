@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Hyprland._GlobalShortcuts
+import "./screen-effects"
 
 ShellRoot {
     GlobalShortcut {
