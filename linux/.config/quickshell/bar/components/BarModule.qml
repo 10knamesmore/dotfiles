@@ -9,6 +9,7 @@ Rectangle {
     property color accentColor: Colors.blue
     property color backgroundColor: Colors.surface0
     property color tintColor: "transparent"
+    property real backgroundAlpha: Tokens.panelAlpha
     property bool hovered: hoverArea.containsMouse
     default property alias contents: inner.data
 
@@ -17,7 +18,9 @@ Rectangle {
     signal scrolled(int delta)
 
     radius: Tokens.radiusL
-    color: hovered ? Colors.surface1 : backgroundColor
+    color: hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha)
+    border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
+    border.width: Tokens.borderWidth
     implicitHeight: 36
     scale: hovered ? 1.03 : 1.0
 
@@ -132,6 +135,14 @@ Rectangle {
     }
 
     Behavior on color {
+        ColorAnimation {
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
+        }
+    }
+
+    Behavior on border.color {
         ColorAnimation {
             duration: Tokens.animFast
             easing.type: Easing.BezierSpline

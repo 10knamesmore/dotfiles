@@ -35,6 +35,12 @@ ShellRoot {
         delegate: Bar {}
     }
 
+    Variants {
+        model: Quickshell.screens
+
+        delegate: BarRevealEdge {}
+    }
+
     // ── 全局快捷键 ──
     GlobalShortcut {
         appid: "quickshell"
