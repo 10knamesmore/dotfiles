@@ -19,7 +19,7 @@ RowLayout {
         text: root.label
         font.family: Fonts.family
         font.pixelSize: Fonts.bodyLarge
-        color: "#b8c0e0"
+        color: Colors.subtext1
         Layout.preferredWidth: 90
     }
 
@@ -53,13 +53,13 @@ RowLayout {
             width: slider.availableWidth
             height: 4
             radius: 2
-            color: "#5b6078"
+            color: Colors.surface2
 
             Rectangle {
                 width: slider.visualPosition * parent.width
                 height: parent.height
                 radius: 2
-                color: "#c6a0f6"
+                color: Colors.mauve
             }
 
         }
@@ -72,8 +72,8 @@ RowLayout {
             width: 18
             height: 18
             radius: 9
-            color: slider.pressed ? "#f5bde6" : "#cad3f5"
-            border.color: "#c6a0f6"
+            color: slider.pressed ? Colors.pink : Colors.text
+            border.color: Colors.mauve
             border.width: 2
         }
 
@@ -83,7 +83,7 @@ RowLayout {
         text: Math.round(slider.value)
         font.family: Fonts.family
         font.pixelSize: Fonts.body
-        color: "#a5adcb"
+        color: Colors.subtext0
         Layout.preferredWidth: 28
         horizontalAlignment: Text.AlignRight
     }

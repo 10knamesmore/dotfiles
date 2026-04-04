@@ -18,7 +18,7 @@ Rectangle {
     implicitHeight: toggleCol.implicitHeight + 16
     radius: Tokens.radiusM
     color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.25 : 0.15) : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : 0.3) : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : Tokens.borderHoverAlpha) : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
     border.width: 1
     scale: toggleHover.containsMouse ? 1.03 : 1
 
@@ -26,7 +26,7 @@ Rectangle {
         id: toggleCol
 
         anchors.fill: parent
-        anchors.margins: 8
+        anchors.margins: Tokens.spaceS
         spacing: 2
 
         Text {
@@ -37,7 +37,9 @@ Rectangle {
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 200
+                    duration: Tokens.animFast
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Anim.standard
                 }
 
             }
@@ -80,22 +82,27 @@ Rectangle {
 
     Behavior on color {
         ColorAnimation {
-            duration: 200
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
 
     }
 
     Behavior on border.color {
         ColorAnimation {
-            duration: 200
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
 
     }
 
     Behavior on scale {
         NumberAnimation {
-            duration: 250
-            easing.type: Easing.OutBack
+            duration: Tokens.animNormal
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.elastic
         }
 
     }

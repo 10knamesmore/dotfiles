@@ -28,14 +28,15 @@ PanelWindow {
 
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.55 : 0
+        opacity: root.showing ? Tokens.backdropDark : 0
 
         Behavior on opacity {
             NumberAnimation {
                 id: _bgAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -97,8 +98,9 @@ PanelWindow {
             NumberAnimation {
                 id: _contentAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -125,14 +127,19 @@ PanelWindow {
 
         width: 100
         height: 110
-        radius: 16
+        radius: Tokens.radiusL
         color: btnArea.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.7) : Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: btnArea.containsMouse ? Colors.blue : Colors.surface1
         border.width: 1
 
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
+
         Column {
             anchors.centerIn: parent
-            spacing: 8
+            spacing: Tokens.spaceS
 
             Text {
                 text: icon
@@ -167,14 +174,18 @@ PanelWindow {
 
         Behavior on color {
             ColorAnimation {
-                duration: 200
+                duration: Tokens.animFast
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
 
         Behavior on border.color {
             ColorAnimation {
-                duration: 200
+                duration: Tokens.animFast
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }

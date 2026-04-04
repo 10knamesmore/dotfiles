@@ -163,9 +163,9 @@ Rectangle {
     Layout.fillWidth: true
     visible: loaded
     implicitHeight: contentCol.implicitHeight + 20
-    radius: 10
+    radius: Tokens.radiusMS
     color: cardHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: cardHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(1, 1, 1, 0.04)
+    border.color: cardHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
     border.width: 1
     clip: true
     Component.onCompleted: fetchWeather()
@@ -479,16 +479,18 @@ Rectangle {
 
     Behavior on color {
         ColorAnimation {
-            duration: 200
-            easing.type: Easing.OutCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
 
     }
 
     Behavior on border.color {
         ColorAnimation {
-            duration: 200
-            easing.type: Easing.OutCubic
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
 
     }

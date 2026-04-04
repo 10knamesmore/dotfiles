@@ -36,12 +36,13 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.15 : 0
+        opacity: root.showing ? Tokens.backdropDim : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -59,7 +60,7 @@ PanelWindow {
 
         width: 360
         height: col.implicitHeight + 32
-        radius: 16
+        radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
@@ -67,6 +68,11 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: root.showing ? 54 : 34
         opacity: root.showing ? 1 : 0
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -79,14 +85,14 @@ PanelWindow {
             id: col
 
             anchors.fill: parent
-            anchors.margins: 16
+            anchors.margins: Tokens.spaceL
             spacing: 10
 
             // ── 封面 ──
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 200
-                radius: 12
+                radius: Tokens.radiusM
                 color: Colors.surface1
                 clip: true
 
@@ -269,7 +275,9 @@ PanelWindow {
 
                     Behavior on color {
                         ColorAnimation {
-                            duration: 200
+                            duration: Tokens.animFast
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Anim.standard
                         }
 
                     }
@@ -329,7 +337,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 visible: root.player && root.player.volumeSupported
-                spacing: 8
+                spacing: Tokens.spaceS
 
                 Text {
                     text: "󰕾"
@@ -375,40 +383,7 @@ PanelWindow {
 
         }
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop {
-                    position: 0
-                    color: "transparent"
-                }
-
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "transparent"
-                }
-
-            }
-
-        }
+        InnerGlow {}
 
         Behavior on anchors.topMargin {
             NumberAnimation {
@@ -425,8 +400,9 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -451,7 +427,7 @@ PanelWindow {
 
         width: 32
         height: 32
-        radius: 16
+        radius: Tokens.radiusL
         color: btnArea.containsMouse ? Colors.surface1 : "transparent"
 
         Text {
@@ -473,7 +449,9 @@ PanelWindow {
 
         Behavior on color {
             ColorAnimation {
-                duration: 150
+                duration: Tokens.animFast
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }

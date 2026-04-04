@@ -26,7 +26,7 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         height: 32
-        radius: 8
+        radius: Tokens.radiusS
         color: Colors.surface1
 
         TextInput {

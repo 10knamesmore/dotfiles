@@ -15,7 +15,6 @@ BarModule {
     }
 
     accentColor: Colors.mauve
-    backgroundColor: Colors.mantle
     implicitWidth: Math.min(titleText.implicitWidth + 32, 400)
     clip: true
 
@@ -25,10 +24,10 @@ BarModule {
         anchors.centerIn: parent
         width: Math.min(implicitWidth, root.width - 32)
         text: root.displayTitle
-        color: Colors.lavender
+        color: Colors.text
         font.family: Fonts.family
         font.pixelSize: Fonts.bodyLarge
-        font.weight: Font.Bold
+        font.weight: Font.Medium
         font.italic: true
         elide: Text.ElideRight
     }

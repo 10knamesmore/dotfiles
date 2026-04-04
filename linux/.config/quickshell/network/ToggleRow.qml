@@ -14,7 +14,7 @@ Rectangle {
 
     Layout.fillWidth: true
     height: 40
-    radius: 10
+    radius: Tokens.radiusMS
     color: hoverArea.containsMouse ? Colors.surface1 : "transparent"
 
     RowLayout {
@@ -40,13 +40,13 @@ Rectangle {
         Rectangle {
             width: 40
             height: 22
-            radius: 11
+            radius: Tokens.radiusFull
             color: root.toggled ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3) : Colors.surface2
 
             Rectangle {
                 width: 16
                 height: 16
-                radius: 8
+                radius: Tokens.radiusS
                 y: 3
                 x: root.toggled ? parent.width - 19 : 3
                 color: root.toggled ? Colors.green : Colors.overlay1
@@ -61,7 +61,9 @@ Rectangle {
 
                 Behavior on color {
                     ColorAnimation {
-                        duration: 200
+                        duration: Tokens.animFast
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.standard
                     }
 
                 }
@@ -70,7 +72,9 @@ Rectangle {
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 200
+                    duration: Tokens.animFast
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Anim.standard
                 }
 
             }
@@ -90,7 +94,9 @@ Rectangle {
 
     Behavior on color {
         ColorAnimation {
-            duration: 150
+            duration: Tokens.animFast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Anim.standard
         }
 
     }

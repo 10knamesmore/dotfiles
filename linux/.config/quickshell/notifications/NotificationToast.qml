@@ -69,13 +69,19 @@ PanelWindow {
 
                 width: 340
                 height: toastContent.implicitHeight + 16
-                radius: 12
+                radius: Tokens.radiusM
                 color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.toastAlpha)
                 border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
                 border.width: 1
                 opacity: 0
                 x: 50
                 clip: true
+
+                SoftShadow {
+                    anchors.fill: parent
+                    radius: parent.radius
+                }
+
                 Component.onCompleted: {
                     opacity = 1;
                     x = 0;
@@ -112,7 +118,7 @@ PanelWindow {
 
                     anchors {
                         fill: parent
-                        margins: 8
+                        margins: Tokens.spaceS
                     }
 
                     Text {
@@ -155,24 +161,27 @@ PanelWindow {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 200
-                        easing.type: Easing.OutCubic
+                        duration: Tokens.animNormal
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.decelerate
                     }
 
                 }
 
                 Behavior on x {
                     NumberAnimation {
-                        duration: 200
-                        easing.type: Easing.OutCubic
+                        duration: Tokens.animNormal
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.decelerate
                     }
 
                 }
 
                 Behavior on height {
                     NumberAnimation {
-                        duration: 200
-                        easing.type: Easing.OutCubic
+                        duration: Tokens.animNormal
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.decelerate
                     }
 
                 }

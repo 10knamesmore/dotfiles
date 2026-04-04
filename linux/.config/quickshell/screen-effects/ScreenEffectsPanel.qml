@@ -128,12 +128,13 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? 0.15 : 0
+        opacity: root.showing ? Tokens.backdropDim : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 250
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }
@@ -151,7 +152,7 @@ PanelWindow {
 
         width: 320
         height: col.implicitHeight + 32
-        radius: 16
+        radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
@@ -160,6 +161,11 @@ PanelWindow {
         anchors.topMargin: root.showing ? 54 : 34
         anchors.rightMargin: 10
         opacity: root.showing ? 1 : 0
+
+        SoftShadow {
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         // 阻止点击面板内部时触发背景 MouseArea
         MouseArea {
@@ -173,7 +179,7 @@ PanelWindow {
             id: col
 
             anchors.fill: parent
-            anchors.margins: 16
+            anchors.margins: Tokens.spaceL
             spacing: 6
 
             // 标题
@@ -185,7 +191,7 @@ PanelWindow {
                     font.family: Fonts.family
                     font.pixelSize: Fonts.title
                     font.bold: true
-                    color: "#cad3f5"
+                    color: Colors.text
                 }
 
                 Item {
@@ -207,16 +213,16 @@ PanelWindow {
                     indicator: Rectangle {
                         implicitWidth: 40
                         implicitHeight: 20
-                        radius: 10
-                        color: toggleSwitch.checked ? "#a6da95" : "#5b6078"
+                        radius: Tokens.radiusMS
+                        color: toggleSwitch.checked ? Colors.green : Colors.surface2
 
                         Rectangle {
                             x: toggleSwitch.checked ? parent.width - width - 2 : 2
                             y: 2
                             width: 16
                             height: 16
-                            radius: 8
-                            color: "#cad3f5"
+                            radius: Tokens.radiusS
+                            color: Colors.text
 
                             Behavior on x {
                                 NumberAnimation {
@@ -236,7 +242,7 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#494d64"
+                color: Colors.surface1
             }
 
             // ── 滑块 ──
@@ -289,7 +295,7 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#494d64"
+                color: Colors.surface1
             }
 
             // ── 预设 ──
@@ -321,40 +327,7 @@ PanelWindow {
 
         }
 
-        // 内发光（毛玻璃顶部光源）
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            z: 1
-
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-
-                GradientStop {
-                    position: 0
-                    color: "transparent"
-                }
-
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "transparent"
-                }
-
-            }
-
-        }
+        InnerGlow {}
 
         Behavior on anchors.topMargin {
             NumberAnimation {
@@ -371,8 +344,9 @@ PanelWindow {
             NumberAnimation {
                 id: _opacityAnim
 
-                duration: 300
-                easing.type: Easing.OutCubic
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
             }
 
         }

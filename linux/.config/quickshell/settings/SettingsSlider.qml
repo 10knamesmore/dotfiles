@@ -53,7 +53,7 @@ ColumnLayout {
         background: Rectangle {
             implicitWidth: 200
             implicitHeight: 8
-            radius: 4
+            radius: Tokens.radiusXS
             color: Colors.surface1
 
             // 渐变填充（accent 浅→深）
@@ -93,7 +93,7 @@ ColumnLayout {
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
             implicitWidth: 22
             implicitHeight: 22
-            radius: 11
+            radius: Tokens.radiusFull
             color: slider.pressed ? Colors.text : slider.hovered ? Colors.subtext1 : Colors.subtext0
             border.color: root.accentColor
             border.width: 2
@@ -111,7 +111,9 @@ ColumnLayout {
 
                 Behavior on border.color {
                     ColorAnimation {
-                        duration: 200
+                        duration: Tokens.animFast
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.standard
                     }
 
                 }
@@ -120,15 +122,18 @@ ColumnLayout {
 
             Behavior on scale {
                 NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.OutBack
+                    duration: Tokens.animFast
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Anim.elastic
                 }
 
             }
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 150
+                    duration: Tokens.animFast
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Anim.standard
                 }
 
             }
