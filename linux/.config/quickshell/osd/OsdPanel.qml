@@ -1,0 +1,111 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Wayland
+import "../theme"
+
+// OSD 浮层 — 音量/亮度变化时在屏幕底部居中显示
+PanelWindow {
+    id: root
+
+    anchors.bottom: true
+    anchors.left: true
+    anchors.right: true
+    implicitHeight: 120
+    margins.bottom: 40
+    exclusionMode: ExclusionMode.Ignore
+    focusable: false
+    color: "transparent"
+
+    // 双阶段可见性
+    property bool showing: PanelState.osdVisible
+    visible: showing || _hideAnim.running
+
+    // 自动关闭定时器
+    Timer {
+        id: dismissTimer
+        interval: 1500
+        onTriggered: PanelState.osdVisible = false
+    }
+
+    ParallelAnimation {
+        id: _showAnim
+        NumberAnimation { target: osdWidget; property: "opacity"; to: 1; duration: 150; easing.type: Easing.OutCubic }
+        NumberAnimation { target: osdWidget; property: "scale"; to: 1.0; duration: 150; easing.type: Easing.OutCubic }
+    }
+    ParallelAnimation {
+        id: _hideAnim
+        NumberAnimation { target: osdWidget; property: "opacity"; to: 0; duration: 200; easing.type: Easing.InCubic }
+        NumberAnimation { target: osdWidget; property: "scale"; to: 0.95; duration: 200; easing.type: Easing.InCubic }
+    }
+
+    onShowingChanged: {
+        if (showing) {
+            _hideAnim.stop()
+            osdWidget.opacity = 0
+            osdWidget.scale = 0.95
+            _showAnim.start()
+            dismissTimer.restart()
+        } else {
+            _showAnim.stop()
+            _hideAnim.start()
+        }
+    }
+
+    // OSD 主体
+    Rectangle {
+        id: osdWidget
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        width: 240
+        height: 80
+        radius: 20
+        color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.85)
+        border.color: Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.9)
+        border.width: 1
+        opacity: 0
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 14
+
+            Text {
+                text: PanelState.osdIcon
+                color: Colors.text
+                font.family: "Hack Nerd Font"
+                font.pixelSize: 24
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+
+                // 进度条
+                Rectangle {
+                    width: 150
+                    height: 6
+                    radius: 3
+                    color: Colors.surface1
+
+                    Rectangle {
+                        width: Math.max(0, Math.min(1, PanelState.osdValue / 100.0)) * parent.width
+                        height: parent.height
+                        radius: parent.radius
+                        color: PanelState.osdType === "brightness" ? Colors.yellow : Colors.blue
+                        Behavior on width { NumberAnimation { duration: 100 } }
+                        Behavior on color { ColorAnimation { duration: 200 } }
+                    }
+                }
+
+                Text {
+                    text: PanelState.osdValue + "%"
+                    color: Colors.subtext0
+                    font.family: "Hack Nerd Font"
+                    font.pixelSize: 11
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+            }
+        }
+    }
+}
