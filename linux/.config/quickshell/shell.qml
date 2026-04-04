@@ -32,9 +32,7 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
 
-        delegate: Bar {
-        }
-
+        delegate: Bar {}
     }
 
     // ── 全局快捷键 ──
@@ -136,7 +134,7 @@ ShellRoot {
         command: ["brightnessctl", "-m"]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let parts = data.split(",");
                 if (parts.length >= 4) {
                     let pct = parseInt(parts[3]) || 0;
@@ -147,7 +145,6 @@ ShellRoot {
                 }
             }
         }
-
     }
 
     // ── 通知服务 ──
@@ -160,7 +157,7 @@ ShellRoot {
         imageSupported: true
         actionsSupported: true
         persistenceSupported: true
-        onNotification: (notification) => {
+        onNotification: notification => {
             notification.tracked = true;
         }
     }
@@ -189,20 +186,15 @@ ShellRoot {
     }
 
     // ── 全局面板（唯一实例）──
-    ScreenEffectsPanel {
-    }
+    ScreenEffectsPanel {}
 
-    CalendarPanel {
-    }
+    CalendarPanel {}
 
-    MediaPanel {
-    }
+    MediaPanel {}
 
-    PowerMenu {
-    }
+    PowerMenu {}
 
-    OsdPanel {
-    }
+    OsdPanel {}
 
     NotificationPanel {
         notifServer: notifServer
@@ -212,22 +204,19 @@ ShellRoot {
         notifServer: notifServer
     }
 
-    AppLauncher {
+    AppLauncher {}
+
+    QuickSettings {}
+
+    Variants {
+        model: Quickshell.screens
+
+        delegate: HotEdge {}
     }
 
-    QuickSettings {
-    }
+    ClipboardPanel {}
 
-    HotEdge {
-    }
+    KeybindingsPanel {}
 
-    ClipboardPanel {
-    }
-
-    KeybindingsPanel {
-    }
-
-    NetworkPanel {
-    }
-
+    NetworkPanel {}
 }
