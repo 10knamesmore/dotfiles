@@ -7,6 +7,9 @@ import Quickshell.Wayland
 PanelWindow {
     id: root
 
+    required property var modelData
+
+    screen: modelData
     anchors.left: true
     anchors.top: true
     anchors.bottom: true

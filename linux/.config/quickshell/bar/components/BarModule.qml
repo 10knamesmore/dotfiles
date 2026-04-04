@@ -44,20 +44,20 @@ Rectangle {
         }
     }
 
-    // 左侧弧形彩色指示器 — 沿胶囊圆弧蔓延
+    // 左侧弧形彩色指示器 — hover 时沿胶囊圆弧蔓延
     Item {
         anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: root.hovered ? 5 : 4
-        height: root.hovered ? parent.height : parent.height * 0.5
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.hovered ? 8 : 3
         clip: true
 
         Rectangle {
             anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: root.radius * 2
-            radius: root.radius
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.hovered ? root.radius * 2 : parent.width
+            height: root.hovered ? parent.height : parent.height * 0.5
+            radius: root.hovered ? root.radius : 1.5
             color: root.accentColor
             opacity: root.hovered ? 1.0 : 0.6
 
@@ -66,12 +66,29 @@ Rectangle {
                     duration: 300
                 }
             }
-        }
 
-        Behavior on height {
-            NumberAnimation {
-                duration: 400
-                easing.type: Easing.OutBack
+            Behavior on width {
+                NumberAnimation {
+                    duration: 400
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on height {
+                NumberAnimation {
+                    duration: 500
+                    easing {
+                        type: Easing.OutBack
+                        overshoot: 1.5
+                    }
+                }
+            }
+
+            Behavior on radius {
+                NumberAnimation {
+                    duration: 400
+                    easing.type: Easing.OutCubic
+                }
             }
         }
 
@@ -103,13 +120,13 @@ Rectangle {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: (mouse) => {
+        onClicked: mouse => {
             if (mouse.button === Qt.RightButton)
                 root.rightClicked(mouse);
             else
                 root.clicked(mouse);
         }
-        onWheel: (wheel) => {
+        onWheel: wheel => {
             return root.scrolled(wheel.angleDelta.y > 0 ? 1 : -1);
         }
     }
