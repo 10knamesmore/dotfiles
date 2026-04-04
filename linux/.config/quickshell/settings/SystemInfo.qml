@@ -4,21 +4,14 @@ import Quickshell.Io
 import "../theme"
 
 // 可折叠系统信息面板
-Item {
+ColumnLayout {
     id: root
 
     property bool expanded: false
 
-    implicitWidth: parent ? parent.width : 300
-    implicitHeight: expanded ? infoCol.implicitHeight : 0
-    clip: true
-
-    Behavior on implicitHeight {
-        NumberAnimation {
-            duration: 250
-            easing.type: Easing.OutCubic
-        }
-    }
+    Layout.fillWidth: true
+    visible: expanded
+    spacing: 8
 
     // ── 数据 ──
     property string cpuModel: ""
@@ -185,10 +178,6 @@ Item {
     }
 
     // ── UI ──
-    ColumnLayout {
-        id: infoCol
-        width: parent.width
-        spacing: 8
 
         // ── 硬件 Card ──
         InfoCard {
@@ -285,86 +274,5 @@ Item {
                 }
             }
         }
-    }
 
-    // ── 组件 ──
-
-    component InfoCard: Rectangle {
-        property Item contentItem: null
-
-        onContentItemChanged: {
-            if (contentItem) {
-                contentItem.parent = cardInner;
-                contentItem.anchors.left = cardInner.left;
-                contentItem.anchors.right = cardInner.right;
-            }
-        }
-
-        implicitHeight: contentItem ? contentItem.implicitHeight + 20 : 20
-        radius: 10
-        color: cardHover.containsMouse ? Colors.surface1 : Colors.surface0
-        border.color: cardHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(1, 1, 1, 0.04)
-        border.width: 1
-
-        Behavior on color {
-            ColorAnimation {
-                duration: 200
-                easing.type: Easing.OutCubic
-            }
-        }
-        Behavior on border.color {
-            ColorAnimation {
-                duration: 200
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        Item {
-            id: cardInner
-            anchors.fill: parent
-            anchors.margins: 10
-        }
-
-        MouseArea {
-            id: cardHover
-            anchors.fill: parent
-            hoverEnabled: true
-            acceptedButtons: Qt.NoButton
-        }
-    }
-
-    component InfoRow: RowLayout {
-        property string icon: ""
-        property string label: ""
-        property string value: ""
-        property color valueColor: Colors.text
-
-        Layout.fillWidth: true
-        spacing: 8
-
-        Text {
-            text: icon
-            color: Colors.overlay1
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 13
-            Layout.preferredWidth: 20
-            horizontalAlignment: Text.AlignHCenter
-        }
-        Text {
-            text: label
-            color: Colors.subtext0
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 11
-            elide: Text.ElideMiddle
-            Layout.fillWidth: true
-        }
-        Text {
-            visible: value.length > 0
-            text: value
-            color: valueColor
-            font.family: "Hack Nerd Font"
-            font.pixelSize: 11
-            font.weight: Font.DemiBold
-        }
-    }
 }

@@ -73,5 +73,8 @@ BarModule {
         }
     }
 
-    onClicked: Quickshell.execDetached(["kitty", "nmtui"])
+    onClicked: {
+        PanelState.closeAll()
+        PanelState.toggleNetwork()
+    }
 }

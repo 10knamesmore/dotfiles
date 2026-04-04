@@ -1,11 +1,12 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import "../theme"
 
-// 通知历史面板 — 右上角弹出，显示已追踪的通知列表
+// 通知历史面板 — 右上角弹出，对齐 ClipboardPanel 交互风格
 PanelWindow {
     id: root
 
@@ -24,6 +25,8 @@ PanelWindow {
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
+
+    Process { id: copyProc }
 
     // 半透明遮罩
     Rectangle {
@@ -72,10 +75,16 @@ PanelWindow {
             anchors.margins: 16
             spacing: 8
 
-            // 标题栏
+            // ── 标题栏 ──
             RowLayout {
                 Layout.fillWidth: true
 
+                Text {
+                    text: "󰂚"
+                    color: Colors.overlay1
+                    font.family: "Hack Nerd Font"
+                    font.pixelSize: 15
+                }
                 Text {
                     text: "通知"
                     font.family: "Hack Nerd Font"
@@ -88,29 +97,32 @@ PanelWindow {
 
                 // 通知计数
                 Text {
-                    visible: root.notifServer.trackedNotifications.count > 0
-                    text: root.notifServer.trackedNotifications.count + " 条"
+                    visible: PanelState.notificationCount > 0
+                    text: PanelState.notificationCount + " 条"
                     color: Colors.subtext0
                     font.family: "Hack Nerd Font"
                     font.pixelSize: 11
                 }
 
-                // 清除全部按钮
+                // 清除全部按钮（红色 hover，对齐 ClipboardPanel）
                 Rectangle {
-                    visible: root.notifServer.trackedNotifications.count > 0
+                    visible: PanelState.notificationCount > 0
                     width: clearText.implicitWidth + 16
                     height: 26
                     radius: 13
-                    color: clearArea.containsMouse ? Colors.surface1 : "transparent"
+                    color: clearArea.containsMouse
+                        ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15)
+                        : "transparent"
                     Behavior on color { ColorAnimation { duration: 150 } }
 
                     Text {
                         id: clearText
                         anchors.centerIn: parent
                         text: "清除全部"
-                        color: Colors.subtext0
+                        color: clearArea.containsMouse ? Colors.red : Colors.subtext0
                         font.family: "Hack Nerd Font"
                         font.pixelSize: 11
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
 
                     MouseArea {
@@ -127,7 +139,7 @@ PanelWindow {
 
             // 空状态
             Text {
-                visible: root.notifServer.trackedNotifications.count === 0
+                visible: PanelState.notificationCount === 0
                 text: "暂无通知"
                 color: Colors.overlay0
                 font.family: "Hack Nerd Font"
@@ -137,7 +149,7 @@ PanelWindow {
                 Layout.bottomMargin: 30
             }
 
-            // 通知列表
+            // ── 通知列表 ──
             ListView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -149,22 +161,31 @@ PanelWindow {
                 delegate: Rectangle {
                     required property var modelData
                     width: ListView.view.width
-                    height: notifCol.implicitHeight + 16
+                    height: notifRow.implicitHeight + 16
                     radius: 10
                     color: notifHover.containsMouse ? Colors.surface2 : Colors.surface1
                     Behavior on color { ColorAnimation { duration: 150 } }
 
-                    ColumnLayout {
-                        id: notifCol
+                    // hover 检测（底层）
+                    MouseArea {
+                        id: notifHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                    }
+
+                    RowLayout {
+                        id: notifRow
                         anchors {
                             left: parent.left; right: parent.right; top: parent.top
                             margins: 8
                         }
-                        spacing: 4
+                        spacing: 8
 
-                        // 应用名 + 关闭按钮
-                        RowLayout {
+                        // 通知内容
+                        ColumnLayout {
                             Layout.fillWidth: true
+                            spacing: 2
 
                             Text {
                                 text: modelData.appName || "未知"
@@ -172,57 +193,81 @@ PanelWindow {
                                 font.family: "Hack Nerd Font"
                                 font.pixelSize: 10
                             }
+                            Text {
+                                text: modelData.summary || ""
+                                color: Colors.text
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                visible: (modelData.body || "") !== ""
+                                text: modelData.body || ""
+                                color: Colors.subtext1
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 11
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                            }
+                        }
 
-                            Item { Layout.fillWidth: true }
+                        // 复制按钮
+                        Rectangle {
+                            width: 28; height: 28; radius: 14
+                            color: copyArea.containsMouse
+                                ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                                : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
 
                             Text {
+                                anchors.centerIn: parent
+                                text: "󰆏"
+                                color: copyArea.containsMouse ? Colors.blue : Colors.overlay0
+                                font.family: "Hack Nerd Font"
+                                font.pixelSize: 14
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            MouseArea {
+                                id: copyArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    let text = modelData.summary + (modelData.body ? "\n" + modelData.body : "");
+                                    copyProc.command = ["wl-copy", text];
+                                    copyProc.running = true;
+                                }
+                            }
+                        }
+
+                        // 删除按钮
+                        Rectangle {
+                            width: 28; height: 28; radius: 14
+                            color: dismissArea.containsMouse
+                                ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15)
+                                : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            Text {
+                                anchors.centerIn: parent
                                 text: "󰅖"
                                 color: dismissArea.containsMouse ? Colors.red : Colors.overlay0
                                 font.family: "Hack Nerd Font"
                                 font.pixelSize: 14
                                 Behavior on color { ColorAnimation { duration: 150 } }
-
-                                MouseArea {
-                                    id: dismissArea
-                                    anchors.fill: parent
-                                    anchors.margins: -4
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: modelData.dismiss()
-                                }
+                            }
+                            MouseArea {
+                                id: dismissArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: modelData.dismiss()
                             }
                         }
-
-                        // 标题
-                        Text {
-                            text: modelData.summary || ""
-                            color: Colors.text
-                            font.family: "Hack Nerd Font"
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                        }
-
-                        // 正文
-                        Text {
-                            visible: (modelData.body || "") !== ""
-                            text: modelData.body || ""
-                            color: Colors.subtext1
-                            font.family: "Hack Nerd Font"
-                            font.pixelSize: 11
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    MouseArea {
-                        id: notifHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.NoButton
                     }
                 }
             }

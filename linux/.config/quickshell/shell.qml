@@ -17,6 +17,8 @@ import "./notifications"
 import "./launcher"
 import "./settings"
 import "./clipboard"
+import "./keybindings"
+import "./network"
 import "./theme"
 
 ShellRoot {
@@ -34,8 +36,8 @@ ShellRoot {
         name: "toggleBar"
         description: "Toggle bar visibility"
         onPressed: {
-            PanelState.closeAll()
-            PanelState.toggleBar()
+            PanelState.closeAll();
+            PanelState.toggleBar();
         }
     }
 
@@ -44,9 +46,9 @@ ShellRoot {
         name: "screenEffects"
         description: "Toggle screen effects panel"
         onPressed: {
-            PanelState.calendarOpen = false
-            PanelState.mediaOpen = false
-            PanelState.toggleScreenEffects()
+            PanelState.calendarOpen = false;
+            PanelState.mediaOpen = false;
+            PanelState.toggleScreenEffects();
         }
     }
 
@@ -55,8 +57,8 @@ ShellRoot {
         name: "powerMenu"
         description: "Toggle power menu"
         onPressed: {
-            PanelState.closeAll()
-            PanelState.togglePowerMenu()
+            PanelState.closeAll();
+            PanelState.togglePowerMenu();
         }
     }
 
@@ -72,8 +74,8 @@ ShellRoot {
         name: "launcher"
         description: "Toggle app launcher"
         onPressed: {
-            PanelState.closeAll()
-            PanelState.toggleLauncher()
+            PanelState.closeAll();
+            PanelState.toggleLauncher();
         }
     }
 
@@ -82,8 +84,18 @@ ShellRoot {
         name: "settings"
         description: "Toggle quick settings"
         onPressed: {
-            PanelState.closeAll()
-            PanelState.toggleSettings()
+            PanelState.closeAll();
+            PanelState.toggleSettings();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "keybindings"
+        description: "Toggle keybindings cheat sheet"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleKeybindings();
         }
     }
 
@@ -94,21 +106,21 @@ ShellRoot {
     Connections {
         target: root._sink ? root._sink.audio : null
         function onVolumesChanged() {
-            let vol = Math.round(root._sink.audio.volume * 100)
+            let vol = Math.round(root._sink.audio.volume * 100);
             if (root._lastVolume >= 0 && vol !== root._lastVolume) {
-                PanelState.osdType = "volume"
-                PanelState.osdValue = vol
-                PanelState.osdIcon = root._sink.audio.muted ? "" : (vol < 50 ? "" : "")
-                PanelState.osdVisible = true
+                PanelState.osdType = "volume";
+                PanelState.osdValue = vol;
+                PanelState.osdIcon = root._sink.audio.muted ? "" : (vol < 50 ? "" : "");
+                PanelState.osdVisible = true;
             }
-            root._lastVolume = vol
+            root._lastVolume = vol;
         }
         function onMutedChanged() {
-            let vol = Math.round(root._sink.audio.volume * 100)
-            PanelState.osdType = "volume"
-            PanelState.osdValue = vol
-            PanelState.osdIcon = root._sink.audio.muted ? "" : ""
-            PanelState.osdVisible = true
+            let vol = Math.round(root._sink.audio.volume * 100);
+            PanelState.osdType = "volume";
+            PanelState.osdValue = vol;
+            PanelState.osdIcon = root._sink.audio.muted ? "" : "";
+            PanelState.osdVisible = true;
         }
     }
 
@@ -118,13 +130,13 @@ ShellRoot {
         command: ["brightnessctl", "-m"]
         stdout: SplitParser {
             onRead: data => {
-                let parts = data.split(",")
+                let parts = data.split(",");
                 if (parts.length >= 4) {
-                    let pct = parseInt(parts[3]) || 0
-                    PanelState.osdType = "brightness"
-                    PanelState.osdValue = pct
-                    PanelState.osdIcon = pct > 50 ? "󰃠" : "󰃞"
-                    PanelState.osdVisible = true
+                    let pct = parseInt(parts[3]) || 0;
+                    PanelState.osdType = "brightness";
+                    PanelState.osdValue = pct;
+                    PanelState.osdIcon = pct > 50 ? "󰃠" : "󰃞";
+                    PanelState.osdVisible = true;
                 }
             }
         }
@@ -141,39 +153,45 @@ ShellRoot {
         persistenceSupported: true
 
         onNotification: notification => {
-            notification.tracked = true
+            notification.tracked = true;
         }
     }
 
     Connections {
         target: notifServer.trackedNotifications
         function onObjectInsertedPost() {
-            PanelState.notificationCount = notifServer.trackedNotifications.count
+            PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
         }
         function onObjectRemovedPost() {
-            PanelState.notificationCount = notifServer.trackedNotifications.count
+            PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
         }
     }
 
     Connections {
         target: PanelState
         function onClearAllNotifications() {
-            let notifs = notifServer.trackedNotifications
+            let notifs = notifServer.trackedNotifications;
             for (let i = notifs.count - 1; i >= 0; i--) {
-                notifs.values[i].dismiss()
+                notifs.values[i].dismiss();
             }
         }
     }
 
     // ── 全局面板（唯一实例）──
     ScreenEffectsPanel {}
-    CalendarPanel      {}
-    MediaPanel         {}
-    PowerMenu          {}
-    OsdPanel           {}
-    NotificationPanel  { notifServer: notifServer }
-    NotificationToast  { notifServer: notifServer }
-    AppLauncher        {}
-    QuickSettings      {}
-    ClipboardPanel     {}
+    CalendarPanel {}
+    MediaPanel {}
+    PowerMenu {}
+    OsdPanel {}
+    NotificationPanel {
+        notifServer: notifServer
+    }
+    NotificationToast {
+        notifServer: notifServer
+    }
+    AppLauncher {}
+    QuickSettings {}
+    ClipboardPanel {}
+    KeybindingsPanel {}
+    NetworkPanel {}
 }
