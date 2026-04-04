@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Noice.nvim + nvim-notify 完整配置手册</title>
+  <style>
+    :root {
+      --bg: #f5f8fc;
+      --surface: #ffffff;
+      --surface-2: #f8fbff;
+      --text: #1a2533;
+      --muted: #5d6f86;
+      --line: #d9e3f0;
+      --brand: #0f6ab7;
+      --brand-soft: #e9f4ff;
+      --ok: #0f8a4b;
+      --warn: #9f6700;
+      --danger: #b42318;
+      --code-bg: #0f1c2e;
+      --code-text: #d9e9ff;
+      --shadow: 0 10px 30px rgba(20, 46, 84, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 110% -10%, #d9ebff 0%, var(--bg) 45%, #f8fbff 100%);
+      line-height: 1.62;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 18px;
+    }
+
+    .main { min-width: 0; }
+
+    .hero {
+      background: linear-gradient(145deg, #ffffff 10%, #edf6ff 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 31px;
+      line-height: 1.2;
+      letter-spacing: 0.2px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      line-height: 1.3;
+      scroll-margin-top: 12px;
+    }
+
+    h3 {
+      margin: 14px 0 8px;
+      font-size: 17px;
+      line-height: 1.35;
+      scroll-margin-top: 12px;
+    }
+
+    h4 {
+      margin: 10px 0 6px;
+      font-size: 15px;
+      line-height: 1.35;
+      color: #22334a;
+      scroll-margin-top: 12px;
+    }
+
+    p { margin: 8px 0; }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .chip {
+      font-size: 12px;
+      color: var(--brand);
+      background: var(--brand-soft);
+      border: 1px solid #cde4ff;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .subsection {
+      background: var(--surface-2);
+      border: 1px solid #dfe8f5;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+
+    ul, ol {
+      margin: 8px 0;
+      padding-left: 21px;
+    }
+
+    li { margin: 4px 0; }
+
+    code {
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: .9em;
+      background: #edf3fb;
+      border-radius: 6px;
+      padding: .1em .4em;
+    }
+
+    pre {
+      margin: 10px 0;
+      background: var(--code-bg);
+      color: var(--code-text);
+      border: 1px solid #203a5a;
+      border-radius: 10px;
+      padding: 13px;
+      overflow: auto;
+      font-size: 12.8px;
+      line-height: 1.55;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .tip, .warn, .danger {
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .tip {
+      background: #eefcf3;
+      border-left: 4px solid var(--ok);
+    }
+
+    .warn {
+      background: #fff8e7;
+      border-left: 4px solid var(--warn);
+    }
+
+    .danger {
+      background: #fff0ef;
+      border-left: 4px solid var(--danger);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      vertical-align: top;
+    }
+
+    th {
+      color: #223349;
+      background: #f2f7fd;
+    }
+
+    td { color: #2f4258; }
+
+    .toc-wrap {
+      position: sticky;
+      top: 12px;
+      align-self: start;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+
+    .toc h3 {
+      margin: 2px 0 8px;
+      font-size: 15px;
+    }
+
+    .toc a {
+      display: block;
+      color: #35506e;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 3px 4px;
+      border-radius: 6px;
+      margin: 1px 0;
+    }
+
+    .toc a:hover {
+      background: #eef5ff;
+      color: #1f446a;
+    }
+
+    .toc .lvl2 { padding-left: 16px; }
+    .toc .lvl3 { padding-left: 28px; font-size: 12px; }
+
+    .kbd {
+      display: inline-block;
+      border: 1px solid #cbd7e8;
+      background: #fff;
+      border-radius: 6px;
+      padding: 0 6px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      padding: 6px 0;
+    }
+
+    @media (max-width: 1050px) {
+      .page { grid-template-columns: 1fr; }
+      .toc-wrap { position: static; }
+      .toc { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main class="main">
+      <section class="hero" id="top">
+        <h1>Noice.nvim + nvim-notify 完整配置手册</h1>
+        <p class="subtitle">本页包含：目录锚点导航、完整字段说明（含义/可选项/效果）、推荐配置模板、常见场景和排错。</p>
+        <div class="chips">
+          <span class="chip">Neovim</span>
+          <span class="chip">lazy.nvim</span>
+          <span class="chip">noice.nvim</span>
+          <span class="chip">nvim-notify</span>
+          <span class="chip">Routing</span>
+          <span class="chip">Animation</span>
+        </div>
+      </section>
+
+      <section class="section" id="model">
+        <h2>1. 工作模型</h2>
+        <ol>
+          <li><code>vim.notify(...)</code> 先进入 noice 的消息系统（当 <code>notify.enabled=true</code>）。</li>
+          <li>noice 根据 <code>routes</code> 与 <code>views</code> 决定消息去向。</li>
+          <li><code>views.notify.backend = "notify"</code> 时，通知最终由 <code>nvim-notify</code> 展示。</li>
+          <li>通知动画来自 nvim-notify 的 <code>stages</code> 和 <code>fps</code>。</li>
+        </ol>
+        <div class="warn">如果动画消失，先检查是否有其他插件重写了 <code>vim.notify</code>（如 <code>snacks.notifier</code>）。</div>
+      </section>
+
+      <section class="section" id="quick-start">
+        <h2>2. 推荐起步配置</h2>
+        <pre><code class="language-lua">-- noice.nvim
+{
+  "folke/noice.nvim",
+  event = "VeryLazy",
+  dependencies = {
+    "MunifTanjim/nui.nvim",
+    "rcarriga/nvim-notify",
+  },
+  opts = {
+    notify = { enabled = true, view = "notify" },
+    views = {
+      notify = {
+        backend = "notify", -- 强制走 nvim-notify
+        fallback = "mini",
+      },
+    },
+    messages = {
+      enabled = true,
+      view = "notify",
+      view_error = "notify",
+      view_warn = "notify",
+      view_history = "messages",
+      view_search = "virtualtext",
+    },
+    cmdline = { enabled = true, view = "cmdline_popup" },
+    popupmenu = { enabled = true, backend = "nui" },
+    lsp = {
+      progress = { enabled = true, view = "mini" },
+      hover = { enabled = true },
+      signature = { enabled = true },
+      message = { enabled = true, view = "notify" },
+    },
+    presets = {
+      command_palette = true,
+      long_message_to_split = true,
+      inc_rename = true,
+      lsp_doc_border = true,
+    },
+  },
+}
+
+-- nvim-notify
+{
+  "rcarriga/nvim-notify",
+  opts = {
+    stages = "fade_in_slide_out",
+    render = "default",
+    timeout = 3000,
+    fps = 60,
+    top_down = true,
+    background_colour = "NotifyBackground",
+    max_width = function() return math.floor(vim.o.columns * 0.4) end,
+    max_height = function() return math.floor(vim.o.lines * 0.3) end,
+    merge_duplicates = true,
+  },
+}
+</code></pre>
+      </section>
+
+      <section class="section" id="noice-overview">
+        <h2>3. Noice 配置总览（顶层键）</h2>
+        <table>
+          <thead><tr><th>键</th><th>含义</th><th>可选项</th><th>效果差异</th></tr></thead>
+          <tbody>
+            <tr><td><code>cmdline</code></td><td>命令行 UI</td><td>table</td><td>控制命令行渲染方式与格式匹配规则</td></tr>
+            <tr><td><code>messages</code></td><td>普通消息系统</td><td>table</td><td>决定 msg_show / errors / warnings 的默认视图</td></tr>
+            <tr><td><code>popupmenu</code></td><td>命令行补全菜单</td><td>table</td><td>可选 <code>nui</code>/<code>cmp</code> 后端</td></tr>
+            <tr><td><code>redirect</code></td><td><code>require("noice").redirect()</code> 默认路由</td><td>route table</td><td>命令输出临时重定向视图</td></tr>
+            <tr><td><code>commands</code></td><td><code>:Noice xxx</code> 子命令定义</td><td>table</td><td>自定义 <code>history/last/errors/all</code> 的 view/filter</td></tr>
+            <tr><td><code>notify</code></td><td>是否让 noice 接管 <code>vim.notify</code></td><td>table</td><td>开启后通知可被 routes 统一管理</td></tr>
+            <tr><td><code>lsp</code></td><td>LSP 显示模块</td><td>table</td><td>控制进度/hover/signature/message 展示策略</td></tr>
+            <tr><td><code>markdown</code></td><td>markdown 链接与高亮规则</td><td>table</td><td>影响 hover 文档里链接与标记解析</td></tr>
+            <tr><td><code>health</code></td><td>健康检查控制</td><td>table</td><td>决定是否运行 noice health checker</td></tr>
+            <tr><td><code>presets</code></td><td>预设快捷开关</td><td>boolean/table</td><td>快速叠加官方预设行为</td></tr>
+            <tr><td><code>throttle</code></td><td>UI 更新频率</td><td>number (ms)</td><td>越小越实时，CPU 开销越高</td></tr>
+            <tr><td><code>views</code></td><td>视图字典</td><td>table</td><td>定义每个 view 的 backend/窗口行为</td></tr>
+            <tr><td><code>routes</code></td><td>全局消息路由</td><td>route[]</td><td>按 filter 条件分流到不同 view</td></tr>
+            <tr><td><code>status</code></td><td>状态栏过滤器</td><td>table&lt;name,filter&gt;</td><td>供 <code>noice.api.status</code> 组件判断显示内容</td></tr>
+            <tr><td><code>format</code></td><td>格式模板与 token 配置</td><td>table</td><td>决定消息文本拼装与高亮</td></tr>
+            <tr><td><code>debug</code></td><td>调试日志开关</td><td><code>true/false</code></td><td>开启后输出更多调试信息</td></tr>
+            <tr><td><code>log</code></td><td>日志文件路径</td><td>string path</td><td>debug 日志写入位置</td></tr>
+            <tr><td><code>log_max_size</code></td><td>日志最大大小</td><td>number (bytes)</td><td>超过后截断，避免日志无限增长</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="noice-cmdline">
+        <h2>4. Noice <code>cmdline</code> 全量说明</h2>
+        <table>
+          <thead><tr><th>字段</th><th>含义</th><th>可选项</th><th>效果</th></tr></thead>
+          <tbody>
+            <tr><td><code>cmdline.enabled</code></td><td>启用命令行 UI 接管</td><td><code>true/false</code></td><td><code>false</code> 时回退 Neovim 原生命令行</td></tr>
+            <tr><td><code>cmdline.view</code></td><td>命令行默认视图</td><td><code>"cmdline_popup"</code> / <code>"cmdline"</code> / 自定义 view 名</td><td>popup 居中浮窗；cmdline 更接近底部经典样式</td></tr>
+            <tr><td><code>cmdline.opts</code></td><td>传给命令行 view 的覆盖选项</td><td>任意 NoiceViewOptions</td><td>可调位置、边框、尺寸、win_options</td></tr>
+            <tr><td><code>cmdline.format</code></td><td>不同命令类型匹配器字典</td><td>table&lt;name, CmdlineFormat|false&gt;</td><td>决定图标、语法高亮、是否 conceal 前缀</td></tr>
+          </tbody>
+        </table>
+
+        <div class="subsection" id="noice-cmdline-format-fields">
+          <h3>4.1 CmdlineFormat 每个字段</h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>name</code></td><td>string（通常键名）</td><td>格式标识，用于内部区分消息 kind</td></tr>
+              <tr><td><code>kind</code></td><td>string</td><td>消息种类标记，供过滤与展示</td></tr>
+              <tr><td><code>pattern</code></td><td>string 或 string[]（Lua pattern）</td><td>匹配命令行内容；可多模式同时匹配</td></tr>
+              <tr><td><code>view</code></td><td>view 名称</td><td>该命令类型单独指定视图</td></tr>
+              <tr><td><code>conceal</code></td><td><code>true/false</code>（默认 true）</td><td>是否隐藏匹配到的前缀（如 <code>:</code>）</td></tr>
+              <tr><td><code>icon</code></td><td>string</td><td>该命令类型显示图标</td></tr>
+              <tr><td><code>icon_hl_group</code></td><td>highlight group 名</td><td>控制图标颜色</td></tr>
+              <tr><td><code>opts</code></td><td>NoiceViewOptions</td><td>仅对此 format 生效的视图参数覆盖</td></tr>
+              <tr><td><code>title</code></td><td>string / 空串</td><td>给 input/popup 设置标题；空串可隐藏</td></tr>
+              <tr><td><code>lang</code></td><td>string（如 <code>vim/lua/regex/bash</code>）</td><td>语法高亮语言</td></tr>
+            </tbody>
+          </table>
+          <p>内置格式名：<code>cmdline</code>、<code>search_down</code>、<code>search_up</code>、<code>filter</code>、<code>lua</code>、<code>help</code>、<code>calculator</code>、<code>input</code>。可用 <code>xxx=false</code> 禁用某一项。</p>
+        </div>
+      </section>
+
+      <section class="section" id="noice-messages">
+        <h2>5. Noice <code>messages</code> 全量说明</h2>
+        <table>
+          <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+          <tbody>
+            <tr><td><code>messages.enabled</code></td><td><code>true/false</code></td><td>控制 noice 是否接管消息 UI。开启后 cmdline 会自动启用（Neovim 限制）。</td></tr>
+            <tr><td><code>messages.view</code></td><td>view 名（如 <code>notify/split/mini</code>）</td><td>普通消息默认去向。</td></tr>
+            <tr><td><code>messages.view_error</code></td><td>view 名</td><td>error 级别消息视图。</td></tr>
+            <tr><td><code>messages.view_warn</code></td><td>view 名</td><td>warn 级别消息视图。</td></tr>
+            <tr><td><code>messages.view_history</code></td><td>view 名</td><td><code>:messages</code> 历史窗口视图。</td></tr>
+            <tr><td><code>messages.view_search</code></td><td>view 名或 <code>false</code></td><td>搜索计数消息去向；设 <code>false</code> 则关闭。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="noice-popupmenu">
+        <h2>6. Noice <code>popupmenu</code> 全量说明</h2>
+        <table>
+          <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+          <tbody>
+            <tr><td><code>popupmenu.enabled</code></td><td><code>true/false</code></td><td>控制命令行补全菜单是否由 noice 接管。</td></tr>
+            <tr><td><code>popupmenu.backend</code></td><td><code>"nui"</code> / <code>"cmp"</code></td><td><code>nui</code> 纯 noice 路径；<code>cmp</code> 与 nvim-cmp 集成。</td></tr>
+            <tr><td><code>popupmenu.kind_icons</code></td><td>table / <code>false</code></td><td>补全项类型图标映射；<code>false</code> 完全关图标。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="noice-redirect-commands-notify">
+        <h2>7. Noice <code>redirect / commands / notify</code></h2>
+        <div class="subsection" id="noice-redirect">
+          <h3>7.1 <code>redirect</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>redirect.view</code></td><td>view 名</td><td><code>require("noice").redirect()</code> 默认输出视图。</td></tr>
+              <tr><td><code>redirect.filter</code></td><td>NoiceFilter</td><td>重定向时只抓符合条件的消息。</td></tr>
+              <tr><td><code>redirect.opts</code></td><td>route/view opts</td><td>对本次重定向附加行为（如 <code>skip/stop</code> 或窗口参数）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-commands">
+          <h3>7.2 <code>commands</code></h3>
+          <p>每个子命令（如 <code>history</code>/<code>last</code>/<code>errors</code>/<code>all</code>）本质是 <code>NoiceCommand</code>（继承 route 配置）。</p>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>commands.&lt;name&gt;.view</code></td><td>view 名</td><td>该命令打开在哪个视图（popup/split/notify 等）。</td></tr>
+              <tr><td><code>commands.&lt;name&gt;.filter</code></td><td>NoiceFilter</td><td>选取要展示的消息范围。</td></tr>
+              <tr><td><code>commands.&lt;name&gt;.opts</code></td><td>view/route 选项</td><td>如 <code>enter=true</code>、<code>format="details"</code>。</td></tr>
+              <tr><td><code>commands.&lt;name&gt;.filter_opts</code></td><td>{ count?, reverse?, sort? ... }</td><td>过滤后结果如何截取/排序（例如 <code>count=1</code> 只看最后一条）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-notify">
+          <h3>7.3 <code>notify</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>notify.enabled</code></td><td><code>true/false</code></td><td>是否用 noice 接管 <code>vim.notify</code>。</td></tr>
+              <tr><td><code>notify.view</code></td><td>view 名（常用 <code>notify</code>）</td><td>通知默认路由视图。</td></tr>
+            </tbody>
+          </table>
+          <p>配合 <code>views.notify.backend</code> 决定最终通知后端（如 <code>notify</code> 或 <code>snacks</code>）。</p>
+        </div>
+      </section>
+
+      <section class="section" id="noice-lsp">
+        <h2>8. Noice <code>lsp</code> 全量说明</h2>
+
+        <div class="subsection" id="noice-lsp-progress">
+          <h3>8.1 <code>lsp.progress</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>enabled</code></td><td><code>true/false</code></td><td>是否显示 LSP 进度消息。</td></tr>
+              <tr><td><code>format</code></td><td>format 名或自定义格式</td><td>进行中状态模板（默认 <code>lsp_progress</code>）。</td></tr>
+              <tr><td><code>format_done</code></td><td>format 名或自定义格式</td><td>完成状态模板（默认 <code>lsp_progress_done</code>）。</td></tr>
+              <tr><td><code>throttle</code></td><td>number(ms)</td><td>进度刷新频率，值越小更新越频繁。</td></tr>
+              <tr><td><code>view</code></td><td>view 名</td><td>LSP 进度显示在哪（常用 <code>mini</code>）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-lsp-override">
+          <h3>8.2 <code>lsp.override</code></h3>
+          <table>
+            <thead><tr><th>键</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>vim.lsp.util.convert_input_to_markdown_lines</code></td><td><code>true/false</code></td><td>是否由 noice 接管 markdown 行转换。</td></tr>
+              <tr><td><code>vim.lsp.util.stylize_markdown</code></td><td><code>true/false</code></td><td>是否由 noice 接管 markdown 美化。</td></tr>
+              <tr><td><code>cmp.entry.get_documentation</code></td><td><code>true/false</code></td><td>是否接管 cmp 文档渲染（通常依赖前两个）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-lsp-hover">
+          <h3>8.3 <code>lsp.hover</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>enabled</code></td><td><code>true/false</code></td><td>是否启用 hover 展示。</td></tr>
+              <tr><td><code>silent</code></td><td><code>true/false</code></td><td><code>true</code> 时 hover 不可用不提示消息。</td></tr>
+              <tr><td><code>view</code></td><td>view 名或 <code>nil</code></td><td><code>nil</code> 使用文档默认 hover 视图。</td></tr>
+              <tr><td><code>opts</code></td><td>NoiceViewOptions</td><td>hover 视图局部覆盖参数。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-lsp-signature">
+          <h3>8.4 <code>lsp.signature</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>enabled</code></td><td><code>true/false</code></td><td>是否启用签名提示。</td></tr>
+              <tr><td><code>auto_open.enabled</code></td><td><code>true/false</code></td><td>是否自动弹出签名。</td></tr>
+              <tr><td><code>auto_open.trigger</code></td><td><code>true/false</code></td><td>输入 LSP trigger 字符时自动请求签名。</td></tr>
+              <tr><td><code>auto_open.luasnip</code></td><td><code>true/false</code></td><td>Luasnip 跳位时自动显示签名。</td></tr>
+              <tr><td><code>auto_open.snipppets</code></td><td><code>true/false</code></td><td>内置 snippets 占位符跳转时自动显示（字段名按上游拼写）。</td></tr>
+              <tr><td><code>auto_open.throttle</code></td><td>number(ms)</td><td>签名请求防抖时间。</td></tr>
+              <tr><td><code>view</code></td><td>view 名或 <code>nil</code></td><td>签名视图；<code>nil</code> 用默认。</td></tr>
+              <tr><td><code>opts</code></td><td>NoiceViewOptions</td><td>签名视图局部覆盖。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-lsp-message-doc">
+          <h3>8.5 <code>lsp.message</code> 与 <code>lsp.documentation</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>lsp.message.enabled</code></td><td><code>true/false</code></td><td>是否展示 LSP server message。</td></tr>
+              <tr><td><code>lsp.message.view</code></td><td>view 名</td><td>通常用 <code>notify</code>。</td></tr>
+              <tr><td><code>lsp.message.opts</code></td><td>table</td><td>附加路由/视图参数。</td></tr>
+              <tr><td><code>lsp.documentation.view</code></td><td>view 名</td><td>hover/signature 文档使用的默认视图。</td></tr>
+              <tr><td><code>lsp.documentation.opts</code></td><td>NoiceViewOptions</td><td>文档窗口样式，如 <code>replace/render/format/win_options</code>。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="noice-markdown-health-presets">
+        <h2>9. Noice <code>markdown / health / presets / runtime</code></h2>
+
+        <div class="subsection" id="noice-markdown">
+          <h3>9.1 <code>markdown</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>markdown.hover</code></td><td>table&lt;pattern, handler&gt;</td><td>匹配文本后执行函数（如 help 链接、url 打开）。</td></tr>
+              <tr><td><code>markdown.highlights</code></td><td>table&lt;pattern, hl_group&gt;</td><td>匹配到的 markdown 片段高亮映射。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-health">
+          <h3>9.2 <code>health</code></h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>health.checker</code></td><td><code>true/false</code></td><td>是否启用 noice health 检查。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-presets">
+          <h3>9.3 <code>presets</code> 每一项的含义</h3>
+          <table>
+            <thead><tr><th>预设名</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>bottom_search</code></td><td><code>true/false</code> 或 table</td><td>把 <code>/</code> 与 <code>?</code> 搜索命令改为底部 cmdline 样式。</td></tr>
+              <tr><td><code>command_palette</code></td><td><code>true/false</code> 或 table</td><td>将 cmdline popup 与 popupmenu 布局成命令面板样式（上下对齐）。</td></tr>
+              <tr><td><code>long_message_to_split</code></td><td><code>true/false</code> 或 table</td><td>长消息（默认 <code>min_height=20</code>）分流到 split。</td></tr>
+              <tr><td><code>inc_rename</code></td><td><code>true/false</code> 或 table</td><td>为 <code>IncRename</code> 命令定义输入框格式与定位。</td></tr>
+              <tr><td><code>lsp_doc_border</code></td><td><code>true/false</code> 或 table</td><td>给 hover 文档添加圆角边框并微调偏移。</td></tr>
+              <tr><td><code>cmdline_output_to_split</code></td><td><code>true/false</code> 或 table</td><td>命令行执行输出统一转到 split。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-runtime">
+          <h3>9.4 运行时键</h3>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>throttle</code></td><td>number（ms）</td><td>Router 更新间隔；小值更灵敏但更耗资源。</td></tr>
+              <tr><td><code>debug</code></td><td><code>true/false</code></td><td>开启后记录更多内部调试信息。</td></tr>
+              <tr><td><code>log</code></td><td>path</td><td>debug 日志输出路径。</td></tr>
+              <tr><td><code>log_max_size</code></td><td>bytes</td><td>超过阈值自动清空日志文件。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="noice-views-routes-status-format">
+        <h2>10. Noice 扩展结构：<code>views / routes / status / format</code></h2>
+
+        <div class="subsection" id="noice-views">
+          <h3>10.1 <code>views</code>（每个视图配置项）</h3>
+          <h4>通用字段（NoiceViewBaseOptions）</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>view</code></td><td>view 名</td><td>继承其它 view 配置（通过 <code>view="xxx"</code> 链式继承）。</td></tr>
+              <tr><td><code>backend</code></td><td>string 或 string[]</td><td>后端名；数组时按顺序尝试，直到可用。</td></tr>
+              <tr><td><code>fallback</code></td><td>view 名</td><td>backend 不可用时回退目标。</td></tr>
+              <tr><td><code>format</code></td><td>format 名或 NoiceFormat</td><td>显示内容模板。</td></tr>
+              <tr><td><code>align</code></td><td><code>left/right/center/message-right</code> 等</td><td>消息块对齐方式。</td></tr>
+              <tr><td><code>lang</code></td><td>string</td><td>语法高亮语言。</td></tr>
+              <tr><td><code>buf_options</code></td><td>vim.bo table</td><td>缓冲区局部选项覆盖。</td></tr>
+            </tbody>
+          </table>
+
+          <h4>NUI/Poup/Split 常用字段（NoiceNuiOptions）</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>relative</code></td><td><code>editor/cursor/win</code> 或对象</td><td>定位参考系。</td></tr>
+              <tr><td><code>position</code></td><td>number/string/{row,col}</td><td>窗口位置。</td></tr>
+              <tr><td><code>size</code></td><td>number/string/table</td><td>窗口尺寸与 min/max 限制。</td></tr>
+              <tr><td><code>border</code></td><td><code>none/single/double/rounded/shadow/solid</code> 或 table</td><td>边框样式、padding、标题。</td></tr>
+              <tr><td><code>enter</code></td><td><code>true/false</code></td><td>打开后是否进入窗口。</td></tr>
+              <tr><td><code>focusable</code></td><td><code>true/false</code></td><td>是否可聚焦。</td></tr>
+              <tr><td><code>close</code></td><td>{events?, keys?}</td><td>关闭触发条件。</td></tr>
+              <tr><td><code>timeout</code></td><td>number(ms)</td><td>自动关闭时间（mini/notify 类视图常用）。</td></tr>
+              <tr><td><code>zindex</code></td><td>number</td><td>浮窗层级。</td></tr>
+              <tr><td><code>anchor</code></td><td><code>NW/NE/SW/SE/auto</code></td><td>锚点定位策略。</td></tr>
+              <tr><td><code>win_options</code></td><td>vim.wo table</td><td>窗口选项，例如 <code>winhighlight</code>、<code>winblend</code>。</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Notify backend 专属字段（NoiceNotifyOptions）</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>title</code></td><td>string</td><td>通知标题默认值。</td></tr>
+              <tr><td><code>level</code></td><td>string/number</td><td>强制日志等级，不设时沿用消息等级。</td></tr>
+              <tr><td><code>merge</code></td><td><code>true/false</code></td><td>多条消息合并成一个通知。</td></tr>
+              <tr><td><code>replace</code></td><td><code>true/false</code></td><td>复用上一条通知窗口，减少刷屏。</td></tr>
+              <tr><td><code>render</code></td><td>render 函数或名称</td><td>覆盖 nvim-notify 渲染器。</td></tr>
+              <tr><td><code>timeout</code></td><td>number(ms)</td><td>该 view 的通知超时覆盖。</td></tr>
+            </tbody>
+          </table>
+
+          <h4>内置 view 名及用途</h4>
+          <p><code>popupmenu</code>、<code>cmdline_popupmenu</code>、<code>virtualtext</code>、<code>notify</code>、<code>split</code>、<code>cmdline_output</code>、<code>messages</code>、<code>vsplit</code>、<code>popup</code>、<code>hover</code>、<code>cmdline</code>、<code>mini</code>、<code>cmdline_popup</code>、<code>cmdline_input</code>、<code>confirm</code>。</p>
+        </div>
+
+        <div class="subsection" id="noice-routes">
+          <h3>10.2 <code>routes</code>（每个配置项）</h3>
+          <h4>Route 字段</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>view</code></td><td>view 名</td><td>命中时投递到哪个视图。</td></tr>
+              <tr><td><code>filter</code></td><td>NoiceFilter</td><td>匹配规则。</td></tr>
+              <tr><td><code>opts.stop</code></td><td><code>true/false</code></td><td>命中此路由后停止后续路由链。</td></tr>
+              <tr><td><code>opts.skip</code></td><td><code>true/false</code></td><td>命中后丢弃显示（仅用于过滤）。</td></tr>
+              <tr><td><code>opts.*</code></td><td>NoiceViewOptions</td><td>可直接作为该路由的局部视图覆盖。</td></tr>
+            </tbody>
+          </table>
+
+          <h4>NoiceFilter 字段（完整）</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>any</code></td><td>filter[]</td><td>任一子条件命中即匹配。</td></tr>
+              <tr><td><code>not</code></td><td>filter</td><td>逻辑取反。</td></tr>
+              <tr><td><code>event</code></td><td>string 或 string[]</td><td>按事件名过滤，如 <code>msg_show</code>、<code>notify</code>、<code>lsp</code>。</td></tr>
+              <tr><td><code>kind</code></td><td>string 或 string[]</td><td>按消息 kind 过滤。</td></tr>
+              <tr><td><code>find</code></td><td>Lua pattern</td><td>按消息文本匹配。</td></tr>
+              <tr><td><code>error</code></td><td><code>true/false</code></td><td>仅错误级别。</td></tr>
+              <tr><td><code>warning</code></td><td><code>true/false</code></td><td>仅警告级别。</td></tr>
+              <tr><td><code>cmdline</code></td><td>string 或 boolean</td><td>按命令行内容或“是否来自 cmdline”过滤。</td></tr>
+              <tr><td><code>message</code></td><td>NoiceMessage 或数组</td><td>按消息对象 ID 精确匹配。</td></tr>
+              <tr><td><code>has</code></td><td><code>true/false</code></td><td>是否仍存在于 manager（含历史）。</td></tr>
+              <tr><td><code>cleared</code></td><td><code>true/false</code></td><td>是否已被清理。</td></tr>
+              <tr><td><code>blocking</code></td><td><code>true/false</code></td><td>是否处于阻塞状态。</td></tr>
+              <tr><td><code>mode</code></td><td>string pattern</td><td>按当前 Vim mode 过滤。</td></tr>
+              <tr><td><code>min_height/max_height</code></td><td>integer</td><td>按消息高度过滤。</td></tr>
+              <tr><td><code>min_width/max_width</code></td><td>integer</td><td>按消息宽度过滤。</td></tr>
+              <tr><td><code>min_length/max_length</code></td><td>integer</td><td>按消息字符长度过滤。</td></tr>
+              <tr><td><code>cond</code></td><td>function(message) -> bool</td><td>自定义函数过滤。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection" id="noice-status">
+          <h3>10.3 <code>status</code></h3>
+          <p>结构为 <code>table&lt;name, NoiceFilter&gt;</code>。内置键：</p>
+          <ul>
+            <li><code>ruler</code>：匹配 <code>msg_ruler</code></li>
+            <li><code>message</code>：匹配 <code>msg_show</code></li>
+            <li><code>command</code>：匹配 <code>msg_showcmd</code></li>
+            <li><code>mode</code>：匹配 <code>msg_showmode</code></li>
+            <li><code>search</code>：匹配搜索计数类消息</li>
+          </ul>
+          <p>作用：供状态栏组件（如 lualine）决定是否显示 noice 状态文本。</p>
+        </div>
+
+        <div class="subsection" id="noice-format">
+          <h3>10.4 <code>format</code>（每个配置项）</h3>
+          <h4>内置 format 名</h4>
+          <p><code>default</code>、<code>notify</code>、<code>details</code>、<code>telescope</code>、<code>telescope_preview</code>、<code>fzf</code>、<code>fzf_preview</code>、<code>snacks</code>、<code>snacks_preview</code>、<code>lsp_progress</code>、<code>lsp_progress_done</code>。</p>
+
+          <h4>NoiceFormatOptions.defaults 字段</h4>
+          <table>
+            <thead><tr><th>字段</th><th>可选项</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><code>debug.enabled</code></td><td><code>true/false</code></td><td>调试 token 是否启用。</td></tr>
+              <tr><td><code>cmdline</code></td><td>table</td><td>cmdline token 格式器配置。</td></tr>
+              <tr><td><code>level.hl_group</code></td><td>table&lt;level,hl&gt;</td><td>不同日志等级文本颜色。</td></tr>
+              <tr><td><code>level.icons</code></td><td>table&lt;level,icon&gt;</td><td>等级图标映射。</td></tr>
+              <tr><td><code>progress.contents</code></td><td>NoiceFormat</td><td>进度条内部内容模板。</td></tr>
+              <tr><td><code>progress.width</code></td><td>number</td><td>进度块宽度。</td></tr>
+              <tr><td><code>progress.align</code></td><td><code>left/right/center</code></td><td>进度块对齐。</td></tr>
+              <tr><td><code>progress.key</code></td><td>string path</td><td>从 <code>message.opts</code> 读取进度字段。</td></tr>
+              <tr><td><code>progress.hl_group</code></td><td>hl group</td><td>进行中颜色。</td></tr>
+              <tr><td><code>progress.hl_group_done</code></td><td>hl group</td><td>完成态颜色。</td></tr>
+              <tr><td><code>text.text</code></td><td>string/nil</td><td>固定文本 token。</td></tr>
+              <tr><td><code>text.hl_group</code></td><td>hl group/nil</td><td>固定文本高亮。</td></tr>
+              <tr><td><code>spinner.name</code></td><td>spinner 名（如 <code>dots</code>）</td><td>LSP 进度旋转动画样式。</td></tr>
+              <tr><td><code>spinner.hl_group</code></td><td>hl group/nil</td><td>spinner 颜色。</td></tr>
+              <tr><td><code>data.key</code></td><td>string path/nil</td><td>读取 <code>message.opts</code> 的键。</td></tr>
+              <tr><td><code>data.hl_group</code></td><td>hl group/nil</td><td>data token 高亮。</td></tr>
+              <tr><td><code>title.hl_group</code></td><td>hl group</td><td>标题颜色。</td></tr>
+              <tr><td><code>event.hl_group</code></td><td>hl group</td><td>事件名颜色。</td></tr>
+              <tr><td><code>kind.hl_group</code></td><td>hl group</td><td>kind 文本颜色。</td></tr>
+              <tr><td><code>date.format</code></td><td>strftime 格式</td><td>时间显示样式。</td></tr>
+              <tr><td><code>date.hl_group</code></td><td>hl group</td><td>日期颜色。</td></tr>
+              <tr><td><code>message.hl_group</code></td><td>hl group/nil</td><td>覆盖消息原有高亮。</td></tr>
+              <tr><td><code>confirm.hl_group.choice</code></td><td>hl group</td><td>confirm 普通选项颜色。</td></tr>
+              <tr><td><code>confirm.hl_group.default_choice</code></td><td>hl group</td><td>confirm 默认选项颜色。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="notify-options">
+        <h2>11. nvim-notify 配置项（完整）</h2>
+        <table>
+          <thead><tr><th>字段</th><th>可选项</th><th>效果说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>level</code></td><td>string 或 number</td><td>最低显示等级。常用：<code>TRACE/DEBUG/INFO/WARN/ERROR</code>。</td></tr>
+            <tr><td><code>timeout</code></td><td>number(ms)</td><td>默认自动关闭时间。</td></tr>
+            <tr><td><code>max_width</code></td><td>number / function / nil</td><td>通知最大宽度，函数可动态按窗口大小计算。</td></tr>
+            <tr><td><code>max_height</code></td><td>number / function / nil</td><td>通知最大高度。</td></tr>
+            <tr><td><code>stages</code></td><td><code>fade</code>/<code>slide</code>/<code>slide_out</code>/<code>fade_in_slide_out</code>/<code>static</code> 或自定义函数数组</td><td>动画轨迹。<code>static</code> 无过渡；<code>fade*</code> 需要透明背景支持。</td></tr>
+            <tr><td><code>render</code></td><td>string 或 render 函数</td><td>消息内容渲染方式。内置常用：<code>default</code>、<code>minimal</code>。</td></tr>
+            <tr><td><code>background_colour</code></td><td>hl group / <code>#RRGGBB</code> / function</td><td>透明动画背景基色。无有效背景时会警告并回退黑色。</td></tr>
+            <tr><td><code>on_open</code></td><td>function(win)</td><td>通知窗打开后回调，可改 win 配置。</td></tr>
+            <tr><td><code>on_close</code></td><td>function(win)</td><td>通知窗关闭回调。</td></tr>
+            <tr><td><code>minimum_width</code></td><td>integer</td><td>通知最小宽度。</td></tr>
+            <tr><td><code>fps</code></td><td>integer</td><td>动画帧率。高帧率更顺滑但更吃资源。</td></tr>
+            <tr><td><code>top_down</code></td><td><code>true/false</code></td><td><code>true</code> 从上往下堆叠，<code>false</code> 反向。</td></tr>
+            <tr><td><code>merge_duplicates</code></td><td><code>true/false</code> 或 integer</td><td>相同消息合并策略。integer 表示最小重复次数阈值。</td></tr>
+            <tr><td><code>time_formats.notification</code></td><td>strftime string</td><td>通知显示时间格式。</td></tr>
+            <tr><td><code>time_formats.notification_history</code></td><td>strftime string</td><td>历史列表时间格式。</td></tr>
+            <tr><td><code>icons.ERROR/WARN/INFO/DEBUG/TRACE</code></td><td>string 图标</td><td>不同等级的显示图标。</td></tr>
+          </tbody>
+        </table>
+
+        <div class="warn">当 <code>stages</code> 使用 <code>fade</code> 或 <code>fade_in_slide_out</code>，且终端/Neovim 透明能力不足时，notify 可能自动回退到 <code>static</code>。</div>
+      </section>
+
+      <section class="section" id="scenarios">
+        <h2>12. 常见场景模板</h2>
+        <h3 id="scenario-popup-sn">12.1 让 <code>&lt;leader&gt;sn</code> 在 popup 打开</h3>
+        <pre><code class="language-lua">{
+  "&lt;leader&gt;sn",
+  function() require("noice").cmd("last") end,
+  desc = "Noice Last (Popup)",
+}
+
+-- 或保留 cmd("all"), 但改 all 命令视图
+opts = {
+  commands = {
+    all = {
+      view = "popup",
+      opts = { enter = true, format = "details" },
+      filter = {},
+    },
+  },
+}
+</code></pre>
+
+        <h3 id="scenario-mini">12.2 把刷屏提示变成 mini</h3>
+        <pre><code class="language-lua">opts = {
+  routes = {
+    {
+      filter = {
+        event = "msg_show",
+        any = {
+          { find = "%d+L, %d+B" },
+          { find = "; after #%d+" },
+          { find = "; before #%d+" },
+        },
+      },
+      view = "mini",
+    },
+  },
+}
+</code></pre>
+
+        <h3 id="scenario-force-notify">12.3 强制 noice 只走 nvim-notify</h3>
+        <pre><code class="language-lua">opts = {
+  views = {
+    notify = {
+      backend = "notify",
+      fallback = "mini",
+    },
+  },
+}
+</code></pre>
+      </section>
+
+      <section class="section" id="troubleshooting">
+        <h2>13. 排错步骤</h2>
+        <ol>
+          <li>运行 <span class="kbd">:checkhealth noice</span> 检查 handler 与依赖状态。</li>
+          <li>运行 <span class="kbd">:lua vim.notify("notify test", vim.log.levels.INFO)</span> 看是否有动画。</li>
+          <li>确认未启用其他通知接管插件（例如 snacks notifier）。</li>
+          <li>检查 <code>views.notify.backend</code> 是否被改成了 <code>snacks</code> 或其他 backend。</li>
+          <li>确认 noice/notifiy 插件确实加载：<span class="kbd">:Lazy</span> 查看状态。</li>
+        </ol>
+        <div class="tip">你当前配置中已经把 <code>snacks.notifier</code> 关掉，这一步是正确的。</div>
+      </section>
+
+      <section class="section" id="validate">
+        <h2>14. 最小验证脚本</h2>
+        <pre><code class="language-lua">vim.notify("INFO demo", vim.log.levels.INFO)
+vim.notify("WARN demo", vim.log.levels.WARN)
+vim.notify("ERROR demo", vim.log.levels.ERROR)
+
+-- 查看历史
+-- :Noice history
+</code></pre>
+      </section>
+
+      <footer>
+        Noice + nvim-notify 完整手册（含锚点目录与字段级说明）
+      </footer>
+    </main>
+
+    <aside class="toc-wrap" aria-label="目录导航">
+      <nav class="toc">
+        <h3>目录</h3>
+        <a href="#top">0. 顶部</a>
+        <a href="#model">1. 工作模型</a>
+        <a href="#quick-start">2. 推荐起步配置</a>
+        <a href="#noice-overview">3. Noice 顶层键</a>
+        <a href="#noice-cmdline">4. cmdline</a>
+        <a class="lvl2" href="#noice-cmdline-format-fields">4.1 CmdlineFormat 字段</a>
+        <a href="#noice-messages">5. messages</a>
+        <a href="#noice-popupmenu">6. popupmenu</a>
+        <a href="#noice-redirect-commands-notify">7. redirect/commands/notify</a>
+        <a class="lvl2" href="#noice-redirect">7.1 redirect</a>
+        <a class="lvl2" href="#noice-commands">7.2 commands</a>
+        <a class="lvl2" href="#noice-notify">7.3 notify</a>
+        <a href="#noice-lsp">8. lsp</a>
+        <a class="lvl2" href="#noice-lsp-progress">8.1 lsp.progress</a>
+        <a class="lvl2" href="#noice-lsp-override">8.2 lsp.override</a>
+        <a class="lvl2" href="#noice-lsp-hover">8.3 lsp.hover</a>
+        <a class="lvl2" href="#noice-lsp-signature">8.4 lsp.signature</a>
+        <a class="lvl2" href="#noice-lsp-message-doc">8.5 lsp.message/docs</a>
+        <a href="#noice-markdown-health-presets">9. markdown/health/presets/runtime</a>
+        <a class="lvl2" href="#noice-markdown">9.1 markdown</a>
+        <a class="lvl2" href="#noice-health">9.2 health</a>
+        <a class="lvl2" href="#noice-presets">9.3 presets</a>
+        <a class="lvl2" href="#noice-runtime">9.4 runtime</a>
+        <a href="#noice-views-routes-status-format">10. views/routes/status/format</a>
+        <a class="lvl2" href="#noice-views">10.1 views</a>
+        <a class="lvl2" href="#noice-routes">10.2 routes & filter</a>
+        <a class="lvl2" href="#noice-status">10.3 status</a>
+        <a class="lvl2" href="#noice-format">10.4 format</a>
+        <a href="#notify-options">11. nvim-notify 全配置</a>
+        <a href="#scenarios">12. 场景模板</a>
+        <a class="lvl2" href="#scenario-popup-sn">12.1 &lt;leader&gt;sn popup</a>
+        <a class="lvl2" href="#scenario-mini">12.2 mini 分流</a>
+        <a class="lvl2" href="#scenario-force-notify">12.3 强制 notify 后端</a>
+        <a href="#troubleshooting">13. 排错步骤</a>
+        <a href="#validate">14. 最小验证</a>
+      </nav>
+    </aside>
+  </div>
+</body>
+</html>

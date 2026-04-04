@@ -1,0 +1,42 @@
+{
+  "string": "Hello, JSON!",
+  "stringWithEscape": "Line1\nLine2\tTabbed \"quoted\"",
+  "unicodeString": "你好, мир, hello",
+  "numberInteger": 42,
+  "numberNegative": -7,
+  "numberFloat": 3.14159,
+  "numberExponential": 1.23e4,
+  "booleanTrue": true,
+  "booleanFalse": false,
+  "nullValue": null,
+  "arrayMixed": [
+    "text",
+    100,
+    false,
+    null,
+    {
+      "nestedKey": "nestedValue"
+    },
+    [
+      1,
+      2,
+      3
+    ]
+  ],
+  "objectNested": {
+    "name": "example",
+    "version": 1,
+    "enabled": true,
+    "tags": [
+      "json",
+      "syntax",
+      "demo"
+    ],
+    "config": {
+      "retry": 3,
+      "timeoutMs": 1500
+    }
+  },
+  "emptyObject": {},
+  "emptyArray": []
+}
