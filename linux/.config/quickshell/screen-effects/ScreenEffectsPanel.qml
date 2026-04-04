@@ -84,32 +84,28 @@ PanelWindow {
         id: stateReader
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 try {
                     let obj = JSON.parse(data);
                     root.warmth = obj.warmth ?? 0;
                     root.grain = obj.grain ?? 0;
                     root.grainSize = obj.grain_size ?? 50;
                     root.shadowBoost = obj.shadow_boost ?? 40;
-                } catch (e) {
-                }
+                } catch (e) {}
             }
         }
-
     }
 
     Process {
         id: brightnessReader
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let parts = data.split(",");
                 if (parts.length >= 4)
                     root.brightness = parseInt(parts[3]) || 100;
-
             }
         }
-
     }
 
     Process {
@@ -136,9 +132,7 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
-
     }
 
     // 点击面板外部关闭
@@ -170,7 +164,7 @@ PanelWindow {
         // 阻止点击面板内部时触发背景 MouseArea
         MouseArea {
             anchors.fill: parent
-            onClicked: (mouse) => {
+            onClicked: mouse => {
                 return mouse.accepted = true;
             }
         }
@@ -202,6 +196,7 @@ PanelWindow {
                     id: toggleSwitch
 
                     checked: root.effectsActive
+                    hoverEnabled: true
                     onToggled: {
                         if (!checked) {
                             root.warmth = 0;
@@ -228,15 +223,17 @@ PanelWindow {
                                 NumberAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
-
                     }
 
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                    }
                 }
-
             }
 
             Rectangle {
@@ -249,7 +246,7 @@ PanelWindow {
             EffectSlider {
                 label: "☀ 亮度"
                 value: root.brightness
-                onMoved: (val) => {
+                onMoved: val => {
                     root.brightness = val;
                     brightnessSetter.command = [root.scriptPath, "brightness", String(val)];
                     brightnessSetter.running = true;
@@ -259,7 +256,7 @@ PanelWindow {
             EffectSlider {
                 label: "🌙 色温"
                 value: root.warmth
-                onMoved: (val) => {
+                onMoved: val => {
                     root.warmth = val;
                     root.saveAndApply();
                 }
@@ -268,7 +265,7 @@ PanelWindow {
             EffectSlider {
                 label: "🎞 颗粒强度"
                 value: root.grain
-                onMoved: (val) => {
+                onMoved: val => {
                     root.grain = val;
                     root.saveAndApply();
                 }
@@ -277,7 +274,7 @@ PanelWindow {
             EffectSlider {
                 label: "◐ 颗粒大小"
                 value: root.grainSize
-                onMoved: (val) => {
+                onMoved: val => {
                     root.grainSize = val;
                     root.saveAndApply();
                 }
@@ -286,7 +283,7 @@ PanelWindow {
             EffectSlider {
                 label: "◑ 暗部增强"
                 value: root.shadowBoost
-                onMoved: (val) => {
+                onMoved: val => {
                     root.shadowBoost = val;
                     root.saveAndApply();
                 }
@@ -322,9 +319,7 @@ PanelWindow {
                     text: "Tri-X"
                     onClicked: root.applyPreset(0, 60, 55, 70)
                 }
-
             }
-
         }
 
         InnerGlow {}
@@ -337,7 +332,6 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.decelerate
             }
-
         }
 
         Behavior on opacity {
@@ -348,9 +342,6 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
-
     }
-
 }
