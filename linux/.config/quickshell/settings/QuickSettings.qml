@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Mpris
 import Quickshell.Wayland
 
 // Quick Settings — 左侧滑出面板
@@ -462,6 +463,18 @@ PanelWindow {
                 // ── 媒体卡片 ──
                 MediaCard {
                     Layout.fillWidth: true
+                    player: {
+                        let ps = Mpris.players.values;
+                        for (let i = 0; i < ps.length; i++) {
+                            if (ps[i].isPlaying) {
+                                PanelState.lastActivePlayer = ps[i];
+                                return ps[i];
+                            }
+                        }
+                        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
+                            return PanelState.lastActivePlayer;
+                        return ps.length > 0 ? ps[0] : null;
+                    }
                 }
 
                 // ── 天气卡片 ──

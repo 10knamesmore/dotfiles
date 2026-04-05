@@ -208,16 +208,14 @@ PanelWindow {
     Rectangle {
         id: panel
 
-        width: 360
+        width: 520
         height: root.height * 0.7
         radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: root.showing ? 54 : 34
-        anchors.rightMargin: 10
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: root.showing ? 0 : 20
         clip: true
         opacity: root.showing ? 1 : 0
 
@@ -546,7 +544,7 @@ PanelWindow {
 
         InnerGlow {}
 
-        Behavior on anchors.topMargin {
+        Behavior on anchors.verticalCenterOffset {
             NumberAnimation {
                 id: _slideAnim
                 duration: Tokens.animSlow

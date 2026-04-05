@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub CLI"
+  short_description: "Operate GitHub through gh CLI workflows"
+  default_prompt: "Use $gh-cli to inspect or modify GitHub state with the gh command."

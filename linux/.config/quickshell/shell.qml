@@ -1,6 +1,7 @@
 //@ pragma IconTheme breeze-dark
 //@ pragma UseQApplication
 
+import "./ai"
 import "./bar"
 import "./calendar"
 import "./clipboard"
@@ -21,6 +22,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland._GlobalShortcuts
 import Quickshell.Io
+import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import Quickshell.Services.Pipewire
 
@@ -46,6 +48,126 @@ ShellRoot {
         PanelState.osdValue = vol;
         PanelState.osdIcon = volumeIcon(vol, muted);
         PanelState.osdVisible = true;
+    }
+
+    // ── 歌词服务 ──
+    property var _lyricsPlayer: {
+        let ps = Mpris.players.values;
+        for (let i = 0; i < ps.length; i++) {
+            if (ps[i].isPlaying) {
+                PanelState.lastActivePlayer = ps[i];
+                return ps[i];
+            }
+        }
+        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
+            return PanelState.lastActivePlayer;
+        return ps.length > 0 ? ps[0] : null;
+    }
+    property string _lyricsTrackKey: _lyricsPlayer ? (_lyricsPlayer.identity + "|" + _lyricsPlayer.trackTitle) : ""
+
+    property string _lastLyricsRaw: "" // 上一次成功的歌词原文，用于双缓冲比较
+
+    on_LyricsTrackKeyChanged: {
+        if (_lyricsTrackKey && _lyricsPlayer) {
+            PanelState.lyricsLines = [];
+            PanelState.currentLyricIndex = -1;
+            PanelState.currentLyric = "";
+            PanelState.lyricsTrackId = _lyricsTrackKey;
+            // 启动轮询，等歌词数据更新
+            _lyricsPollTimer.restart();
+        } else {
+            _lyricsPollTimer.stop();
+            PanelState.lyricsLines = [];
+            PanelState.currentLyricIndex = -1;
+            PanelState.currentLyric = "";
+            PanelState.lyricsTrackId = "";
+        }
+    }
+
+    Timer {
+        id: _lyricsPollTimer
+        interval: 500
+        repeat: true
+        onTriggered: {
+            if (!root._lyricsPlayer) {
+                stop();
+                return;
+            }
+            _lyricsPollProc._buf = "";
+            _lyricsPollProc.command = ["playerctl", "-p", root._lyricsPlayer.identity, "metadata", "xesam:asText"];
+            _lyricsPollProc.running = true;
+        }
+    }
+
+    Process {
+        id: _lyricsPollProc
+        property string _buf: ""
+
+        stdout: SplitParser {
+            onRead: data => {
+                _lyricsPollProc._buf += data + "\n";
+            }
+        }
+        onRunningChanged: {
+            if (!running && _buf.length > 0) {
+                if (_buf !== root._lastLyricsRaw) {
+                    // 歌词内容变了，更新并停止轮询
+                    root._lastLyricsRaw = _buf;
+                    PanelState.lyricsLines = root._parseLrc(_buf);
+                    PanelState.currentLyricIndex = -1;
+                    PanelState.currentLyric = "";
+                    _lyricsPollTimer.stop();
+                }
+                _buf = "";
+            }
+        }
+    }
+
+    function _parseLrc(raw) {
+        let lines = raw.split("\n");
+        let result = [];
+        for (let line of lines) {
+            let m = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)$/);
+            if (m) {
+                let time = parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3]) / (m[3].length === 3 ? 1000 : 100);
+                let text = m[4].trim();
+                if (text.length > 0)
+                    result.push({ "time": time, "text": text });
+            }
+        }
+        result.sort((a, b) => a.time - b.time);
+        return result;
+    }
+
+    function _syncLyric(position) {
+        let lines = PanelState.lyricsLines;
+        if (!lines || lines.length === 0) {
+            PanelState.currentLyricIndex = -1;
+            PanelState.currentLyric = "";
+            return;
+        }
+        let idx = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            if (position >= lines[i].time) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx !== PanelState.currentLyricIndex) {
+            PanelState.currentLyricIndex = idx;
+            PanelState.currentLyric = idx >= 0 ? lines[idx].text : "";
+        }
+    }
+
+
+    Timer {
+        interval: 200
+        running: root._lyricsPlayer !== null && PanelState.lyricsLines.length > 0
+        repeat: true
+        onTriggered: {
+            if (root._lyricsPlayer)
+                root._syncLyric(root._lyricsPlayer.position + PanelState.lyricsOffset);
+        }
     }
 
     // ── 每个显示器生成一个 Bar ──
@@ -154,6 +276,16 @@ ShellRoot {
         onPressed: {
             PanelState.closeAll();
             PanelState.toggleJournal();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "ai"
+        description: "Toggle AI assistant panel"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleAi();
         }
     }
 
@@ -289,6 +421,8 @@ ShellRoot {
     JournalPanel {}
 
     NotesPanel {}
+
+    AiPanel {}
 
     // ── 桌面浮动组件（每屏一个）──
     Variants {

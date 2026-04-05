@@ -3,29 +3,36 @@ import "../components"
 import QtQuick
 import Quickshell.Services.Mpris
 
-// 媒体播放模块 — 显示当前播放曲目，左键播放/暂停，滚轮调音量，右键展开面板
+// 媒体播放模块 — 显示歌名+artist，左键打开面板，右键切换歌词显示
 BarModule {
     id: root
 
-    property var player: Mpris.players.count > 0 ? Mpris.players.values[0] : null
+    property var player: {
+        let ps = Mpris.players.values;
+        for (let i = 0; i < ps.length; i++) {
+            if (ps[i].isPlaying) {
+                PanelState.lastActivePlayer = ps[i];
+                return ps[i];
+            }
+        }
+        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
+            return PanelState.lastActivePlayer;
+        return ps.length > 0 ? ps[0] : null;
+    }
+
+    property bool showLyric: false
 
     accentColor: Colors.pink
     implicitWidth: Math.max(row.implicitWidth + 32, 80)
     visible: player !== null
     onClicked: {
-        if (player)
-            player.togglePlaying();
-
-    }
-    onRightClicked: {
-        PanelState.screenEffectsOpen = false;
-        PanelState.calendarOpen = false;
+        PanelState.closeAll();
         PanelState.toggleMedia();
     }
-    onScrolled: (delta) => {
-        if (player && player.volumeSupported)
-            player.volume = Math.max(0, Math.min(1, player.volume + delta * 0.05));
-
+    onRightClicked: showLyric = !showLyric
+    onScrolled: delta => {
+        if (player)
+            player.togglePlaying();
     }
 
     Row {
@@ -35,11 +42,9 @@ BarModule {
         spacing: 6
 
         Text {
-            // Waybar media_volume.sh: 󰏤 (playing=pause icon), 󰐊 (paused=play icon), 󰓛 (stopped)
             text: {
                 if (!root.player)
                     return "󰓛";
-
                 return root.player.isPlaying ? "󰏤" : "󰐊";
             }
             color: Colors.pink
@@ -54,19 +59,32 @@ BarModule {
                 if (!root.player)
                     return "";
 
-                let t = root.player.trackTitle;
-                if (!t || t === "")
+                // 右键切换：歌词模式 / 歌名+artist 模式
+                if (root.showLyric && PanelState.currentLyric.length > 0) {
+                    let l = PanelState.currentLyric;
+                    return l.length > 40 ? l.substring(0, 37) + "…" : l;
+                }
+
+                let t = root.player.trackTitle || "";
+                let a = root.player.trackArtist || "";
+
+                if (!t)
                     return root.player.identity;
 
-                return t.length > 25 ? t.substring(0, 22) + "…" : t;
+                let display = t;
+                if (a)
+                    display += " - " + a;
+
+                return display.length > 35 ? display.substring(0, 32) + "…" : display;
             }
-            color: Colors.text
+            color: root.showLyric && PanelState.currentLyric.length > 0 ? Colors.mauve : Colors.text
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.Medium
+            font.italic: root.showLyric && PanelState.currentLyric.length > 0
             anchors.verticalCenter: parent.verticalCenter
+
+            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
         }
-
     }
-
 }

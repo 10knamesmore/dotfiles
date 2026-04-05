@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kaomoji"
+  short_description: "Pick kaomoji for the convesation"
+  default_prompt: "Use $kaomoji to add fitting kaomoji to this reply."

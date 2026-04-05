@@ -1,0 +1,10 @@
+[(－－)]..zzZ
+(－_－) zzZ
+(∪｡∪)｡｡｡zzZ
+(－ω－) zzZ
+(￣o￣) zzZZzzZZ
+(( _ _ ))..zzzZZ
+(￣ρ￣)..zzZZ
+(－.－)...zzz
+(＿ ＿*) Z z z
+(x . x) ~~zzZ

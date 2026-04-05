@@ -18,14 +18,35 @@ PanelWindow {
 
     function barColor(index) {
         let t = index / (barCount - 1);
-        // 低频 blue → 中频 mauve → 高频 pink
-        if (t < 0.5) {
-            let f = t * 2;
-            return Qt.rgba(Colors.blue.r + (Colors.mauve.r - Colors.blue.r) * f, Colors.blue.g + (Colors.mauve.g - Colors.blue.g) * f, Colors.blue.b + (Colors.mauve.b - Colors.blue.b) * f, 1);
-        } else {
-            let f = (t - 0.5) * 2;
-            return Qt.rgba(Colors.mauve.r + (Colors.pink.r - Colors.mauve.r) * f, Colors.mauve.g + (Colors.pink.g - Colors.mauve.g) * f, Colors.mauve.b + (Colors.pink.b - Colors.mauve.b) * f, 1);
+        // 低频 teal → blue → mauve → pink → red 五段渐变
+        let stops = [
+            {
+                pos: 0.0,
+                c: Colors.blue
+            },
+            {
+                pos: 0.33,
+                c: Colors.mauve
+            },
+            {
+                pos: 0.66,
+                c: Colors.pink
+            },
+            {
+                pos: 1.0,
+                c: Colors.red
+            }
+        ];
+        let i = 0;
+        for (let s = 1; s < stops.length; s++) {
+            if (t <= stops[s].pos) {
+                i = s - 1;
+                break;
+            }
         }
+        let f = (t - stops[i].pos) / (stops[i + 1].pos - stops[i].pos);
+        let a = stops[i].c, b = stops[i + 1].c;
+        return Qt.rgba(a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f, 1);
     }
 
     anchors.bottom: true
@@ -37,6 +58,10 @@ PanelWindow {
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
+    mask: Region {
+        width: 0
+        height: 0
+    }
 
     // ── 频谱柱状图 ──
     Row {
@@ -55,18 +80,11 @@ PanelWindow {
                 property real barValue: index < PanelState.visualizerBars.length ? PanelState.visualizerBars[index] : 0
 
                 width: 6
-                height: Math.max(2, barValue / root.maxRange * 52)
+                height: Math.max(2, Math.pow(barValue / root.maxRange, 0.8) * 52)
                 radius: 3
                 color: root.barColor(index)
                 opacity: 0.5
                 anchors.bottom: parent.bottom
-
-                Behavior on height {
-                    NumberAnimation {
-                        duration: 80
-                        easing.type: Easing.OutQuad
-                    }
-                }
             }
         }
     }

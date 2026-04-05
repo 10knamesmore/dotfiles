@@ -75,11 +75,11 @@ PanelWindow {
             spacing: 6
             height: parent.height
 
-            MediaModule {}
-
             NetSpeedModule {
                 direction: "up"
             }
+
+            MediaModule {}
 
             ClockModule {}
 
