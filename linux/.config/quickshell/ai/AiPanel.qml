@@ -1,3 +1,4 @@
+import "../components"
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
@@ -587,30 +588,10 @@ PanelWindow {
                             font.pixelSize: Fonts.xs
                         }
 
-                        Rectangle {
-                            width: 30
-                            height: 16
-                            radius: 8
-                            color: root.showToolMessages
-                                ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3)
-                                : Qt.rgba(1, 1, 1, 0.08)
-
-                            Rectangle {
-                                width: 12; height: 12; radius: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: root.showToolMessages ? parent.width - width - 2 : 2
-                                color: root.showToolMessages ? Colors.green : Colors.overlay1
-                                Behavior on x { NumberAnimation { duration: Tokens.animFast } }
-                                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: { root.showToolMessages = !root.showToolMessages; root.saveState(); }
-                            }
-
-                            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        ToggleSwitch {
+                            small: true
+                            checked: root.showToolMessages
+                            onToggled: { root.showToolMessages = !root.showToolMessages; root.saveState(); }
                         }
                     }
                 }

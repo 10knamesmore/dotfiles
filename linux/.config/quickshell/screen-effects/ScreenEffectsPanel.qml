@@ -1,6 +1,6 @@
+import "../components"
 import "../theme"
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -25,6 +25,31 @@ PanelWindow {
     property int shadowBoost: 40
     property int brightness: 100
     property bool effectsActive: warmth > 0 || grain > 0
+    // 备份值，用于 toggle 恢复
+    property int _bakWarmth: 60
+    property int _bakGrain: 0
+    property int _bakGrainSize: 50
+    property int _bakShadowBoost: 40
+
+    function toggleEffects() {
+        if (effectsActive) {
+            // 关闭：保存当前值到备份，清零
+            _bakWarmth = warmth;
+            _bakGrain = grain;
+            _bakGrainSize = grainSize;
+            _bakShadowBoost = shadowBoost;
+            warmth = 0;
+            grain = 0;
+            saveAndApply();
+        } else {
+            // 打开：从备份恢复
+            warmth = _bakWarmth;
+            grain = _bakGrain;
+            grainSize = _bakGrainSize;
+            shadowBoost = _bakShadowBoost;
+            saveAndApply();
+        }
+    }
 
     function togglePanel() {
         PanelState.calendarOpen = false;
@@ -192,47 +217,9 @@ PanelWindow {
                     Layout.fillWidth: true
                 }
 
-                Switch {
-                    id: toggleSwitch
-
+                ToggleSwitch {
                     checked: root.effectsActive
-                    hoverEnabled: true
-                    onToggled: {
-                        if (!checked) {
-                            root.warmth = 0;
-                            root.grain = 0;
-                            root.saveAndApply();
-                        }
-                    }
-
-                    indicator: Rectangle {
-                        implicitWidth: 40
-                        implicitHeight: 20
-                        radius: Tokens.radiusMS
-                        color: toggleSwitch.checked ? Colors.green : Colors.surface2
-
-                        Rectangle {
-                            x: toggleSwitch.checked ? parent.width - width - 2 : 2
-                            y: 2
-                            width: 16
-                            height: 16
-                            radius: Tokens.radiusS
-                            color: Colors.text
-
-                            Behavior on x {
-                                NumberAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.NoButton
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                    }
+                    onToggled: root.toggleEffects()
                 }
             }
 
