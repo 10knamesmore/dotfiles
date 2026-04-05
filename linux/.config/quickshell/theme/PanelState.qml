@@ -40,6 +40,9 @@ QtObject {
     property bool dndEnabled: false
     // ── 通知 ──
     property int notificationCount: 0
+    // ── 面板动画源（鼠标点击位置）──
+    property real morphSourceX: -1
+    property real morphSourceY: -1
     // ── OSD ──
     property bool osdVisible: false
     property string osdType: "" // "volume" | "brightness"
@@ -122,8 +125,15 @@ QtObject {
         aiOpen = !aiOpen;
     }
 
+    // 重置 morph 源（每次打开新面板前调用）
+    function resetMorphSource() {
+        morphSourceX = -1;
+        morphSourceY = -1;
+    }
+
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
+        resetMorphSource();
         screenEffectsOpen = false;
         calendarOpen = false;
         mediaOpen = false;

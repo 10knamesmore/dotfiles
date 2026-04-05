@@ -11,11 +11,14 @@ Rectangle {
     property color tintColor: "transparent"
     property real backgroundAlpha: Tokens.panelAlpha
     property bool hovered: hoverArea.containsMouse
+    property real progress: -1 // 0~1 进度值，-1 不启用
+    property bool progressDraggable: false
     default property alias contents: inner.data
 
     signal clicked(var mouse)
     signal rightClicked(var mouse)
     signal scrolled(int delta)
+    signal progressDragged(real value)
 
     radius: Tokens.radiusL
     color: hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha)
@@ -47,13 +50,14 @@ Rectangle {
         }
     }
 
-    // 左侧弧形彩色指示器 — hover 时沿胶囊圆弧蔓延
+    // 左侧弧形彩色指示器 — hover 时沿胶囊圆弧蔓延（无 progress 时）
     Item {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: root.hovered ? 8 : 3
         clip: true
+        visible: root.progress < 0
 
         Rectangle {
             anchors.left: parent.left
@@ -99,6 +103,55 @@ Rectangle {
             NumberAnimation {
                 duration: Tokens.animSlow
                 easing.type: Easing.OutCubic
+            }
+        }
+    }
+
+    // 进度填充 — eclipse 风格，accent 色从左到右铺满模块高度
+    Item {
+        visible: root.progress >= 0
+        anchors.fill: parent
+        clip: true
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: root.progress * parent.width
+            radius: root.radius
+            color: root.accentColor
+            opacity: root.hovered ? 0.42 : 0.27
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: Tokens.animNormal
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Tokens.animFast
+                }
+            }
+        }
+    }
+
+    // 拖动调节区域（progressDraggable 时覆盖整个模块）
+    MouseArea {
+        visible: root.progressDraggable
+        enabled: root.progressDraggable
+        anchors.fill: parent
+        preventStealing: true
+        cursorShape: Qt.PointingHandCursor
+        onPressed: mouse => {
+            let val = mouse.x / width;
+            root.progressDragged(Math.max(0, Math.min(1, val)));
+        }
+        onPositionChanged: mouse => {
+            if (pressed) {
+                let val = mouse.x / width;
+                root.progressDragged(Math.max(0, Math.min(1, val)));
             }
         }
     }

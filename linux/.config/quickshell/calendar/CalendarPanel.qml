@@ -1,19 +1,13 @@
+import "../components"
 import "../theme"
 import "Lunar.js" as Lunar
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
-import Quickshell.Wayland
 
 // 月历面板 — 点击时钟弹出，显示当月日历 + 农历
-PanelWindow {
-    // ── 辅助函数 ──
-
+PanelOverlay {
     id: root
 
-    // 双阶段可见性：动画结束后才隐藏 PanelWindow
-    property bool showing: PanelState.calendarOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
     property date currentDate: new Date()
     property int viewYear: currentDate.getFullYear()
     property int viewMonth: currentDate.getMonth() // 0-based
@@ -76,14 +70,13 @@ PanelWindow {
         return days;
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: false
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
+    showing: PanelState.calendarOpen
+    panelWidth: 320
+    panelHeight: col.implicitHeight + 32
+    panelTargetY: 54
+    closedOffsetY: -20
+    onCloseRequested: PanelState.calendarOpen = false
+
     onShowingChanged: {
         if (showing) {
             currentDate = new Date();
@@ -92,257 +85,165 @@ PanelWindow {
         }
     }
 
-    // 半透明遮罩
-    Rectangle {
+    ColumnLayout {
+        id: col
+
         anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
+        anchors.margins: Tokens.spaceL
+        spacing: Tokens.spaceS
 
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
-            }
+        // ── 月份导航 ──
+        RowLayout {
+            Layout.fillWidth: true
 
-        }
-
-    }
-
-    // 点击面板外部关闭
-    MouseArea {
-        anchors.fill: parent
-        onClicked: PanelState.calendarOpen = false
-    }
-
-    Rectangle {
-        id: panel
-
-        width: 320
-        height: col.implicitHeight + 32
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.topMargin: root.showing ? 54 : 34
-        opacity: root.showing ? 1 : 0
-
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: (mouse) => {
-                return mouse.accepted = true;
-            }
-        }
-
-        ColumnLayout {
-            id: col
-
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            spacing: Tokens.spaceS
-
-            // ── 月份导航 ──
-            RowLayout {
-                Layout.fillWidth: true
-
-                CalNavButton {
-                    text: "󰅁"
-                    onClicked: {
-                        if (root.viewMonth === 0) {
-                            root.viewMonth = 11;
-                            root.viewYear--;
-                        } else {
-                            root.viewMonth--;
-                        }
+            CalNavButton {
+                text: "󰅁"
+                onClicked: {
+                    if (root.viewMonth === 0) {
+                        root.viewMonth = 11;
+                        root.viewYear--;
+                    } else {
+                        root.viewMonth--;
                     }
                 }
+            }
 
-                Item {
+            Item {
+                Layout.fillWidth: true
+            }
+
+            Text {
+                text: monthName(root.viewMonth) + " " + root.viewYear
+                color: Colors.text
+                font.family: Fonts.family
+                font.pixelSize: Fonts.icon
+                font.weight: Font.Bold
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            CalNavButton {
+                text: "󰅂"
+                onClicked: {
+                    if (root.viewMonth === 11) {
+                        root.viewMonth = 0;
+                        root.viewYear++;
+                    } else {
+                        root.viewMonth++;
+                    }
+                }
+            }
+
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // ── 星期头 ──
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
+
+            Repeater {
+                model: ["一", "二", "三", "四", "五", "六", "日"]
+
+                delegate: Text {
                     Layout.fillWidth: true
-                }
-
-                Text {
-                    text: monthName(root.viewMonth) + " " + root.viewYear
-                    color: Colors.text
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.icon
-                    font.weight: Font.Bold
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                CalNavButton {
-                    text: "󰅂"
-                    onClicked: {
-                        if (root.viewMonth === 11) {
-                            root.viewMonth = 0;
-                            root.viewYear++;
-                        } else {
-                            root.viewMonth++;
-                        }
-                    }
-                }
-
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Colors.surface1
-            }
-
-            // ── 星期头 ──
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 0
-
-                Repeater {
-                    model: ["一", "二", "三", "四", "五", "六", "日"]
-
-                    delegate: Text {
-                        Layout.fillWidth: true
-                        text: modelData
-                        color: Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                }
-
-            }
-
-            // ── 日期网格 ──
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 7
-                rowSpacing: 2
-                columnSpacing: 0
-
-                Repeater {
-                    model: root.generateDays()
-
-                    delegate: Rectangle {
-                        property bool hovered: dayArea.containsMouse
-
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 42
-                        radius: Tokens.radiusL
-                        color: {
-                            if (modelData.isToday)
-                                return Colors.mauve;
-
-                            if (modelData.hovered)
-                                return Colors.surface1;
-
-                            return "transparent";
-                        }
-
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 1
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.day > 0 ? modelData.day : ""
-                                color: {
-                                    if (modelData.isToday)
-                                        return Colors.base;
-
-                                    if (!modelData.inMonth)
-                                        return Colors.overlay0;
-
-                                    return Colors.text;
-                                }
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                font.weight: modelData.isToday ? Font.Bold : Font.Normal
-                            }
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.lunar || ""
-                                color: {
-                                    if (modelData.isToday)
-                                        return Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.8);
-
-                                    if (modelData.isFestival)
-                                        return Colors.peach;
-
-                                    if (!modelData.inMonth)
-                                        return Qt.rgba(Colors.overlay0.r, Colors.overlay0.g, Colors.overlay0.b, 0.6);
-
-                                    return Colors.overlay0;
-                                }
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.xs
-                            }
-                        }
-
-                        MouseArea {
-                            id: dayArea
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-                        }
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-            // ── 今天按钮 ──
-            Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                width: todayText.implicitWidth + 20
-                height: 26
-                radius: Tokens.radiusFull
-                color: todayBtnArea.containsMouse ? Colors.surface1 : "transparent"
-
-                Text {
-                    id: todayText
-
-                    anchors.centerIn: parent
-                    text: "今天"
-                    color: Colors.mauve
+                    text: modelData
+                    color: Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small
-                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                MouseArea {
-                    id: todayBtnArea
+            }
 
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.currentDate = new Date();
-                        root.viewYear = root.currentDate.getFullYear();
-                        root.viewMonth = root.currentDate.getMonth();
+        }
+
+        // ── 日期网格 ──
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 7
+            rowSpacing: 2
+            columnSpacing: 0
+
+            Repeater {
+                model: root.generateDays()
+
+                delegate: Rectangle {
+                    property bool hovered: dayArea.containsMouse
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 42
+                    radius: Tokens.radiusL
+                    color: {
+                        if (modelData.isToday)
+                            return Colors.mauve;
+
+                        if (modelData.hovered)
+                            return Colors.surface1;
+
+                        return "transparent";
                     }
-                }
 
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 150
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 1
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: modelData.day > 0 ? modelData.day : ""
+                            color: {
+                                if (modelData.isToday)
+                                    return Colors.base;
+
+                                if (!modelData.inMonth)
+                                    return Colors.overlay0;
+
+                                return Colors.text;
+                            }
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            font.weight: modelData.isToday ? Font.Bold : Font.Normal
+                        }
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: modelData.lunar || ""
+                            color: {
+                                if (modelData.isToday)
+                                    return Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.8);
+
+                                if (modelData.isFestival)
+                                    return Colors.peach;
+
+                                if (!modelData.inMonth)
+                                    return Qt.rgba(Colors.overlay0.r, Colors.overlay0.g, Colors.overlay0.b, 0.6);
+
+                                return Colors.overlay0;
+                            }
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.xs
+                        }
+                    }
+
+                    MouseArea {
+                        id: dayArea
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                    }
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+
                     }
 
                 }
@@ -351,26 +252,43 @@ PanelWindow {
 
         }
 
-        InnerGlow {}
+        // ── 今天按钮 ──
+        Rectangle {
+            Layout.alignment: Qt.AlignHCenter
+            width: todayText.implicitWidth + 20
+            height: 26
+            radius: Tokens.radiusFull
+            color: todayBtnArea.containsMouse ? Colors.surface1 : "transparent"
 
-        Behavior on anchors.topMargin {
-            NumberAnimation {
-                id: _slideAnim
+            Text {
+                id: todayText
 
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
+                anchors.centerIn: parent
+                text: "今天"
+                color: Colors.mauve
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+                font.weight: Font.DemiBold
             }
 
-        }
+            MouseArea {
+                id: todayBtnArea
 
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    root.currentDate = new Date();
+                    root.viewYear = root.currentDate.getFullYear();
+                    root.viewMonth = root.currentDate.getMonth();
+                }
+            }
 
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+
             }
 
         }

@@ -9,8 +9,11 @@ BarModule {
 
     accentColor: Colors.flamingo
     implicitWidth: label.implicitWidth + 32
-    onClicked: {
+    onClicked: mouse => {
         PanelState.closeAll();
+        let pos = root.mapToItem(null, mouse.x, mouse.y);
+        PanelState.morphSourceX = pos.x + 2;
+        PanelState.morphSourceY = pos.y + 6;
         PanelState.toggleClipboard();
     }
 
