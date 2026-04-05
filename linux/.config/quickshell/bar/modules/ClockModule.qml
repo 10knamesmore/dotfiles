@@ -99,8 +99,10 @@ Rectangle {
             if (mouse.button === Qt.RightButton) {
                 root.showDate = !root.showDate;
             } else {
-                PanelState.screenEffectsOpen = false;
-                PanelState.mediaOpen = false;
+                PanelState.closeAll();
+                let pos = root.mapToItem(null, mouse.x, mouse.y);
+                PanelState.morphSourceX = pos.x + 2;
+                PanelState.morphSourceY = pos.y + 6;
                 PanelState.toggleCalendar();
             }
         }

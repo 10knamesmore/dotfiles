@@ -23,10 +23,14 @@ BarModule {
     property bool showLyric: false
 
     accentColor: Colors.pink
+    progress: player && player.lengthSupported && player.length > 0 ? player.position / player.length : -1
     implicitWidth: Math.max(row.implicitWidth + 32, 80)
     visible: player !== null
-    onClicked: {
+    onClicked: mouse => {
         PanelState.closeAll();
+        let pos = root.mapToItem(null, mouse.x, mouse.y);
+        PanelState.morphSourceX = pos.x + 2;
+        PanelState.morphSourceY = pos.y + 6;
         PanelState.toggleMedia();
     }
     onRightClicked: showLyric = !showLyric
@@ -84,7 +88,11 @@ BarModule {
             font.italic: root.showLyric && PanelState.currentLyric.length > 0
             anchors.verticalCenter: parent.verticalCenter
 
-            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
         }
     }
 }

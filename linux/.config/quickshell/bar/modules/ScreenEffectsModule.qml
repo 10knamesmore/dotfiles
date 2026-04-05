@@ -13,9 +13,11 @@ BarModule {
     accentColor: Colors.flamingo
     implicitWidth: label.implicitWidth + 32
     Component.onCompleted: stateReader.running = true
-    onClicked: {
-        PanelState.calendarOpen = false;
-        PanelState.mediaOpen = false;
+    onClicked: mouse => {
+        PanelState.closeAll();
+        let pos = root.mapToItem(null, mouse.x, mouse.y);
+        PanelState.morphSourceX = pos.x + 2;
+        PanelState.morphSourceY = pos.y + 6;
         PanelState.toggleScreenEffects();
     }
 

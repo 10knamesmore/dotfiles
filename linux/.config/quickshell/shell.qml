@@ -361,11 +361,11 @@ ShellRoot {
 
     Connections {
         function onObjectInsertedPost() {
-            PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
+            PanelState.notificationCount = notifServer.trackedNotifications.values.length;
         }
 
         function onObjectRemovedPost() {
-            PanelState.notificationCount = notifServer.trackedNotifications.count ?? 0;
+            PanelState.notificationCount = notifServer.trackedNotifications.values.length;
         }
 
         target: notifServer.trackedNotifications
@@ -373,9 +373,9 @@ ShellRoot {
 
     Connections {
         function onClearAllNotifications() {
-            let notifs = notifServer.trackedNotifications;
-            for (let i = notifs.count - 1; i >= 0; i--) {
-                notifs.values[i].dismiss();
+            let vals = notifServer.trackedNotifications.values;
+            for (let i = vals.length - 1; i >= 0; i--) {
+                vals[i].dismiss();
             }
         }
 

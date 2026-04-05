@@ -1,3 +1,4 @@
+import "../components"
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
@@ -7,11 +8,9 @@ import Quickshell.Services.Mpris
 import Quickshell.Wayland
 
 // Quick Settings — 左侧滑出面板
-PanelWindow {
+PanelOverlay {
     id: root
 
-    property bool showing: PanelState.settingsOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
     // ── 系统状态 ──
     property bool wifiEnabled: true
     property bool btEnabled: true
@@ -71,14 +70,14 @@ PanelWindow {
         }
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
+    showing: PanelState.settingsOpen
+    panelWidth: 340
+    panelHeight: root.height - 64
+    panelTargetX: 10
+    panelTargetY: 54
+    closedOffsetX: -360
+    closedOffsetY: 0
+    onCloseRequested: PanelState.settingsOpen = false
     onShowingChanged: {
         if (showing)
             refreshStatus();
@@ -242,541 +241,457 @@ PanelWindow {
     }
 
     // ── UI ──
-    Rectangle {
+    Flickable {
         anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
-            }
-
-        }
-
-    }
-
-    Item {
-        focus: root.showing
-        Keys.onEscapePressed: PanelState.settingsOpen = false
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        onClicked: PanelState.settingsOpen = false
-    }
-
-    Rectangle {
-        id: panel
-
-        width: 340
-        anchors.leftMargin: root.showing ? 10 : -360
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
+        anchors.margins: Tokens.spaceL
+        contentHeight: mainCol.implicitHeight
         clip: true
-        opacity: root.showing ? 1 : 0
 
-        anchors {
-            top: parent.top
-            bottom: parent.bottom
-            left: parent.left
-            topMargin: 54
-            bottomMargin: 10
-        }
+        ColumnLayout {
+            id: mainCol
 
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
+            // ── 系统信息（可点击展开）──
+            property bool infoExpanded: false
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: (mouse) => {
-                return mouse.accepted = true;
+            width: parent.width
+            spacing: Tokens.spaceM
+
+            // ── 用户头像 ──
+            ProfileHeader {
+                Layout.fillWidth: true
             }
-        }
 
-        Flickable {
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            contentHeight: mainCol.implicitHeight
-            clip: true
+            Divider {
+                Layout.fillWidth: true
+            }
 
-            ColumnLayout {
-                id: mainCol
+            // ── 滑块区 ──
+            Text {
+                text: "调节"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
 
-                // ── 系统信息（可点击展开）──
-                property bool infoExpanded: false
+            SettingsSlider {
+                Layout.fillWidth: true
+                icon: root.brightnessValue > 50 ? "󰃠" : "󰃞"
+                value: root.brightnessValue / 100
+                label: "亮度 " + root.brightnessValue + "%"
+                accentColor: Colors.yellow
+                onMoved: (val) => {
+                    root.brightnessValue = Math.round(val * 100);
+                    actionProc.command = [Quickshell.env("HOME") + "/dotfiles/generated/scripts/hypr/screen_effects.sh", "brightness", String(root.brightnessValue)];
+                    actionProc.running = true;
+                }
+            }
 
-                width: parent.width
-                spacing: Tokens.spaceM
+            SettingsSlider {
+                Layout.fillWidth: true
+                icon: root.volumeMuted ? "" : (root.volumePct < 50 ? "" : "")
+                value: root.volumePct / 100
+                label: "音量 " + root.volumePct + "%"
+                accentColor: Colors.blue
+                onMoved: (val) => {
+                    actionProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", Math.round(val * 100) + "%"];
+                    actionProc.running = true;
+                }
+            }
 
-                // ── 用户头像 ──
-                ProfileHeader {
-                    Layout.fillWidth: true
+            Divider {
+                Layout.fillWidth: true
+            }
+
+            // ── 开关区 ──
+            Text {
+                text: "快捷开关"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 3
+                rowSpacing: 8
+                columnSpacing: 8
+
+                QuickToggle {
+                    icon: root.wifiEnabled ? "󰤨" : "󰤭"
+                    label: "WiFi"
+                    status: root.wifiName || (root.wifiEnabled ? "已开启" : "已关闭")
+                    toggled: root.wifiEnabled
+                    onClicked: {
+                        actionProc.command = ["nmcli", "radio", "wifi", root.wifiEnabled ? "off" : "on"];
+                        actionProc.running = true;
+                        root.wifiEnabled = !root.wifiEnabled;
+                    }
+                    onRightClicked: {
+                        PanelState.settingsOpen = false;
+                        PanelState.toggleNetwork();
+                    }
                 }
 
-                Divider {
-                    Layout.fillWidth: true
+                QuickToggle {
+                    icon: root.btEnabled ? "󰂯" : "󰂲"
+                    label: "蓝牙"
+                    status: root.btDevice || (root.btEnabled ? "已开启" : "已关闭")
+                    toggled: root.btEnabled
+                    onClicked: {
+                        actionProc.command = ["bluetoothctl", "power", root.btEnabled ? "off" : "on"];
+                        actionProc.running = true;
+                        root.btEnabled = !root.btEnabled;
+                    }
                 }
 
-                // ── 滑块区 ──
-                Text {
-                    text: "调节"
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.xs
-                    font.letterSpacing: 2
-                    font.weight: Font.Medium
+                QuickToggle {
+                    icon: PanelState.dndEnabled ? "󰂛" : "󰂚"
+                    label: "勿扰"
+                    status: PanelState.dndEnabled ? "已开启" : "已关闭"
+                    toggled: PanelState.dndEnabled
+                    onClicked: PanelState.dndEnabled = !PanelState.dndEnabled
                 }
 
-                SettingsSlider {
-                    Layout.fillWidth: true
-                    icon: root.brightnessValue > 50 ? "󰃠" : "󰃞"
-                    value: root.brightnessValue / 100
-                    label: "亮度 " + root.brightnessValue + "%"
-                    accentColor: Colors.yellow
-                    onMoved: (val) => {
-                        root.brightnessValue = Math.round(val * 100);
-                        actionProc.command = [Quickshell.env("HOME") + "/dotfiles/generated/scripts/hypr/screen_effects.sh", "brightness", String(root.brightnessValue)];
+                QuickToggle {
+                    icon: root.volumeMuted ? "" : "󰕾"
+                    label: "静音"
+                    status: root.volumeMuted ? "已静音" : "未静音"
+                    toggled: root.volumeMuted
+                    onClicked: {
+                        actionProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"];
                         actionProc.running = true;
                     }
                 }
 
-                SettingsSlider {
-                    Layout.fillWidth: true
-                    icon: root.volumeMuted ? "" : (root.volumePct < 50 ? "" : "")
-                    value: root.volumePct / 100
-                    label: "音量 " + root.volumePct + "%"
-                    accentColor: Colors.blue
-                    onMoved: (val) => {
-                        actionProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", Math.round(val * 100) + "%"];
+                QuickToggle {
+                    icon: root.nightLightEnabled ? "󰛨" : "󰹏"
+                    label: "夜灯"
+                    status: root.nightLightEnabled ? "已开启" : "已关闭"
+                    toggled: root.nightLightEnabled
+                    onClicked: root.toggleNightLight()
+                }
+
+                QuickToggle {
+                    icon: root.caffeineEnabled ? "󰅶" : "󰾪"
+                    label: "咖啡因"
+                    status: root.caffeineEnabled ? "保持唤醒" : "已关闭"
+                    toggled: root.caffeineEnabled
+                    onClicked: root.toggleCaffeine()
+                }
+
+                QuickToggle {
+                    icon: "󰈋"
+                    label: "取色器"
+                    status: "hyprpicker"
+                    toggled: false
+                    onClicked: {
+                        PanelState.settingsOpen = false;
+                        actionProc.command = ["hyprpicker", "-a"];
                         actionProc.running = true;
                     }
                 }
 
-                Divider {
-                    Layout.fillWidth: true
+            }
+
+            Divider {
+                Layout.fillWidth: true
+            }
+
+            // ── 媒体卡片 ──
+            MediaCard {
+                Layout.fillWidth: true
+                player: {
+                    let ps = Mpris.players.values;
+                    for (let i = 0; i < ps.length; i++) {
+                        if (ps[i].isPlaying) {
+                            PanelState.lastActivePlayer = ps[i];
+                            return ps[i];
+                        }
+                    }
+                    if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
+                        return PanelState.lastActivePlayer;
+                    return ps.length > 0 ? ps[0] : null;
+                }
+            }
+
+            // ── 天气卡片 ──
+            WeatherCard {
+                Layout.fillWidth: true
+            }
+
+            // ── 电池卡片 ──
+            BatteryCard {
+                Layout.fillWidth: true
+            }
+
+            Divider {
+                Layout.fillWidth: true
+            }
+
+            // ── 截图 ──
+            Text {
+                text: "工具"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.spaceS
+
+                ToolButton {
+                    icon: "󰹑"
+                    label: "区域截图"
+                    command: "hyprshot -m region"
                 }
 
-                // ── 开关区 ──
-                Text {
-                    text: "快捷开关"
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.xs
-                    font.letterSpacing: 2
-                    font.weight: Font.Medium
+                ToolButton {
+                    icon: "󰖯"
+                    label: "窗口截图"
+                    command: "hyprshot -m window"
                 }
 
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: 3
-                    rowSpacing: 8
-                    columnSpacing: 8
+            }
 
-                    QuickToggle {
-                        icon: root.wifiEnabled ? "󰤨" : "󰤭"
-                        label: "WiFi"
-                        status: root.wifiName || (root.wifiEnabled ? "已开启" : "已关闭")
-                        toggled: root.wifiEnabled
-                        onClicked: {
-                            actionProc.command = ["nmcli", "radio", "wifi", root.wifiEnabled ? "off" : "on"];
-                            actionProc.running = true;
-                            root.wifiEnabled = !root.wifiEnabled;
-                        }
-                        onRightClicked: {
-                            PanelState.settingsOpen = false;
-                            PanelState.toggleNetwork();
-                        }
-                    }
+            // ── 显示器切换 ──
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.spaceS
 
-                    QuickToggle {
-                        icon: root.btEnabled ? "󰂯" : "󰂲"
-                        label: "蓝牙"
-                        status: root.btDevice || (root.btEnabled ? "已开启" : "已关闭")
-                        toggled: root.btEnabled
-                        onClicked: {
-                            actionProc.command = ["bluetoothctl", "power", root.btEnabled ? "off" : "on"];
-                            actionProc.running = true;
-                            root.btEnabled = !root.btEnabled;
-                        }
-                    }
-
-                    QuickToggle {
-                        icon: PanelState.dndEnabled ? "󰂛" : "󰂚"
-                        label: "勿扰"
-                        status: PanelState.dndEnabled ? "已开启" : "已关闭"
-                        toggled: PanelState.dndEnabled
-                        onClicked: PanelState.dndEnabled = !PanelState.dndEnabled
-                    }
-
-                    QuickToggle {
-                        icon: root.volumeMuted ? "" : "󰕾"
-                        label: "静音"
-                        status: root.volumeMuted ? "已静音" : "未静音"
-                        toggled: root.volumeMuted
-                        onClicked: {
-                            actionProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"];
-                            actionProc.running = true;
-                        }
-                    }
-
-                    QuickToggle {
-                        icon: root.nightLightEnabled ? "󰛨" : "󰹏"
-                        label: "夜灯"
-                        status: root.nightLightEnabled ? "已开启" : "已关闭"
-                        toggled: root.nightLightEnabled
-                        onClicked: root.toggleNightLight()
-                    }
-
-                    QuickToggle {
-                        icon: root.caffeineEnabled ? "󰅶" : "󰾪"
-                        label: "咖啡因"
-                        status: root.caffeineEnabled ? "保持唤醒" : "已关闭"
-                        toggled: root.caffeineEnabled
-                        onClicked: root.toggleCaffeine()
-                    }
-
-                    QuickToggle {
-                        icon: "󰈋"
-                        label: "取色器"
-                        status: "hyprpicker"
-                        toggled: false
-                        onClicked: {
-                            PanelState.settingsOpen = false;
-                            actionProc.command = ["hyprpicker", "-a"];
-                            actionProc.running = true;
-                        }
-                    }
-
+                ToolButton {
+                    icon: "󰍹"
+                    label: "双屏"
+                    command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh dual"
+                    closeOnClick: false
                 }
 
-                Divider {
-                    Layout.fillWidth: true
+                ToolButton {
+                    icon: "󰶐"
+                    label: "外接"
+                    command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh external"
+                    closeOnClick: false
                 }
 
-                // ── 媒体卡片 ──
-                MediaCard {
-                    Layout.fillWidth: true
-                    player: {
-                        let ps = Mpris.players.values;
-                        for (let i = 0; i < ps.length; i++) {
-                            if (ps[i].isPlaying) {
-                                PanelState.lastActivePlayer = ps[i];
-                                return ps[i];
+                ToolButton {
+                    icon: "󰌢"
+                    label: "笔记本"
+                    command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh laptop"
+                    closeOnClick: false
+                }
+
+            }
+
+            Divider {
+                Layout.fillWidth: true
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: sysInfoCol.implicitHeight + 20
+                radius: Tokens.radiusM
+                color: sysHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
+                border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
+                border.width: 1
+                clip: true
+
+                MouseArea {
+                    id: sysHover
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: mainCol.infoExpanded = !mainCol.infoExpanded
+                }
+
+                ColumnLayout {
+                    id: sysInfoCol
+
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    spacing: Tokens.spaceS
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Text {
+                            text: "󰍹"
+                            color: Colors.overlay1
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.icon
+                        }
+
+                        Text {
+                            id: uptimeText
+
+                            color: Colors.subtext0
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.small
+                            text: "uptime..."
+
+                            Timer {
+                                running: root.showing
+                                interval: 60000
+                                repeat: true
+                                triggeredOnStart: true
+                                onTriggered: uptimeProc.running = true
                             }
+
+                            Process {
+                                id: uptimeProc
+
+                                command: ["sh", "-c", "uptime -p | sed 's/up //'"]
+
+                                stdout: SplitParser {
+                                    onRead: (data) => {
+                                        return uptimeText.text = data;
+                                    }
+                                }
+
+                            }
+
                         }
-                        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
-                            return PanelState.lastActivePlayer;
-                        return ps.length > 0 ? ps[0] : null;
-                    }
-                }
 
-                // ── 天气卡片 ──
-                WeatherCard {
-                    Layout.fillWidth: true
-                }
-
-                // ── 电池卡片 ──
-                BatteryCard {
-                    Layout.fillWidth: true
-                }
-
-                Divider {
-                    Layout.fillWidth: true
-                }
-
-                // ── 截图 ──
-                Text {
-                    text: "工具"
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.xs
-                    font.letterSpacing: 2
-                    font.weight: Font.Medium
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Tokens.spaceS
-
-                    ToolButton {
-                        icon: "󰹑"
-                        label: "区域截图"
-                        command: "hyprshot -m region"
-                    }
-
-                    ToolButton {
-                        icon: "󰖯"
-                        label: "窗口截图"
-                        command: "hyprshot -m window"
-                    }
-
-                }
-
-                // ── 显示器切换 ──
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Tokens.spaceS
-
-                    ToolButton {
-                        icon: "󰍹"
-                        label: "双屏"
-                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh dual"
-                        closeOnClick: false
-                    }
-
-                    ToolButton {
-                        icon: "󰶐"
-                        label: "外接"
-                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh external"
-                        closeOnClick: false
-                    }
-
-                    ToolButton {
-                        icon: "󰌢"
-                        label: "笔记本"
-                        command: root._home + "/dotfiles/generated/scripts/hypr/monitor_profile.sh laptop"
-                        closeOnClick: false
-                    }
-
-                }
-
-                Divider {
-                    Layout.fillWidth: true
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: sysInfoCol.implicitHeight + 20
-                    radius: Tokens.radiusM
-                    color: sysHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
-                    border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
-                    border.width: 1
-                    clip: true
-
-                    MouseArea {
-                        id: sysHover
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: mainCol.infoExpanded = !mainCol.infoExpanded
-                    }
-
-                    ColumnLayout {
-                        id: sysInfoCol
-
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 10
-                        spacing: Tokens.spaceS
-
-                        RowLayout {
+                        Item {
                             Layout.fillWidth: true
-                            spacing: 10
+                        }
+
+                        Text {
+                            text: mainCol.infoExpanded ? "󰅃" : "󰅀"
+                            color: Colors.overlay1
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.icon
+                        }
+
+                        // 重载按钮（阻止点击穿透到卡片）
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: Tokens.radiusFull
+                            color: reloadHover.containsMouse ? Colors.surface2 : "transparent"
 
                             Text {
-                                text: "󰍹"
-                                color: Colors.overlay1
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.icon
-                            }
-
-                            Text {
-                                id: uptimeText
-
+                                anchors.centerIn: parent
+                                text: "󰑓"
                                 color: Colors.subtext0
                                 font.family: Fonts.family
-                                font.pixelSize: Fonts.small
-                                text: "uptime..."
-
-                                Timer {
-                                    running: root.showing
-                                    interval: 60000
-                                    repeat: true
-                                    triggeredOnStart: true
-                                    onTriggered: uptimeProc.running = true
-                                }
-
-                                Process {
-                                    id: uptimeProc
-
-                                    command: ["sh", "-c", "uptime -p | sed 's/up //'"]
-
-                                    stdout: SplitParser {
-                                        onRead: (data) => {
-                                            return uptimeText.text = data;
-                                        }
-                                    }
-
-                                }
-
-                            }
-
-                            Item {
-                                Layout.fillWidth: true
-                            }
-
-                            Text {
-                                text: mainCol.infoExpanded ? "󰅃" : "󰅀"
-                                color: Colors.overlay1
-                                font.family: Fonts.family
                                 font.pixelSize: Fonts.icon
                             }
 
-                            // 重载按钮（阻止点击穿透到卡片）
-                            Rectangle {
-                                width: 28
-                                height: 28
-                                radius: Tokens.radiusFull
-                                color: reloadHover.containsMouse ? Colors.surface2 : "transparent"
+                            MouseArea {
+                                id: reloadHover
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "󰑓"
-                                    color: Colors.subtext0
-                                    font.family: Fonts.family
-                                    font.pixelSize: Fonts.icon
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: (mouse) => {
+                                    mouse.accepted = true;
+                                    Quickshell.reload(true);
                                 }
+                            }
 
-                                MouseArea {
-                                    id: reloadHover
-
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: (mouse) => {
-                                        mouse.accepted = true;
-                                        Quickshell.reload(true);
-                                    }
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
                                 }
 
                             }
 
                         }
 
-                        // 折叠的系统信息
-                        SystemInfo {
-                            Layout.fillWidth: true
-                            expanded: mainCol.infoExpanded
-                        }
-
                     }
 
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 200
-                            easing.type: Easing.OutCubic
-                        }
-
-                    }
-
-                    Behavior on border.color {
-                        ColorAnimation {
-                            duration: 200
-                            easing.type: Easing.OutCubic
-                        }
-
-                    }
-
-                    Behavior on implicitHeight {
-                        NumberAnimation {
-                            duration: 200
-                            easing.type: Easing.OutCubic
-                        }
-
+                    // 折叠的系统信息
+                    SystemInfo {
+                        Layout.fillWidth: true
+                        expanded: mainCol.infoExpanded
                     }
 
                 }
 
-                Divider {
-                    Layout.fillWidth: true
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 200
+                        easing.type: Easing.OutCubic
+                    }
+
                 }
 
-                // ── 电源操作 ──
-                Text {
-                    text: "电源"
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.xs
-                    font.letterSpacing: 2
-                    font.weight: Font.Medium
+                Behavior on border.color {
+                    ColorAnimation {
+                        duration: 200
+                        easing.type: Easing.OutCubic
+                    }
+
                 }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Tokens.spaceS
-
-                    PowerButton {
-                        icon: "󰌾"
-                        label: "锁屏"
-                        command: "hyprlock"
-                    }
-
-                    PowerButton {
-                        icon: "󰍃"
-                        label: "注销"
-                        command: "hyprctl dispatch exit"
-                    }
-
-                    PowerButton {
-                        icon: "󰤄"
-                        label: "挂起"
-                        command: "systemctl suspend"
-                    }
-
-                    PowerButton {
-                        icon: "󰜉"
-                        label: "重启"
-                        command: "systemctl reboot"
-                    }
-
-                    PowerButton {
-                        icon: "󰐥"
-                        label: "关机"
-                        command: "systemctl poweroff"
+                Behavior on implicitHeight {
+                    NumberAnimation {
+                        duration: 200
+                        easing.type: Easing.OutCubic
                     }
 
                 }
 
             }
 
-        }
-
-        InnerGlow {}
-
-        Behavior on anchors.leftMargin {
-            NumberAnimation {
-                id: _slideAnim
-
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
+            Divider {
+                Layout.fillWidth: true
             }
 
-        }
+            // ── 电源操作 ──
+            Text {
+                text: "电源"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
 
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.spaceS
 
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+                PowerButton {
+                    icon: "󰌾"
+                    label: "锁屏"
+                    command: "hyprlock"
+                }
+
+                PowerButton {
+                    icon: "󰍃"
+                    label: "注销"
+                    command: "hyprctl dispatch exit"
+                }
+
+                PowerButton {
+                    icon: "󰤄"
+                    label: "挂起"
+                    command: "systemctl suspend"
+                }
+
+                PowerButton {
+                    icon: "󰜉"
+                    label: "重启"
+                    command: "systemctl reboot"
+                }
+
+                PowerButton {
+                    icon: "󰐥"
+                    label: "关机"
+                    command: "systemctl poweroff"
+                }
+
             }
 
         }

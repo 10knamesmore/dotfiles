@@ -43,6 +43,13 @@ BarModule {
     accentColor: root.muted ? Colors.overlay0 : Colors.peach
     backgroundColor: root.muted ? Colors.mantle : Colors.surface0
     opacity: root.muted ? 0.7 : 1
+    progress: root.muted ? 0 : root.volumePct / 100
+    progressDraggable: true
+    onProgressDragged: value => {
+        let pct = Math.round(value * 100);
+        volSetter.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", (pct / 100).toFixed(2)];
+        applyAndRefresh(volSetter);
+    }
     implicitWidth: label.implicitWidth + 32
     // 立即读取一次，之后每秒轮询
     Component.onCompleted: volReader.running = true
@@ -96,13 +103,17 @@ BarModule {
     Process {
         id: volUp
 
-        command: ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+"]
+        command: ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", "5%+"]
     }
 
     Process {
         id: volDown
 
         command: ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"]
+    }
+
+    Process {
+        id: volSetter
     }
 
     Row {

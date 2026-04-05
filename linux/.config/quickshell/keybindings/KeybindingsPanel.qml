@@ -4,23 +4,17 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../theme"
+import "../components"
 
-// ���捷键速查面板 — 解析 keybindings.conf，分组卡片，可搜索
-PanelWindow {
+// 快捷键速查面板 — 解析 keybindings.conf，分组卡片，可搜索
+PanelOverlay {
     id: root
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-
-    property bool showing: PanelState.keybindingsOpen
-    property bool animating: _opacityAnim.running || _scaleAnim.running
-    visible: showing || animating
-
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
+    showing: PanelState.keybindingsOpen
+    panelWidth: Math.min(700, root.width - 40)
+    panelHeight: root.height * 0.8
+    backdropOpacity: Tokens.backdropMedium
+    onCloseRequested: PanelState.keybindingsOpen = false
 
     property string searchQuery: ""
     property var _lines: []
@@ -233,192 +227,153 @@ PanelWindow {
     }
 
     // ── UI ──
-    Rectangle {
-        anchors.fill: parent; color: "#000000"
-        opacity: root.showing ? Tokens.backdropMedium : 0.0
-        Behavior on opacity { NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
-    }
+    ColumnLayout {
+        anchors.fill: parent; anchors.margins: 20; spacing: Tokens.spaceM
 
-    Item { focus: root.showing; Keys.onEscapePressed: PanelState.keybindingsOpen = false }
-    MouseArea { anchors.fill: parent; onClicked: PanelState.keybindingsOpen = false }
+        // 标题 + 搜索
+        RowLayout {
+            Layout.fillWidth: true; spacing: Tokens.spaceM
 
-    Rectangle {
-        id: panel
-        width: Math.min(700, root.width - 40)
-        height: root.height * 0.8
-        anchors.centerIn: parent
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha); border.width: 1
-        clip: true
+            Text {
+                text: "󰌌 快捷键速查"
+                color: Colors.text
+                font.family: Fonts.family; font.pixelSize: Fonts.heading
+                font.weight: Font.Bold
+            }
+            Item { Layout.fillWidth: true }
 
-        scale: root.showing ? 1.0 : 0.95
-        opacity: root.showing ? 1.0 : 0.0
+            // 搜索框
+            Rectangle {
+                Layout.preferredWidth: 200; height: 32; radius: Tokens.radiusMS
+                color: Colors.surface1
 
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
-
-        InnerGlow {}
-
-        Behavior on scale {
-            NumberAnimation { id: _scaleAnim; duration: Tokens.animSlow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.decelerate }
-        }
-        Behavior on opacity {
-            NumberAnimation { id: _opacityAnim; duration: Tokens.animNormal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard }
-        }
-
-        MouseArea { anchors.fill: parent; onClicked: mouse => mouse.accepted = true }
-
-        ColumnLayout {
-            anchors.fill: parent; anchors.margins: 20; spacing: Tokens.spaceM
-
-            // 标题 + 搜索
-            RowLayout {
-                Layout.fillWidth: true; spacing: Tokens.spaceM
-
-                Text {
-                    text: "󰌌 快捷键速查"
-                    color: Colors.text
-                    font.family: Fonts.family; font.pixelSize: Fonts.heading
-                    font.weight: Font.Bold
-                }
-                Item { Layout.fillWidth: true }
-
-                // 搜索框
-                Rectangle {
-                    Layout.preferredWidth: 200; height: 32; radius: Tokens.radiusMS
-                    color: Colors.surface1
-
-                    RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 6
-                        Text { text: ""; color: Colors.overlay1; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
-                        TextInput {
-                            id: searchInput
-                            Layout.fillWidth: true
-                            color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.body
-                            clip: true; selectByMouse: true
-                            onTextChanged: { root.searchQuery = text; root.applyFilter() }
-                            Keys.onEscapePressed: PanelState.keybindingsOpen = false
-                            Text {
-                                anchors.fill: parent; text: "搜索快捷键..."
-                                color: Colors.overlay0; font: parent.font
-                                visible: !parent.text && !parent.activeFocus
-                            }
+                RowLayout {
+                    anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 6
+                    Text { text: ""; color: Colors.overlay1; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
+                    TextInput {
+                        id: searchInput
+                        Layout.fillWidth: true
+                        color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.body
+                        clip: true; selectByMouse: true
+                        onTextChanged: { root.searchQuery = text; root.applyFilter() }
+                        Keys.onEscapePressed: PanelState.keybindingsOpen = false
+                        Text {
+                            anchors.fill: parent; text: "搜索快捷键..."
+                            color: Colors.overlay0; font: parent.font
+                            visible: !parent.text && !parent.activeFocus
                         }
                     }
                 }
             }
+        }
 
-            Rectangle { Layout.fillWidth: true; height: 1; color: Colors.surface1 }
+        Rectangle { Layout.fillWidth: true; height: 1; color: Colors.surface1 }
 
-            // 分组列表
-            Flickable {
-                Layout.fillWidth: true; Layout.fillHeight: true
-                contentHeight: sectionsCol.implicitHeight
-                clip: true
+        // 分组列表
+        Flickable {
+            Layout.fillWidth: true; Layout.fillHeight: true
+            contentHeight: sectionsCol.implicitHeight
+            clip: true
 
-                ColumnLayout {
-                    id: sectionsCol
-                    width: parent.width
-                    spacing: Tokens.spaceM
+            ColumnLayout {
+                id: sectionsCol
+                width: parent.width
+                spacing: Tokens.spaceM
 
-                    // 空状态
-                    Text {
-                        visible: filteredModel.count === 0
-                        text: "未找到匹配的快捷键"
-                        color: Colors.overlay0
-                        font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 40
-                    }
+                // 空状态
+                Text {
+                    visible: filteredModel.count === 0
+                    text: "未找到匹配的快捷键"
+                    color: Colors.overlay0
+                    font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 40
+                }
 
-                    Repeater {
-                        model: filteredModel
-                        delegate: Rectangle {
-                            required property string sectionTitle
-                            required property string bindingsJson
+                Repeater {
+                    model: filteredModel
+                    delegate: Rectangle {
+                        required property string sectionTitle
+                        required property string bindingsJson
 
-                            Layout.fillWidth: true
-                            implicitHeight: cardCol.implicitHeight + 20
-                            radius: Tokens.radiusMS
-                            color: sectionHover.containsMouse ? Colors.surface1 : Colors.surface0
-                            border.color: sectionHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
-                            Behavior on border.color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
+                        Layout.fillWidth: true
+                        implicitHeight: cardCol.implicitHeight + 20
+                        radius: Tokens.radiusMS
+                        color: sectionHover.containsMouse ? Colors.surface1 : Colors.surface0
+                        border.color: sectionHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
+                        Behavior on border.color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
 
-                            MouseArea {
-                                id: sectionHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.NoButton
+                        MouseArea {
+                            id: sectionHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+
+                        ColumnLayout {
+                            id: cardCol
+                            anchors.left: parent.left; anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            spacing: 6
+
+                            // 分组标题
+                            Text {
+                                text: sectionTitle
+                                color: Colors.blue
+                                font.family: Fonts.family; font.pixelSize: Fonts.body
+                                font.weight: Font.Bold
                             }
 
-                            ColumnLayout {
-                                id: cardCol
-                                anchors.left: parent.left; anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.margins: 10
-                                spacing: 6
-
-                                // 分组标题
-                                Text {
-                                    text: sectionTitle
-                                    color: Colors.blue
-                                    font.family: Fonts.family; font.pixelSize: Fonts.body
-                                    font.weight: Font.Bold
+                            // 绑定列表
+                            Repeater {
+                                model: {
+                                    try { return JSON.parse(bindingsJson); }
+                                    catch(e) { return []; }
                                 }
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    spacing: Tokens.spaceM
 
-                                // 绑定列表
-                                Repeater {
-                                    model: {
-                                        try { return JSON.parse(bindingsJson); }
-                                        catch(e) { return []; }
-                                    }
-                                    delegate: RowLayout {
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        spacing: Tokens.spaceM
+                                    // 按键 badge
+                                    Row {
+                                        spacing: Tokens.spaceXS
+                                        Layout.preferredWidth: 200
+                                        Layout.alignment: Qt.AlignTop
 
-                                        // 按键 badge
-                                        Row {
-                                            spacing: Tokens.spaceXS
-                                            Layout.preferredWidth: 200
-                                            Layout.alignment: Qt.AlignTop
+                                        Repeater {
+                                            model: modelData.key.split(" + ")
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                width: keyLabel.implicitWidth + 12
+                                                height: 22
+                                                radius: Tokens.radiusXS
+                                                color: Colors.surface1
+                                                border.color: Qt.rgba(1, 1, 1, 0.08)
+                                                border.width: 1
 
-                                            Repeater {
-                                                model: modelData.key.split(" + ")
-                                                delegate: Rectangle {
-                                                    required property var modelData
-                                                    width: keyLabel.implicitWidth + 12
-                                                    height: 22
-                                                    radius: Tokens.radiusXS
-                                                    color: Colors.surface1
-                                                    border.color: Qt.rgba(1, 1, 1, 0.08)
-                                                    border.width: 1
-
-                                                    Text {
-                                                        id: keyLabel
-                                                        anchors.centerIn: parent
-                                                        text: modelData
-                                                        color: Colors.text
-                                                        font.family: Fonts.family; font.pixelSize: Fonts.caption
-                                                        font.weight: Font.DemiBold
-                                                    }
+                                                Text {
+                                                    id: keyLabel
+                                                    anchors.centerIn: parent
+                                                    text: modelData
+                                                    color: Colors.text
+                                                    font.family: Fonts.family; font.pixelSize: Fonts.caption
+                                                    font.weight: Font.DemiBold
                                                 }
                                             }
                                         }
+                                    }
 
-                                        // 描述
-                                        Text {
-                                            text: modelData.desc
-                                            color: Colors.subtext0
-                                            font.family: Fonts.family; font.pixelSize: Fonts.small
-                                            elide: Text.ElideRight
-                                            Layout.fillWidth: true
-                                        }
+                                    // 描述
+                                    Text {
+                                        text: modelData.desc
+                                        color: Colors.subtext0
+                                        font.family: Fonts.family; font.pixelSize: Fonts.small
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
                                     }
                                 }
                             }

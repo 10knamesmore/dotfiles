@@ -4,14 +4,16 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
 // AI 聊天面板 — 右侧滑出，对接 AstrBot HTTP API
-PanelWindow {
+PanelOverlay {
     id: root
 
-    property bool showing: PanelState.aiOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
+    showing: PanelState.aiOpen
+    panelWidth: 600
+    panelHeight: root.height * 0.85
+    onCloseRequested: PanelState.aiOpen = false
+
     property bool generating: false
     property bool apiReachable: false
     property string _currentContent: ""
@@ -190,14 +192,6 @@ PanelWindow {
         loadMsgProc.running = true;
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
     onShowingChanged: {
         if (showing) {
             focusTimer.start();
@@ -450,55 +444,569 @@ PanelWindow {
     Process { id: notifyProc }
 
     // ── UI ──
-    Rectangle {
+    ColumnLayout {
         anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
+        anchors.margins: Tokens.spaceL
+        spacing: Tokens.spaceS
 
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+        // ── 标题栏 ──
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Tokens.spaceS
+
+            Text {
+                text: "󰧑 AI 助手"
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
+                font.bold: true
+                color: Colors.text
+            }
+
+            // 状态指示
+            Rectangle {
+                width: 8
+                height: 8
+                radius: 4
+                color: root.apiReachable ? (root.generating ? Colors.yellow : Colors.green) : Colors.red
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animNormal }
+                }
+            }
+
+            // 配置选择按钮
+            Rectangle {
+                width: configLabel.implicitWidth + 16
+                height: 24
+                radius: Tokens.radiusFull
+                color: configArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : Qt.rgba(1, 1, 1, 0.05)
+
+                Text {
+                    id: configLabel
+                    anchors.centerIn: parent
+                    text: root._currentConfigName || "配置"
+                    color: configArea.containsMouse ? Colors.blue : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+                    elide: Text.ElideRight
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+
+                MouseArea {
+                    id: configArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.showConfigPicker = !root.showConfigPicker
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
+            }
+
+            // 工具调用开关
+            Rectangle {
+                width: toolRow.implicitWidth + 12
+                height: 24
+                radius: Tokens.radiusFull
+                color: Qt.rgba(1, 1, 1, 0.05)
+
+                RowLayout {
+                    id: toolRow
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text {
+                        text: "工具"
+                        color: Colors.subtext0
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.xs
+                    }
+
+                    ToggleSwitch {
+                        small: true
+                        checked: root.showToolMessages
+                        onToggled: { root.showToolMessages = !root.showToolMessages; root.saveState(); }
+                    }
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // 会话历史按钮
+            Rectangle {
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
+                color: historyArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰋚"
+                    color: historyArea.containsMouse ? Colors.blue : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.iconLarge
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+
+                MouseArea {
+                    id: historyArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.showSessionDrawer = !root.showSessionDrawer
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
+            }
+
+            // 新建会话按钮
+            Rectangle {
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
+                color: newChatArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰐕"
+                    color: newChatArea.containsMouse ? Colors.green : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.iconLarge
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+
+                MouseArea {
+                    id: newChatArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.newSession()
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
+            }
+
+            // 清空按钮
+            Rectangle {
+                width: clearText.implicitWidth + 16
+                height: 26
+                radius: Tokens.radiusFull
+                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+
+                Text {
+                    id: clearText
+                    anchors.centerIn: parent
+                    text: "清空"
+                    color: clearArea.containsMouse ? Colors.red : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+
+                MouseArea {
+                    id: clearArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.clearChat()
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
+            }
+
+            // 设置按钮
+            Rectangle {
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
+                color: settingsArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰒓"
+                    color: settingsArea.containsMouse ? Colors.text : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.iconLarge
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+
+                MouseArea {
+                    id: settingsArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.showSettings = !root.showSettings
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // ── 消息列表 ──
+        ListView {
+            id: msgView
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            model: messageModel
+            spacing: Tokens.spaceS
+            clip: true
+
+            // 空状态
+            Text {
+                anchors.centerIn: parent
+                visible: messageModel.count === 0
+                text: root.apiReachable ? "发送消息开始对话" : (root._server ? "正在连接..." : "请先配置服务器地址")
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.bodyLarge
+            }
+
+            delegate: Item {
+                required property int index
+                required property string role
+                required property string content
+
+                width: msgView.width
+                height: (bubble.isAnyTool && !root.showToolMessages) ? 0 : bubble.height
+                visible: !(bubble.isAnyTool && !root.showToolMessages)
+
+                HoverHandler {
+                    id: bubbleHover
+                }
+
+                Rectangle {
+                    id: bubble
+
+                    property bool isUser: role === "user"
+                    property bool isError: role === "error"
+                    property bool isTool: role === "tool"
+                    property bool isToolResult: role === "tool_result"
+                    property bool isAnyTool: isTool || isToolResult
+
+                    anchors.right: isUser ? parent.right : undefined
+                    anchors.left: isUser ? undefined : parent.left
+                    width: Math.min(msgText.implicitWidth + 24, parent.width * 0.85)
+                    height: msgText.implicitHeight + 16
+                    radius: Tokens.radiusMS
+
+                    color: {
+                        if (isUser)
+                            return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2);
+                        if (isError)
+                            return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.1);
+                        if (isToolResult)
+                            return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.08);
+                        if (isTool)
+                            return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.08);
+                        return Colors.surface0;
+                    }
+
+                    border.color: {
+                        if (isUser)
+                            return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.15);
+                        if (isError)
+                            return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15);
+                        if (isToolResult)
+                            return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.12);
+                        if (isTool)
+                            return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.12);
+                        return Qt.rgba(1, 1, 1, 0.04);
+                    }
+                    border.width: 1
+
+                    TextEdit {
+                        id: msgText
+
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        anchors.rightMargin: 12
+                        text: content || (role === "assistant" && root.generating && index === messageModel.count - 1 ? "..." : "")
+                        color: {
+                            if (bubble.isError) return Colors.red;
+                            if (bubble.isToolResult) return Colors.green;
+                            if (bubble.isTool) return Colors.peach;
+                            return Colors.text;
+                        }
+                        font.family: Fonts.family
+                        font.pixelSize: bubble.isAnyTool ? Fonts.body : Fonts.title
+                        wrapMode: TextEdit.WordWrap
+                        textFormat: (bubble.isUser || bubble.isAnyTool || bubble.isError) ? TextEdit.PlainText : TextEdit.MarkdownText
+                        readOnly: true
+                        selectByMouse: true
+                        selectedTextColor: Colors.base
+                        selectionColor: Colors.mauve
+                    }
+
+                }
+
+                // 复制按钮（气泡外侧）
+                Rectangle {
+                    id: copyBtn
+                    property bool copied: false
+
+                    width: 26
+                    height: 26
+                    radius: Tokens.radiusFull
+                    anchors.bottom: bubble.bottom
+                    anchors.bottomMargin: 4
+                    // user: 贴气泡左侧外边；assistant/tool: 贴气泡右侧外边
+                    x: bubble.isUser ? (bubble.x - width - 4) : (bubble.x + bubble.width + 4)
+                    visible: bubbleHover.hovered || copyArea.containsMouse || copied
+                    color: copyArea.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: copyBtn.copied ? "󰄬" : "󰆏"
+                        color: copyBtn.copied ? Colors.green : (copyArea.containsMouse ? Colors.text : Colors.overlay1)
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.body
+
+                        Behavior on color {
+                            ColorAnimation { duration: Tokens.animFast }
+                        }
+                    }
+
+                    MouseArea {
+                        id: copyArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            copyProc.command = ["sh", "-c", "printf '%s' '" + content.replace(/'/g, "'\\''") + "' | wl-copy"];
+                            copyProc.running = true;
+                            copyBtn.copied = true;
+                            copyResetTimer.start();
+                        }
+                    }
+
+                    Timer {
+                        id: copyResetTimer
+                        interval: 1500
+                        onTriggered: copyBtn.copied = false
+                    }
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
+            }
+        }
+
+        // ── Stats 显示 ──
+        Text {
+            Layout.fillWidth: true
+            visible: root._lastStats !== null && !root.generating
+            text: {
+                if (!root._lastStats) return "";
+                let s = root._lastStats;
+                let parts = [];
+                if (s.token_usage) {
+                    let u = s.token_usage;
+                    let input = (u.input_other || 0) + (u.input_cached || 0);
+                    parts.push("tokens: " + input + "→" + (u.output || 0));
+                    if (u.input_cached > 0)
+                        parts.push("cached: " + u.input_cached);
+                }
+                if (s.time_to_first_token !== undefined)
+                    parts.push("TTFT: " + s.time_to_first_token.toFixed(2) + "s");
+                if (s.start_time && s.end_time)
+                    parts.push("total: " + (s.end_time - s.start_time).toFixed(2) + "s");
+                return parts.join("  ·  ");
+            }
+            color: Colors.overlay0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.body
+            horizontalAlignment: Text.AlignHCenter
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // ── 输入区域 ──
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(Math.max(inputEdit.implicitHeight + 16, 44), 120)
+            radius: Tokens.radiusMS
+            color: Colors.surface1
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 8
+                anchors.topMargin: 4
+                anchors.bottomMargin: 4
+                spacing: Tokens.spaceS
+
+                TextEdit {
+                    id: inputEdit
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
+                    wrapMode: TextEdit.Wrap
+                    selectByMouse: true
+                    verticalAlignment: TextEdit.AlignVCenter
+
+                    Keys.onReturnPressed: event => {
+                        if (event.modifiers & Qt.ShiftModifier) {
+                            inputEdit.insert(inputEdit.cursorPosition, "\n");
+                        } else {
+                            root.sendMessage();
+                            event.accepted = true;
+                        }
+                    }
+                    Keys.onEscapePressed: PanelState.aiOpen = false
+
+                    Text {
+                        anchors.fill: parent
+                        anchors.topMargin: 2
+                        text: "输入消息..."
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                // 发送/停止按钮
+                Rectangle {
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    Layout.alignment: Qt.AlignBottom
+                    radius: Tokens.radiusFull
+                    color: {
+                        if (root.generating)
+                            return sendArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent";
+                        return sendArea.containsMouse && root.apiReachable ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent";
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.generating ? "󰓛" : "󰒊"
+                        color: {
+                            if (root.generating)
+                                return sendArea.containsMouse ? Colors.red : Colors.overlay1;
+                            return root.apiReachable ? (sendArea.containsMouse ? Colors.blue : Colors.overlay1) : Colors.surface2;
+                        }
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.iconLarge
+
+                        Behavior on color {
+                            ColorAnimation { duration: Tokens.animFast }
+                        }
+                    }
+
+                    MouseArea {
+                        id: sendArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: root.apiReachable || root.generating ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: {
+                            if (root.generating)
+                                api.abortChat();
+                            else
+                                root.sendMessage();
+                        }
+                    }
+
+                    Behavior on color {
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                }
             }
         }
     }
 
-    Item {
-        focus: root.showing
-        Keys.onEscapePressed: {
-            if (root.showSessionDrawer)
-                root.showSessionDrawer = false;
-            else if (root.showConfigPicker)
-                root.showConfigPicker = false;
-            else
-                PanelState.aiOpen = false;
+    // ── ConfigPicker 弹出层 ──
+    ConfigPicker {
+        id: configPicker
+        visible: root.showConfigPicker
+        configs: root._configs
+        currentConfigId: root._currentConfigId
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 56
+        anchors.leftMargin: Tokens.spaceL
+        anchors.rightMargin: Tokens.spaceL
+
+        onConfigSelected: (configId, configName) => {
+            root._currentConfigId = configId;
+            root._currentConfigName = configName;
+            root.showConfigPicker = false;
+            root.saveState();
         }
     }
 
-    MouseArea {
+    // ── SessionDrawer 覆盖层 ──
+    SessionDrawer {
+        id: sessionDrawer
+        visible: root.showSessionDrawer
+        sessions: root._sessions
+        currentSessionId: root._currentSessionId
         anchors.fill: parent
-        onClicked: PanelState.aiOpen = false
+
+        onSessionSelected: sessionId => {
+            root.switchSession(sessionId);
+            root.showSessionDrawer = false;
+        }
+        onNewSessionRequested: {
+            root.newSession();
+            root.showSessionDrawer = false;
+        }
+        onSessionDeleted: sessionId => {
+            root.deleteSession(sessionId);
+        }
+        onCloseRequested: {
+            root.showSessionDrawer = false;
+        }
     }
 
+    // ── 设置视图 ──
     Rectangle {
-        id: panel
-
-        width: 600
-        height: root.height * 0.85
+        id: settingsView
+        visible: root.showSettings
+        anchors.fill: parent
         radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.showing ? 0 : -20
-        clip: true
-        opacity: root.showing ? 1 : 0
-
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
+        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.98)
+        z: 20
 
         MouseArea {
             anchors.fill: parent
@@ -508,222 +1016,41 @@ PanelWindow {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: Tokens.spaceL
-            spacing: Tokens.spaceS
+            spacing: Tokens.spaceM
 
-            // ── 标题栏 ──
             RowLayout {
                 Layout.fillWidth: true
-                spacing: Tokens.spaceS
 
                 Text {
-                    text: "󰧑 AI 助手"
+                    text: "󰒓 设置"
                     font.family: Fonts.family
                     font.pixelSize: Fonts.title
                     font.bold: true
                     color: Colors.text
                 }
 
-                // 状态指示
-                Rectangle {
-                    width: 8
-                    height: 8
-                    radius: 4
-                    color: root.apiReachable ? (root.generating ? Colors.yellow : Colors.green) : Colors.red
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animNormal }
-                    }
-                }
-
-                // 配置选择按钮
-                Rectangle {
-                    width: configLabel.implicitWidth + 16
-                    height: 24
-                    radius: Tokens.radiusFull
-                    color: configArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : Qt.rgba(1, 1, 1, 0.05)
-
-                    Text {
-                        id: configLabel
-                        anchors.centerIn: parent
-                        text: root._currentConfigName || "配置"
-                        color: configArea.containsMouse ? Colors.blue : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
-                        elide: Text.ElideRight
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-
-                    MouseArea {
-                        id: configArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.showConfigPicker = !root.showConfigPicker
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
-                    }
-                }
-
-                // 工具调用开关
-                Rectangle {
-                    width: toolRow.implicitWidth + 12
-                    height: 24
-                    radius: Tokens.radiusFull
-                    color: Qt.rgba(1, 1, 1, 0.05)
-
-                    RowLayout {
-                        id: toolRow
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        Text {
-                            text: "工具"
-                            color: Colors.subtext0
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.xs
-                        }
-
-                        ToggleSwitch {
-                            small: true
-                            checked: root.showToolMessages
-                            onToggled: { root.showToolMessages = !root.showToolMessages; root.saveState(); }
-                        }
-                    }
-                }
-
                 Item { Layout.fillWidth: true }
 
-                // 会话历史按钮
                 Rectangle {
                     width: 28
                     height: 28
                     radius: Tokens.radiusFull
-                    color: historyArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
+                    color: settingsCloseArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
 
                     Text {
                         anchors.centerIn: parent
-                        text: "󰋚"
-                        color: historyArea.containsMouse ? Colors.blue : Colors.subtext0
+                        text: "󰅖"
+                        color: settingsCloseArea.containsMouse ? Colors.text : Colors.subtext0
                         font.family: Fonts.family
                         font.pixelSize: Fonts.iconLarge
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
                     }
 
                     MouseArea {
-                        id: historyArea
+                        id: settingsCloseArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.showSessionDrawer = !root.showSessionDrawer
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
-                    }
-                }
-
-                // 新建会话按钮
-                Rectangle {
-                    width: 28
-                    height: 28
-                    radius: Tokens.radiusFull
-                    color: newChatArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰐕"
-                        color: newChatArea.containsMouse ? Colors.green : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.iconLarge
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-
-                    MouseArea {
-                        id: newChatArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.newSession()
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
-                    }
-                }
-
-                // 清空按钮
-                Rectangle {
-                    width: clearText.implicitWidth + 16
-                    height: 26
-                    radius: Tokens.radiusFull
-                    color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
-
-                    Text {
-                        id: clearText
-                        anchors.centerIn: parent
-                        text: "清空"
-                        color: clearArea.containsMouse ? Colors.red : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-
-                    MouseArea {
-                        id: clearArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.clearChat()
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
-                    }
-                }
-
-                // 设置按钮
-                Rectangle {
-                    width: 28
-                    height: 28
-                    radius: Tokens.radiusFull
-                    color: settingsArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰒓"
-                        color: settingsArea.containsMouse ? Colors.text : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.iconLarge
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-
-                    MouseArea {
-                        id: settingsArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.showSettings = !root.showSettings
-                    }
-
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
+                        onClicked: root.showSettings = false
                     }
                 }
             }
@@ -734,566 +1061,157 @@ PanelWindow {
                 color: Colors.surface1
             }
 
-            // ── 消息列表 ──
-            ListView {
-                id: msgView
-
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                model: messageModel
-                spacing: Tokens.spaceS
-                clip: true
-
-                // 空状态
-                Text {
-                    anchors.centerIn: parent
-                    visible: messageModel.count === 0
-                    text: root.apiReachable ? "发送消息开始对话" : (root._server ? "正在连接..." : "请先配置服务器地址")
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.bodyLarge
-                }
-
-                delegate: Item {
-                    required property int index
-                    required property string role
-                    required property string content
-
-                    width: msgView.width
-                    height: (bubble.isAnyTool && !root.showToolMessages) ? 0 : bubble.height
-                    visible: !(bubble.isAnyTool && !root.showToolMessages)
-
-                    HoverHandler {
-                        id: bubbleHover
-                    }
-
-                    Rectangle {
-                        id: bubble
-
-                        property bool isUser: role === "user"
-                        property bool isError: role === "error"
-                        property bool isTool: role === "tool"
-                        property bool isToolResult: role === "tool_result"
-                        property bool isAnyTool: isTool || isToolResult
-
-                        anchors.right: isUser ? parent.right : undefined
-                        anchors.left: isUser ? undefined : parent.left
-                        width: Math.min(msgText.implicitWidth + 24, parent.width * 0.85)
-                        height: msgText.implicitHeight + 16
-                        radius: Tokens.radiusMS
-
-                        color: {
-                            if (isUser)
-                                return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2);
-                            if (isError)
-                                return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.1);
-                            if (isToolResult)
-                                return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.08);
-                            if (isTool)
-                                return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.08);
-                            return Colors.surface0;
-                        }
-
-                        border.color: {
-                            if (isUser)
-                                return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.15);
-                            if (isError)
-                                return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15);
-                            if (isToolResult)
-                                return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.12);
-                            if (isTool)
-                                return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.12);
-                            return Qt.rgba(1, 1, 1, 0.04);
-                        }
-                        border.width: 1
-
-                        TextEdit {
-                            id: msgText
-
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            anchors.rightMargin: 12
-                            text: content || (role === "assistant" && root.generating && index === messageModel.count - 1 ? "..." : "")
-                            color: {
-                                if (bubble.isError) return Colors.red;
-                                if (bubble.isToolResult) return Colors.green;
-                                if (bubble.isTool) return Colors.peach;
-                                return Colors.text;
-                            }
-                            font.family: Fonts.family
-                            font.pixelSize: bubble.isAnyTool ? Fonts.body : Fonts.title
-                            wrapMode: TextEdit.WordWrap
-                            textFormat: (bubble.isUser || bubble.isAnyTool || bubble.isError) ? TextEdit.PlainText : TextEdit.MarkdownText
-                            readOnly: true
-                            selectByMouse: true
-                            selectedTextColor: Colors.base
-                            selectionColor: Colors.mauve
-                        }
-
-                    }
-
-                    // 复制按钮（气泡外侧）
-                    Rectangle {
-                        id: copyBtn
-                        property bool copied: false
-
-                        width: 26
-                        height: 26
-                        radius: Tokens.radiusFull
-                        anchors.bottom: bubble.bottom
-                        anchors.bottomMargin: 4
-                        // user: 贴气泡左侧外边；assistant/tool: 贴气泡右侧外边
-                        x: bubble.isUser ? (bubble.x - width - 4) : (bubble.x + bubble.width + 4)
-                        visible: bubbleHover.hovered || copyArea.containsMouse || copied
-                        color: copyArea.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: copyBtn.copied ? "󰄬" : "󰆏"
-                            color: copyBtn.copied ? Colors.green : (copyArea.containsMouse ? Colors.text : Colors.overlay1)
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.body
-
-                            Behavior on color {
-                                ColorAnimation { duration: Tokens.animFast }
-                            }
-                        }
-
-                        MouseArea {
-                            id: copyArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                copyProc.command = ["sh", "-c", "printf '%s' '" + content.replace(/'/g, "'\\''") + "' | wl-copy"];
-                                copyProc.running = true;
-                                copyBtn.copied = true;
-                                copyResetTimer.start();
-                            }
-                        }
-
-                        Timer {
-                            id: copyResetTimer
-                            interval: 1500
-                            onTriggered: copyBtn.copied = false
-                        }
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-                }
-            }
-
-            // ── Stats 显示 ──
+            // 服务器地址
             Text {
-                Layout.fillWidth: true
-                visible: root._lastStats !== null && !root.generating
-                text: {
-                    if (!root._lastStats) return "";
-                    let s = root._lastStats;
-                    let parts = [];
-                    if (s.token_usage) {
-                        let u = s.token_usage;
-                        let input = (u.input_other || 0) + (u.input_cached || 0);
-                        parts.push("tokens: " + input + "→" + (u.output || 0));
-                        if (u.input_cached > 0)
-                            parts.push("cached: " + u.input_cached);
-                    }
-                    if (s.time_to_first_token !== undefined)
-                        parts.push("TTFT: " + s.time_to_first_token.toFixed(2) + "s");
-                    if (s.start_time && s.end_time)
-                        parts.push("total: " + (s.end_time - s.start_time).toFixed(2) + "s");
-                    return parts.join("  ·  ");
-                }
-                color: Colors.overlay0
+                text: "服务器地址"
+                color: Colors.subtext0
                 font.family: Fonts.family
-                font.pixelSize: Fonts.body
-                horizontalAlignment: Text.AlignHCenter
+                font.pixelSize: Fonts.small
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
-                color: Colors.surface1
-            }
-
-            // ── 输入区域 ──
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(Math.max(inputEdit.implicitHeight + 16, 44), 120)
+                height: 40
                 radius: Tokens.radiusMS
                 color: Colors.surface1
 
-                RowLayout {
+                TextEdit {
+                    id: serverEdit
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 8
-                    anchors.topMargin: 4
-                    anchors.bottomMargin: 4
-                    spacing: Tokens.spaceS
-
-                    TextEdit {
-                        id: inputEdit
-
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.body
-                        wrapMode: TextEdit.Wrap
-                        selectByMouse: true
-                        verticalAlignment: TextEdit.AlignVCenter
-
-                        Keys.onReturnPressed: event => {
-                            if (event.modifiers & Qt.ShiftModifier) {
-                                inputEdit.insert(inputEdit.cursorPosition, "\n");
-                            } else {
-                                root.sendMessage();
-                                event.accepted = true;
-                            }
-                        }
-                        Keys.onEscapePressed: PanelState.aiOpen = false
-
-                        Text {
-                            anchors.fill: parent
-                            anchors.topMargin: 2
-                            text: "输入消息..."
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    // 发送/停止按钮
-                    Rectangle {
-                        Layout.preferredWidth: 32
-                        Layout.preferredHeight: 32
-                        Layout.alignment: Qt.AlignBottom
-                        radius: Tokens.radiusFull
-                        color: {
-                            if (root.generating)
-                                return sendArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent";
-                            return sendArea.containsMouse && root.apiReachable ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent";
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: root.generating ? "󰓛" : "󰒊"
-                            color: {
-                                if (root.generating)
-                                    return sendArea.containsMouse ? Colors.red : Colors.overlay1;
-                                return root.apiReachable ? (sendArea.containsMouse ? Colors.blue : Colors.overlay1) : Colors.surface2;
-                            }
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.iconLarge
-
-                            Behavior on color {
-                                ColorAnimation { duration: Tokens.animFast }
-                            }
-                        }
-
-                        MouseArea {
-                            id: sendArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: root.apiReachable || root.generating ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: {
-                                if (root.generating)
-                                    api.abortChat();
-                                else
-                                    root.sendMessage();
-                            }
-                        }
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── ConfigPicker 弹出层 ──
-        ConfigPicker {
-            id: configPicker
-            visible: root.showConfigPicker
-            configs: root._configs
-            currentConfigId: root._currentConfigId
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.topMargin: 56
-            anchors.leftMargin: Tokens.spaceL
-            anchors.rightMargin: Tokens.spaceL
-
-            onConfigSelected: (configId, configName) => {
-                root._currentConfigId = configId;
-                root._currentConfigName = configName;
-                root.showConfigPicker = false;
-                root.saveState();
-            }
-        }
-
-        // ── SessionDrawer 覆盖层 ──
-        SessionDrawer {
-            id: sessionDrawer
-            visible: root.showSessionDrawer
-            sessions: root._sessions
-            currentSessionId: root._currentSessionId
-            anchors.fill: parent
-
-            onSessionSelected: sessionId => {
-                root.switchSession(sessionId);
-                root.showSessionDrawer = false;
-            }
-            onNewSessionRequested: {
-                root.newSession();
-                root.showSessionDrawer = false;
-            }
-            onSessionDeleted: sessionId => {
-                root.deleteSession(sessionId);
-            }
-            onCloseRequested: {
-                root.showSessionDrawer = false;
-            }
-        }
-
-        // ── 设置视图 ──
-        Rectangle {
-            id: settingsView
-            visible: root.showSettings
-            anchors.fill: parent
-            radius: Tokens.radiusL
-            color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.98)
-            z: 20
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: mouse => mouse.accepted = true
-            }
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: Tokens.spaceL
-                spacing: Tokens.spaceM
-
-                RowLayout {
-                    Layout.fillWidth: true
+                    anchors.margins: 10
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
+                    verticalAlignment: TextEdit.AlignVCenter
+                    selectByMouse: true
+                    text: root._server
 
                     Text {
-                        text: "󰒓 设置"
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.title
-                        font.bold: true
-                        color: Colors.text
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Rectangle {
-                        width: 28
-                        height: 28
-                        radius: Tokens.radiusFull
-                        color: settingsCloseArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰅖"
-                            color: settingsCloseArea.containsMouse ? Colors.text : Colors.subtext0
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.iconLarge
-                        }
-
-                        MouseArea {
-                            id: settingsCloseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.showSettings = false
-                        }
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: Colors.surface1
-                }
-
-                // 服务器地址
-                Text {
-                    text: "服务器地址"
-                    color: Colors.subtext0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.small
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 40
-                    radius: Tokens.radiusMS
-                    color: Colors.surface1
-
-                    TextEdit {
-                        id: serverEdit
                         anchors.fill: parent
-                        anchors.margins: 10
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.body
-                        verticalAlignment: TextEdit.AlignVCenter
-                        selectByMouse: true
-                        text: root._server
-
-                        Text {
-                            anchors.fill: parent
-                            text: "http://host:6185"
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                        text: "http://host:6185"
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
+            }
 
-                // API Key
-                Text {
-                    text: "API Key"
-                    color: Colors.subtext0
+            // API Key
+            Text {
+                text: "API Key"
+                color: Colors.subtext0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 40
+                radius: Tokens.radiusMS
+                color: Colors.surface1
+
+                TextEdit {
+                    id: apiKeyEdit
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Colors.text
                     font.family: Fonts.family
-                    font.pixelSize: Fonts.small
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 40
-                    radius: Tokens.radiusMS
-                    color: Colors.surface1
-
-                    TextEdit {
-                        id: apiKeyEdit
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.body
-                        verticalAlignment: TextEdit.AlignVCenter
-                        selectByMouse: true
-                        text: root._apiKey
-
-                        Text {
-                            anchors.fill: parent
-                            text: "输入 API Key"
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                }
-
-                // 用户名
-                Text {
-                    text: "用户名"
-                    color: Colors.subtext0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.small
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 40
-                    radius: Tokens.radiusMS
-                    color: Colors.surface1
-
-                    TextEdit {
-                        id: usernameEdit
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.body
-                        verticalAlignment: TextEdit.AlignVCenter
-                        selectByMouse: true
-                        text: root._username
-
-                        Text {
-                            anchors.fill: parent
-                            text: "qml-user"
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
-
-                // 保存按钮
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 40
-                    radius: Tokens.radiusMS
-                    color: saveSettingsArea.containsMouse
-                        ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25)
-                        : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                    font.pixelSize: Fonts.body
+                    verticalAlignment: TextEdit.AlignVCenter
+                    selectByMouse: true
+                    text: root._apiKey
 
                     Text {
-                        anchors.centerIn: parent
-                        text: "保存并连接"
-                        color: Colors.blue
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.body
-                        font.bold: true
-
-                        Behavior on color {
-                            ColorAnimation { duration: Tokens.animFast }
-                        }
-                    }
-
-                    MouseArea {
-                        id: saveSettingsArea
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root._server = serverEdit.text.trim();
-                            root._apiKey = apiKeyEdit.text.trim();
-                            root._username = usernameEdit.text.trim() || "qml-user";
-                            root.saveState();
-                            root.showSettings = false;
-                            if (root._server)
-                                api.fetchConfigs();
-                        }
+                        text: "输入 API Key"
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                        verticalAlignment: Text.AlignVCenter
                     }
+                }
+            }
+
+            // 用户名
+            Text {
+                text: "用户名"
+                color: Colors.subtext0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 40
+                radius: Tokens.radiusMS
+                color: Colors.surface1
+
+                TextEdit {
+                    id: usernameEdit
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
+                    verticalAlignment: TextEdit.AlignVCenter
+                    selectByMouse: true
+                    text: root._username
+
+                    Text {
+                        anchors.fill: parent
+                        text: "qml-user"
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            // 保存按钮
+            Rectangle {
+                Layout.fillWidth: true
+                height: 40
+                radius: Tokens.radiusMS
+                color: saveSettingsArea.containsMouse
+                    ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25)
+                    : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "保存并连接"
+                    color: Colors.blue
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
+                    font.bold: true
 
                     Behavior on color {
                         ColorAnimation { duration: Tokens.animFast }
                     }
                 }
-            }
-        }
 
-        InnerGlow {}
+                MouseArea {
+                    id: saveSettingsArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root._server = serverEdit.text.trim();
+                        root._apiKey = apiKeyEdit.text.trim();
+                        root._username = usernameEdit.text.trim() || "qml-user";
+                        root.saveState();
+                        root.showSettings = false;
+                        if (root._server)
+                            api.fetchConfigs();
+                    }
+                }
 
-        Behavior on anchors.verticalCenterOffset {
-            NumberAnimation {
-                id: _slideAnim
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
-            }
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
             }
         }
     }

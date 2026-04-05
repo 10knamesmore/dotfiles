@@ -1,21 +1,37 @@
+import "../components"
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
-// 便签面板 — 右侧滑出，JSON 持久化
-PanelWindow {
+// 便签 + 待办面板 — 居中弹出，JSON 持久化
+PanelOverlay {
     id: root
 
-    property bool showing: PanelState.notesOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
-    property string searchQuery: ""
-    property int editingIndex: -1 // -1=列表模式，>=0=编辑模式
-    property int nextId: 1
+    showing: PanelState.notesOpen
+    panelWidth: 520
+    panelHeight: root.height * 0.7
 
-    readonly property string dataPath: (Qt.resolvedUrl("").toString().replace("file://", "").replace(/\/notes\/$/, "") + "/../../../.cache/quickshell/notes.json").replace("/../../../", "/home/" + _userProc._user + "/.cache/quickshell/notes.json")
+    onCloseRequested: {
+        if (editingIndex >= 0)
+            editingIndex = -1;
+        else
+            PanelState.notesOpen = false;
+    }
+
+    onShowingChanged: {
+        if (showing) {
+            searchQuery = "";
+            editingIndex = -1;
+            loadNotes();
+        }
+    }
+
+    property string searchQuery: ""
+    property int editingIndex: -1
+    property int nextId: 1
+    property int filterMode: 0 // 0=全部 1=便签 2=待办未完成 3=已完成
+
     readonly property string _storePath: "/home/" + _userProc._user + "/.cache/quickshell/notes.json"
 
     property var colorOptions: [
@@ -48,7 +64,9 @@ PanelWindow {
                 id: item.noteId,
                 text: item.text,
                 color: item.noteColor,
-                created: item.created
+                created: item.created,
+                isTodo: item.isTodo,
+                done: item.done
             });
         }
         let json = JSON.stringify(arr);
@@ -62,25 +80,35 @@ PanelWindow {
         let q = searchQuery.toLowerCase();
         for (let i = 0; i < noteModel.count; i++) {
             let item = noteModel.get(i);
-            if (q.length === 0 || item.text.toLowerCase().includes(q))
-                filteredModel.append({
-                    "noteId": item.noteId,
-                    "text": item.text,
-                    "noteColor": item.noteColor,
-                    "created": item.created,
-                    "sourceIndex": i
-                });
+            // 文本搜索
+            if (q.length > 0 && !item.text.toLowerCase().includes(q))
+                continue;
+            // 类型过滤
+            if (filterMode === 1 && item.isTodo) continue;
+            if (filterMode === 2 && (!item.isTodo || item.done)) continue;
+            if (filterMode === 3 && (!item.isTodo || !item.done)) continue;
+            filteredModel.append({
+                "noteId": item.noteId,
+                "text": item.text,
+                "noteColor": item.noteColor,
+                "created": item.created,
+                "isTodo": item.isTodo,
+                "done": item.done,
+                "sourceIndex": i
+            });
         }
     }
 
-    function addNote() {
+    function addNote(asTodo) {
         let id = nextId++;
         let now = new Date().toISOString().substring(0, 10);
         noteModel.insert(0, {
             "noteId": id,
             "text": "",
-            "noteColor": "blue",
-            "created": now
+            "noteColor": asTodo ? "green" : "blue",
+            "created": now,
+            "isTodo": asTodo,
+            "done": false
         });
         applyFilter();
         editingIndex = 0;
@@ -88,7 +116,6 @@ PanelWindow {
     }
 
     function deleteNote(idx) {
-        // 找到 sourceIndex 并删除
         let item = filteredModel.get(idx);
         let srcIdx = item.sourceIndex;
         noteModel.remove(srcIdx);
@@ -112,20 +139,24 @@ PanelWindow {
         saveNotes();
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
-    onShowingChanged: {
-        if (showing) {
-            searchQuery = "";
-            editingIndex = -1;
-            loadNotes();
+    function toggleDone(idx) {
+        let item = filteredModel.get(idx);
+        let newVal = !item.done;
+        noteModel.setProperty(item.sourceIndex, "done", newVal);
+        filteredModel.setProperty(idx, "done", newVal);
+        saveNotes();
+    }
+
+    function toggleTodo(idx) {
+        let item = filteredModel.get(idx);
+        let newVal = !item.isTodo;
+        noteModel.setProperty(item.sourceIndex, "isTodo", newVal);
+        filteredModel.setProperty(idx, "isTodo", newVal);
+        if (!newVal) {
+            noteModel.setProperty(item.sourceIndex, "done", false);
+            filteredModel.setProperty(idx, "done", false);
         }
+        saveNotes();
     }
 
     ListModel { id: noteModel }
@@ -137,7 +168,6 @@ PanelWindow {
         onTriggered: root.saveNotes()
     }
 
-    // ── 获取用户名 ──
     Process {
         id: _userProc
         property string _user: "wanger"
@@ -148,7 +178,6 @@ PanelWindow {
         }
     }
 
-    // ── 加载 ──
     Process {
         id: loadProc
         command: ["sh", "-c", "cat " + root._storePath + " 2>/dev/null || echo '[]'"]
@@ -162,7 +191,9 @@ PanelWindow {
                             "noteId": item.id || 0,
                             "text": item.text || "",
                             "noteColor": item.color || "blue",
-                            "created": item.created || ""
+                            "created": item.created || "",
+                            "isTodo": item.isTodo || false,
+                            "done": item.done || false
                         });
                         if (item.id > maxId) maxId = item.id;
                     }
@@ -175,390 +206,481 @@ PanelWindow {
 
     Process { id: saveProc }
 
-    // ── UI ──
-    Rectangle {
+    // ── 面板内容 ──
+    ColumnLayout {
         anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
+        anchors.margins: Tokens.spaceL
+        spacing: Tokens.spaceS
 
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+        // ── 标题栏 ──
+        RowLayout {
+            Layout.fillWidth: true
+
+            Text {
+                text: "󰎚 便签"
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
+                font.bold: true
+                color: Colors.text
             }
-        }
-    }
 
-    Item {
-        focus: root.showing
-        Keys.onEscapePressed: {
-            if (root.editingIndex >= 0)
-                root.editingIndex = -1;
-            else
-                PanelState.notesOpen = false;
-        }
-    }
+            Item { Layout.fillWidth: true }
 
-    MouseArea {
-        anchors.fill: parent
-        onClicked: PanelState.notesOpen = false
-    }
+            Text {
+                text: noteModel.count + " 条"
+                color: Colors.subtext0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+            }
 
-    Rectangle {
-        id: panel
-
-        width: 520
-        height: root.height * 0.7
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.showing ? 0 : 20
-        clip: true
-        opacity: root.showing ? 1 : 0
-
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: mouse => mouse.accepted = true
-        }
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            spacing: Tokens.spaceS
-
-            // ── 标题栏 ──
-            RowLayout {
-                Layout.fillWidth: true
+            // 新建便签
+            Rectangle {
+                width: addNoteText.implicitWidth + 16
+                height: 26
+                radius: Tokens.radiusFull
+                color: addNoteArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
 
                 Text {
-                    text: "󰎚 便签"
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.title
-                    font.bold: true
-                    color: Colors.text
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                    text: noteModel.count + " 条"
-                    color: Colors.subtext0
+                    id: addNoteText
+                    anchors.centerIn: parent
+                    text: "+ 便签"
+                    color: addNoteArea.containsMouse ? Colors.blue : Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small
+                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
                 }
 
-                // 新建按钮
-                Rectangle {
-                    width: addText.implicitWidth + 16
-                    height: 26
-                    radius: Tokens.radiusFull
-                    color: addArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
+                MouseArea {
+                    id: addNoteArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.addNote(false)
+                }
+
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            }
+
+            // 新建待办
+            Rectangle {
+                width: addTodoText.implicitWidth + 16
+                height: 26
+                radius: Tokens.radiusFull
+                color: addTodoArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
+
+                Text {
+                    id: addTodoText
+                    anchors.centerIn: parent
+                    text: "+ 待办"
+                    color: addTodoArea.containsMouse ? Colors.green : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                }
+
+                MouseArea {
+                    id: addTodoArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.addNote(true)
+                }
+
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            }
+        }
+
+        // ── 搜索框 ──
+        Rectangle {
+            Layout.fillWidth: true
+            height: 36
+            radius: Tokens.radiusMS
+            color: Colors.surface1
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: Tokens.spaceS
+
+                Text {
+                    text: ""
+                    color: Colors.overlay1
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.icon
+                }
+
+                TextInput {
+                    id: searchInput
+                    Layout.fillWidth: true
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.bodyLarge
+                    clip: true
+                    selectByMouse: true
+                    onTextChanged: {
+                        root.searchQuery = text;
+                        root.applyFilter();
+                    }
+                    Keys.onEscapePressed: {
+                        if (root.editingIndex >= 0)
+                            root.editingIndex = -1;
+                        else
+                            PanelState.notesOpen = false;
+                    }
 
                     Text {
-                        id: addText
-                        anchors.centerIn: parent
-                        text: "新建"
-                        color: addArea.containsMouse ? Colors.green : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
+                        anchors.fill: parent
+                        text: "搜索便签..."
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+                }
+            }
+        }
+
+        // ── 过滤标签 ──
+        Row {
+            Layout.fillWidth: true
+            spacing: 4
+
+            component FilterTab: Rectangle {
+                property string label: ""
+                property int mode: 0
+                property bool active: root.filterMode === mode
+
+                width: tabLabel.implicitWidth + 16
+                height: 24
+                radius: Tokens.radiusFull
+                color: active ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2) : tabArea.containsMouse ? Colors.surface1 : "transparent"
+
+                Text {
+                    id: tabLabel
+                    anchors.centerIn: parent
+                    text: label
+                    color: active ? Colors.mauve : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    font.weight: active ? Font.Bold : Font.Normal
+                }
+
+                MouseArea {
+                    id: tabArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.filterMode = mode;
+                        root.applyFilter();
+                    }
+                }
+
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            }
+
+            FilterTab { label: "全部"; mode: 0 }
+            FilterTab { label: "便签"; mode: 1 }
+            FilterTab { label: "待办"; mode: 2 }
+            FilterTab { label: "已完成"; mode: 3 }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // ── 空状态 ──
+        Text {
+            visible: filteredModel.count === 0
+            text: noteModel.count === 0 ? "还没有便签" : "未找到匹配项"
+            color: Colors.overlay0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 20
+            Layout.bottomMargin: 20
+        }
+
+        // ── 列表 ──
+        ListView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            model: filteredModel
+            spacing: Tokens.spaceS
+            clip: true
+
+            delegate: Rectangle {
+                required property int index
+                required property int noteId
+                required property string text
+                required property string noteColor
+                required property string created
+                required property bool isTodo
+                required property bool done
+
+                property bool isEditing: root.editingIndex === index
+
+                width: ListView.view.width
+                height: isEditing ? editCol.implicitHeight + 16 : 52
+                radius: Tokens.radiusMS
+                color: itemHover.containsMouse || isEditing ? Colors.surface1 : Colors.surface0
+                border.color: Qt.rgba(root.noteColor(noteColor).r, root.noteColor(noteColor).g, root.noteColor(noteColor).b, 0.3)
+                border.width: 1
+
+                Behavior on height {
+                    NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+                }
+
+                MouseArea {
+                    id: itemHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (!isEditing)
+                            root.editingIndex = index;
+                    }
+                }
+
+                // ── 列表模式 ──
+                RowLayout {
+                    visible: !isEditing
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: Tokens.spaceS
+
+                    // 左侧：TODO checkbox 或 颜色条
+                    Rectangle {
+                        visible: !isTodo
+                        Layout.preferredWidth: 3
+                        Layout.fillHeight: true
+                        radius: 2
+                        color: root.noteColor(noteColor)
+                    }
+
+                    // TODO checkbox
+                    Rectangle {
+                        visible: isTodo
+                        Layout.preferredWidth: 22
+                        Layout.preferredHeight: 22
+                        radius: 11
+                        color: "transparent"
+                        border.color: done ? Colors.green : Colors.overlay1
+                        border.width: 2
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰄬"
+                            color: Colors.green
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            visible: done
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.toggleDone(index)
+                        }
+
+                        Behavior on border.color { ColorAnimation { duration: Tokens.animFast } }
+                    }
+
+                    // 预览
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Text {
+                            text: (parent.parent.parent.text || "空便签").split("\n")[0]
+                            color: done ? Colors.overlay0 : Colors.text
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            font.strikeout: done
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                            maximumLineCount: 1
+                            opacity: done ? 0.6 : 1
+
+                            Behavior on opacity { NumberAnimation { duration: Tokens.animFast } }
+                        }
+
+                        Text {
+                            text: created
+                            color: Colors.overlay0
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.xs
+                        }
+                    }
+
+                    // 删除
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: Tokens.radiusFull
+                        color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰅖"
+                            color: delArea.containsMouse ? Colors.red : Colors.overlay0
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.icon
+                            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        }
+
+                        MouseArea {
+                            id: delArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.deleteNote(index)
+                        }
 
                         Behavior on color { ColorAnimation { duration: Tokens.animFast } }
                     }
-
-                    MouseArea {
-                        id: addArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.addNote()
-                    }
-
-                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
                 }
-            }
 
-            // ── 搜索框 ──
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Tokens.radiusMS
-                color: Colors.surface1
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
+                // ── 编辑模式 ──
+                ColumnLayout {
+                    id: editCol
+                    visible: isEditing
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
                     spacing: Tokens.spaceS
 
-                    Text {
-                        text: ""
-                        color: Colors.overlay1
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.icon
-                    }
+                    // 类型切换 + 颜色选择
+                    Row {
+                        spacing: 6
 
-                    TextInput {
-                        id: searchInput
-                        Layout.fillWidth: true
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.bodyLarge
-                        clip: true
-                        selectByMouse: true
-                        onTextChanged: {
-                            root.searchQuery = text;
-                            root.applyFilter();
-                        }
-                        Keys.onEscapePressed: PanelState.notesOpen = false
-
-                        Text {
-                            anchors.fill: parent
-                            text: "搜索便签..."
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Colors.surface1
-            }
-
-            // ── 空状态 ──
-            Text {
-                visible: filteredModel.count === 0
-                text: noteModel.count === 0 ? "还没有便签" : "未找到匹配项"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.bodyLarge
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 20
-                Layout.bottomMargin: 20
-            }
-
-            // ── 便签列表 ──
-            ListView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                model: filteredModel
-                spacing: Tokens.spaceS
-                clip: true
-
-                delegate: Rectangle {
-                    required property int index
-                    required property int noteId
-                    required property string text
-                    required property string noteColor
-                    required property string created
-
-                    property bool isEditing: root.editingIndex === index
-
-                    width: ListView.view.width
-                    height: isEditing ? editCol.implicitHeight + 16 : 52
-                    radius: Tokens.radiusMS
-                    color: itemHover.containsMouse || isEditing ? Colors.surface1 : Colors.surface0
-                    border.color: Qt.rgba(root.noteColor(noteColor).r, root.noteColor(noteColor).g, root.noteColor(noteColor).b, 0.3)
-                    border.width: 1
-
-                    Behavior on height {
-                        NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
-                    }
-
-                    MouseArea {
-                        id: itemHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (!isEditing)
-                                root.editingIndex = index;
-                        }
-                    }
-
-                    // ── 列表模式 ──
-                    RowLayout {
-                        visible: !isEditing
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: Tokens.spaceS
-
-                        // 颜色指示条
+                        // 便签/待办切换
                         Rectangle {
-                            Layout.preferredWidth: 3
-                            Layout.fillHeight: true
-                            radius: 2
-                            color: root.noteColor(noteColor)
-                        }
-
-                        // 预览
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
+                            width: typeLabel.implicitWidth + 14
+                            height: 22
+                            radius: Tokens.radiusFull
+                            color: isTodo
+                                ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.2)
+                                : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2)
 
                             Text {
-                                text: (parent.parent.parent.text || "空便签").split("\n")[0]
-                                color: Colors.text
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                maximumLineCount: 1
-                            }
-
-                            Text {
-                                text: created
-                                color: Colors.overlay0
+                                id: typeLabel
+                                anchors.centerIn: parent
+                                text: isTodo ? "待办" : "便签"
+                                color: isTodo ? Colors.green : Colors.blue
                                 font.family: Fonts.family
                                 font.pixelSize: Fonts.xs
-                            }
-                        }
-
-                        // 删除
-                        Rectangle {
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
-                            radius: Tokens.radiusFull
-                            color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "󰅖"
-                                color: delArea.containsMouse ? Colors.red : Colors.overlay0
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.icon
-
-                                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                                font.weight: Font.Bold
                             }
 
                             MouseArea {
-                                id: delArea
                                 anchors.fill: parent
-                                hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.deleteNote(index)
+                                onClicked: root.toggleTodo(index)
+                            }
+                        }
+
+                        // done checkbox（仅 todo）
+                        Rectangle {
+                            visible: isTodo
+                            width: doneLabel.implicitWidth + 14
+                            height: 22
+                            radius: Tokens.radiusFull
+                            color: done
+                                ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15)
+                                : Qt.rgba(1, 1, 1, 0.06)
+
+                            Text {
+                                id: doneLabel
+                                anchors.centerIn: parent
+                                text: done ? "󰄬 已完成" : "未完成"
+                                color: done ? Colors.green : Colors.overlay1
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.xs
                             }
 
-                            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.toggleDone(index)
+                            }
                         }
-                    }
 
-                    // ── 编辑模式 ──
-                    ColumnLayout {
-                        id: editCol
-                        visible: isEditing
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 10
-                        spacing: Tokens.spaceS
+                        Item { width: 8; height: 1 }
 
                         // 颜色选择
-                        Row {
-                            spacing: 6
+                        Repeater {
+                            model: root.colorOptions
 
-                            Repeater {
-                                model: root.colorOptions
+                            delegate: Rectangle {
+                                required property var modelData
 
-                                delegate: Rectangle {
-                                    required property var modelData
-
-                                    width: 18
-                                    height: 18
-                                    radius: 9
-                                    color: modelData.color
-                                    border.color: noteColor === modelData.name ? Colors.text : "transparent"
-                                    border.width: 2
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.updateNoteColor(index, modelData.name)
-                                    }
-                                }
-                            }
-
-                            Item { width: 20; height: 1 }
-
-                            // 关闭编辑
-                            Text {
-                                text: "󰅁 返回"
-                                color: Colors.subtext0
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.small
+                                width: 18
+                                height: 18
+                                radius: 9
+                                color: modelData.color
+                                border.color: noteColor === modelData.name ? Colors.text : "transparent"
+                                border.width: 2
 
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.editingIndex = -1
+                                    onClicked: root.updateNoteColor(index, modelData.name)
                                 }
                             }
                         }
 
-                        // 文本编辑
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: Math.max(120, editArea.implicitHeight + 16)
-                            radius: Tokens.radiusS
-                            color: Colors.surface0
+                        Item { width: 12; height: 1 }
 
-                            TextEdit {
-                                id: editArea
+                        Text {
+                            text: "󰅁 返回"
+                            color: Colors.subtext0
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.small
+
+                            MouseArea {
                                 anchors.fill: parent
-                                anchors.margins: 8
-                                color: Colors.text
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                wrapMode: TextEdit.WordWrap
-                                selectByMouse: true
-                                text: parent.parent.parent.text
-                                onTextChanged: {
-                                    if (isEditing)
-                                        root.updateNoteText(index, editArea.text);
-                                }
-
-                                Component.onCompleted: {
-                                    if (isEditing) forceActiveFocus();
-                                }
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.editingIndex = -1
                             }
                         }
                     }
 
-                    Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
+                    // 文本编辑
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.max(120, editArea.implicitHeight + 16)
+                        radius: Tokens.radiusS
+                        color: Colors.surface0
+
+                        TextEdit {
+                            id: editArea
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            color: Colors.text
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            wrapMode: TextEdit.WordWrap
+                            selectByMouse: true
+                            text: parent.parent.parent.text
+                            onTextChanged: {
+                                if (isEditing)
+                                    root.updateNoteText(index, editArea.text);
+                            }
+
+                            Component.onCompleted: {
+                                if (isEditing) forceActiveFocus();
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        InnerGlow {}
-
-        Behavior on anchors.verticalCenterOffset {
-            NumberAnimation {
-                id: _slideAnim
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
-            }
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+                Behavior on color {
+                    ColorAnimation { duration: Tokens.animFast }
+                }
             }
         }
     }

@@ -15,8 +15,11 @@ BarModule {
     accentColor: Colors.sky
     implicitWidth: label.implicitWidth + 32
     Component.onCompleted: reader.running = true
-    onClicked: {
+    onClicked: mouse => {
         PanelState.closeAll();
+        let pos = root.mapToItem(null, mouse.x, mouse.y);
+        PanelState.morphSourceX = pos.x + 2;
+        PanelState.morphSourceY = pos.y + 6;
         PanelState.toggleNetwork();
     }
 

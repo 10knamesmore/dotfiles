@@ -1,3 +1,4 @@
+import "../components"
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
@@ -6,11 +7,9 @@ import Quickshell.Io
 import Quickshell.Wayland
 
 // WiFi 网络面板 — 右上角弹出，扫描/连接/断开/编辑
-PanelWindow {
+PanelOverlay {
     id: root
 
-    property bool showing: PanelState.networkOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
     // ── 状态 ──
     property string searchQuery: ""
     property bool wifiEnabled: true
@@ -182,14 +181,13 @@ PanelWindow {
         return Colors.red;
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
+    showing: PanelState.networkOpen
+    panelWidth: 400
+    panelHeight: root.height * 0.7
+    panelTargetX: root.width - 410
+    panelTargetY: 54
+    closedOffsetY: -20
+    onCloseRequested: PanelState.networkOpen = false
     onShowingChanged: {
         if (showing) {
             searchQuery = "";
@@ -489,529 +487,496 @@ PanelWindow {
         }
     }
 
-    // ── UI ──
-    Rectangle {
-        anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
+    // ════════════════════════════════════════
+    // 列表视图（editingSsid === "" 时显示）
+    // ════════════════════════════════════════
+    ColumnLayout {
+        id: listView
 
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+        anchors.fill: parent
+        anchors.margins: Tokens.spaceL
+        spacing: Tokens.spaceS
+        visible: root.editingSsid === ""
+
+        // ── 标题栏 ──
+        RowLayout {
+            Layout.fillWidth: true
+
+            Text {
+                text: root.wifiEnabled ? "󰤨" : "󰤭"
+                color: root.wifiEnabled ? Colors.blue : Colors.overlay1
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
             }
 
-        }
-
-    }
-
-    Item {
-        focus: root.showing
-        Keys.onEscapePressed: PanelState.networkOpen = false
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        onClicked: PanelState.networkOpen = false
-    }
-
-    Rectangle {
-        id: panel
-
-        width: 380
-        height: root.height * 0.6
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: root.showing ? 54 : 34
-        anchors.rightMargin: 10
-        clip: true
-        opacity: root.showing ? 1 : 0
-
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: (mouse) => {
-                return mouse.accepted = true;
+            Text {
+                text: "WiFi"
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
+                font.bold: true
+                color: Colors.text
             }
-        }
 
-        // ════════════════════════════════════════
-        // 列表视图（editingSsid === "" 时显示）
-        // ════════════════════════════════════════
-        ColumnLayout {
-            id: listView
-
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            spacing: Tokens.spaceS
-            visible: root.editingSsid === ""
-
-            // ── 标题栏 ──
-            RowLayout {
+            Item {
                 Layout.fillWidth: true
-
-                Text {
-                    text: root.wifiEnabled ? "󰤨" : "󰤭"
-                    color: root.wifiEnabled ? Colors.blue : Colors.overlay1
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.title
-                }
-
-                Text {
-                    text: "WiFi"
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.title
-                    font.bold: true
-                    color: Colors.text
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                // 刷新
-                Rectangle {
-                    width: 28
-                    height: 28
-                    radius: Tokens.radiusFull
-                    color: refreshArea.containsMouse ? Colors.surface2 : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰑓"
-                        color: refreshArea.containsMouse ? Colors.blue : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.icon
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-
-                        }
-
-                    }
-
-                    MouseArea {
-                        id: refreshArea
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.scanNetworks()
-                    }
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 150
-                        }
-
-                    }
-
-                }
-
-                // WiFi 开关
-                Rectangle {
-                    width: wifiToggleText.implicitWidth + 16
-                    height: 26
-                    radius: Tokens.radiusFull
-                    color: root.wifiEnabled ? (wifiToggleArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)) : (wifiToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
-
-                    Text {
-                        id: wifiToggleText
-
-                        anchors.centerIn: parent
-                        text: root.wifiEnabled ? "开启" : "关闭"
-                        color: root.wifiEnabled ? Colors.blue : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 150
-                            }
-
-                        }
-
-                    }
-
-                    MouseArea {
-                        id: wifiToggleArea
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.toggleWifi()
-                    }
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 150
-                        }
-
-                    }
-
-                }
-
             }
 
-            // ── 搜索框 ──
+            // 刷新
             Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Tokens.radiusMS
-                color: Colors.surface1
-                visible: root.wifiEnabled
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
+                color: refreshArea.containsMouse ? Colors.surface2 : "transparent"
 
-                RowLayout {
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰑓"
+                    color: refreshArea.containsMouse ? Colors.blue : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.icon
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+
+                    }
+
+                }
+
+                MouseArea {
+                    id: refreshArea
+
                     anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: Tokens.spaceS
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.scanNetworks()
+                }
 
-                    Text {
-                        text: ""
-                        color: Colors.overlay1
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.icon
-                    }
-
-                    TextInput {
-                        id: searchInput
-
-                        Layout.fillWidth: true
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.bodyLarge
-                        clip: true
-                        selectByMouse: true
-                        onTextChanged: {
-                            root.searchQuery = text;
-                            root.applyFilter();
-                        }
-                        Keys.onEscapePressed: PanelState.networkOpen = false
-
-                        Text {
-                            anchors.fill: parent
-                            text: "搜索网络..."
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                        }
-
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
                     }
 
                 }
 
             }
 
+            // WiFi 开关
             Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Colors.surface1
+                width: wifiToggleText.implicitWidth + 16
+                height: 26
+                radius: Tokens.radiusFull
+                color: root.wifiEnabled ? (wifiToggleArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)) : (wifiToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
+
+                Text {
+                    id: wifiToggleText
+
+                    anchors.centerIn: parent
+                    text: root.wifiEnabled ? "开启" : "关闭"
+                    color: root.wifiEnabled ? Colors.blue : Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+
+                    }
+
+                }
+
+                MouseArea {
+                    id: wifiToggleArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.toggleWifi()
+                }
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+
+                }
+
             }
 
-            // ── WiFi 关闭提示 ──
-            ColumnLayout {
-                visible: !root.wifiEnabled
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+        }
+
+        // ── 搜索框 ──
+        Rectangle {
+            Layout.fillWidth: true
+            height: 36
+            radius: Tokens.radiusMS
+            color: Colors.surface1
+            visible: root.wifiEnabled
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
                 spacing: Tokens.spaceS
 
-                Item {
-                    Layout.fillHeight: true
-                }
-
                 Text {
-                    text: "󰤭"
-                    color: Colors.overlay0
+                    text: ""
+                    color: Colors.overlay1
                     font.family: Fonts.family
-                    font.pixelSize: Fonts.display2
-                    Layout.alignment: Qt.AlignHCenter
+                    font.pixelSize: Fonts.icon
                 }
 
-                Text {
-                    text: "WiFi 已关闭"
-                    color: Colors.overlay0
+                TextInput {
+                    id: searchInput
+
+                    Layout.fillWidth: true
+                    color: Colors.text
                     font.family: Fonts.family
                     font.pixelSize: Fonts.bodyLarge
-                    Layout.alignment: Qt.AlignHCenter
-                }
+                    clip: true
+                    selectByMouse: true
+                    onTextChanged: {
+                        root.searchQuery = text;
+                        root.applyFilter();
+                    }
+                    Keys.onEscapePressed: PanelState.networkOpen = false
 
-                Item {
-                    Layout.fillHeight: true
+                    Text {
+                        anchors.fill: parent
+                        text: "搜索网络..."
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+
                 }
 
             }
 
-            // ── 空状态 ──
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // ── WiFi 关闭提示 ──
+        ColumnLayout {
+            visible: !root.wifiEnabled
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: Tokens.spaceS
+
+            Item {
+                Layout.fillHeight: true
+            }
+
             Text {
-                visible: root.wifiEnabled && filteredModel.count === 0
-                text: networkModel.count === 0 ? "正在扫描..." : "未找到匹配网络"
+                text: "󰤭"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.display2
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                text: "WiFi 已关闭"
                 color: Colors.overlay0
                 font.family: Fonts.family
                 font.pixelSize: Fonts.bodyLarge
                 Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 20
-                Layout.bottomMargin: 20
             }
 
-            // ── 网络列表 ──
-            ListView {
-                Layout.fillWidth: true
+            Item {
                 Layout.fillHeight: true
-                model: filteredModel
-                spacing: Tokens.spaceXS
-                clip: true
-                visible: root.wifiEnabled
-
-                delegate: Rectangle {
-                    id: netDelegate
-
-                    required property int index
-                    required property string ssid
-                    required property int signal
-                    required property string security
-                    required property bool inUse
-                    required property bool saved
-
-                    width: ListView.view.width
-                    height: netRow.implicitHeight + 12
-                    radius: Tokens.radiusMS
-                    color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, netHover.containsMouse ? 0.2 : 0.1) : (netHover.containsMouse ? Colors.surface1 : "transparent")
-                    border.color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, Tokens.borderHoverAlpha) : "transparent"
-                    border.width: inUse ? 1 : 0
-
-                    MouseArea {
-                        id: netHover
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton) {
-                                // 右键：仅已保存网络可编辑
-                                if (saved || inUse)
-                                    root.openEditView(ssid);
-
-                            } else {
-                                if (inUse) {
-                                    root.disconnectNetwork();
-                                } else if (saved || !security) {
-                                    root.connectToNetwork(ssid, "");
-                                } else {
-                                    root.selectedSsid = ssid;
-                                    root.errorMsg = "";
-                                    passwordInput.text = "";
-                                    passwordInput.forceActiveFocus();
-                                }
-                            }
-                        }
-                    }
-
-                    RowLayout {
-                        id: netRow
-
-                        spacing: Tokens.spaceS
-
-                        anchors {
-                            left: parent.left
-                            right: parent.right
-                            verticalCenter: parent.verticalCenter
-                            leftMargin: 10
-                            rightMargin: 10
-                        }
-
-                        Text {
-                            text: root.signalIcon(signal)
-                            color: root.signalColor(signal)
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.heading
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 1
-
-                            Text {
-                                text: ssid
-                                color: Colors.text
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-
-                            RowLayout {
-                                spacing: 6
-
-                                Text {
-                                    visible: inUse
-                                    text: "已连接"
-                                    color: Colors.green
-                                    font.family: Fonts.family
-                                    font.pixelSize: Fonts.caption
-                                }
-
-                                Text {
-                                    visible: saved && !inUse
-                                    text: "已保存"
-                                    color: Colors.subtext0
-                                    font.family: Fonts.family
-                                    font.pixelSize: Fonts.caption
-                                }
-
-                                Text {
-                                    visible: !!security
-                                    text: "󰌾 " + security
-                                    color: Colors.overlay1
-                                    font.family: Fonts.family
-                                    font.pixelSize: Fonts.caption
-                                }
-
-                            }
-
-                        }
-
-                        Text {
-                            text: signal + "%"
-                            color: root.signalColor(signal)
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.small
-                            font.weight: Font.DemiBold
-                        }
-
-                    }
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: 150
-                        }
-
-                    }
-
-                }
-
             }
 
-            // ── 错误提示 ──
-            Text {
-                visible: root.errorMsg !== ""
-                text: "⚠ " + root.errorMsg
-                color: Colors.red
-                font.family: Fonts.family
-                font.pixelSize: Fonts.small
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-            }
+        }
 
-            // ── 密码输入区 ──
-            Rectangle {
-                Layout.fillWidth: true
-                visible: root.selectedSsid !== ""
-                height: passwordCol.implicitHeight + 16
+        // ── 空状态 ──
+        Text {
+            visible: root.wifiEnabled && filteredModel.count === 0
+            text: networkModel.count === 0 ? "正在扫描..." : "未找到匹配网络"
+            color: Colors.overlay0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 20
+            Layout.bottomMargin: 20
+        }
+
+        // ── 网络列表 ──
+        ListView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            model: filteredModel
+            spacing: Tokens.spaceXS
+            clip: true
+            visible: root.wifiEnabled
+
+            delegate: Rectangle {
+                id: netDelegate
+
+                required property int index
+                required property string ssid
+                required property int signal
+                required property string security
+                required property bool inUse
+                required property bool saved
+
+                width: ListView.view.width
+                height: netRow.implicitHeight + 12
                 radius: Tokens.radiusMS
-                color: Colors.surface1
+                color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, netHover.containsMouse ? 0.2 : 0.1) : (netHover.containsMouse ? Colors.surface1 : "transparent")
+                border.color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, Tokens.borderHoverAlpha) : "transparent"
+                border.width: inUse ? 1 : 0
 
-                ColumnLayout {
-                    id: passwordCol
+                MouseArea {
+                    id: netHover
 
                     anchors.fill: parent
-                    anchors.margins: Tokens.spaceS
-                    spacing: 6
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: (mouse) => {
+                        if (mouse.button === Qt.RightButton) {
+                            // 右键：仅已保存网络可编辑
+                            if (saved || inUse)
+                                root.openEditView(ssid);
+
+                        } else {
+                            if (inUse) {
+                                root.disconnectNetwork();
+                            } else if (saved || !security) {
+                                root.connectToNetwork(ssid, "");
+                            } else {
+                                root.selectedSsid = ssid;
+                                root.errorMsg = "";
+                                passwordInput.text = "";
+                                passwordInput.forceActiveFocus();
+                            }
+                        }
+                    }
+                }
+
+                RowLayout {
+                    id: netRow
+
+                    spacing: Tokens.spaceS
+
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 10
+                        rightMargin: 10
+                    }
 
                     Text {
-                        text: "连接到 " + root.selectedSsid
-                        color: Colors.text
+                        text: root.signalIcon(signal)
+                        color: root.signalColor(signal)
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.heading
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Text {
+                            text: ssid
+                            color: Colors.text
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        RowLayout {
+                            spacing: 6
+
+                            Text {
+                                visible: inUse
+                                text: "已连接"
+                                color: Colors.green
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+
+                            Text {
+                                visible: saved && !inUse
+                                text: "已保存"
+                                color: Colors.subtext0
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+
+                            Text {
+                                visible: !!security
+                                text: "󰌾 " + security
+                                color: Colors.overlay1
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+
+                        }
+
+                    }
+
+                    Text {
+                        text: signal + "%"
+                        color: root.signalColor(signal)
                         font.family: Fonts.family
                         font.pixelSize: Fonts.small
                         font.weight: Font.DemiBold
                     }
 
-                    RowLayout {
+                }
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+
+                }
+
+            }
+
+        }
+
+        // ── 错误提示 ──
+        Text {
+            visible: root.errorMsg !== ""
+            text: "⚠ " + root.errorMsg
+            color: Colors.red
+            font.family: Fonts.family
+            font.pixelSize: Fonts.small
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        // ── 密码输入区 ──
+        Rectangle {
+            Layout.fillWidth: true
+            visible: root.selectedSsid !== ""
+            height: passwordCol.implicitHeight + 16
+            radius: Tokens.radiusMS
+            color: Colors.surface1
+
+            ColumnLayout {
+                id: passwordCol
+
+                anchors.fill: parent
+                anchors.margins: Tokens.spaceS
+                spacing: 6
+
+                Text {
+                    text: "连接到 " + root.selectedSsid
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+                    font.weight: Font.DemiBold
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Tokens.spaceS
+
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: Tokens.spaceS
+                        height: 32
+                        radius: Tokens.radiusS
+                        color: Colors.surface0
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 32
-                            radius: Tokens.radiusS
-                            color: Colors.surface0
+                        TextInput {
+                            id: passwordInput
 
-                            TextInput {
-                                id: passwordInput
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: Colors.text
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            clip: true
+                            echoMode: TextInput.Password
+                            selectByMouse: true
+                            onAccepted: {
+                                if (text.length > 0)
+                                    root.connectToNetwork(root.selectedSsid, text);
 
+                            }
+                            Keys.onEscapePressed: root.selectedSsid = ""
+
+                            Text {
                                 anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                verticalAlignment: TextInput.AlignVCenter
-                                color: Colors.text
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                clip: true
-                                echoMode: TextInput.Password
-                                selectByMouse: true
-                                onAccepted: {
-                                    if (text.length > 0)
-                                        root.connectToNetwork(root.selectedSsid, text);
-
-                                }
-                                Keys.onEscapePressed: root.selectedSsid = ""
-
-                                Text {
-                                    anchors.fill: parent
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: "输入密码..."
-                                    color: Colors.overlay0
-                                    font: parent.font
-                                    visible: !parent.text && !parent.activeFocus
-                                }
-
+                                verticalAlignment: Text.AlignVCenter
+                                text: "输入密码..."
+                                color: Colors.overlay0
+                                font: parent.font
+                                visible: !parent.text && !parent.activeFocus
                             }
 
                         }
 
-                        Rectangle {
-                            width: connectBtnText.implicitWidth + 20
-                            height: 32
-                            radius: Tokens.radiusS
-                            color: connectBtnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                    }
 
-                            Text {
-                                id: connectBtnText
+                    Rectangle {
+                        width: connectBtnText.implicitWidth + 20
+                        height: 32
+                        radius: Tokens.radiusS
+                        color: connectBtnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
 
-                                anchors.centerIn: parent
-                                text: root.connecting ? "连接中..." : "连接"
-                                color: Colors.blue
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.body
-                                font.weight: Font.DemiBold
+                        Text {
+                            id: connectBtnText
+
+                            anchors.centerIn: parent
+                            text: root.connecting ? "连接中..." : "连接"
+                            color: Colors.blue
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.body
+                            font.weight: Font.DemiBold
+                        }
+
+                        MouseArea {
+                            id: connectBtnArea
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            enabled: !root.connecting
+                            onClicked: {
+                                if (passwordInput.text.length > 0)
+                                    root.connectToNetwork(root.selectedSsid, passwordInput.text);
+
+                            }
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
                             }
 
-                            MouseArea {
-                                id: connectBtnArea
+                        }
 
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                enabled: !root.connecting
-                                onClicked: {
-                                    if (passwordInput.text.length > 0)
-                                        root.connectToNetwork(root.selectedSsid, passwordInput.text);
+                    }
 
-                                }
-                            }
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: Tokens.radiusS
+                        color: cancelArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰅖"
+                            color: cancelArea.containsMouse ? Colors.red : Colors.overlay0
+                            font.family: Fonts.family
+                            font.pixelSize: Fonts.icon
 
                             Behavior on color {
                                 ColorAnimation {
@@ -1022,42 +987,18 @@ PanelWindow {
 
                         }
 
-                        Rectangle {
-                            width: 32
-                            height: 32
-                            radius: Tokens.radiusS
-                            color: cancelArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                        MouseArea {
+                            id: cancelArea
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: "󰅖"
-                                color: cancelArea.containsMouse ? Colors.red : Colors.overlay0
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.icon
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.selectedSsid = ""
+                        }
 
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-
-                                }
-
-                            }
-
-                            MouseArea {
-                                id: cancelArea
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.selectedSsid = ""
-                            }
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
                             }
 
                         }
@@ -1070,38 +1011,14 @@ PanelWindow {
 
         }
 
-        // ── 编辑视图 ──
-        NetworkEditView {
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            visible: root.editingSsid !== ""
-            panel: root
-        }
+    }
 
-        InnerGlow {}
-
-        Behavior on anchors.topMargin {
-            NumberAnimation {
-                id: _slideAnim
-
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
-            }
-
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
-
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
-            }
-
-        }
-
+    // ── 编辑视图 ──
+    NetworkEditView {
+        anchors.fill: parent
+        anchors.margins: Tokens.spaceL
+        visible: root.editingSsid !== ""
+        panel: root
     }
 
 }

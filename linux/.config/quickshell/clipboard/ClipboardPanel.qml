@@ -1,3 +1,4 @@
+import "../components"
 import "../theme"
 import QtQuick
 import QtQuick.Layouts
@@ -6,11 +7,9 @@ import Quickshell.Io
 import Quickshell.Wayland
 
 // 剪贴板历史面板 — 右上角弹出
-PanelWindow {
+PanelOverlay {
     id: root
 
-    property bool showing: PanelState.clipboardOpen
-    property bool animating: _opacityAnim.running || _slideAnim.running
     property string searchQuery: ""
 
     function loadClipboard() {
@@ -54,14 +53,13 @@ PanelWindow {
         }
     }
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    visible: showing || animating
-    focusable: root.showing
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
+    showing: PanelState.clipboardOpen
+    panelWidth: 400
+    panelHeight: root.height * 0.6
+    panelTargetX: root.width - 410
+    panelTargetY: 54
+    closedOffsetY: -20
+    onCloseRequested: PanelState.clipboardOpen = false
     onShowingChanged: {
         if (showing) {
             searchQuery = "";
@@ -131,126 +129,52 @@ PanelWindow {
     }
 
     // ── UI ──
-    Rectangle {
-        anchors.fill: parent
-        color: "#000000"
-        opacity: root.showing ? Tokens.backdropDim : 0
+    ColumnLayout {
+        id: col
 
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+        anchors.fill: parent
+        anchors.margins: Tokens.spaceL
+        spacing: Tokens.spaceS
+
+        // 标题栏
+        RowLayout {
+            Layout.fillWidth: true
+
+            Text {
+                text: "󰅍 剪贴板"
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
+                font.bold: true
+                color: Colors.text
             }
 
-        }
-
-    }
-
-    Item {
-        focus: root.showing
-        Keys.onEscapePressed: PanelState.clipboardOpen = false
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        onClicked: PanelState.clipboardOpen = false
-    }
-
-    Rectangle {
-        id: panel
-
-        width: 400
-        height: root.height * 0.6
-        radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
-        border.width: 1
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: root.showing ? 54 : 34
-        anchors.rightMargin: 10
-        clip: true
-        opacity: root.showing ? 1 : 0
-
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: (mouse) => {
-                return mouse.accepted = true;
-            }
-        }
-
-        ColumnLayout {
-            id: col
-
-            anchors.fill: parent
-            anchors.margins: Tokens.spaceL
-            spacing: Tokens.spaceS
-
-            // 标题栏
-            RowLayout {
+            Item {
                 Layout.fillWidth: true
+            }
+
+            Text {
+                visible: filteredModel.count > 0
+                text: filteredModel.count + " 条"
+                color: Colors.subtext0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+            }
+
+            Rectangle {
+                visible: clipModel.count > 0
+                width: clearText.implicitWidth + 16
+                height: 26
+                radius: Tokens.radiusFull
+                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
 
                 Text {
-                    text: "󰅍 剪贴板"
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.title
-                    font.bold: true
-                    color: Colors.text
-                }
+                    id: clearText
 
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                Text {
-                    visible: filteredModel.count > 0
-                    text: filteredModel.count + " 条"
-                    color: Colors.subtext0
+                    anchors.centerIn: parent
+                    text: "清空"
+                    color: clearArea.containsMouse ? Colors.red : Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small
-                }
-
-                Rectangle {
-                    visible: clipModel.count > 0
-                    width: clearText.implicitWidth + 16
-                    height: 26
-                    radius: Tokens.radiusFull
-                    color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
-
-                    Text {
-                        id: clearText
-
-                        anchors.centerIn: parent
-                        text: "清空"
-                        color: clearArea.containsMouse ? Colors.red : Colors.subtext0
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.small
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: Tokens.animFast
-                                easing.type: Easing.BezierSpline
-                                easing.bezierCurve: Anim.standard
-                            }
-
-                        }
-
-                    }
-
-                    MouseArea {
-                        id: clearArea
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: wipeProc.running = true
-                    }
 
                     Behavior on color {
                         ColorAnimation {
@@ -263,152 +187,152 @@ PanelWindow {
 
                 }
 
-            }
+                MouseArea {
+                    id: clearArea
 
-            // 搜索框
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Tokens.radiusMS
-                color: Colors.surface1
-
-                RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: Tokens.spaceS
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: wipeProc.running = true
+                }
 
-                    Text {
-                        text: ""
-                        color: Colors.overlay1
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.icon
-                    }
-
-                    TextInput {
-                        id: searchInput
-
-                        Layout.fillWidth: true
-                        color: Colors.text
-                        font.family: Fonts.family
-                        font.pixelSize: Fonts.bodyLarge
-                        clip: true
-                        selectByMouse: true
-                        onTextChanged: {
-                            root.searchQuery = text;
-                            root.applyFilter();
-                        }
-                        Keys.onEscapePressed: PanelState.clipboardOpen = false
-
-                        Text {
-                            anchors.fill: parent
-                            text: "搜索..."
-                            color: Colors.overlay0
-                            font: parent.font
-                            visible: !parent.text && !parent.activeFocus
-                        }
-
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Anim.standard
                     }
 
                 }
 
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Colors.surface1
-            }
+        }
 
-            // 空状态
-            Text {
-                visible: filteredModel.count === 0
-                text: clipModel.count === 0 ? "剪贴板为空" : "未找到匹配项"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.bodyLarge
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 20
-                Layout.bottomMargin: 20
-            }
+        // 搜索框
+        Rectangle {
+            Layout.fillWidth: true
+            height: 36
+            radius: Tokens.radiusMS
+            color: Colors.surface1
 
-            // 列表
-            ListView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                model: filteredModel
-                spacing: Tokens.spaceXS
-                clip: true
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: Tokens.spaceS
 
-                delegate: Rectangle {
-                    required property int index
-                    required property string clipId
-                    required property string preview
+                Text {
+                    text: ""
+                    color: Colors.overlay1
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.icon
+                }
 
-                    width: ListView.view.width
-                    height: 40
-                    radius: Tokens.radiusS
-                    color: itemHover.containsMouse ? Colors.surface1 : "transparent"
+                TextInput {
+                    id: searchInput
 
-                    MouseArea {
-                        id: itemHover
+                    Layout.fillWidth: true
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.bodyLarge
+                    clip: true
+                    selectByMouse: true
+                    onTextChanged: {
+                        root.searchQuery = text;
+                        root.applyFilter();
+                    }
+                    Keys.onEscapePressed: PanelState.clipboardOpen = false
 
+                    Text {
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton
-                        onClicked: root.selectItem(clipId)
+                        text: "搜索..."
+                        color: Colors.overlay0
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
                     }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 6
-                        spacing: Tokens.spaceS
+                }
+
+            }
+
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Colors.surface1
+        }
+
+        // 空状态
+        Text {
+            visible: filteredModel.count === 0
+            text: clipModel.count === 0 ? "剪贴板为空" : "未找到匹配项"
+            color: Colors.overlay0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 20
+            Layout.bottomMargin: 20
+        }
+
+        // 列表
+        ListView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            model: filteredModel
+            spacing: Tokens.spaceXS
+            clip: true
+
+            delegate: Rectangle {
+                required property int index
+                required property string clipId
+                required property string preview
+
+                width: ListView.view.width
+                height: 40
+                radius: Tokens.radiusS
+                color: itemHover.containsMouse ? Colors.surface1 : "transparent"
+
+                MouseArea {
+                    id: itemHover
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton
+                    onClicked: root.selectItem(clipId)
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 6
+                    spacing: Tokens.spaceS
+
+                    Text {
+                        text: preview
+                        color: Colors.text
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.body
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                        maximumLineCount: 1
+                    }
+
+                    // 删除按钮
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: Tokens.radiusFull
+                        color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
 
                         Text {
-                            text: preview
-                            color: Colors.text
+                            anchors.centerIn: parent
+                            text: "󰅖"
+                            color: delArea.containsMouse ? Colors.red : Colors.overlay0
                             font.family: Fonts.family
-                            font.pixelSize: Fonts.body
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                            maximumLineCount: 1
-                        }
-
-                        // 删除按钮
-                        Rectangle {
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
-                            radius: Tokens.radiusFull
-                            color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "󰅖"
-                                color: delArea.containsMouse ? Colors.red : Colors.overlay0
-                                font.family: Fonts.family
-                                font.pixelSize: Fonts.icon
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: Tokens.animFast
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: Anim.standard
-                                    }
-
-                                }
-
-                            }
-
-                            MouseArea {
-                                id: delArea
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.deleteItem(clipId)
-                            }
+                            font.pixelSize: Fonts.icon
 
                             Behavior on color {
                                 ColorAnimation {
@@ -421,41 +345,35 @@ PanelWindow {
 
                         }
 
-                    }
+                        MouseArea {
+                            id: delArea
 
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: Tokens.animFast
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.deleteItem(clipId)
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Tokens.animFast
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: Anim.standard
+                            }
+
                         }
 
                     }
 
                 }
 
-            }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
 
-        }
+                }
 
-        InnerGlow {}
-
-        Behavior on anchors.topMargin {
-            NumberAnimation {
-                id: _slideAnim
-
-                duration: Tokens.animSlow
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.decelerate
-            }
-
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                id: _opacityAnim
-
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
             }
 
         }
