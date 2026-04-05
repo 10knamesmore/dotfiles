@@ -4,16 +4,19 @@
 import "./bar"
 import "./calendar"
 import "./clipboard"
+import "./journal"
 import "./keybindings"
 import "./launcher"
 import "./media"
 import "./network"
+import "./notes"
 import "./notifications"
 import "./osd"
 import "./power"
 import "./screen-effects"
 import "./settings"
 import "./theme"
+import "./widgets"
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland._GlobalShortcuts
@@ -131,6 +134,26 @@ ShellRoot {
         onPressed: {
             PanelState.closeAll();
             PanelState.toggleKeybindings();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "notes"
+        description: "Toggle notes panel"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleNotes();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "journal"
+        description: "Toggle journal log panel"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleJournal();
         }
     }
 
@@ -261,4 +284,28 @@ ShellRoot {
     KeybindingsPanel {}
 
     NetworkPanel {}
+
+    // ── 新增面板 ──
+    JournalPanel {}
+
+    NotesPanel {}
+
+    // ── 桌面浮动组件（每屏一个）──
+    Variants {
+        model: Quickshell.screens
+        delegate: AnalogClock {}
+    }
+
+    Variants {
+        model: Quickshell.screens
+        delegate: PomodoroTimer {}
+    }
+
+    // ── 音频频谱（cava 单例 + 每屏渲染）──
+    CavaService {}
+
+    Variants {
+        model: Quickshell.screens
+        delegate: AudioVisualizer {}
+    }
 }
