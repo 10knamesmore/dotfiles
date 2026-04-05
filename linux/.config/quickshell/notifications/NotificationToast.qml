@@ -30,7 +30,7 @@ PanelWindow {
         function onNotification(notification) {
             // 勿扰模式或面板打开时不弹 toast
             if (PanelState.dndEnabled || PanelState.notificationOpen)
-                return ;
+                return;
 
             let timeout = notification.expireTimeout > 0 ? notification.expireTimeout : 5000;
             toastModel.append({
@@ -38,7 +38,8 @@ PanelWindow {
                 "appName": notification.appName || "",
                 "summary": notification.summary || "",
                 "body": notification.body || "",
-                "timeout": timeout
+                "timeout": timeout,
+                "dismissed": false
             });
         }
 
@@ -61,6 +62,9 @@ PanelWindow {
                 id: toast
 
                 function dismissToast() {
+                    if (model.dismissed)
+                        return;
+                    toastModel.setProperty(index, "dismissed", true);
                     toast.opacity = 0;
                     toast.x = 50;
                     toast.height = 0;
@@ -100,14 +104,12 @@ PanelWindow {
 
                     interval: 250
                     onTriggered: {
-                        // 按 notifId 查找并移除，避免索引漂移
-                        let targetId = model.notifId;
+                        // 等全部 toast 都消失后一次性清空，避免索引漂移
                         for (let i = 0; i < toastModel.count; i++) {
-                            if (toastModel.get(i).notifId === targetId) {
-                                toastModel.remove(i);
-                                break;
-                            }
+                            if (!toastModel.get(i).dismissed)
+                                return;
                         }
+                        toastModel.clear();
                     }
                 }
 
@@ -150,7 +152,6 @@ PanelWindow {
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
-
                 }
 
                 // 点击关闭 toast
@@ -165,7 +166,6 @@ PanelWindow {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.decelerate
                     }
-
                 }
 
                 Behavior on x {
@@ -174,7 +174,6 @@ PanelWindow {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.decelerate
                     }
-
                 }
 
                 Behavior on height {
@@ -183,13 +182,8 @@ PanelWindow {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.decelerate
                     }
-
                 }
-
             }
-
         }
-
     }
-
 }

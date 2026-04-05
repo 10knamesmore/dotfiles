@@ -9,62 +9,63 @@ Item {
     id: root
 
     // ── cava 参数 ──
-    property int barCount: 48        // 频谱柱数量，决定横向宽度
-    property int framerate: 60       // 刷新帧率 (fps)
-    property int sensitivity: 80     // 自动增益灵敏度（越低越不容易打满，建议 20-80）
-    property int maxRange: 100       // ascii 输出最大值，柱高按此归一化
+    // [general]
+    property int barCount: 150          // 频谱柱数量
+    property int framerate: 120          // 刷新帧率 (fps)
+    property int sensitivity: 200       // 自动增益灵敏度
+    property bool autosens: true        // 自动灵敏度调节
+    property real noiseReduction: 0   // 噪声抑制 0-1
+    property int lowerCutoff: 40        // 最低频率 Hz
+    property int upperCutoff: 10000     // 最高频率 Hz
+    // [output]
+    property int maxRange: 100          // ascii 输出最大值
+    property string channels: "mono"    // stereo/mono
+    property string monoOption: "average" // average/left/right
+    property bool reverse: false        // 反转柱子顺序
+    // [smoothing]
+    property int integral: 0            // 积分平滑度 0-100
+    property bool monstercat: false     // Monstercat 风格平滑
+    property int waves: 0              // 波浪平滑强度
+    property int gravity: 100          // 下落速度
 
-    Component.onCompleted: ensureFifo.running = true
-    Component.onDestruction: {
-        cavaProc.running = false;
-        readerProc.running = false;
-    }
+    Component.onCompleted: writeConfig.running = true
+    Component.onDestruction: cavaProc.running = false
 
-    // 确保 FIFO 存在
-    Process {
-        id: ensureFifo
-        command: ["sh", "-c", "[ -p /tmp/quickshell-cava.fifo ] || mkfifo /tmp/quickshell-cava.fifo"]
-        onExited: writeConfig.running = true
-    }
-
-    // 生成 cava 配置
+    // 生成 cava 配置（输出到 stdout）
     Process {
         id: writeConfig
-        command: ["sh", "-c",
-            "mkdir -p /tmp/quickshell-cava && cat > /tmp/quickshell-cava/config << CAVAEOF\n" +
-            "[general]\n" +
-            "bars = " + root.barCount + "\n" +
-            "framerate = " + root.framerate + "\n" +
-            "sensitivity = " + root.sensitivity + "\n" +
-            "\n" +
-            "[output]\n" +
-            "method = raw\n" +
-            "raw_target = /tmp/quickshell-cava.fifo\n" +
-            "data_format = ascii\n" +
-            "ascii_max_range = " + root.maxRange + "\n" +
-            "CAVAEOF"]
-        onExited: {
-            cavaProc.running = true;
-            startReader.start();
-        }
+        command: ["sh", "-c", "mkdir -p /tmp/quickshell-cava && cat > /tmp/quickshell-cava/config << CAVAEOF\n"
+            + "[general]\n"
+            + "bars = " + root.barCount + "\n"
+            + "framerate = " + root.framerate + "\n"
+            + "sensitivity = " + root.sensitivity + "\n"
+            + "autosens = " + (root.autosens ? 1 : 0) + "\n"
+            + "noise_reduction = " + root.noiseReduction + "\n"
+            + "lower_cutoff_freq = " + root.lowerCutoff + "\n"
+            + "upper_cutoff_freq = " + root.upperCutoff + "\n"
+            + "\n"
+            + "[output]\n"
+            + "method = raw\n"
+            + "raw_target = /dev/stdout\n"
+            + "data_format = ascii\n"
+            + "ascii_max_range = " + root.maxRange + "\n"
+            + "channels = " + root.channels + "\n"
+            + "mono_option = " + root.monoOption + "\n"
+            + "reverse = " + (root.reverse ? 1 : 0) + "\n"
+            + "\n"
+            + "[smoothing]\n"
+            + "integral = " + root.integral + "\n"
+            + "monstercat = " + (root.monstercat ? 1 : 0) + "\n"
+            + "waves = " + root.waves + "\n"
+            + "gravity = " + root.gravity + "\n"
+            + "CAVAEOF"]
+        onExited: cavaProc.running = true
     }
 
-    Timer {
-        id: startReader
-        interval: 500
-        onTriggered: readerProc.running = true
-    }
-
-    // cava 进程
+    // cava 直接输出到 stdout，SplitParser 直接读取
     Process {
         id: cavaProc
         command: ["cava", "-p", "/tmp/quickshell-cava/config"]
-    }
-
-    // 读取 FIFO 输出
-    Process {
-        id: readerProc
-        command: ["cat", "/tmp/quickshell-cava.fifo"]
         stdout: SplitParser {
             onRead: data => {
                 let parts = data.split(";");
@@ -90,6 +91,6 @@ Item {
     Timer {
         id: restartTimer
         interval: 3000
-        onTriggered: ensureFifo.running = true
+        onTriggered: writeConfig.running = true
     }
 }

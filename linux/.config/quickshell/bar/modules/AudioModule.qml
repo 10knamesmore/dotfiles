@@ -47,7 +47,7 @@ BarModule {
     // 立即读取一次，之后每秒轮询
     Component.onCompleted: volReader.running = true
     onClicked: applyAndRefresh(muteToggler)
-    onScrolled: (delta) => {
+    onScrolled: delta => {
         return applyAndRefresh(delta > 0 ? volUp : volDown);
     }
 
@@ -59,7 +59,7 @@ BarModule {
         command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
                 if (m) {
                     root.volumePct = Math.round(parseFloat(m[1]) * 100);
@@ -74,7 +74,6 @@ BarModule {
                 }
             }
         }
-
     }
 
     Timer {
@@ -130,14 +129,11 @@ BarModule {
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
         }
-
     }
 
     Behavior on opacity {
         NumberAnimation {
             duration: 300
         }
-
     }
-
 }

@@ -17,16 +17,21 @@ PanelWindow {
     property string filterUnit: ""
 
     function priorityColor(p) {
-        if (p <= 2) return Colors.red;       // emerg/alert/crit
-        if (p === 3) return Colors.red;       // error
-        if (p === 4) return Colors.yellow;    // warning
-        if (p === 5) return Colors.peach;     // notice
-        if (p === 6) return Colors.blue;      // info
+        if (p <= 2)
+            return Colors.red;       // emerg/alert/crit
+        if (p === 3)
+            return Colors.red;       // error
+        if (p === 4)
+            return Colors.yellow;    // warning
+        if (p === 5)
+            return Colors.peach;     // notice
+        if (p === 6)
+            return Colors.blue;      // info
         return Colors.overlay0;               // debug
     }
 
     function priorityLabel(p) {
-        let labels = ["EMRG","ALRT","CRIT","ERR","WARN","NOTC","INFO","DBG"];
+        let labels = ["EMRG", "ALRT", "CRIT", "ERR", "WARN", "NOTC", "INFO", "DBG"];
         return (p >= 0 && p <= 7) ? labels[p] : "???";
     }
 
@@ -38,7 +43,7 @@ PanelWindow {
             let m = d.getMinutes().toString().padStart(2, '0');
             let s = d.getSeconds().toString().padStart(2, '0');
             return h + ":" + m + ":" + s;
-        } catch(e) {
+        } catch (e) {
             return "??:??:??";
         }
     }
@@ -52,14 +57,16 @@ PanelWindow {
     }
 
     function addEntry(obj) {
-        if (paused) return;
+        if (paused)
+            return;
 
         let priority = parseInt(obj.PRIORITY || "6");
         let unit = obj.SYSLOG_IDENTIFIER || obj._COMM || "unknown";
         let message = obj.MESSAGE || "";
         let timestamp = obj.__REALTIME_TIMESTAMP || "0";
 
-        if (!matchesFilter(priority, unit)) return;
+        if (!matchesFilter(priority, unit))
+            return;
 
         logModel.append({
             "priority": priority,
@@ -127,7 +134,7 @@ PanelWindow {
                 try {
                     let obj = JSON.parse(data);
                     root.addEntry(obj);
-                } catch(e) {
+                } catch (e) {
                     // 忽略非 JSON 行
                 }
             }
@@ -162,16 +169,14 @@ PanelWindow {
     Rectangle {
         id: panel
 
-        width: 520
+        width: 880
         height: root.height * 0.7
         radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: root.showing ? 54 : 34
-        anchors.rightMargin: 10
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: root.showing ? 0 : 20
         clip: true
         opacity: root.showing ? 1 : 0
 
@@ -204,7 +209,9 @@ PanelWindow {
                     color: Colors.text
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 Text {
                     text: logModel.count + " 条"
@@ -228,7 +235,11 @@ PanelWindow {
                         font.family: Fonts.family
                         font.pixelSize: Fonts.small
 
-                        Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Tokens.animFast
+                            }
+                        }
                     }
 
                     MouseArea {
@@ -239,7 +250,11 @@ PanelWindow {
                         onClicked: root.paused = !root.paused
                     }
 
-                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
+                    }
                 }
 
                 // 清空
@@ -257,7 +272,11 @@ PanelWindow {
                         font.family: Fonts.family
                         font.pixelSize: Fonts.small
 
-                        Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Tokens.animFast
+                            }
+                        }
                     }
 
                     MouseArea {
@@ -268,7 +287,11 @@ PanelWindow {
                         onClicked: logModel.clear()
                     }
 
-                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
+                    }
                 }
             }
 
@@ -280,10 +303,22 @@ PanelWindow {
                 // 优先级过滤按钮
                 Repeater {
                     model: [
-                        {"label": "全部", "value": -1},
-                        {"label": "ERR", "value": 3},
-                        {"label": "WARN", "value": 4},
-                        {"label": "INFO", "value": 6}
+                        {
+                            "label": "全部",
+                            "value": -1
+                        },
+                        {
+                            "label": "ERR",
+                            "value": 3
+                        },
+                        {
+                            "label": "WARN",
+                            "value": 4
+                        },
+                        {
+                            "label": "INFO",
+                            "value": 6
+                        }
                     ]
 
                     delegate: Rectangle {
@@ -292,12 +327,8 @@ PanelWindow {
                         width: filterLabel.implicitWidth + 14
                         height: 24
                         radius: Tokens.radiusFull
-                        color: root.filterPriority === modelData.value
-                            ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2)
-                            : (filterBtnArea.containsMouse ? Colors.surface1 : "transparent")
-                        border.color: root.filterPriority === modelData.value
-                            ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.4)
-                            : "transparent"
+                        color: root.filterPriority === modelData.value ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2) : (filterBtnArea.containsMouse ? Colors.surface1 : "transparent")
+                        border.color: root.filterPriority === modelData.value ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.4) : "transparent"
                         border.width: 1
 
                         Text {
@@ -319,11 +350,17 @@ PanelWindow {
                             }
                         }
 
-                        Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Tokens.animFast
+                            }
+                        }
                     }
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 // Unit 过滤输入框
                 Rectangle {
@@ -463,7 +500,9 @@ PanelWindow {
                     }
 
                     Behavior on color {
-                        ColorAnimation { duration: Tokens.animFast }
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
                     }
                 }
             }
@@ -471,7 +510,7 @@ PanelWindow {
 
         InnerGlow {}
 
-        Behavior on anchors.topMargin {
+        Behavior on anchors.verticalCenterOffset {
             NumberAnimation {
                 id: _slideAnim
                 duration: Tokens.animSlow

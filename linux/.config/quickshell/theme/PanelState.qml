@@ -27,6 +27,15 @@ QtObject {
     // ── 新面板 ──
     property bool notesOpen: false
     property bool journalOpen: false
+    property bool aiOpen: false
+    // ── 媒体 ──
+    property var lastActivePlayer: null
+    // ── 歌词 ──
+    property var lyricsLines: []      // [{time: seconds, text: "歌词行"}, ...]
+    property int currentLyricIndex: -1
+    property string currentLyric: ""
+    property string lyricsTrackId: "" // 用于检测歌曲切换
+    property real lyricsOffset: 0    // 歌词时间偏移（秒），正值=歌词提前，负值=歌词延后
     // ── 勿扰 ──
     property bool dndEnabled: false
     // ── 通知 ──
@@ -36,7 +45,7 @@ QtObject {
     property string osdType: "" // "volume" | "brightness"
     property int osdValue: 0 // 0-100
     property string osdIcon: ""
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || aiOpen
 
     signal clearAllNotifications()
 
@@ -109,6 +118,10 @@ QtObject {
         journalOpen = !journalOpen;
     }
 
+    function toggleAi() {
+        aiOpen = !aiOpen;
+    }
+
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
         screenEffectsOpen = false;
@@ -123,6 +136,7 @@ QtObject {
         networkOpen = false;
         notesOpen = false;
         journalOpen = false;
+        aiOpen = false;
     }
 
 }
