@@ -1,10 +1,11 @@
 import "../theme"
+import "Lunar.js" as Lunar
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 
-// 月历面板 — 点击时钟弹出，显示当月日历
+// 月历面板 — 点击时钟弹出，显示当月日历 + 农历
 PanelWindow {
     // ── 辅助函数 ──
 
@@ -33,28 +34,43 @@ PanelWindow {
         let todayM = today.getMonth();
         let todayD = today.getDate();
         // 上月尾部
+        let prevY = viewMonth === 0 ? viewYear - 1 : viewYear;
+        let prevM = viewMonth === 0 ? 12 : viewMonth; // 1-based for Lunar
         for (let i = startDow - 1; i >= 0; i--) {
+            let d = prevMonthDays - i;
+            let lunar = Lunar.toLunar(prevY, prevM, d);
             days.push({
-                "day": prevMonthDays - i,
+                "day": d,
                 "inMonth": false,
-                "isToday": false
+                "isToday": false,
+                "lunar": lunar.display,
+                "isFestival": lunar.isFestival
             });
         }
         // 当月
+        let curM = viewMonth + 1; // 1-based
         for (let d = 1; d <= daysInMonth; d++) {
+            let lunar = Lunar.toLunar(viewYear, curM, d);
             days.push({
                 "day": d,
                 "inMonth": true,
-                "isToday": (viewYear === todayY && viewMonth === todayM && d === todayD)
+                "isToday": (viewYear === todayY && viewMonth === todayM && d === todayD),
+                "lunar": lunar.display,
+                "isFestival": lunar.isFestival
             });
         }
         // 下月头部（填满到 6 行 × 7 = 42 格）
+        let nextY = viewMonth === 11 ? viewYear + 1 : viewYear;
+        let nextM = viewMonth === 11 ? 1 : viewMonth + 2; // 1-based
         let remaining = 42 - days.length;
         for (let i = 1; i <= remaining; i++) {
+            let lunar = Lunar.toLunar(nextY, nextM, i);
             days.push({
                 "day": i,
                 "inMonth": false,
-                "isToday": false
+                "isToday": false,
+                "lunar": lunar.display,
+                "isFestival": lunar.isFestival
             });
         }
         return days;
@@ -102,7 +118,7 @@ PanelWindow {
     Rectangle {
         id: panel
 
-        width: 300
+        width: 320
         height: col.implicitHeight + 32
         radius: Tokens.radiusL
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
@@ -219,7 +235,7 @@ PanelWindow {
                         property bool hovered: dayArea.containsMouse
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 32
+                        Layout.preferredHeight: 42
                         radius: Tokens.radiusL
                         color: {
                             if (modelData.isToday)
@@ -231,21 +247,45 @@ PanelWindow {
                             return "transparent";
                         }
 
-                        Text {
+                        Column {
                             anchors.centerIn: parent
-                            text: modelData.day > 0 ? modelData.day : ""
-                            color: {
-                                if (modelData.isToday)
-                                    return Colors.base;
+                            spacing: 1
 
-                                if (!modelData.inMonth)
-                                    return Colors.overlay0;
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: modelData.day > 0 ? modelData.day : ""
+                                color: {
+                                    if (modelData.isToday)
+                                        return Colors.base;
 
-                                return Colors.text;
+                                    if (!modelData.inMonth)
+                                        return Colors.overlay0;
+
+                                    return Colors.text;
+                                }
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.body
+                                font.weight: modelData.isToday ? Font.Bold : Font.Normal
                             }
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.body
-                            font.weight: modelData.isToday ? Font.Bold : Font.Normal
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: modelData.lunar || ""
+                                color: {
+                                    if (modelData.isToday)
+                                        return Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.8);
+
+                                    if (modelData.isFestival)
+                                        return Colors.peach;
+
+                                    if (!modelData.inMonth)
+                                        return Qt.rgba(Colors.overlay0.r, Colors.overlay0.g, Colors.overlay0.b, 0.6);
+
+                                    return Colors.overlay0;
+                                }
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.xs
+                            }
                         }
 
                         MouseArea {

@@ -18,6 +18,15 @@ QtObject {
     property bool clipboardOpen: false
     property bool keybindingsOpen: false
     property bool networkOpen: false
+    // ── 桌面小组件 ──
+    property bool analogClockVisible: true
+    property bool pomodoroVisible: true
+    property bool visualizerVisible: true
+    // ── 音频可视化共享数据（cava 进程单例，多屏共享）──
+    property var visualizerBars: []
+    // ── 新面板 ──
+    property bool notesOpen: false
+    property bool journalOpen: false
     // ── 勿扰 ──
     property bool dndEnabled: false
     // ── 通知 ──
@@ -27,7 +36,7 @@ QtObject {
     property string osdType: "" // "volume" | "brightness"
     property int osdValue: 0 // 0-100
     property string osdIcon: ""
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen
 
     signal clearAllNotifications()
 
@@ -92,6 +101,14 @@ QtObject {
         networkOpen = !networkOpen;
     }
 
+    function toggleNotes() {
+        notesOpen = !notesOpen;
+    }
+
+    function toggleJournal() {
+        journalOpen = !journalOpen;
+    }
+
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
         screenEffectsOpen = false;
@@ -104,6 +121,8 @@ QtObject {
         clipboardOpen = false;
         keybindingsOpen = false;
         networkOpen = false;
+        notesOpen = false;
+        journalOpen = false;
     }
 
 }
