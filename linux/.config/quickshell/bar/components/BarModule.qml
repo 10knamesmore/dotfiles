@@ -108,26 +108,31 @@ Rectangle {
     }
 
     // 进度填充 — eclipse 风格，accent 色从左到右铺满模块高度
+    // 外层 Item 按进度宽度做矩形裁剪，内层 Rectangle 始终全宽 + 匹配圆角
+    // 这样左侧圆角始终正确，右侧被 clip 截断为直线（进度 100% 时自然露出右侧圆角）
     Item {
         visible: root.progress >= 0
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.progress * root.width
         clip: true
+
+        Behavior on width {
+            NumberAnimation {
+                duration: Tokens.animNormal
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Rectangle {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: root.progress * parent.width
+            width: root.width
             radius: root.radius
             color: root.accentColor
             opacity: root.hovered ? 0.42 : 0.27
-
-            Behavior on width {
-                NumberAnimation {
-                    duration: Tokens.animNormal
-                    easing.type: Easing.OutCubic
-                }
-            }
 
             Behavior on opacity {
                 NumberAnimation {

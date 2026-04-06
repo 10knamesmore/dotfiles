@@ -139,6 +139,7 @@ PanelOverlay {
             let item = noteModel.get(i);
             if (q.length > 0 && !item.text.toLowerCase().includes(q))
                 continue;
+            if (filterMode === 0 && item.isTodo && item.done) continue;
             if (filterMode === 1 && item.isTodo) continue;
             if (filterMode === 2 && (!item.isTodo || item.done)) continue;
             if (filterMode === 3 && (!item.isTodo || !item.done)) continue;
@@ -561,6 +562,7 @@ PanelOverlay {
             clip: true
 
             delegate: Rectangle {
+                id: delegateRect
                 required property int index
                 required property int noteId
                 required property string text
@@ -572,15 +574,41 @@ PanelOverlay {
                 required property string priority
 
                 property bool isEditing: root.editingIndex === index
+                onIsEditingChanged: {
+                    if (isEditing) editArea.forceActiveFocus();
+                }
+
+                // 完成后滑出动画
+                property bool _initialized: false
+                Component.onCompleted: _initialized = true
+                onDoneChanged: {
+                    if (!_initialized) return;
+                    let shouldHide = (root.filterMode === 0 && isTodo && done) ||
+                                     (root.filterMode === 2 && done) ||
+                                     (root.filterMode === 3 && !done);
+                    if (shouldHide) dismissAnim.start();
+                }
+
+                SequentialAnimation {
+                    id: dismissAnim
+                    ParallelAnimation {
+                        NumberAnimation { target: delegateRect; property: "x"; to: delegateRect.width * 0.15; duration: 250; easing.type: Easing.InCubic }
+                        NumberAnimation { target: delegateRect; property: "opacity"; to: 0; duration: 250; easing.type: Easing.InCubic }
+                    }
+                    NumberAnimation { target: delegateRect; property: "height"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+                    ScriptAction { script: root.applyFilter() }
+                }
 
                 width: ListView.view.width
                 height: isEditing ? editCol.implicitHeight + 16 : 52
                 radius: Tokens.radiusMS
+                clip: true
                 color: itemHover.containsMouse || isEditing ? Colors.surface1 : Colors.surface0
                 border.color: Qt.rgba(root.noteColor(noteColor).r, root.noteColor(noteColor).g, root.noteColor(noteColor).b, pinned ? 0.6 : 0.3)
                 border.width: pinned ? 2 : 1
 
                 Behavior on height {
+                    enabled: !dismissAnim.running
                     NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
                 }
 
