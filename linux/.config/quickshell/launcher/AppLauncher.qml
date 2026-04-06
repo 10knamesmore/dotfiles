@@ -31,10 +31,10 @@ PanelOverlay {
     // 搜索状态
     property string query: ""
     property int selectedIndex: 0
-    // 缓存全部应用（非 noDisplay），启动时填充一次
+    // 缓存全部应用（非 noDisplay），启动时填充一次，预计算 lowercase 字段
     property var allApps: []
     property bool appsLoaded: false
-    // 存储排序后的结果引用，delegate 通过 appIndex 索引取
+    // 存储排序后的结果引用，delegate 通过 index 索引取
     property var _results: []
 
     function ensureAppsLoaded() {
@@ -47,30 +47,37 @@ PanelOverlay {
 
         let list = [];
         for (let i = 0; i < apps.length; i++) {
-            if (!apps[i].noDisplay)
-                list.push(apps[i]);
+            let app = apps[i];
+            if (!app.noDisplay)
+                list.push({
+                    entry: app,
+                    _name: (app.name || "").toLowerCase(),
+                    _id: (app.id || "").toLowerCase(),
+                    _generic: (app.genericName || "").toLowerCase(),
+                    _comment: (app.comment || "").toLowerCase(),
+                    _keywords: (app.keywords || []).map(k => k.toLowerCase())
+                });
         }
         allApps = list;
         appsLoaded = true;
     }
 
-    // ── Fuzzy Match ──
-    function fuzzyScore(q, text) {
-        if (q.length === 0)
+    // ── Fuzzy Match（接收已 lowercase 的文本，避免重复转换） ──
+    function fuzzyScore(ql, lower, origLen) {
+        if (ql.length === 0)
             return 1;
-
-        let lower = text.toLowerCase();
-        let ql = q.toLowerCase();
-        let qi = 0, score = 0, consecutive = 0;
+        if (lower.length === 0)
+            return 0;
         if (lower.startsWith(ql))
-            return 1000 + (100 - text.length);
+            return 1000 + (100 - origLen);
 
+        let qi = 0, score = 0, consecutive = 0;
         for (let i = 0; i < lower.length && qi < ql.length; i++) {
             if (lower[i] === ql[qi]) {
                 qi++;
                 consecutive++;
                 score += consecutive * 10;
-                if (i === 0 || text[i - 1] === ' ' || text[i - 1] === '-' || text[i - 1] === '.')
+                if (i === 0 || lower[i - 1] === ' ' || lower[i - 1] === '-' || lower[i - 1] === '.')
                     score += 50;
             } else {
                 consecutive = 0;
@@ -81,31 +88,30 @@ PanelOverlay {
 
     function updateFilter() {
         let apps = root.allApps;
-        let q = root.query.trim();
+        let q = root.query.trim().toLowerCase();
         let results = [];
         for (let i = 0; i < apps.length; i++) {
-            let app = apps[i];
-            let idScore = fuzzyScore(q, app.id || "") * 0.9;
-            let nameScore = fuzzyScore(q, app.name || "");
-            let genericScore = fuzzyScore(q, app.genericName || "") * 0.8;
-            let commentScore = fuzzyScore(q, app.comment || "") * 0.5;
+            let a = apps[i];
+            let nameScore = fuzzyScore(q, a._name, a._name.length);
+            let idScore = fuzzyScore(q, a._id, a._id.length) * 0.9;
+            let genericScore = fuzzyScore(q, a._generic, a._generic.length) * 0.8;
+            let commentScore = fuzzyScore(q, a._comment, a._comment.length) * 0.5;
             let keywordScore = 0;
-            let kw = app.keywords || [];
+            let kw = a._keywords;
             for (let k = 0; k < kw.length; k++) {
-                keywordScore = Math.max(keywordScore, fuzzyScore(q, kw[k]) * 0.6);
+                keywordScore = Math.max(keywordScore, fuzzyScore(q, kw[k], kw[k].length) * 0.6);
             }
-            let best = Math.max(idScore, nameScore, genericScore, commentScore, keywordScore);
+            let best = Math.max(nameScore, idScore, genericScore, commentScore, keywordScore);
             if (best > 0)
-                results.push({ "entry": app, "score": best });
+                results.push({
+                    "entry": a.entry,
+                    "score": best
+                });
         }
         if (q.length > 0)
             results.sort((a, b) => b.score - a.score);
         else
             results.sort((a, b) => (a.entry.name || "").localeCompare(b.entry.name || ""));
-        resultModel.clear();
-        for (let r = 0; r < results.length; r++) {
-            resultModel.append({ "appIndex": r });
-        }
         root._results = results;
         root.selectedIndex = Math.min(root.selectedIndex, Math.max(0, results.length - 1));
     }
@@ -120,8 +126,10 @@ PanelOverlay {
         PanelState.launcherOpen = false;
     }
 
-    ListModel {
-        id: resultModel
+    Timer {
+        id: filterDebounce
+        interval: 50
+        onTriggered: root.updateFilter()
     }
 
     Timer {
@@ -175,7 +183,7 @@ PanelOverlay {
                 onTextChanged: {
                     root.query = text;
                     root.selectedIndex = 0;
-                    root.updateFilter();
+                    filterDebounce.restart();
                 }
                 Keys.onUpPressed: {
                     root.selectedIndex = Math.max(0, root.selectedIndex - 1);
@@ -213,7 +221,7 @@ PanelOverlay {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            model: resultModel
+            model: root._results.length
             spacing: 2
             currentIndex: root.selectedIndex
             onCurrentIndexChanged: {
@@ -223,8 +231,7 @@ PanelOverlay {
 
             delegate: Rectangle {
                 required property int index
-                required property int appIndex
-                property var entry: root._results[appIndex] ? root._results[appIndex].entry : null
+                property var entry: root._results[index] ? root._results[index].entry : null
 
                 width: resultList.width
                 height: 44
@@ -285,14 +292,16 @@ PanelOverlay {
                 }
 
                 Behavior on color {
-                    ColorAnimation { duration: Tokens.animFast }
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
                 }
             }
         }
 
         // 空状态
         Text {
-            visible: root.query.length > 0 && resultModel.count === 0
+            visible: root.query.length > 0 && root._results.length === 0
             text: "未找到匹配的应用"
             color: Colors.overlay0
             font.family: Fonts.family

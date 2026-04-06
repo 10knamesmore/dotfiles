@@ -34,10 +34,6 @@ BarModule {
         PanelState.toggleMedia();
     }
     onRightClicked: showLyric = !showLyric
-    onScrolled: delta => {
-        if (player)
-            player.togglePlaying();
-    }
 
     Row {
         id: row
