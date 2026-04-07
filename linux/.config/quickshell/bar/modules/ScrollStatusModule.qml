@@ -183,6 +183,26 @@ BarModule {
             font.family: Fonts.family
             font.pixelSize: Fonts.title
             anchors.verticalCenter: parent.verticalCenter
+
+            Behavior on color {
+                ColorAnimation { duration: Tokens.animFast }
+            }
+        }
+
+        // hover 时显示列位置文字
+        Text {
+            visible: root.hovered && root.specialState === "" && root.totalCols > 0
+            text: root.curCol + "/" + root.totalCols
+            color: Colors.yellow
+            font.family: Fonts.family
+            font.pixelSize: Fonts.caption
+            font.weight: Font.DemiBold
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: root.hovered ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Tokens.animNormal }
+            }
         }
 
         Row {
@@ -214,7 +234,7 @@ BarModule {
                             width: 10
                             height: Math.max(4, Math.floor(24 / colDelegate.winCount) - 1)
                             radius: 2
-                            color: modelData.active ? Colors.yellow : colDelegate.colFocused ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.4) : Colors.surface2
+                            color: modelData.active ? Colors.yellow : colDelegate.colFocused ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, root.hovered ? 0.6 : 0.4) : (root.hovered ? Colors.surface1 : Colors.surface2)
 
                             Behavior on color {
                                 ColorAnimation {
