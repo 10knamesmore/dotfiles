@@ -31,7 +31,7 @@ BarModule {
     }
 
     accentColor: Colors.blue
-    implicitWidth: label.implicitWidth + 32
+    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
     Component.onCompleted: reader.running = true
     onClicked: Quickshell.execDetached(["plasma-systemmonitor"])
 
@@ -94,6 +94,15 @@ BarModule {
         }
     }
 
+    // 紧凑模式宽度参考
+    Row {
+        id: compactLabel
+        visible: false
+        spacing: 5
+        Text { text: label.children[0].text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
+        Text { text: root.usage + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
+    }
+
     Row {
         id: label
 
@@ -126,15 +135,20 @@ BarModule {
 
         }
 
-        // Per-core bar chart — 单个 Text 用富文本着色，字符紧贴无间距
+        // Per-core bar chart — hover 时展开显示
         Text {
-            visible: root.chartHtml !== ""
+            visible: root.chartHtml !== "" && root.hovered
             textFormat: Text.RichText
             text: root.chartHtml
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
+            opacity: root.hovered ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Tokens.animNormal }
+            }
         }
 
     }

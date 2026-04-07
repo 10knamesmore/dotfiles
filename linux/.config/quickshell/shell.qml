@@ -442,4 +442,20 @@ ShellRoot {
         model: Quickshell.screens
         delegate: AudioVisualizer {}
     }
+
+    // ── 新桌面小组件 ──
+    Variants {
+        model: Quickshell.screens
+        delegate: WeatherWidget {}
+    }
+
+    Variants {
+        model: Quickshell.screens
+        delegate: NowPlaying {}
+    }
+
+    Variants {
+        model: Quickshell.screens
+        delegate: SystemMonitor {}
+    }
 }

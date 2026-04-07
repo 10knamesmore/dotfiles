@@ -12,6 +12,13 @@ Rectangle {
 
     implicitWidth: col.implicitWidth + 36
     implicitHeight: 36
+
+    Behavior on implicitWidth {
+        NumberAnimation {
+            duration: Tokens.animSlow
+            easing.type: Easing.OutCubic
+        }
+    }
     radius: 20
 
     // Hover 渐变叠加 sapphire → sky → teal
@@ -74,7 +81,18 @@ Rectangle {
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.ExtraBold
-            visible: !root.showDate
+            visible: !root.showDate && !root.hovered
+        }
+
+        // hover 时显示时间 + 日期
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            text: Qt.formatTime(clock.date, "HH:mm") + "  " + Qt.formatDate(clock.date, "MM/dd ddd")
+            color: Colors.base
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+            font.weight: Font.ExtraBold
+            visible: !root.showDate && root.hovered
         }
 
         Text {

@@ -26,8 +26,11 @@ QtObject {
     readonly property int spaceM: 12
     readonly property int spaceL: 16
     readonly property int spaceXL: 24
+    // ── 亮色/暗色适配 ──
+    readonly property color borderBase: Colors.isLight ? "#000000" : "#ffffff"
+
     // ── 毛玻璃面板 ──
-    readonly property real panelAlpha: 0.55
+    readonly property real panelAlpha: Colors.isLight ? 0.75 : 0.55
     // 主面板（Settings/Calendar/Notif…）
     readonly property real cardAlpha: 0.45
     // 面板内卡片（比面板更透）

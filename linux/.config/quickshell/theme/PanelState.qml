@@ -22,6 +22,9 @@ QtObject {
     property bool analogClockVisible: true
     property bool pomodoroVisible: true
     property bool visualizerVisible: true
+    property bool weatherWidgetVisible: true
+    property bool nowPlayingVisible: true
+    property bool systemMonitorVisible: true
     // ── 音频可视化共享数据（cava 进程单例，多屏共享）──
     property var visualizerBars: []
     // ── 新面板 ──

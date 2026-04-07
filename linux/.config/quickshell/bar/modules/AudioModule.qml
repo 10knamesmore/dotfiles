@@ -50,7 +50,7 @@ BarModule {
         volSetter.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", (pct / 100).toFixed(2)];
         applyAndRefresh(volSetter);
     }
-    implicitWidth: label.implicitWidth + 32
+    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
     // 立即读取一次，之后每秒轮询
     Component.onCompleted: volReader.running = true
     onClicked: applyAndRefresh(muteToggler)
@@ -117,6 +117,13 @@ BarModule {
     }
 
     Row {
+        id: compactLabel
+        visible: false
+        spacing: 5
+        Text { text: root.volumeIcon(); font.family: Fonts.family; font.pixelSize: Fonts.icon }
+    }
+
+    Row {
         id: label
 
         anchors.centerIn: parent
@@ -132,7 +139,7 @@ BarModule {
         }
 
         Text {
-            visible: !root.muted
+            visible: !root.muted && root.hovered
             text: root.volumePct + "%"
             color: Colors.text
             font.family: Fonts.family

@@ -9,8 +9,10 @@ BarModule {
     property int usagePct: 0
     property string tooltipText: ""
 
+    property string detailText: ""
+
     accentColor: Colors.mauve
-    implicitWidth: label.implicitWidth + 32
+    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
     Component.onCompleted: reader.running = true
 
     Process {
@@ -24,6 +26,7 @@ BarModule {
                 root.usagePct = Math.round(used / v.MemTotal * 100);
                 let usedGib = (used / 1.04858e+06).toFixed(1);
                 let totalGib = (v.MemTotal / 1.04858e+06).toFixed(1);
+                root.detailText = usedGib + "/" + totalGib + "G";
                 let swapUsed = v.SwapTotal - (v.SwapFree ?? 0);
                 root.tooltipText = "RAM: " + usedGib + " / " + totalGib + " GiB (" + root.usagePct + "%)" + (v.SwapTotal > 0 ? "\nSwap: " + (swapUsed / 1.04858e+06).toFixed(1) + " / " + (v.SwapTotal / 1.04858e+06).toFixed(1) + " GiB" : "");
             }
@@ -53,6 +56,14 @@ BarModule {
             reader.running = false;
             reader.running = true;
         }
+    }
+
+    Row {
+        id: compactLabel
+        visible: false
+        spacing: 5
+        Text { text: label.children[0].text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
+        Text { text: root.usagePct + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
     }
 
     Row {
@@ -87,6 +98,20 @@ BarModule {
 
         }
 
+        // hover 展开显示详细内存
+        Text {
+            visible: root.hovered && root.detailText !== ""
+            text: root.detailText
+            color: Colors.subtext0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.caption
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: root.hovered ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Tokens.animNormal }
+            }
+        }
     }
 
 }

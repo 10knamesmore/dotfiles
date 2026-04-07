@@ -117,18 +117,29 @@ PanelOverlay {
             visible: PanelState.lyricsLines.length > 0
 
             Rectangle {
-                width: 28; height: 28; radius: Tokens.radiusFull
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
                 color: offMinusArea.containsMouse ? Colors.surface1 : "transparent"
                 Text {
-                    anchors.centerIn: parent; text: "−"
-                    color: Colors.subtext0; font.family: Fonts.family; font.pixelSize: Fonts.body
+                    anchors.centerIn: parent
+                    text: "−"
+                    color: Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
                 }
                 MouseArea {
-                    id: offMinusArea; anchors.fill: parent; hoverEnabled: true
+                    id: offMinusArea
+                    anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: PanelState.lyricsOffset = Math.round((PanelState.lyricsOffset - 0.1) * 10) / 10
                 }
-                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
             }
 
             Text {
@@ -143,24 +154,36 @@ PanelOverlay {
                 Layout.preferredWidth: 44
 
                 MouseArea {
-                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
                     onClicked: PanelState.lyricsOffset = 0
                 }
             }
 
             Rectangle {
-                width: 28; height: 28; radius: Tokens.radiusFull
+                width: 28
+                height: 28
+                radius: Tokens.radiusFull
                 color: offPlusArea.containsMouse ? Colors.surface1 : "transparent"
                 Text {
-                    anchors.centerIn: parent; text: "+"
-                    color: Colors.subtext0; font.family: Fonts.family; font.pixelSize: Fonts.body
+                    anchors.centerIn: parent
+                    text: "+"
+                    color: Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
                 }
                 MouseArea {
-                    id: offPlusArea; anchors.fill: parent; hoverEnabled: true
+                    id: offPlusArea
+                    anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: PanelState.lyricsOffset = Math.round((PanelState.lyricsOffset + 0.1) * 10) / 10
                 }
-                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
             }
         }
 
