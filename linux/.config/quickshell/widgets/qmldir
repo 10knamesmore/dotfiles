@@ -2,3 +2,6 @@ AnalogClock 1.0 AnalogClock.qml
 PomodoroTimer 1.0 PomodoroTimer.qml
 AudioVisualizer 1.0 AudioVisualizer.qml
 CavaService 1.0 CavaService.qml
+WeatherWidget 1.0 WeatherWidget.qml
+NowPlaying 1.0 NowPlaying.qml
+SystemMonitor 1.0 SystemMonitor.qml

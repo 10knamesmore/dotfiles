@@ -3,14 +3,18 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 
-// 桌面浮动仿真时钟 — 右下角 Canvas 绘制
+// 桌面浮动仿真时钟 — Canvas 绘制
 PanelWindow {
     id: root
 
     required property var modelData
     screen: modelData
 
-    property int clockSize: 500
+    // ── 布局配置（改这里调整位置和大小）──
+    property int widgetX: 20        // 左边距
+    property int widgetY: 60        // 上边距
+    property int clockSize: 500     // 时钟直径
+
     property real _hours: 0
     property real _minutes: 0
     property real _seconds: 0
@@ -20,8 +24,8 @@ PanelWindow {
     anchors.left: true
     implicitWidth: clockSize + 40
     implicitHeight: clockSize + 40
-    margins.top: 60
-    margins.left: 20
+    margins.top: widgetY
+    margins.left: widgetX
     visible: PanelState.analogClockVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
@@ -165,4 +169,5 @@ PanelWindow {
             ctx.fill();
         }
     }
+
 }

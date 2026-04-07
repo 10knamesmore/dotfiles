@@ -86,6 +86,20 @@ BarModule {
 
         }
 
+        // hover 展开显示 tooltip（IP/SSID）
+        Text {
+            visible: root.hovered && root.tooltipText !== ""
+            text: root.tooltipText.split("\n")[0]
+            color: Colors.subtext0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.caption
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: root.hovered ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Tokens.animNormal }
+            }
+        }
     }
 
 }

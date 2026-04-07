@@ -401,6 +401,24 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
+            // ── 主题切换 ──
+            Text {
+                text: "主题"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
+
+            ThemePicker {
+                Layout.fillWidth: true
+            }
+
+            Divider {
+                Layout.fillWidth: true
+            }
+
             // ── 媒体卡片 ──
             MediaCard {
                 Layout.fillWidth: true

@@ -20,6 +20,7 @@ Rectangle {
     signal scrolled(int delta)
     signal progressDragged(real value)
 
+    clip: true
     radius: Tokens.radiusL
     color: hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha)
     border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
@@ -205,6 +206,13 @@ Rectangle {
             duration: Tokens.animFast
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
+        }
+    }
+
+    Behavior on implicitWidth {
+        NumberAnimation {
+            duration: Tokens.animSlow
+            easing.type: Easing.OutCubic
         }
     }
 

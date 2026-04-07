@@ -5,12 +5,16 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// 桌面浮动番茄钟 — 右下角，时钟上方
+// 桌面浮动番茄钟
 PanelWindow {
     id: root
 
     required property var modelData
     screen: modelData
+
+    // ── 布局配置（改这里调整位置和大小）──
+    property int widgetX: 180       // 左边距
+    property int widgetY: 610       // 上边距
 
     // ── 状态 ──
     property string mode: "work" // "work" | "break" | "longBreak"
@@ -62,8 +66,8 @@ PanelWindow {
     anchors.left: true
     implicitWidth: 260
     implicitHeight: 310
-    margins.top: 610
-    margins.left: 180
+    margins.top: widgetY
+    margins.left: widgetX
     visible: PanelState.pomodoroVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
