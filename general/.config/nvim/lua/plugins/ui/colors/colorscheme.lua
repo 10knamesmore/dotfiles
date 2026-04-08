@@ -51,7 +51,46 @@ return {
         lazy = true,
         name = "catppuccin",
         opts = {
-            flavour = "mocha", -- latte, frappe, macchiato, mocha
+            flavour = "mocha",
+            styles = {
+                comments = { "italic" },
+                conditionals = { "italic", "bold" },
+                loops = { "italic", "bold" },
+                functions = { "italic", "bold" },
+                keywords = { "italic", "bold" },
+                strings = { "italic" },
+                variables = {},
+                numbers = {},
+                booleans = { "italic", "bold" },
+                properties = {},
+                types = { "italic" },
+                operators = {},
+            },
+            custom_highlights = function(colors)
+                return {
+                    -- 颜色区分度：解决黄色撞车
+                    ["@type"] = { fg = colors.sapphire, italic = true },
+                    ["@type.builtin"] = { fg = colors.sapphire, italic = true },
+                    ["@constructor"] = { fg = colors.mauve },
+                    ["@module"] = { fg = colors.red, italic = true },
+                    ["@property"] = { fg = colors.teal },
+                    ["@variable.member"] = { fg = colors.teal },
+                    ["@variable.parameter"] = { fg = colors.peach, italic = true },
+                    ["@punctuation.delimiter"] = { fg = colors.sky },
+                    -- italic 移植：对齐 tokyonight 风格
+                    ["Constant"] = { fg = colors.peach, italic = true, bold = true },
+                    ["@string"] = { fg = colors.green, italic = true },
+                    ["@keyword.return"] = { fg = colors.mauve, italic = true, bold = true },
+                    ["@keyword.import"] = { fg = colors.red, italic = true },
+                    -- Vue 高亮（从 tokyonight 移植）
+                    ["@tag.builtin.vue"] = { fg = colors.blue },
+                    ["@tag.vue"] = { fg = colors.red },
+                    ["@lsp.type.component.vue"] = { fg = colors.red },
+                    ["@tag.template.vue"] = { fg = colors.mauve, bold = true },
+                    ["@tag.script.vue"] = { fg = colors.yellow, bold = true },
+                    ["@tag.style.vue"] = { fg = colors.green, bold = true },
+                }
+            end,
             integrations = {
                 aerial = true,
                 alpha = true,
