@@ -133,3 +133,8 @@ alias jobs="jobs -l"
 alias zj="zellij"
 alias zjl="zellij list-sessions"
 alias zja="zellij attach"
+
+# ================================
+# AI
+# ================================
+alias cc="claude"
