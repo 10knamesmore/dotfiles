@@ -31,7 +31,7 @@ return {
 
             --- 是否启用 code lens 支持
             --- 当光标位置有可执行的 code lens 时, 图标从 text 变为 lens_text
-            code_lenses = true,
+            code_lenses = false,
 
             --- 1. Sign column 显示
             sign = {
