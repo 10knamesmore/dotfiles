@@ -5,7 +5,6 @@ return {
     {
         "gbprod/yanky.nvim",
         desc = "Better Yank/Paste",
-        event = { "BufReadPost", "BufWritePost", "BufNewFile" },
         opts = {
             highlight = { timer = 150 },
             picker = {
@@ -42,7 +41,7 @@ return {
     },
     {
         "10knamesmore/yank-more.nvim",
-        event = { "BufReadPost", "BufWritePost", "BufNewFile" },
+        event = "VeryLazy",
         opts = {
             highlight = {
                 timer = 150,

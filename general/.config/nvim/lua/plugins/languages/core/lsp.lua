@@ -3,7 +3,7 @@ return {
     --
     {
         "neovim/nvim-lspconfig",
-        event = { "BufReadPost", "BufNewFile", "BufWritePre" },
+        event = "VeryLazy",
         dependencies = {
             "mason.nvim",
             { "mason-org/mason-lspconfig.nvim", config = function() end },
@@ -207,33 +207,24 @@ return {
                 end
             end
 
-            -- Inlay hints need a direct LspAttach check; relying only on capability
-            -- observers can miss buffers that were already attached.
+            -- inlay hints：通过 LspAttach 统一触发；lspconfig 现在 VeryLazy 加载，
+            -- vim.lsp.enable 会对已打开 buffer 触发 LspAttach，无需再遍历 get_clients。
             if opts.inlay_hints.enabled then
-                local function enable_inlay_hints(buffer, client)
-                    if
-                        vim.api.nvim_buf_is_valid(buffer)
-                        and vim.bo[buffer].buftype == ""
-                        and not vim.tbl_contains(opts.inlay_hints.exclude, vim.bo[buffer].filetype)
-                        and client
-                        and client:supports_method("textDocument/inlayHint")
-                    then
-                        vim.lsp.inlay_hint.enable(true, { bufnr = buffer })
-                    end
-                end
-
                 vim.api.nvim_create_autocmd("LspAttach", {
                     callback = function(event)
                         local client = vim.lsp.get_client_by_id(event.data.client_id)
-                        enable_inlay_hints(event.buf, client)
+                        local buffer = event.buf
+                        if
+                            vim.api.nvim_buf_is_valid(buffer)
+                            and vim.bo[buffer].buftype == ""
+                            and not vim.tbl_contains(opts.inlay_hints.exclude, vim.bo[buffer].filetype)
+                            and client
+                            and client:supports_method("textDocument/inlayHint")
+                        then
+                            vim.lsp.inlay_hint.enable(true, { bufnr = buffer })
+                        end
                     end,
                 })
-
-                for _, client in ipairs(vim.lsp.get_clients()) do
-                    for buffer in pairs(client.attached_buffers or {}) do
-                        enable_inlay_hints(buffer, client)
-                    end
-                end
             end
 
             -- folds

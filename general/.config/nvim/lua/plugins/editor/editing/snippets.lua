@@ -2,4 +2,8 @@
 return {
     "garymjr/nvim-snippets",
     lazy = true,
+    opts = {
+        friendly_snippets = false,
+        search_paths = { vim.fn.stdpath("config") .. "/snippets" },
+    },
 }

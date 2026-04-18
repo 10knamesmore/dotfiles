@@ -56,8 +56,8 @@ opt.foldcolumn = "0"
 -- 小于这个level的被折叠
 opt.foldlevel = 99
 
--- 基于缩进生成折叠
-opt.foldmethod = "indent"
+-- 默认 manual，让 LSP (vim.lsp.foldexpr) / treesitter / nvim-ufo 按需接管
+opt.foldmethod = "manual"
 
 opt.foldtext = ""
 opt.formatexpr = "v:lua.utils.format.formatexpr()"
@@ -199,7 +199,7 @@ opt.undofile = true
 opt.undolevels = 10000
 
 -- Save swap file and trigger CursorHold
-opt.updatetime = 200
+opt.updatetime = 350
 
 -- 只在visual block模式下允许vituraledit
 opt.virtualedit = "block"

@@ -1,7 +1,7 @@
 -- mini.pairs - 自动配对括号/引号
 return {
     "echasnovski/mini.pairs",
-    event = "VeryLazy",
+    event = "InsertEnter",
     opts = {
         modes = { insert = true, command = true, terminal = false },
         skip_next = [=[[%w%%%'%[%"%.%`%$]]=],

@@ -94,9 +94,8 @@ return {
                 --- 是否自动创建 autocmd 来更新灯泡
                 --- 关闭后需手动调用 NvimLightbulb.update_lightbulb()
                 enabled = true,
-                --- 设置 vim 的 updatetime (影响 CursorHold 触发时间)
-                --- 设为负数则不修改 updatetime
-                updatetime = 200,
+                --- 设为负数则不修改 updatetime（由 config/options.lua 统一控制）
+                updatetime = -1,
                 --- 触发灯泡更新的事件
                 events = { "CursorHold", "CursorHoldI" },
                 --- 文件匹配模式
