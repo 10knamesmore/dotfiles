@@ -31,6 +31,8 @@ QtObject {
     property bool notesOpen: false
     property bool journalOpen: false
     property bool aiOpen: false
+    property bool bluetoothOpen: false
+    property bool displayOpen: false
     // ── 媒体 ──
     property var lastActivePlayer: null
     // ── 歌词 ──
@@ -51,7 +53,7 @@ QtObject {
     property string osdType: "" // "volume" | "brightness"
     property int osdValue: 0 // 0-100
     property string osdIcon: ""
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || aiOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || aiOpen || bluetoothOpen || displayOpen
 
     signal clearAllNotifications()
 
@@ -128,6 +130,14 @@ QtObject {
         aiOpen = !aiOpen;
     }
 
+    function toggleBluetooth() {
+        bluetoothOpen = !bluetoothOpen;
+    }
+
+    function toggleDisplay() {
+        displayOpen = !displayOpen;
+    }
+
     // 重置 morph 源（每次打开新面板前调用）
     function resetMorphSource() {
         morphSourceX = -1;
@@ -150,6 +160,8 @@ QtObject {
         notesOpen = false;
         journalOpen = false;
         aiOpen = false;
+        bluetoothOpen = false;
+        displayOpen = false;
     }
 
 }

@@ -3,6 +3,8 @@
 
 import "./ai"
 import "./bar"
+import "./bluetooth"
+import "./display"
 import "./calendar"
 import "./clipboard"
 import "./journal"
@@ -289,6 +291,26 @@ ShellRoot {
         }
     }
 
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "bluetooth"
+        description: "Toggle bluetooth panel"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleBluetooth();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "display"
+        description: "Toggle display management panel"
+        onPressed: {
+            PanelState.closeAll();
+            PanelState.toggleDisplay();
+        }
+    }
+
     Connections {
         function onVolumesChanged() {
             let vol = Math.round(root._sink.audio.volume * 100);
@@ -416,6 +438,10 @@ ShellRoot {
     KeybindingsPanel {}
 
     NetworkPanel {}
+
+    BluetoothPanel {}
+
+    DisplayPanel {}
 
     // ── 新增面板 ──
     JournalPanel {}
