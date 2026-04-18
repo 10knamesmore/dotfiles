@@ -61,12 +61,18 @@ PanelWindow {
             delegate: Rectangle {
                 id: toast
 
+                property bool exiting: false
+                property real _startTime: 0
+                property real _remainingTime: 0
+
                 function dismissToast() {
                     if (model.dismissed)
                         return;
                     toastModel.setProperty(index, "dismissed", true);
+                    exiting = true;
                     toast.opacity = 0;
                     toast.x = 50;
+                    toast.scale = 0.92;
                     toast.height = 0;
                     removeTimer.start();
                 }
@@ -79,6 +85,7 @@ PanelWindow {
                 border.width: 1
                 opacity: 0
                 x: 50
+                scale: 0.92
                 clip: true
 
                 SoftShadow {
@@ -89,8 +96,12 @@ PanelWindow {
                 Component.onCompleted: {
                     opacity = 1;
                     x = 0;
+                    scale = 1.0;
+                    toast._startTime = Date.now();
                     dismissTimer.interval = model.timeout;
                     dismissTimer.start();
+                    progressAnim.duration = model.timeout;
+                    progressAnim.start();
                 }
 
                 Timer {
@@ -154,17 +165,50 @@ PanelWindow {
                     }
                 }
 
-                // 点击关闭 toast
+                // 进度条 — 底部渐缩显示剩余时间
+                Rectangle {
+                    id: progressBar
+
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    height: 2
+                    width: 340
+                    radius: 1
+                    color: Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.5)
+
+                    NumberAnimation on width {
+                        id: progressAnim
+
+                        from: 340
+                        to: 0
+                        duration: 5000
+                        running: false
+                    }
+                }
+
+                // 点击关闭 toast，悬停暂停自动消失
                 MouseArea {
                     anchors.fill: parent
+                    hoverEnabled: true
                     onClicked: toast.dismissToast()
+                    onEntered: {
+                        toast._remainingTime = Math.max(500, dismissTimer.interval - (Date.now() - toast._startTime));
+                        dismissTimer.stop();
+                        progressAnim.pause();
+                    }
+                    onExited: {
+                        dismissTimer.interval = toast._remainingTime;
+                        toast._startTime = Date.now();
+                        dismissTimer.start();
+                        progressAnim.resume();
+                    }
                 }
 
                 Behavior on opacity {
                     NumberAnimation {
                         duration: Tokens.animNormal
                         easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Anim.decelerate
+                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
                     }
                 }
 
@@ -172,7 +216,15 @@ PanelWindow {
                     NumberAnimation {
                         duration: Tokens.animNormal
                         easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Anim.decelerate
+                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
+                    }
+                }
+
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: Tokens.animNormal
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
                     }
                 }
 
@@ -180,7 +232,7 @@ PanelWindow {
                     NumberAnimation {
                         duration: Tokens.animNormal
                         easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Anim.decelerate
+                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
                     }
                 }
             }

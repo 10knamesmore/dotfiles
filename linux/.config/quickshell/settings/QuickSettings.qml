@@ -346,6 +346,10 @@ PanelOverlay {
                         actionProc.running = true;
                         root.btEnabled = !root.btEnabled;
                     }
+                    onRightClicked: {
+                        PanelState.settingsOpen = false;
+                        PanelState.toggleBluetooth();
+                    }
                 }
 
                 QuickToggle {
