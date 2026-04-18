@@ -329,6 +329,9 @@ return {
             ensure_installed = {
                 "stylua",
                 "shfmt",
+                "shellcheck",
+                "yamllint",
+                "hadolint",
             },
         },
         ---@param opts MasonSettings | {ensure_installed: string[]}

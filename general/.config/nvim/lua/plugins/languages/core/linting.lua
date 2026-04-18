@@ -11,6 +11,11 @@ return {
             events = { "BufWritePost", "BufReadPost", "InsertLeave" },
             linters_by_ft = {
                 fish = { "fish" },
+                sh = { "shellcheck" },
+                bash = { "shellcheck" },
+                zsh = { "shellcheck" },
+                yaml = { "yamllint" },
+                dockerfile = { "hadolint" },
                 -- 使用 "*" 对所有文件类型运行 linter
                 -- ['*'] = { 'global linter' },
                 -- 使用 "_" 作为没有配置 linter 的文件类型的fallback
