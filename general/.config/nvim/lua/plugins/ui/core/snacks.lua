@@ -1,17 +1,31 @@
 -- 定义仪表盘各个部分的配置
 --- @type snacks.dashboard.Section
 local dashboard_sections = {
-    {
-        ttl = 0,
-        enabled = function()
-            return vim.o.lines > 75 and vim.o.columns > 110
-        end,
-        section = "terminal",
-        cmd = 'ascii-image-converter --color -H50 "' .. vim.fn.stdpath("config") .. '/data/mutsumi.jpg"',
-        height = 50,
-        padding = 2,
-        align = "center",
-    },
+    (function()
+        local img_w, img_h = 60, 30
+        return {
+            padding = 2,
+            align = "center",
+            -- 预留 20 行真实 buffer 行，每行 40 空格。
+            -- 配合 conceal + range 让 snacks.image 走 overlay 分支（覆盖现有行），
+            -- 避免 virt_lines 导致 dashboard 垂直居中计算偏差。
+            text = (string.rep(" ", img_w) .. "\n"):rep(img_h - 1) .. string.rep(" ", img_w),
+            render = function(self, pos)
+                -- dashboard align=center 在 40 宽文本前加了 (100-40)/2 = 30 空格；
+                -- pos[2] 指向这些前导空格的起点，需要手动加 30 才是图片实际列。
+                local col = pos[2] + math.floor((self.opts.width - img_w) / 2)
+                Snacks.image.placement.new(self.buf, vim.fn.stdpath("config") .. "/data/mutsumi.jpg", {
+                    pos = { pos[1], col },
+                    range = { pos[1], col, pos[1] + img_h - 1, col + img_w },
+                    inline = true,
+                    conceal = true,
+                    width = img_w,
+                    height = img_h,
+                    auto_resize = false,
+                })
+            end,
+        }
+    end)(),
     {
         pane = 1,
         icon = " ", -- 图标
@@ -84,6 +98,7 @@ return {
                 },
             },
             explorer = { enabled = false, replace_netrw = false }, -- 文件浏览器功能禁用
+            image = { enabled = true }, -- Kitty 图形协议渲染（markdown/html 内联图片等）
             input = { enabled = true }, -- 启用输入增强（如 float 弹窗输入）
             profiler = { enabled = false },
             indent = {
@@ -295,9 +310,22 @@ return {
             {
                 "<c-/>",
                 function()
-                    require("snacks").terminal()
+                    require("snacks").terminal(nil, { win = { position = "bottom", height = 0.35 } })
                 end,
-                desc = "Terminal (Root Dir)",
+                desc = "Bottom Terminal",
+                mode = { "n", "t" },
+            },
+            {
+                "<c-\\>",
+                function()
+                    -- 显式 win.position=float（snacks/terminal.lua:92 默认 cmd=nil 时 position=bottom）；
+                    -- env 给独有值避免和 bottom 实例撞缓存 key（源码见 terminal.lua:176 M.tid）
+                    require("snacks").terminal(nil, {
+                        win = { position = "float", border = "rounded" },
+                        env = { SNACKS_TERM_KIND = "float" },
+                    })
+                end,
+                desc = "Float Terminal",
                 mode = { "n", "t" },
             },
         }

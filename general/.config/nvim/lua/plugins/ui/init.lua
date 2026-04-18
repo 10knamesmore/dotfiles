@@ -4,6 +4,5 @@ return {
     { import = "plugins.ui.git" },
     { import = "plugins.ui.diagnostics" },
     { import = "plugins.ui.structure" },
-    { import = "plugins.ui.terminal" },
     { import = "plugins.ui.statusline" },
 }

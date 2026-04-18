@@ -1,7 +1,6 @@
 _G.utils = require("utils")
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
-vim.g.copilot_enabled = false
 
 if vim.g.vscode then
     require("code.config.options")
