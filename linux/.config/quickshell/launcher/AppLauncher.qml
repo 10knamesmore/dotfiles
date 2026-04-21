@@ -48,15 +48,20 @@ PanelOverlay {
         let list = [];
         for (let i = 0; i < apps.length; i++) {
             let app = apps[i];
-            if (!app.noDisplay)
-                list.push({
-                    entry: app,
-                    _name: (app.name || "").toLowerCase(),
-                    _id: (app.id || "").toLowerCase(),
-                    _generic: (app.genericName || "").toLowerCase(),
-                    _comment: (app.comment || "").toLowerCase(),
-                    _keywords: (app.keywords || []).map(k => k.toLowerCase())
-                });
+            if (app.noDisplay)
+                continue;
+            // 过滤无 Name= 的 .desktop 条目，否则它们会让"首行"呈现为空白
+            let name = (app.name || "").trim();
+            if (name.length === 0)
+                continue;
+            list.push({
+                entry: app,
+                _name: name.toLowerCase(),
+                _id: (app.id || "").toLowerCase(),
+                _generic: (app.genericName || "").toLowerCase(),
+                _comment: (app.comment || "").toLowerCase(),
+                _keywords: (app.keywords || []).map(k => k.toLowerCase())
+            });
         }
         allApps = list;
         appsLoaded = true;
