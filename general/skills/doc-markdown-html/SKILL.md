@@ -1,6 +1,6 @@
 ---
 name: doc-markdown-html
-description: 任何情况需要编写文档时使用, 将markdown文档渲染成html优化显示
+description: 撰写、生成或更新任何文档时必须触发——包括"写文档/写说明/文档化/写一份指南/教程/README/API 文档/项目说明/技术文档/使用手册"等任意表述。
 ---
 
 # Doc Markdown HTML
@@ -47,7 +47,7 @@ uv run scripts/render_markdown_html.py <input.md> --output <output.html>
 | 表格             | GFM 风格，支持列对齐                                         |
 | 有序/无序列表    | 含嵌套                                                       |
 | 代码块           | 围栏代码块，支持语言标注、`title="…"` 和 `{行号}` 高亮元信息 |
-| Mermaid 图表     | ` ```mermaid ` 块自动渲染为 SVG，跟随亮/暗主题切换           |
+| Mermaid 图表     | ```mermaid``` 块自动渲染为 SVG，跟随亮/暗主题切换           |
 | 本地图片         | `![](相对路径)` 自动 base64 内嵌，生成的 HTML 完全自包含     |
 | 块引用           | 单层与嵌套                                                   |
 | 定义列表         | `term\n: definition` 格式                                    |
