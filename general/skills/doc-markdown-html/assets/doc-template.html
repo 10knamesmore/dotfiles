@@ -530,6 +530,30 @@
     .content h1 + h2 { border-top: none; padding-top: 0; margin-top: 1.1em; }
     .content p { margin: 0.55em 0; }
     .content ul, .content ol { margin: 0.55em 0; padding-left: 1.2em; }
+    .content a:not(.anchor-link):not(.section-copy-btn) {
+      color: var(--brand);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-decoration-color: color-mix(in srgb, var(--brand) 45%, transparent);
+      text-underline-offset: 3px;
+      border-radius: 3px;
+      padding: 0 1px;
+      transition: color .15s ease,
+                  background-color .15s ease,
+                  text-decoration-color .15s ease;
+    }
+    .content a:not(.anchor-link):not(.section-copy-btn):visited {
+      color: var(--brand);
+    }
+    .content a:not(.anchor-link):not(.section-copy-btn):hover {
+      text-decoration-color: var(--brand);
+      background: color-mix(in srgb, var(--brand) 10%, transparent);
+    }
+    .content a:not(.anchor-link):not(.section-copy-btn):focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+      text-decoration-color: var(--brand);
+    }
     .content .en-latin {
       font: inherit;
     }
@@ -920,6 +944,29 @@
       padding: 12px;
       max-height: calc(100vh - 24px);
       overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+    }
+    .toc::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .toc::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .toc::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--muted) 32%, transparent);
+      border-radius: 999px;
+      transition: background-color 0.2s ease;
+    }
+    .toc::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--brand) 55%, transparent);
+    }
+    .toc::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    .toc:not(:hover):not(:focus-within)::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--muted) 18%, transparent);
     }
     .toc h2 { margin: 2px 0 8px; font-size: 15px; }
     .toc ul { list-style: none; padding: 0; margin: 0; }
@@ -959,6 +1006,29 @@
       gap: 8px;
       max-height: min(46vh, 420px);
       overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+    }
+    .search-results::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .search-results::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .search-results::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--muted) 32%, transparent);
+      border-radius: 999px;
+      transition: background-color 0.2s ease;
+    }
+    .search-results::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--brand) 55%, transparent);
+    }
+    .search-results::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    .search-results:not(:hover):not(:focus-within)::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--muted) 18%, transparent);
     }
     .search-result {
       border: 1px solid var(--line);
@@ -1145,8 +1215,8 @@
       to   { opacity: 1; }
     }
     .doc-lightbox-inner {
-      max-width: 95vw;
-      max-height: 92vh;
+      max-width: 96vw;
+      max-height: 94vh;
       overflow: visible;
       border-radius: 10px;
       background: var(--surface);
@@ -1161,8 +1231,8 @@
     }
     .doc-lightbox-inner img {
       display: block;
-      max-width: 85vw;
-      max-height: 85vh;
+      max-width: 92vw;
+      max-height: 90vh;
       object-fit: contain;
     }
     .mermaid, .content img {
@@ -1610,7 +1680,10 @@
         var latin = (text.match(/[a-zA-Z]+/g) || []).length;
         var words = cjk + latin;
         var mins = Math.max(1, Math.round(words / 300));
-        el.textContent = '全文阅读约 ' + mins + ' 分钟';
+        var wordsLabel = words >= 1000
+          ? (words / 1000).toFixed(words >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
+          : String(words);
+        el.textContent = '全文 ' + wordsLabel + ' 字 · 阅读约 ' + mins + ' 分钟';
       }
 
       /* ── 标题锚点链接 ── */
@@ -2944,14 +3017,38 @@
       inner.appendChild(content);
       overlay.appendChild(inner);
 
-      const saved = lightboxStateMap.get(sourceEl) || { scale: 1, tx: 0, ty: 0 };
-      let { scale, tx, ty } = saved;
+      const saved = lightboxStateMap.get(sourceEl);
+      let scale = saved ? saved.scale : 1;
+      let tx = saved ? saved.tx : 0;
+      let ty = saved ? saved.ty : 0;
 
       function applyTransform() {
         inner.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
         inner.style.transformOrigin = 'center center';
       }
       applyTransform();
+
+      function computeInitialScale() {
+        const rect = content.getBoundingClientRect();
+        if (!rect.width || !rect.height) return 1;
+        const targetW = window.innerWidth * 0.82;
+        const targetH = window.innerHeight * 0.82;
+        const fit = Math.min(targetW / rect.width, targetH / rect.height);
+        return Math.min(Math.max(fit, 1), 4);
+      }
+      function fitInitial() {
+        if (saved) return;
+        scale = computeInitialScale();
+        applyTransform();
+      }
+      if (!saved) {
+        if (content.tagName === 'IMG' && !content.complete) {
+          content.addEventListener('load', () => requestAnimationFrame(fitInitial), { once: true });
+          requestAnimationFrame(fitInitial);
+        } else {
+          requestAnimationFrame(fitInitial);
+        }
+      }
 
       const close = () => {
         lightboxStateMap.set(sourceEl, { scale, tx, ty });
