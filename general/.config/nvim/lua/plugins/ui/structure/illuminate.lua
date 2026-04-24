@@ -13,6 +13,16 @@ return {
     config = function(_, opts)
         require("illuminate").configure(opts)
 
+        local function set_underline()
+            for _, group in ipairs({ "IlluminatedWordText", "IlluminatedWordRead", "IlluminatedWordWrite" }) do
+                local hl = vim.api.nvim_get_hl(0, { name = group, link = false })
+                hl.underline = true
+                vim.api.nvim_set_hl(0, group, hl)
+            end
+        end
+        set_underline()
+        vim.api.nvim_create_autocmd("ColorScheme", { callback = set_underline })
+
         local function map(key, dir, buffer)
             vim.keymap.set("n", key, function()
                 require("illuminate")["goto_" .. dir .. "_reference"](false)

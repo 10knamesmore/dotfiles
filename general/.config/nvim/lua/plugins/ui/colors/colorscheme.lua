@@ -19,6 +19,9 @@ return {
                     highlights["String"].italic = true
                     highlights["Constant"].italic = true
                     highlights["Constant"].bold = true
+                    -- Rust: struct 保留默认蓝，enum 用青蓝+斜体做细微区分
+                    highlights["@lsp.type.struct.rust"] = { fg = colors.blue1 }
+                    highlights["@lsp.type.enum.rust"] = { fg = colors.cyan, italic = true, bold = true }
                     -- Vue 内建 HTML 标签用蓝色
                     highlights["@tag.builtin.vue"] = { fg = colors.blue }
                     -- Vue 组件标签用红色，和 React 保持一致
