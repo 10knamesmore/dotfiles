@@ -13,7 +13,7 @@ PanelWindow {
     screen: modelData
 
     // ── 外观参数 ──
-    property int barCount: PanelState.visualizerBars.length > 0 ? PanelState.visualizerBars.length : 48
+    property int barCount: MediaState.visualizerBars.length > 0 ? MediaState.visualizerBars.length : 48
     property int maxRange: 100       // 与 CavaService 的 ascii_max_range 一致
 
     function barColor(index) {
@@ -54,7 +54,7 @@ PanelWindow {
     anchors.right: true
     implicitHeight: 80
     margins.bottom: 0
-    visible: PanelState.visualizerVisible
+    visible: WidgetVisibility.visualizerVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
@@ -77,7 +77,7 @@ PanelWindow {
             delegate: Rectangle {
                 required property int index
 
-                property real barValue: index < PanelState.visualizerBars.length ? PanelState.visualizerBars[index] : 0
+                property real barValue: index < MediaState.visualizerBars.length ? MediaState.visualizerBars[index] : 0
 
                 width: 6
                 height: Math.max(2, Math.pow(barValue / root.maxRange, 0.8) * 52)

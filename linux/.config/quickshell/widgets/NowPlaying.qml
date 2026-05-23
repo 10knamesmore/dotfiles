@@ -21,12 +21,12 @@ PanelWindow {
         let ps = Mpris.players.values;
         for (let i = 0; i < ps.length; i++) {
             if (ps[i].isPlaying) {
-                PanelState.lastActivePlayer = ps[i];
+                MediaState.lastActivePlayer = ps[i];
                 return ps[i];
             }
         }
-        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
-            return PanelState.lastActivePlayer;
+        if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
+            return MediaState.lastActivePlayer;
         return ps.length > 0 ? ps[0] : null;
     }
 
@@ -44,7 +44,7 @@ PanelWindow {
     implicitHeight: 180
     margins.bottom: widgetMarginBottom
     margins.right: widgetMarginRight
-    visible: PanelState.nowPlayingVisible && root.player !== null
+    visible: WidgetVisibility.nowPlayingVisible && root.player !== null
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
@@ -145,7 +145,7 @@ PanelWindow {
                 // 歌词行
                 Text {
                     Layout.fillWidth: true
-                    text: PanelState.currentLyric || ""
+                    text: LyricsState.currentLyric || ""
                     visible: text.length > 0
                     color: Colors.mauve
                     font.family: Fonts.family

@@ -9,7 +9,7 @@ PanelWindow {
     id: root
 
     // 双阶段可见性
-    property bool showing: PanelState.osdVisible
+    property bool showing: OsdState.osdVisible
 
     function refreshDismissTimer() {
         if (root.showing)
@@ -39,7 +39,7 @@ PanelWindow {
     }
 
     Connections {
-        target: PanelState
+        target: OsdState
 
         function onOsdValueChanged() {
             root.refreshDismissTimer();
@@ -59,7 +59,7 @@ PanelWindow {
         id: dismissTimer
 
         interval: 1500
-        onTriggered: PanelState.osdVisible = false
+        onTriggered: OsdState.osdVisible = false
     }
 
     ParallelAnimation {
@@ -132,7 +132,7 @@ PanelWindow {
             spacing: 14
 
             Text {
-                text: PanelState.osdIcon
+                text: OsdState.osdIcon
                 color: Colors.text
                 font.family: Fonts.family
                 font.pixelSize: Fonts.h1
@@ -151,10 +151,10 @@ PanelWindow {
                     color: Colors.surface1
 
                     Rectangle {
-                        width: Math.max(0, Math.min(1, PanelState.osdValue / 100)) * parent.width
+                        width: Math.max(0, Math.min(1, OsdState.osdValue / 100)) * parent.width
                         height: parent.height
                         radius: parent.radius
-                        color: PanelState.osdType === "brightness" ? Colors.yellow : Colors.blue
+                        color: OsdState.osdType === "brightness" ? Colors.yellow : Colors.blue
 
                         Behavior on width {
                             NumberAnimation {
@@ -175,7 +175,7 @@ PanelWindow {
                 }
 
                 Text {
-                    text: PanelState.osdValue + "%"
+                    text: OsdState.osdValue + "%"
                     color: Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small

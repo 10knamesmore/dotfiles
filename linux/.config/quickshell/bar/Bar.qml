@@ -10,8 +10,8 @@ PanelWindow {
     id: root
 
     required property var modelData
-    property bool revealed: PanelState.isBarVisibleForScreen(root.modelData.name)
-    property bool transientReveal: !PanelState.barPinnedVisible && PanelState.barHoverRevealScreen === root.modelData.name
+    property bool revealed: BarState.isBarVisibleForScreen(root.modelData.name)
+    property bool transientReveal: !BarState.barPinnedVisible && BarState.barHoverRevealScreen === root.modelData.name
     property int barHeight: 44
     property int trackingBandHeight: 44
 
@@ -134,7 +134,7 @@ PanelWindow {
         interval: 180
         onTriggered: {
             if (root.transientReveal && !PanelState.anyPanelOpen && !barHover.hovered && !trackingHover.hovered)
-                PanelState.hideHoverBar();
+                BarState.hideHoverBar();
         }
     }
 

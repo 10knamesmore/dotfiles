@@ -7,17 +7,17 @@ import QtQuick.Layouts
 BarModule {
     id: root
 
-    accentColor: PanelState.notificationCount > 0 ? Colors.yellow : Colors.overlay0
+    accentColor: SystemState.notificationCount > 0 ? Colors.yellow : Colors.overlay0
     implicitWidth: label.implicitWidth + 32
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);
-        PanelState.morphSourceX = pos.x + 2;
-        PanelState.morphSourceY = pos.y + 6;
+        MorphState.morphSourceX = pos.x + 2;
+        MorphState.morphSourceY = pos.y + 6;
         PanelState.toggleNotification();
     }
     onRightClicked: {
-        PanelState.clearAllNotifications();
+        SystemState.clearAllNotifications();
     }
 
     Row {
@@ -27,16 +27,16 @@ BarModule {
         spacing: 5
 
         Text {
-            text: PanelState.notificationCount > 0 ? "󰂚" : "󰂜"
-            color: PanelState.notificationCount > 0 ? Colors.yellow : Colors.overlay1
+            text: SystemState.notificationCount > 0 ? "󰂚" : "󰂜"
+            color: SystemState.notificationCount > 0 ? Colors.yellow : Colors.overlay1
             font.family: Fonts.family
             font.pixelSize: Fonts.title
             anchors.verticalCenter: parent.verticalCenter
         }
 
         Text {
-            visible: PanelState.notificationCount > 0
-            text: PanelState.notificationCount
+            visible: SystemState.notificationCount > 0
+            text: SystemState.notificationCount
             color: Colors.text
             font.family: Fonts.family
             font.pixelSize: Fonts.body

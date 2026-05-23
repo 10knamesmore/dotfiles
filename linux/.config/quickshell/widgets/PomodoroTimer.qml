@@ -68,7 +68,7 @@ PanelWindow {
     implicitHeight: 310
     margins.top: widgetY
     margins.left: widgetX
-    visible: PanelState.pomodoroVisible
+    visible: WidgetVisibility.pomodoroVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"

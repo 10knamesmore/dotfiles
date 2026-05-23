@@ -18,8 +18,8 @@ BarModule {
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);
-        PanelState.morphSourceX = pos.x + 2;
-        PanelState.morphSourceY = pos.y + 6;
+        MorphState.morphSourceX = pos.x + 2;
+        MorphState.morphSourceY = pos.y + 6;
         PanelState.toggleNetwork();
     }
 

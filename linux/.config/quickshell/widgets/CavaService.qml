@@ -3,20 +3,20 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// cava 单例服务 — 启动 cava 进程，将频谱数据写入 PanelState.visualizerBars
+// cava 单例服务 — 启动 cava 进程，将频谱数据写入 MediaState.visualizerBars
 // 在 shell.qml 中实例化一次即可，多个 AudioVisualizer 共享数据
 Item {
     id: root
 
     // ── cava 参数 ──
     // [general]
-    property int barCount: 64           // 频谱柱数量（64 已足够细腻，少于旧的 150 可大幅减少 binding 重算）
-    property int framerate: 60           // 刷新帧率 (fps)：60 才有 DAW EQ 的跟手感；30 会明显拖沓。高刷屏可上 90/120（CPU 同比上升）
+    property int barCount: 80           // 频谱柱数量
+    property int framerate: 60           // 刷新帧率 (fps)
     property int sensitivity: 200       // 自动增益灵敏度
     property bool autosens: true        // 自动灵敏度调节
     property real noiseReduction: 0   // 噪声抑制 0-1
-    property int lowerCutoff: 40        // 最低频率 Hz
-    property int upperCutoff: 10000     // 最高频率 Hz
+    property int lowerCutoff: 20        // 最低频率 Hz
+    property int upperCutoff: 20000     // 最高频率 Hz
     // [output]
     property int maxRange: 100          // ascii 输出最大值
     property string channels: "mono"    // stereo/mono
@@ -74,7 +74,7 @@ Item {
                     let v = i < parts.length ? (parseInt(parts[i]) || 0) : 0;
                     vals.push(v);
                 }
-                PanelState.visualizerBars = vals;
+                MediaState.visualizerBars = vals;
             }
         }
     }
@@ -83,7 +83,7 @@ Item {
     Connections {
         target: cavaProc
         function onExited() {
-            if (PanelState.visualizerVisible)
+            if (WidgetVisibility.visualizerVisible)
                 restartTimer.start();
         }
     }

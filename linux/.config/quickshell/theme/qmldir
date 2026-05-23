@@ -1,8 +1,16 @@
 singleton Anim 1.0 Anim.qml
+singleton BarState 1.0 BarState.qml
 singleton Colors 1.0 Colors.qml
 singleton Fonts 1.0 Fonts.qml
+singleton LyricsState 1.0 LyricsState.qml
+singleton MediaState 1.0 MediaState.qml
+singleton MorphState 1.0 MorphState.qml
+singleton OsdState 1.0 OsdState.qml
+singleton SystemState 1.0 SystemState.qml
+singleton SystemStats 1.0 SystemStats.qml
 singleton PanelState 1.0 PanelState.qml
 singleton Tokens 1.0 Tokens.qml
+singleton WidgetVisibility 1.0 WidgetVisibility.qml
 Divider 1.0 Divider.qml
 InnerGlow 1.0 InnerGlow.qml
 SoftShadow 1.0 SoftShadow.qml

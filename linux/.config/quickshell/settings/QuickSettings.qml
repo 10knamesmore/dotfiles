@@ -335,11 +335,11 @@ PanelOverlay {
                 }
 
                 QuickToggle {
-                    icon: PanelState.dndEnabled ? "󰂛" : "󰂚"
+                    icon: SystemState.dndEnabled ? "󰂛" : "󰂚"
                     label: "勿扰"
-                    status: PanelState.dndEnabled ? "已开启" : "已关闭"
-                    toggled: PanelState.dndEnabled
-                    onClicked: PanelState.dndEnabled = !PanelState.dndEnabled
+                    status: SystemState.dndEnabled ? "已开启" : "已关闭"
+                    toggled: SystemState.dndEnabled
+                    onClicked: SystemState.dndEnabled = !SystemState.dndEnabled
                 }
 
                 QuickToggle {
@@ -412,12 +412,12 @@ PanelOverlay {
                     let ps = Mpris.players.values;
                     for (let i = 0; i < ps.length; i++) {
                         if (ps[i].isPlaying) {
-                            PanelState.lastActivePlayer = ps[i];
+                            MediaState.lastActivePlayer = ps[i];
                             return ps[i];
                         }
                     }
-                    if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
-                        return PanelState.lastActivePlayer;
+                    if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
+                        return MediaState.lastActivePlayer;
                     return ps.length > 0 ? ps[0] : null;
                 }
             }

@@ -57,8 +57,8 @@ PanelOverlay {
 
             // 通知计数
             Text {
-                visible: PanelState.notificationCount > 0
-                text: PanelState.notificationCount + " 条"
+                visible: SystemState.notificationCount > 0
+                text: SystemState.notificationCount + " 条"
                 color: Colors.subtext0
                 font.family: Fonts.family
                 font.pixelSize: Fonts.small
@@ -66,7 +66,7 @@ PanelOverlay {
 
             // 清除全部按钮（红色 hover，对齐 ClipboardPanel）
             Rectangle {
-                visible: PanelState.notificationCount > 0
+                visible: SystemState.notificationCount > 0
                 width: clearText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
@@ -96,7 +96,7 @@ PanelOverlay {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: PanelState.clearAllNotifications()
+                    onClicked: SystemState.clearAllNotifications()
                 }
 
                 Behavior on color {
@@ -118,7 +118,7 @@ PanelOverlay {
 
         // 空状态
         Text {
-            visible: PanelState.notificationCount === 0
+            visible: SystemState.notificationCount === 0
             text: "暂无通知"
             color: Colors.overlay0
             font.family: Fonts.family

@@ -1,26 +1,24 @@
 import "../../theme"
 import "../components"
 import QtQuick
-import Quickshell.Io
+import Quickshell
 
 BarModule {
     id: root
 
-    property int usage: 0
-    property var prevStat: null // [total, idle]
-    property var prevCores: [] // [[total, idle], ...] per core
-    property var corePcts: [] // per-core usage percentages
+    // 数据来自 SystemStats（SystemStatsService 每秒更新）
     // Waybar 彩色柱状图（8级）
     readonly property var barChars: ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
     readonly property var barColors: ["#69ff94", "#2aa9ff", "#f8f8f2", "#f8f8f2", "#ffffa5", "#ffffa5", "#ff9977", "#dd532e"]
     // 构建彩色柱状图富文本
     property string chartHtml: {
-        if (corePcts.length === 0)
+        let cores = SystemStats.cpuCorePcts;
+        if (cores.length === 0)
             return "";
 
         let s = "";
-        for (let i = 0; i < corePcts.length; i++) {
-            let bi = barIndex(corePcts[i]);
+        for (let i = 0; i < cores.length; i++) {
+            let bi = barIndex(cores[i]);
             s += "<span style='color:" + barColors[bi] + "'>" + barChars[bi] + "</span>";
         }
         return s;
@@ -32,67 +30,7 @@ BarModule {
 
     accentColor: Colors.blue
     implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
-    Component.onCompleted: reader.running = true
     onClicked: Quickshell.execDetached(["plasma-systemmonitor"])
-
-    Process {
-        id: reader
-
-        command: ["bash", "-c", "grep '^cpu' /proc/stat"]
-        onExited: {
-            let lines = reader.stdout.lines;
-            reader.stdout.lines = [];
-            let cores = [];
-            for (let i = 0; i < lines.length; i++) {
-                let parts = lines[i].trim().split(/\s+/);
-                let nums = parts.slice(1).map(Number);
-                let idle = nums[3] + nums[4];
-                let total = nums.reduce((a, b) => {
-                    return a + b;
-                }, 0);
-                if (parts[0] === "cpu") {
-                    if (root.prevStat !== null) {
-                        let dt = total - root.prevStat[0];
-                        let di = idle - root.prevStat[1];
-                        root.usage = dt > 0 ? Math.round((dt - di) / dt * 100) : 0;
-                    }
-                    root.prevStat = [total, idle];
-                } else {
-                    cores.push([total, idle]);
-                }
-            }
-            // Per-core percentages
-            if (root.prevCores.length === cores.length && cores.length > 0) {
-                let pcts = [];
-                for (let i = 0; i < cores.length; i++) {
-                    let dt = cores[i][0] - root.prevCores[i][0];
-                    let di = cores[i][1] - root.prevCores[i][1];
-                    pcts.push(dt > 0 ? Math.round((dt - di) / dt * 100) : 0);
-                }
-                root.corePcts = pcts;
-            }
-            root.prevCores = cores;
-        }
-
-        stdout: SplitParser {
-            property var lines: []
-
-            onRead: (data) => {
-                lines.push(data);
-            }
-        }
-
-    }
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
-            reader.running = false;
-            reader.running = true;
-        }
-    }
 
     // 紧凑模式宽度参考
     Row {
@@ -100,7 +38,7 @@ BarModule {
         visible: false
         spacing: 5
         Text { text: label.children[0].text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
-        Text { text: root.usage + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
+        Text { text: SystemStats.cpuUsage + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
     }
 
     Row {
@@ -110,7 +48,7 @@ BarModule {
         spacing: 5
 
         Text {
-            text: ""
+            text: ""
             color: Colors.blue
             font.family: Fonts.family
             font.pixelSize: Fonts.icon
@@ -119,8 +57,8 @@ BarModule {
         }
 
         Text {
-            text: root.usage + "%"
-            color: root.usage > 80 ? Colors.red : (root.usage > 50 ? Colors.yellow : Colors.text)
+            text: SystemStats.cpuUsage + "%"
+            color: SystemStats.cpuUsage > 80 ? Colors.red : (SystemStats.cpuUsage > 50 ? Colors.yellow : Colors.text)
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.DemiBold

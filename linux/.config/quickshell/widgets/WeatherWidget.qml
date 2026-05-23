@@ -96,7 +96,7 @@ PanelWindow {
     implicitHeight: 200
     margins.top: widgetY
     margins.right: widgetMarginRight
-    visible: PanelState.weatherWidgetVisible && root.loaded
+    visible: WidgetVisibility.weatherWidgetVisible && root.loaded
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"

@@ -15,7 +15,7 @@ PanelOverlay {
     panelHeight: Math.min(height * 0.85, col.implicitHeight + 32)
     onCloseRequested: PanelState.mediaOpen = false
     onShowingChanged: {
-        if (showing && PanelState.currentLyricIndex >= 0)
+        if (showing && LyricsState.currentLyricIndex >= 0)
             lyricsJumpTimer.start();
     }
 
@@ -23,12 +23,12 @@ PanelOverlay {
         let ps = Mpris.players.values;
         for (let i = 0; i < ps.length; i++) {
             if (ps[i].isPlaying) {
-                PanelState.lastActivePlayer = ps[i];
+                MediaState.lastActivePlayer = ps[i];
                 return ps[i];
             }
         }
-        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
-            return PanelState.lastActivePlayer;
+        if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
+            return MediaState.lastActivePlayer;
         return ps.length > 0 ? ps[0] : null;
     }
 
@@ -114,7 +114,7 @@ PanelOverlay {
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
             spacing: Tokens.spaceS
-            visible: PanelState.lyricsLines.length > 0
+            visible: LyricsState.lyricsLines.length > 0
 
             Rectangle {
                 width: 28
@@ -133,7 +133,7 @@ PanelOverlay {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: PanelState.lyricsOffset = Math.round((PanelState.lyricsOffset - 0.1) * 10) / 10
+                    onClicked: LyricsState.lyricsOffset = Math.round((LyricsState.lyricsOffset - 0.1) * 10) / 10
                 }
                 Behavior on color {
                     ColorAnimation {
@@ -144,10 +144,10 @@ PanelOverlay {
 
             Text {
                 text: {
-                    let v = PanelState.lyricsOffset;
+                    let v = LyricsState.lyricsOffset;
                     return (v >= 0 ? "+" : "") + v.toFixed(1) + "s";
                 }
-                color: PanelState.lyricsOffset === 0 ? Colors.overlay0 : Colors.mauve
+                color: LyricsState.lyricsOffset === 0 ? Colors.overlay0 : Colors.mauve
                 font.family: Fonts.family
                 font.pixelSize: Fonts.caption
                 horizontalAlignment: Text.AlignHCenter
@@ -156,7 +156,7 @@ PanelOverlay {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: PanelState.lyricsOffset = 0
+                    onClicked: LyricsState.lyricsOffset = 0
                 }
             }
 
@@ -177,7 +177,7 @@ PanelOverlay {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: PanelState.lyricsOffset = Math.round((PanelState.lyricsOffset + 0.1) * 10) / 10
+                    onClicked: LyricsState.lyricsOffset = Math.round((LyricsState.lyricsOffset + 0.1) * 10) / 10
                 }
                 Behavior on color {
                     ColorAnimation {
@@ -193,12 +193,12 @@ PanelOverlay {
             Layout.fillHeight: true
             Layout.minimumHeight: 400
             clip: true
-            visible: PanelState.lyricsLines.length > 0
+            visible: LyricsState.lyricsLines.length > 0
 
             ListView {
                 id: lyricsView
                 anchors.fill: parent
-                model: PanelState.lyricsLines
+                model: LyricsState.lyricsLines
                 spacing: 14
                 clip: true
                 interactive: true
@@ -206,13 +206,13 @@ PanelOverlay {
                 preferredHighlightBegin: height / 2 - 16
                 preferredHighlightEnd: height / 2 + 16
                 highlightRangeMode: ListView.ApplyRange
-                currentIndex: PanelState.currentLyricIndex >= 0 ? PanelState.currentLyricIndex : 0
+                currentIndex: LyricsState.currentLyricIndex >= 0 ? LyricsState.currentLyricIndex : 0
 
                 delegate: Text {
                     required property int index
                     required property var modelData
 
-                    property bool isCurrent: index === PanelState.currentLyricIndex
+                    property bool isCurrent: index === LyricsState.currentLyricIndex
 
                     width: ListView.view.width
                     text: modelData.text
@@ -223,7 +223,7 @@ PanelOverlay {
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignCenter
                     opacity: {
-                        let dist = Math.abs(index - PanelState.currentLyricIndex);
+                        let dist = Math.abs(index - LyricsState.currentLyricIndex);
                         if (dist === 0)
                             return 1.0;
                         if (dist === 1)
@@ -266,8 +266,8 @@ PanelOverlay {
                 id: lyricsJumpTimer
                 interval: 50
                 onTriggered: {
-                    if (PanelState.currentLyricIndex >= 0)
-                        lyricsView.positionViewAtIndex(PanelState.currentLyricIndex, ListView.Center);
+                    if (LyricsState.currentLyricIndex >= 0)
+                        lyricsView.positionViewAtIndex(LyricsState.currentLyricIndex, ListView.Center);
                 }
             }
         }
@@ -276,7 +276,7 @@ PanelOverlay {
         Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 60
-            visible: PanelState.lyricsLines.length === 0
+            visible: LyricsState.lyricsLines.length === 0
 
             Text {
                 anchors.centerIn: parent

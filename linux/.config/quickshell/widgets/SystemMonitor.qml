@@ -63,7 +63,7 @@ PanelWindow {
     implicitHeight: 520
     margins.top: widgetY
     margins.right: widgetMarginRight
-    visible: PanelState.systemMonitorVisible
+    visible: WidgetVisibility.systemMonitorVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"

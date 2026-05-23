@@ -3,10 +3,6 @@ pragma Singleton
 
 // 全局面板状态单例 — 用于 bar 模块与弹出面板之间的跨组件通信
 QtObject {
-    // ── Bar ──
-    property bool barPinnedVisible: true
-    property string barHoverRevealScreen: ""
-    readonly property bool barVisible: barPinnedVisible
     // ── 面板 ──
     property bool screenEffectsOpen: false
     property bool calendarOpen: false
@@ -18,65 +14,13 @@ QtObject {
     property bool clipboardOpen: false
     property bool keybindingsOpen: false
     property bool networkOpen: false
-    // ── 桌面小组件 ──
-    property bool analogClockVisible: true
-    property bool pomodoroVisible: true
-    property bool visualizerVisible: true
-    property bool weatherWidgetVisible: true
-    property bool nowPlayingVisible: true
-    property bool systemMonitorVisible: true
-    // ── 音频可视化共享数据（cava 进程单例，多屏共享）──
-    property var visualizerBars: []
     // ── 新面板 ──
     property bool notesOpen: false
     property bool journalOpen: false
     property bool aiOpen: false
     property bool bluetoothOpen: false
     property bool displayOpen: false
-    // ── 媒体 ──
-    property var lastActivePlayer: null
-    // ── 歌词 ──
-    property var lyricsLines: []      // [{time: seconds, text: "歌词行"}, ...]
-    property int currentLyricIndex: -1
-    property string currentLyric: ""
-    property string lyricsTrackId: "" // 用于检测歌曲切换
-    property real lyricsOffset: 0    // 歌词时间偏移（秒），正值=歌词提前，负值=歌词延后
-    // ── 勿扰 ──
-    property bool dndEnabled: false
-    // ── 通知 ──
-    property int notificationCount: 0
-    // ── 面板动画源（鼠标点击位置）──
-    property real morphSourceX: -1
-    property real morphSourceY: -1
-    // ── OSD ──
-    property bool osdVisible: false
-    property string osdType: "" // "volume" | "brightness"
-    property int osdValue: 0 // 0-100
-    property string osdIcon: ""
     readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || aiOpen || bluetoothOpen || displayOpen
-
-    signal clearAllNotifications()
-
-    function toggleBar() {
-        barPinnedVisible = !barPinnedVisible;
-        if (barPinnedVisible)
-            barHoverRevealScreen = "";
-    }
-
-    function showBarForScreen(screenName) {
-        if (!screenName || barPinnedVisible)
-            return;
-
-        barHoverRevealScreen = screenName;
-    }
-
-    function hideHoverBar() {
-        barHoverRevealScreen = "";
-    }
-
-    function isBarVisibleForScreen(screenName) {
-        return barPinnedVisible || barHoverRevealScreen === screenName;
-    }
 
     function toggleScreenEffects() {
         screenEffectsOpen = !screenEffectsOpen;
@@ -138,15 +82,9 @@ QtObject {
         displayOpen = !displayOpen;
     }
 
-    // 重置 morph 源（每次打开新面板前调用）
-    function resetMorphSource() {
-        morphSourceX = -1;
-        morphSourceY = -1;
-    }
-
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
-        resetMorphSource();
+        MorphState.reset();
         screenEffectsOpen = false;
         calendarOpen = false;
         mediaOpen = false;

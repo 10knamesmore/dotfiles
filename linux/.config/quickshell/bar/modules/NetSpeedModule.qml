@@ -1,18 +1,16 @@
 import "../../theme"
 import "../components"
 import QtQuick
-import Quickshell.Io
 
 BarModule {
     id: root
 
     property string direction: "up" // "up" 或 "down"
 
-    // ── 内部状态 ──
-    property string ifaceName: ""
-    property real speed: 0          // bytes/s
-    property real totalBytes: 0     // 累计字节数
-    property real _prevBytes: -1
+    // 数据来自 SystemStats（SystemStatsService 每秒更新；up/down 共用一次 /proc/net/dev 读取）
+    readonly property real speed: direction === "up" ? SystemStats.netUpSpeed : SystemStats.netDownSpeed
+    readonly property real totalBytes: direction === "up" ? SystemStats.netUpTotal : SystemStats.netDownTotal
+    readonly property string ifaceName: SystemStats.netIface
 
     function formatSpeed(bytesPerSec) {
         if (bytesPerSec < 1024)
@@ -38,70 +36,6 @@ BarModule {
     implicitWidth: root.hovered
         ? Math.max(hoverRow.implicitWidth + 32, 180)
         : Math.max(label.implicitWidth + 32, 120)
-    Component.onCompleted: reader.running = true
-
-    // 读 /proc/net/dev，解析非虚拟接口的字节数
-    Process {
-        id: reader
-
-        property string _buf: ""
-
-        command: ["cat", "/proc/net/dev"]
-
-        stdout: SplitParser {
-            onRead: data => reader._buf += data + "\n"
-        }
-
-        onExited: {
-            let lines = reader._buf.split("\n");
-            let skipPrefixes = ["lo", "docker", "br-", "vmnet", "veth"];
-
-            for (let line of lines) {
-                let m = line.match(/^\s*(\S+):\s+(.*)/);
-                if (!m)
-                    continue;
-
-                let iface = m[1];
-                let skip = false;
-                for (let p of skipPrefixes) {
-                    if (iface.startsWith(p)) {
-                        skip = true;
-                        break;
-                    }
-                }
-                if (skip)
-                    continue;
-
-                let fields = m[2].trim().split(/\s+/);
-                if (fields.length < 10)
-                    continue;
-
-                let rxBytes = parseInt(fields[0]);
-                let txBytes = parseInt(fields[8]);
-                let curBytes = root.direction === "down" ? rxBytes : txBytes;
-                let curTotal = root.direction === "down" ? rxBytes : txBytes;
-
-                root.ifaceName = iface;
-                root.totalBytes = curTotal;
-
-                if (root._prevBytes >= 0)
-                    root.speed = curBytes - root._prevBytes;
-                root._prevBytes = curBytes;
-                break; // 只取第一个匹配的物理接口
-            }
-            reader._buf = "";
-        }
-    }
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
-            reader.running = false;
-            reader.running = true;
-        }
-    }
 
     // ── 默认视图 ──
     Text {

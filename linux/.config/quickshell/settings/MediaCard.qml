@@ -252,7 +252,7 @@ Rectangle {
             // 当前歌词
             Text {
                 id: cardLyric
-                text: PanelState.currentLyric
+                text: LyricsState.currentLyric
                 color: Colors.mauve
                 font.family: Fonts.family
                 font.pixelSize: Fonts.small
@@ -260,7 +260,7 @@ Rectangle {
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
                 Layout.fillWidth: true
-                visible: PanelState.currentLyric.length > 0
+                visible: LyricsState.currentLyric.length > 0
                 opacity: 1
 
                 onTextChanged: {

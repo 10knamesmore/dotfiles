@@ -33,7 +33,7 @@ PanelWindow {
     implicitHeight: clockSize + 40
     margins.top: widgetY
     margins.left: widgetX
-    visible: PanelState.analogClockVisible
+    visible: WidgetVisibility.analogClockVisible
     focusable: false
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"

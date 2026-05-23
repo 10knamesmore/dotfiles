@@ -15,7 +15,7 @@ PanelWindow {
     implicitHeight: 3
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
-    visible: !PanelState.barPinnedVisible && PanelState.barHoverRevealScreen !== root.modelData.name
+    visible: !BarState.barPinnedVisible && BarState.barHoverRevealScreen !== root.modelData.name
 
     MouseArea {
         anchors.fill: parent
@@ -29,6 +29,6 @@ PanelWindow {
         id: revealTimer
 
         interval: 140
-        onTriggered: PanelState.showBarForScreen(root.modelData.name)
+        onTriggered: BarState.showBarForScreen(root.modelData.name)
     }
 }

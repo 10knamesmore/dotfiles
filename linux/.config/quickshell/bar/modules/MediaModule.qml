@@ -12,12 +12,12 @@ BarModule {
         let ps = Mpris.players.values;
         for (let i = 0; i < ps.length; i++) {
             if (ps[i].isPlaying) {
-                PanelState.lastActivePlayer = ps[i];
+                MediaState.lastActivePlayer = ps[i];
                 return ps[i];
             }
         }
-        if (PanelState.lastActivePlayer && ps.indexOf(PanelState.lastActivePlayer) >= 0)
-            return PanelState.lastActivePlayer;
+        if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
+            return MediaState.lastActivePlayer;
         return ps.length > 0 ? ps[0] : null;
     }
 
@@ -29,8 +29,8 @@ BarModule {
     property string fullContent: {
         if (!player)
             return "";
-        if (showLyric && PanelState.currentLyric.length > 0)
-            return PanelState.currentLyric;
+        if (showLyric && LyricsState.currentLyric.length > 0)
+            return LyricsState.currentLyric;
         let t = player.trackTitle || "";
         let a = player.trackArtist || "";
         if (!t)
@@ -42,8 +42,8 @@ BarModule {
     property string truncatedContent: {
         if (!player)
             return "";
-        if (showLyric && PanelState.currentLyric.length > 0) {
-            let l = PanelState.currentLyric;
+        if (showLyric && LyricsState.currentLyric.length > 0) {
+            let l = LyricsState.currentLyric;
             return l.length > 40 ? l.substring(0, 37) + "…" : l;
         }
         let t = player.trackTitle || "";
@@ -69,8 +69,8 @@ BarModule {
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);
-        PanelState.morphSourceX = pos.x + 2;
-        PanelState.morphSourceY = pos.y + 6;
+        MorphState.morphSourceX = pos.x + 2;
+        MorphState.morphSourceY = pos.y + 6;
         PanelState.toggleMedia();
     }
     onRightClicked: {
@@ -148,11 +148,11 @@ BarModule {
 
         Text {
             text: root.truncatedContent
-            color: root.showLyric && PanelState.currentLyric.length > 0 ? Colors.mauve : Colors.text
+            color: root.showLyric && LyricsState.currentLyric.length > 0 ? Colors.mauve : Colors.text
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.Medium
-            font.italic: root.showLyric && PanelState.currentLyric.length > 0
+            font.italic: root.showLyric && LyricsState.currentLyric.length > 0
             anchors.verticalCenter: parent.verticalCenter
 
             Behavior on color {
@@ -220,11 +220,11 @@ BarModule {
         // 完整内容
         Text {
             text: root.fullContent
-            color: root.showLyric && PanelState.currentLyric.length > 0 ? Colors.mauve : Colors.pink
+            color: root.showLyric && LyricsState.currentLyric.length > 0 ? Colors.mauve : Colors.pink
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.Medium
-            font.italic: root.showLyric && PanelState.currentLyric.length > 0
+            font.italic: root.showLyric && LyricsState.currentLyric.length > 0
             elide: Text.ElideRight
             width: Math.min(implicitWidth, hoverRow.maxWidth - hoverRow.reservedWidth)
             anchors.verticalCenter: parent.verticalCenter

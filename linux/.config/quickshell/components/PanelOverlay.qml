@@ -53,8 +53,8 @@ PanelWindow {
 
     onShowingChanged: {
         if (showing) {
-            _morphX = PanelState.morphSourceX;
-            _morphY = PanelState.morphSourceY;
+            _morphX = MorphState.morphSourceX;
+            _morphY = MorphState.morphSourceY;
             _animEnabled = false; // 关闭动画
             _atTarget = false;    // 跳到源位置（无动画）
             _keepVisible = true;
