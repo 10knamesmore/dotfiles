@@ -112,6 +112,6 @@ for i in $(seq 1 "$frames"); do
 
     [ "$step" -eq 0 ] && continue
 
-    hyprctl dispatch resizeactive "0 $((step_sign * step))" >/dev/null 2>&1 || exit 0
+    hyprctl dispatch "hl.dsp.window.resize({ x = 0, y = $((step_sign * step)), relative = true })" >/dev/null 2>&1 || exit 0
     sleep "$sleep_s"
 done

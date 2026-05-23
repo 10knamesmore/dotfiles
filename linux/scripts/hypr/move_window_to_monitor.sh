@@ -58,4 +58,4 @@ if [[ -z "$target" ]]; then
   exit 1
 fi
 
-hyprctl dispatch movewindow "mon:${target}" >/dev/null
+hyprctl dispatch "hl.dsp.window.move({ monitor = '${target}' })" >/dev/null

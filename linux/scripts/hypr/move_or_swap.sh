@@ -17,7 +17,7 @@ old_x=$(echo "$win" | jq '.at[0]')
 old_y=$(echo "$win" | jq '.at[1]')
 
 # 尝试移动窗口
-hyprctl dispatch movewindow "$dir"
+hyprctl dispatch "hl.dsp.window.move({ direction = '$dir' })"
 
 sleep 0.02
 
@@ -28,5 +28,5 @@ new_y=$(echo "$win2" | jq '.at[1]')
 
 # 如果位置相同，说明无法移动 → 执行 swap
 if [ "$old_x" = "$new_x" ] && [ "$old_y" = "$new_y" ]; then
-    hyprctl dispatch swapwindow "$dir"
+    hyprctl dispatch "hl.dsp.window.swap({ direction = '$dir' })"
 fi

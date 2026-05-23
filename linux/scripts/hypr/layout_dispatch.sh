@@ -41,7 +41,7 @@ case "$mode" in
         old_x="$(echo "$win_before" | jq -r '.at[0] // empty')"
         old_y="$(echo "$win_before" | jq -r '.at[1] // empty')"
 
-        hyprctl dispatch movewindow "$dir" >/dev/null 2>&1 || true
+        hyprctl dispatch "hl.dsp.window.move({ direction = '$dir' })" >/dev/null 2>&1 || true
 
         win_after="$(hyprctl -j activewindow 2>/dev/null || true)"
         new_x="$(echo "$win_after" | jq -r '.at[0] // empty')"
@@ -62,8 +62,8 @@ case "$mode" in
       scrolling)
         # scrolling：左右用 colresize，上下用动画 resizeactive。
         case "$key" in
-          h) hyprctl dispatch layoutmsg "colresize -0.05" ;;
-          l) hyprctl dispatch layoutmsg "colresize +0.05" ;;
+          h) hyprctl dispatch "hl.dsp.layout('colresize -0.05')" ;;
+          l) hyprctl dispatch "hl.dsp.layout('colresize +0.05')" ;;
           j) "$script_dir/resizeactive_animated.sh" down ;;
           k) "$script_dir/resizeactive_animated.sh" up ;;
         esac
@@ -71,17 +71,17 @@ case "$mode" in
       dwindle)
         # dwindle：使用传统像素级 resizeactive。
         case "$key" in
-          h) hyprctl dispatch resizeactive "-40 0" ;;
-          l) hyprctl dispatch resizeactive "40 0" ;;
-          j) hyprctl dispatch resizeactive "0 40" ;;
-          k) hyprctl dispatch resizeactive "0 -40" ;;
+          h) hyprctl dispatch "hl.dsp.window.resize({ x = -40, y = 0, relative = true })" ;;
+          l) hyprctl dispatch "hl.dsp.window.resize({ x = 40,  y = 0, relative = true })" ;;
+          j) hyprctl dispatch "hl.dsp.window.resize({ x = 0,   y = 40, relative = true })" ;;
+          k) hyprctl dispatch "hl.dsp.window.resize({ x = 0,   y = -40, relative = true })" ;;
         esac
         ;;
       *)
         # 回退到现有默认行为。
         case "$key" in
-          h) hyprctl dispatch layoutmsg "colresize -0.05" ;;
-          l) hyprctl dispatch layoutmsg "colresize +0.05" ;;
+          h) hyprctl dispatch "hl.dsp.layout('colresize -0.05')" ;;
+          l) hyprctl dispatch "hl.dsp.layout('colresize +0.05')" ;;
           j) "$script_dir/resizeactive_animated.sh" down ;;
           k) "$script_dir/resizeactive_animated.sh" up ;;
         esac
