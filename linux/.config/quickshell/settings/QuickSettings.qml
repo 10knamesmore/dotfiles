@@ -401,6 +401,19 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
+            Text {
+                text: "栏样式"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.letterSpacing: 2
+                font.weight: Font.Medium
+            }
+
+            BarStylePicker {
+                Layout.fillWidth: true
+            }
+
             Divider {
                 Layout.fillWidth: true
             }

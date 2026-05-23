@@ -1,5 +1,6 @@
 singleton Anim 1.0 Anim.qml
 singleton BarState 1.0 BarState.qml
+singleton BarLayout 1.0 BarLayout.qml
 singleton Colors 1.0 Colors.qml
 singleton Fonts 1.0 Fonts.qml
 singleton LyricsState 1.0 LyricsState.qml

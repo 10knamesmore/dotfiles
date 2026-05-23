@@ -10,11 +10,12 @@ Rectangle {
     id: root
 
     property var barWindow: null
+    property bool flat: false
 
     implicitWidth: Math.max(trayRow.implicitWidth + 24, 36)
     implicitHeight: 36
     radius: 16
-    color: Colors.surface0
+    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : Colors.surface0
     visible: trayRepeater.count > 0
     clip: false
 
@@ -22,6 +23,7 @@ Rectangle {
     SoftShadow {
         anchors.fill: parent
         radius: root.radius
+        visible: !root.flat
     }
 
     // 左侧弧形指示器
@@ -31,6 +33,7 @@ Rectangle {
         width: 4
         height: parent.height * 0.5
         clip: true
+        visible: !root.flat
 
         Rectangle {
             anchors.left: parent.left

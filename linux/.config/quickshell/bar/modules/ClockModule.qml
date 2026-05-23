@@ -9,6 +9,7 @@ Rectangle {
 
     property bool showDate: false
     property bool hovered: clockHover.containsMouse
+    property bool flat: false
 
     implicitWidth: col.implicitWidth + 36
     implicitHeight: 36
@@ -26,6 +27,7 @@ Rectangle {
         anchors.fill: parent
         radius: parent.radius
         opacity: root.hovered ? 1 : 0
+        visible: !root.flat
 
         gradient: Gradient {
             orientation: Gradient.Horizontal
@@ -60,6 +62,7 @@ Rectangle {
         radius: root.radius
         shadowColor: Colors.blue
         strength: root.hovered ? 0.35 : 0.25
+        visible: !root.flat
     }
 
     SystemClock {
@@ -77,7 +80,7 @@ Rectangle {
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: Qt.formatTime(clock.date, "HH:mm:ss") + " "
-            color: Colors.base
+            color: root.flat ? Colors.text : Colors.base
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.ExtraBold
@@ -88,7 +91,7 @@ Rectangle {
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: Qt.formatTime(clock.date, "HH:mm") + "  " + Qt.formatDate(clock.date, "MM/dd ddd")
-            color: Colors.base
+            color: root.flat ? Colors.text : Colors.base
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.ExtraBold
@@ -98,7 +101,7 @@ Rectangle {
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: Qt.formatDate(clock.date, "dddd, MMMM d, yyyy") + " 󰃰"
-            color: Colors.base
+            color: root.flat ? Colors.text : Colors.base
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.ExtraBold
@@ -126,8 +129,11 @@ Rectangle {
         }
     }
 
-    // 默认渐变 blue → sapphire → sky
-    gradient: Gradient {
+    // 默认渐变 blue → sapphire → sky（flat 模式回退淡背景）
+    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, root.hovered ? 0.85 : 0.5) : "transparent"
+    gradient: root.flat ? null : clockGrad
+
+    property Gradient clockGrad: Gradient {
         orientation: Gradient.Horizontal
 
         GradientStop {

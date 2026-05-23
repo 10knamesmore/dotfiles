@@ -29,9 +29,9 @@ PanelWindow {
     anchors.right: true
     implicitHeight: root.barHeight + (root.transientReveal ? root.trackingBandHeight : 0)
     exclusiveZone: root.revealed ? 50 : 0
-    margins.top: root.revealed ? 6 : -(root.implicitHeight + 12)
-    margins.left: 2
-    margins.right: 2
+    margins.top: root.revealed ? BarLayout.current.topMargin : -(root.implicitHeight + 12)
+    margins.left: BarLayout.current.sideMargin
+    margins.right: BarLayout.current.sideMargin
     color: "transparent"
 
     Item {
@@ -46,71 +46,92 @@ PanelWindow {
             id: barHover
         }
 
-        // ── 左区：工作区 · 布局状态 · 窗口标题 · systemd ──
+        // ── floating 悬浮底板（barBackground 预设才显示）──
+        Rectangle {
+            id: barPlate
+
+            anchors.fill: parent
+            visible: BarLayout.current.barBackground
+            radius: BarLayout.current.squareCorners ? 0 : Tokens.radiusL
+            color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, BarLayout.current.barAlpha)
+            border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
+            border.width: BarLayout.current.barBackground ? Tokens.borderWidth : 0
+
+            SoftShadow {
+                anchors.fill: parent
+                radius: parent.radius
+                visible: BarLayout.current.barBackground
+            }
+        }
+
+        // ── 左区 ──
         RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: 4
-            spacing: 6
+            spacing: BarLayout.current.spacing
             height: parent.height
 
-            WorkspacesModule {
-                barScreen: root.modelData
-            }
+            Repeater {
+                model: BarLayout.current.leftWidgets
 
-            ScrollStatusModule {
-                barScreen: root.modelData
-            }
+                delegate: WidgetSlot {
+                    required property var modelData
 
-            WindowTitleModule {}
-
-            TrayModule {
-                barWindow: root
+                    widgetItem: modelData
+                    flat: BarLayout.current.moduleFlat
+                    barScreen: root.modelData
+                    barWindow: root
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
+                }
             }
         }
 
-        // ── 中区：媒体 · 上行速度 · 时钟 · 下行速度 ──
+        // ── 中区 ──
         RowLayout {
             anchors.centerIn: parent
-            spacing: 6
+            spacing: BarLayout.current.spacing
             height: parent.height
 
-            NetSpeedModule {
-                direction: "up"
-            }
+            Repeater {
+                model: BarLayout.current.centerWidgets
 
-            MediaModule {}
+                delegate: WidgetSlot {
+                    required property var modelData
 
-            ClockModule {}
-
-            NetSpeedModule {
-                direction: "down"
+                    widgetItem: modelData
+                    flat: BarLayout.current.moduleFlat
+                    barScreen: root.modelData
+                    barWindow: root
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
+                }
             }
         }
 
-        // ── 右区：CPU · 内存 · 音量 · 网络 · 屏幕效果 · 电量 · 托盘 ──
+        // ── 右区 ──
         RowLayout {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: 4
-            spacing: 6
+            spacing: BarLayout.current.spacing
             height: parent.height
 
-            CpuModule {}
+            Repeater {
+                model: BarLayout.current.rightWidgets
 
-            MemoryModule {}
+                delegate: WidgetSlot {
+                    required property var modelData
 
-            AudioModule {}
-
-            NetworkModule {}
-
-            ClipboardModule {}
-
-            NotificationModule {}
-
-            ScreenEffectsModule {}
-
-            BatteryModule {}
+                    widgetItem: modelData
+                    flat: BarLayout.current.moduleFlat
+                    barScreen: root.modelData
+                    barWindow: root
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
+                }
+            }
         }
     }
 

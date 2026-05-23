@@ -10,6 +10,7 @@ Rectangle {
     property color backgroundColor: Colors.surface0
     property color tintColor: "transparent"
     property real backgroundAlpha: Tokens.panelAlpha
+    property bool flat: false
     property bool hovered: hoverArea.containsMouse
     property real progress: -1 // 0~1 进度值，-1 不启用
     property bool progressDraggable: false
@@ -22,9 +23,9 @@ Rectangle {
 
     clip: true
     radius: Tokens.radiusL
-    color: hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha)
+    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, root.hovered ? 0.85 : 0.5) : (hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha))
     border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
-    border.width: Tokens.borderWidth
+    border.width: root.flat ? 0 : Tokens.borderWidth
     implicitHeight: 36
     scale: hovered ? 1.03 : 1.0
 
@@ -34,6 +35,7 @@ Rectangle {
         radius: root.radius
         shadowColor: "#000000"
         strength: root.hovered ? Tokens.shadowHoverOpacity : Tokens.shadowOpacity
+        visible: !root.flat
     }
 
     // 状态色调叠加层（电池/systemd 等用）

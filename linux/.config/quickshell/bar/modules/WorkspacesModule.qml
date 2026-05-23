@@ -9,9 +9,10 @@ Rectangle {
     id: root
 
     property var barScreen: null
+    property bool flat: false
 
     radius: Tokens.radiusL
-    color: Colors.base
+    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : Colors.base
     implicitHeight: 36
     implicitWidth: row.implicitWidth + 8
 
@@ -19,6 +20,7 @@ Rectangle {
     SoftShadow {
         anchors.fill: parent
         radius: root.radius
+        visible: !root.flat
     }
 
     RowLayout {
