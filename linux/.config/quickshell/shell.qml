@@ -75,7 +75,8 @@ ShellRoot {
             PanelState.currentLyricIndex = -1;
             PanelState.currentLyric = "";
             PanelState.lyricsTrackId = _lyricsTrackKey;
-            // 启动轮询，等歌词数据更新
+            // 重置尝试计数，启动轮询等歌词数据
+            _lyricsPollTimer._attempts = 0;
             _lyricsPollTimer.restart();
         } else {
             _lyricsPollTimer.stop();
@@ -90,11 +91,15 @@ ShellRoot {
         id: _lyricsPollTimer
         interval: 500
         repeat: true
+        property int _attempts: 0
+        // 最多轮询 20 次（约 10 秒），避免曲目无歌词时无限调用 playerctl
+        readonly property int _maxAttempts: 20
         onTriggered: {
-            if (!root._lyricsPlayer) {
+            if (!root._lyricsPlayer || _attempts >= _maxAttempts) {
                 stop();
                 return;
             }
+            _attempts++;
             _lyricsPollProc._buf = "";
             _lyricsPollProc.command = ["playerctl", "-p", root._lyricsPlayer.identity, "metadata", "xesam:asText"];
             _lyricsPollProc.running = true;
@@ -450,18 +455,8 @@ ShellRoot {
 
     AiPanel {}
 
-    // ── 桌面浮动组件（每屏一个）──
-    Variants {
-        model: Quickshell.screens
-        delegate: AnalogClock {}
-    }
-
-    Variants {
-        model: Quickshell.screens
-        delegate: PomodoroTimer {}
-    }
-
-    // ── 音频频谱（cava 单例 + 每屏渲染）──
+    // ── 桌面浮动组件 ──
+    // 保留音频频谱（常驻最前端可见）；其余 widget 多被窗口遮挡用不到，已禁用以省 CPU。
     CavaService {}
 
     Variants {
@@ -469,19 +464,12 @@ ShellRoot {
         delegate: AudioVisualizer {}
     }
 
-    // ── 新桌面小组件 ──
-    Variants {
-        model: Quickshell.screens
-        delegate: WeatherWidget {}
-    }
-
-    Variants {
-        model: Quickshell.screens
-        delegate: NowPlaying {}
-    }
-
-    Variants {
-        model: Quickshell.screens
-        delegate: SystemMonitor {}
-    }
+    // 已禁用（用不到，约省 7% CPU）。如需恢复，取消对应 Variants 注释即可。
+    /*
+    Variants { model: Quickshell.screens; delegate: AnalogClock {} }
+    Variants { model: Quickshell.screens; delegate: PomodoroTimer {} }
+    Variants { model: Quickshell.screens; delegate: WeatherWidget {} }
+    Variants { model: Quickshell.screens; delegate: NowPlaying {} }
+    Variants { model: Quickshell.screens; delegate: SystemMonitor {} }
+    */
 }

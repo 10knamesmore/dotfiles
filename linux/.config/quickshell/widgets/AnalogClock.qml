@@ -3,7 +3,12 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 
-// 桌面浮动仿真时钟 — Canvas 绘制
+// 桌面浮动仿真时钟
+//
+// 性能要点：完全用 Rectangle + Rotation transform，不用 Canvas。
+//   - 60 根刻度 / 4 个数字静态排列一次，永不重绘
+//   - 3 根针只更新 rotation.angle，scene graph 走 GPU 矩阵合成
+//   - 1Hz 更新仅触发 3 个 binding，无 requestPaint
 PanelWindow {
     id: root
 
@@ -11,13 +16,15 @@ PanelWindow {
     screen: modelData
 
     // ── 布局配置（改这里调整位置和大小）──
-    property int widgetX: 20        // 左边距
-    property int widgetY: 60        // 上边距
-    property int clockSize: 500     // 时钟直径
+    property int widgetX: 20
+    property int widgetY: 60
+    property int clockSize: 500
 
     property real _hours: 0
     property real _minutes: 0
     property real _seconds: 0
+
+    readonly property real _radius: clockSize / 2
 
     aboveWindows: false
     anchors.top: true
@@ -41,17 +48,16 @@ PanelWindow {
             root._seconds = now.getSeconds() + now.getMilliseconds() / 1000;
             root._minutes = now.getMinutes() + root._seconds / 60;
             root._hours = (now.getHours() % 12) + root._minutes / 60;
-            canvas.requestPaint();
         }
     }
 
-    // 表盘背景（用于 SoftShadow）
+    // 表盘背景
     Rectangle {
         id: clockBg
         anchors.centerIn: parent
         width: root.clockSize
         height: root.clockSize
-        radius: root.clockSize / 2
+        radius: root._radius
         color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
         border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
         border.width: 1
@@ -64,110 +70,138 @@ PanelWindow {
         InnerGlow {}
     }
 
-    Canvas {
-        id: canvas
-
+    // 表盘 dial：所有指针/刻度/数字都以它的中心为锚
+    Item {
+        id: dial
         anchors.centerIn: parent
         width: root.clockSize
         height: root.clockSize
 
-        onPaint: {
-            let ctx = getContext("2d");
-            let w = width;
-            let h = height;
-            let cx = w / 2;
-            let cy = h / 2;
-            let r = Math.min(cx, cy) - 4;
+        // ── 60 根刻度（每个都是 dial 高度的 Item，绕中心旋转，顶端贴 Rectangle）──
+        Repeater {
+            model: 60
 
-            ctx.clearRect(0, 0, w, h);
+            delegate: Item {
+                required property int index
+                readonly property bool isHour: index % 5 === 0
 
-            // ── 刻度 ──
-            for (let i = 0; i < 60; i++) {
-                let angle = (i * 6 - 90) * Math.PI / 180;
-                let isHour = (i % 5 === 0);
-                let innerR = isHour ? r - 12 : r - 6;
-                let outerR = r - 2;
+                anchors.horizontalCenter: dial.horizontalCenter
+                anchors.verticalCenter: dial.verticalCenter
+                width: 2
+                height: root.clockSize - 8
+                rotation: index * 6
 
-                ctx.beginPath();
-                ctx.moveTo(cx + innerR * Math.cos(angle), cy + innerR * Math.sin(angle));
-                ctx.lineTo(cx + outerR * Math.cos(angle), cy + outerR * Math.sin(angle));
-                ctx.strokeStyle = isHour ? Colors.text.toString() : Colors.overlay0.toString();
-                ctx.lineWidth = isHour ? 2 : 1;
-                ctx.lineCap = "round";
-                ctx.stroke();
-            }
-
-            // ── 数字（12/3/6/9）──
-            ctx.font = "bold 11px 'Hack Nerd Font'";
-            ctx.fillStyle = Colors.subtext0.toString();
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            let nums = [
-                {
-                    n: "12",
-                    a: -90
-                },
-                {
-                    n: "3",
-                    a: 0
-                },
-                {
-                    n: "6",
-                    a: 90
-                },
-                {
-                    n: "9",
-                    a: 180
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.isHour ? 2 : 1
+                    height: parent.isHour ? 10 : 6
+                    color: parent.isHour ? Colors.text : Colors.overlay0
+                    radius: width / 2
                 }
-            ];
-            for (let item of nums) {
-                let a = item.a * Math.PI / 180;
-                let nr = r - 22;
-                ctx.fillText(item.n, cx + nr * Math.cos(a), cy + nr * Math.sin(a));
             }
+        }
 
-            // ── 时针 ──
-            let hourAngle = (root._hours * 30 - 90) * Math.PI / 180;
-            ctx.beginPath();
-            ctx.moveTo(cx - 8 * Math.cos(hourAngle), cy - 8 * Math.sin(hourAngle));
-            ctx.lineTo(cx + (r * 0.5) * Math.cos(hourAngle), cy + (r * 0.5) * Math.sin(hourAngle));
-            ctx.strokeStyle = Colors.text.toString();
-            ctx.lineWidth = 3.5;
-            ctx.lineCap = "round";
-            ctx.stroke();
+        // ── 数字 12 / 3 / 6 / 9 ──
+        Text {
+            anchors.horizontalCenter: dial.horizontalCenter
+            anchors.top: dial.top
+            anchors.topMargin: 18
+            text: "12"
+            color: Colors.subtext0
+            font.family: "Hack Nerd Font"
+            font.pixelSize: 11
+            font.bold: true
+        }
+        Text {
+            anchors.verticalCenter: dial.verticalCenter
+            anchors.right: dial.right
+            anchors.rightMargin: 22
+            text: "3"
+            color: Colors.subtext0
+            font.family: "Hack Nerd Font"
+            font.pixelSize: 11
+            font.bold: true
+        }
+        Text {
+            anchors.horizontalCenter: dial.horizontalCenter
+            anchors.bottom: dial.bottom
+            anchors.bottomMargin: 18
+            text: "6"
+            color: Colors.subtext0
+            font.family: "Hack Nerd Font"
+            font.pixelSize: 11
+            font.bold: true
+        }
+        Text {
+            anchors.verticalCenter: dial.verticalCenter
+            anchors.left: dial.left
+            anchors.leftMargin: 22
+            text: "9"
+            color: Colors.subtext0
+            font.family: "Hack Nerd Font"
+            font.pixelSize: 11
+            font.bold: true
+        }
 
-            // ── 分针 ──
-            let minAngle = (root._minutes * 6 - 90) * Math.PI / 180;
-            ctx.beginPath();
-            ctx.moveTo(cx - 8 * Math.cos(minAngle), cy - 8 * Math.sin(minAngle));
-            ctx.lineTo(cx + (r * 0.7) * Math.cos(minAngle), cy + (r * 0.7) * Math.sin(minAngle));
-            ctx.strokeStyle = Colors.text.toString();
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = "round";
-            ctx.stroke();
+        // ── 指针 pivot：0x0 Item，centerIn dial，rotation 绕 (0,0)；子 Rectangle 在 pivot 上方延伸 ──
+        component Hand: Item {
+            id: handRoot
+            property real length: 100   // 针从中心向上伸出的长度
+            property real tail: 8       // 针超过中心向下的尾部
+            property real thickness: 3
+            property color tint: Colors.text
 
-            // ── 秒针 ──
-            let secAngle = (root._seconds * 6 - 90) * Math.PI / 180;
-            ctx.beginPath();
-            ctx.moveTo(cx - 12 * Math.cos(secAngle), cy - 12 * Math.sin(secAngle));
-            ctx.lineTo(cx + (r * 0.78) * Math.cos(secAngle), cy + (r * 0.78) * Math.sin(secAngle));
-            ctx.strokeStyle = Colors.red.toString();
-            ctx.lineWidth = 1.2;
-            ctx.lineCap = "round";
-            ctx.stroke();
+            anchors.centerIn: parent
+            width: 0
+            height: 0
 
-            // ── 中心圆点 ──
-            ctx.beginPath();
-            ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
-            ctx.fillStyle = Colors.mauve.toString();
-            ctx.fill();
+            Rectangle {
+                x: -handRoot.thickness / 2
+                y: -handRoot.length
+                width: handRoot.thickness
+                height: handRoot.length + handRoot.tail
+                radius: handRoot.thickness / 2
+                color: handRoot.tint
+            }
+        }
 
-            // 内圆
-            ctx.beginPath();
-            ctx.arc(cx, cy, 2, 0, 2 * Math.PI);
-            ctx.fillStyle = Colors.base.toString();
-            ctx.fill();
+        Hand {
+            length: root._radius * 0.5
+            thickness: 3.5
+            tint: Colors.text
+            rotation: root._hours * 30
+        }
+
+        Hand {
+            length: root._radius * 0.7
+            thickness: 2.5
+            tint: Colors.text
+            rotation: root._minutes * 6
+        }
+
+        Hand {
+            length: root._radius * 0.78
+            tail: 12
+            thickness: 1.2
+            tint: Colors.red
+            rotation: root._seconds * 6
+        }
+
+        // ── 中心圆点 ──
+        Rectangle {
+            anchors.centerIn: dial
+            width: 8
+            height: 8
+            radius: 4
+            color: Colors.mauve
+        }
+        Rectangle {
+            anchors.centerIn: dial
+            width: 4
+            height: 4
+            radius: 2
+            color: Colors.base
         }
     }
-
 }

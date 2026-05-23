@@ -160,10 +160,18 @@ BarModule {
         }
     }
 
+    // 事件驱动：监听 Hyprland IPC 事件，仅在窗口/工作区变化时 fetch（debounce 合并突发事件）。
+    // 取代旧的 100ms 无条件轮询 —— 空闲时完全不调用 hyprctl。
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            fetchDebounce.restart();
+        }
+    }
+
     Timer {
-        interval: 100
-        running: true
-        repeat: true
+        id: fetchDebounce
+        interval: 80
         onTriggered: {
             fetchProc.running = false;
             fetchProc.running = true;

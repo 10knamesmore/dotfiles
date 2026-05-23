@@ -4,6 +4,15 @@ import Quickshell
 import Quickshell.Wayland
 
 // 通用面板 overlay — morph / 滑入 / 淡入动画
+//
+// 视觉设计：
+//   - 有 morph 源（bar 模块点击等）：从点击点的 40×40 小块「展开」到目标位置目标尺寸，
+//     子元素跟着 anchors 重排显现，给人「光柱展开」感
+//   - 无 morph 源（全局快捷键唤起）：从 closedOffset 方向 slide 到目标 + 淡入
+//
+// 性能权衡：morph 路径会触发子元素 relayout（这是「展开」感的根源，不可避免），
+// 但只发生在 ~500ms 动画期内；静态后无消耗。
+// SoftShadow / panel container 都开了 layer 缓存，让 hover 等微动画走 GPU 合成。
 PanelWindow {
     id: root
 
@@ -72,7 +81,8 @@ PanelWindow {
         onTriggered: root._keepVisible = false
     }
 
-    // 关闭时延迟淡出（morph 模式）
+    // 关闭时延迟淡出（morph 模式）— 80ms 停顿后 150ms 淡出，
+    // 让用户先看到面板"开始收缩"再消失
     Item {
         id: _closeFade
         property real fadeValue: 1
@@ -145,7 +155,7 @@ PanelWindow {
         onClicked: root.closeRequested()
     }
 
-    // ── panel 容器 ──
+    // ── panel 容器（几何动画 morph）──
     Rectangle {
         id: panel
 

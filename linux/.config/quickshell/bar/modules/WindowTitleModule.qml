@@ -67,10 +67,18 @@ BarModule {
         }
     }
 
+    // 事件驱动：焦点窗口变化时才读 class/pid（title 已由 Hyprland.activeToplevel 响应式绑定）。
+    // 取代旧的 500ms 轮询 —— 空闲时不调用 hyprctl。
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            winDebounce.restart();
+        }
+    }
+
     Timer {
-        interval: 500
-        running: true
-        repeat: true
+        id: winDebounce
+        interval: 80
         onTriggered: {
             winReader.running = false;
             winReader.running = true;

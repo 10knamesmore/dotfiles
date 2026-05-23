@@ -10,8 +10,8 @@ Item {
 
     // ── cava 参数 ──
     // [general]
-    property int barCount: 150          // 频谱柱数量
-    property int framerate: 120          // 刷新帧率 (fps)
+    property int barCount: 64           // 频谱柱数量（64 已足够细腻，少于旧的 150 可大幅减少 binding 重算）
+    property int framerate: 60           // 刷新帧率 (fps)：60 才有 DAW EQ 的跟手感；30 会明显拖沓。高刷屏可上 90/120（CPU 同比上升）
     property int sensitivity: 200       // 自动增益灵敏度
     property bool autosens: true        // 自动灵敏度调节
     property real noiseReduction: 0   // 噪声抑制 0-1

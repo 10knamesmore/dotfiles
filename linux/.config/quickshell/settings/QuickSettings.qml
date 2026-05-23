@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 
 // Quick Settings — 左侧滑出面板
@@ -17,8 +18,15 @@ PanelOverlay {
     property string wifiName: ""
     property string btDevice: ""
     property int brightnessValue: 100
-    property int volumePct: 0
-    property bool volumeMuted: false
+    // 音量直接从 PipeWire 取，不再 40ms 轮询 wpctl
+    readonly property var _sink: Pipewire.defaultAudioSink
+    readonly property int volumePct: _sink && _sink.audio ? Math.round(_sink.audio.volume * 100) : 0
+    readonly property bool volumeMuted: _sink && _sink.audio ? _sink.audio.muted : false
+
+    // PipeWire 节点属性需要 tracker 才会实时同步，否则 volume 恒为 0
+    PwObjectTracker {
+        objects: root._sink ? [root._sink] : []
+    }
     property bool nightLightEnabled: false
     property bool caffeineEnabled: false
     // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
@@ -33,6 +41,7 @@ PanelOverlay {
         brightnessProc.running = true;
         nightLightReader.running = true;
         caffeineCheckProc.running = true;
+        // 音量直接 binding Pipewire，无需 polling
     }
 
     function toggleNightLight() {
@@ -161,23 +170,6 @@ PanelOverlay {
     }
 
     Process {
-        id: volProc
-
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
-                if (m) {
-                    root.volumePct = Math.round(parseFloat(m[1]) * 100);
-                    root.volumeMuted = m[2] !== undefined;
-                }
-            }
-        }
-
-    }
-
-    Process {
         id: actionProc
     }
 
@@ -228,16 +220,6 @@ PanelOverlay {
             }
         }
 
-    }
-
-    Timer {
-        running: root.showing
-        interval: 40
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            volProc.running = true;
-        }
     }
 
     // ── UI ──

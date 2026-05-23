@@ -235,13 +235,46 @@ PanelOverlay {
             }
 
             delegate: Rectangle {
+                id: item
                 required property int index
                 property var entry: root._results[index] ? root._results[index].entry : null
+                readonly property bool isSelected: index === root.selectedIndex
+                readonly property bool isHovered: appHover.containsMouse
 
                 width: resultList.width
                 height: 44
                 radius: Tokens.radiusMS
-                color: index === root.selectedIndex ? Colors.surface1 : appHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : "transparent"
+                // 默认 transparent；states 接管 selected/hovered 着色
+                color: "transparent"
+
+                states: [
+                    State {
+                        name: "selected"
+                        when: item.isSelected
+                        PropertyChanges { target: item; color: Colors.surface1 }
+                    },
+                    State {
+                        name: "hovered"
+                        when: !item.isSelected && item.isHovered
+                        PropertyChanges {
+                            target: item
+                            color: Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5)
+                        }
+                    }
+                ]
+
+                // 只对 hover 进/出过渡，selected 切换立即吸附 —— 键盘快速上下选择时
+                // 不再触发一连串 ColorAnimation
+                transitions: [
+                    Transition {
+                        from: ""; to: "hovered"
+                        ColorAnimation { duration: Tokens.animFast }
+                    },
+                    Transition {
+                        from: "hovered"; to: ""
+                        ColorAnimation { duration: Tokens.animFast }
+                    }
+                ]
 
                 RowLayout {
                     anchors.fill: parent
@@ -293,12 +326,6 @@ PanelOverlay {
                     onClicked: {
                         root.selectedIndex = index;
                         root.launchSelected();
-                    }
-                }
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: Tokens.animFast
                     }
                 }
             }
