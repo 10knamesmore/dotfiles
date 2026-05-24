@@ -32,9 +32,9 @@ description: 编写 Rust TUI 应用的最佳实践。使用 ratatui 库时、需
 | `references/event-handling.md` | 实现事件循环 / 键鼠处理 |
 | `references/widget-system.md` | 编写自定义 Widget / 使用内置 Widget |
 | `references/layout-system.md` | 布局计算 / Constraint 使用 |
-| `references/state-management.md` | 状态设计 / 脏检测优化 |
+| `references/state-management.md` | 状态设计 / **状态所有权(UI-local vs 后端同步)** / 脏检测优化 |
 | `references/performance.md` | 帧率控制 / 异步 I/O 分离 / 高负载优化 |
-| `references/error-handling.md` | 终端恢复 / panic hook / 错误展示 |
+| `references/error-handling.md` | 终端恢复 / **panic hook 链** / **信号处理** / **可选子系统降级(null object)** / 错误展示 |
 | `references/testing.md` | 写测试 / 快照 / 驱动事件循环 / 集成测试 |
 
 ## 测试

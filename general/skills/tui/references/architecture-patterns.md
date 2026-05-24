@@ -200,15 +200,19 @@ impl Component for FileList {
         if !self.is_focused { return Ok(None); }
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
-                let next = self.state.selected()
-                    .map(|i| (i + 1).min(self.items.len() - 1))
-                    .unwrap_or(0);
+                // saturating_sub 防空列表下溢:len()==0 时 len()-1 会 usize 回绕成
+                // 巨大值,(i+1).min(那个) 不再夹住 → 选择越界。
+                let max = self.items.len().saturating_sub(1);
+                let next = self.state.selected().map(|i| (i + 1).min(max)).unwrap_or(0);
                 self.state.select(Some(next));
                 Ok(None)
             }
             KeyCode::Enter => {
+                // 用 .get() 不用 self.items[i]:选择索引相对 items 会**过期**——
+                // 列表异步刷新/筛选后变短,旧 selected 就指向越界,索引直接 panic。
                 let path = self.state.selected()
-                    .map(|i| self.items[i].clone());
+                    .and_then(|i| self.items.get(i))
+                    .cloned();
                 Ok(path.map(Action::OpenFile))
             }
             _ => Ok(None),

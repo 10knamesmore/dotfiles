@@ -2,6 +2,7 @@
 
 ## 目录
 - [状态分层原则](#状态分层原则)
+- [状态所有权：UI-local vs 后端同步态](#状态所有权ui-local-vs-后端同步态)
 - [StatefulWidget 的 State 设计](#statefulwidget-的-state-设计)
 - [脏检测优化渲染](#脏检测优化渲染)
 - [内部可变性（Cell/RefCell）](#内部可变性)
@@ -38,6 +39,47 @@
 ```
 
 **原则**：View State 不要混入 Component State；业务数据不要放进 `ListState` / `TableState` 等 ratatui 内置 State。
+
+---
+
+## 状态所有权：UI-local vs 后端同步态
+
+**当你的 TUI 从一个外部来源周期性同步状态时**（client/server、轮询服务端、镜像守护进程、监控数据源——任何「每 tick `state = backend.snapshot()`」的架构），有一类极隐蔽、单元测试和组件快照都抓不到的 bug:
+
+> **用户用按键改了某个 UI 状态，下一帧 tick 又把整份 snapshot 灌进来，把它覆盖回去。**
+
+表现是「这个键好像没反应 / 光标一闪就弹回」。根因是**两类状态被混为一谈**：
+
+| | 谁拥有 | 例子 | 同步规则 |
+|---|---|---|---|
+| **UI-local 状态** | 用户（本地） | 浮层里的选择光标、滚动位置、筛选词、折叠状态 | **永不被后端 snapshot 覆盖** |
+| **后端权威状态** | 后端 | 播放位置、下载进度、连接状态、服务端列表 | 每 tick 从 snapshot 刷新 |
+
+最容易踩的是**两者语义相近、却被塞进同一个字段**：比如「队列里的当前播放项下标」(后端的播放锚点) 和「队列浮层里用户选中的行」(UI 光标)——名字都叫 `selected`，于是同步时一并覆盖，用户根本移不动光标。
+
+**正解**：
+
+```rust
+// ❌ 同步时无脑覆盖整个镜像，连 UI-local 字段一起冲掉
+fn apply_snapshot(&mut self, snap: Snapshot) {
+    self.state = snap.into();   // sel / scroll / filter 全没了
+}
+
+// ✅ 只刷新后端拥有的字段；UI-local 字段保留，至多做合法性 clamp
+fn apply_snapshot(&mut self, snap: Snapshot) {
+    self.items = snap.items;              // 后端态：刷新
+    self.playback = snap.playback;        // 后端态：刷新
+    // self.sel 是 UI 光标：不动它，只在列表变短时夹住防越界
+    self.clamp_selection();
+}
+```
+
+设计准则：
+
+- **字段层面就分清谁拥有**。UI-local 字段像 `sel_*` / `scroll_*` 一样,是纯客户端的,同步逻辑碰都不该碰。
+- **别让 UI 状态和后端状态共用一个字段**——哪怕语义「看起来一样」。命名上就区分（`backend_cursor` vs `ui_sel`）。
+- 「当前后端项」要在 UI 里高亮,**用独立标记**（比对 id 画个 `▶`），而不是让 UI 光标去兼任。
+- 这类 bug 的回归只有「喂键 → 跨一次 tick → 断言 UI 状态没被覆盖」的集成测试抓得住（见 testing.md 模式 C）。
 
 ---
 
