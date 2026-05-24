@@ -1,25 +1,15 @@
 import "../../theme"
+import "../../state"
+import "../../services"
 import "../components"
 import QtQuick
-import Quickshell.Services.Mpris
 import Quickshell.Io
 
 // 媒体播放模块 — 显示歌名+artist，左键打开面板，右键切换歌词显示
 BarModule {
     id: root
 
-    property var player: {
-        let ps = Mpris.players.values;
-        for (let i = 0; i < ps.length; i++) {
-            if (ps[i].isPlaying) {
-                MediaState.lastActivePlayer = ps[i];
-                return ps[i];
-            }
-        }
-        if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
-            return MediaState.lastActivePlayer;
-        return ps.length > 0 ? ps[0] : null;
-    }
+    readonly property var player: MediaService.activePlayer
 
     property bool showLyric: false
     property int playerPid: 0
@@ -28,7 +18,7 @@ BarModule {
     // 完整内容文字
     property string fullContent: {
         if (!player)
-            return "";
+            return "暂无媒体播放";
         if (showLyric && LyricsState.currentLyric.length > 0)
             return LyricsState.currentLyric;
         let t = player.trackTitle || "";
@@ -41,7 +31,7 @@ BarModule {
     // 截断内容文字
     property string truncatedContent: {
         if (!player)
-            return "";
+            return "暂无媒体播放";
         if (showLyric && LyricsState.currentLyric.length > 0) {
             let l = LyricsState.currentLyric;
             return l.length > 40 ? l.substring(0, 37) + "…" : l;
@@ -65,7 +55,6 @@ BarModule {
     implicitWidth: root.hovered
         ? Math.min(hoverRow.implicitWidth + 32, 600)
         : Math.max(row.implicitWidth + 32, 80)
-    visible: player !== null
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);

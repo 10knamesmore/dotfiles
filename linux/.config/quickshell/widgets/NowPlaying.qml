@@ -1,4 +1,6 @@
+import "../services"
 import "../theme"
+import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -17,18 +19,7 @@ PanelWindow {
     property int widgetMarginRight: 20   // 右边距
     property int widgetMarginBottom: 120  // 下边距
 
-    property var player: {
-        let ps = Mpris.players.values;
-        for (let i = 0; i < ps.length; i++) {
-            if (ps[i].isPlaying) {
-                MediaState.lastActivePlayer = ps[i];
-                return ps[i];
-            }
-        }
-        if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
-            return MediaState.lastActivePlayer;
-        return ps.length > 0 ? ps[0] : null;
-    }
+    readonly property var player: MediaService.activePlayer
 
     function formatTime(seconds) {
         if (!seconds || seconds < 0) return "0:00";

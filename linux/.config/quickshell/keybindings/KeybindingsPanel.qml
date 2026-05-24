@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../theme"
+import "../state"
 import "../components"
 
 // 快捷键速查面板 — 解析 keybindings.conf，分组卡片，可搜索

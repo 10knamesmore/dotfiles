@@ -1,0 +1,6 @@
+singleton AudioService 1.0 AudioService.qml
+singleton MediaService 1.0 MediaService.qml
+LyricsService 1.0 LyricsService.qml
+NotificationService 1.0 NotificationService.qml
+OsdService 1.0 OsdService.qml
+SystemStatsService 1.0 SystemStatsService.qml

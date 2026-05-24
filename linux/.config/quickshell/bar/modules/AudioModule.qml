@@ -1,22 +1,14 @@
 import "../../theme"
+import "../../services"
 import "../components"
 import QtQuick
-import Quickshell.Io
-import Quickshell.Services.Pipewire
 
 BarModule {
     id: root
 
-    // 音量/静音直接从 PipeWire 取，事件驱动，不再 100ms 轮询 wpctl。
-    // OSD 弹出由 shell.qml 的全局 PipeWire Connections 统一处理。
-    readonly property var _sink: Pipewire.defaultAudioSink
-    readonly property int volumePct: _sink && _sink.audio ? Math.round(_sink.audio.volume * 100) : 0
-    readonly property bool muted: _sink && _sink.audio ? _sink.audio.muted : false
-
-    // PipeWire 节点属性需要 tracker 才会实时同步，否则 volume 恒为 0
-    PwObjectTracker {
-        objects: root._sink ? [root._sink] : []
-    }
+    // 音量/静音统一走 AudioService（PipeWire 事件驱动）。
+    readonly property int volumePct: AudioService.volume
+    readonly property bool muted: AudioService.muted
 
     // Waybar pulseaudio: format-icons ["  ", "  "], format-muted "  "
     function volumeIcon() {
@@ -34,39 +26,10 @@ BarModule {
     opacity: root.muted ? 0.7 : 1
     progress: root.muted ? 0 : root.volumePct / 100
     progressDraggable: true
-    onProgressDragged: value => {
-        let pct = Math.round(value * 100);
-        volSetter.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", (pct / 100).toFixed(2)];
-        volSetter.running = true;
-    }
+    onProgressDragged: value => AudioService.setVolume(Math.round(value * 100))
     implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
-    onClicked: muteToggler.running = true
-    onScrolled: delta => {
-        (delta > 0 ? volUp : volDown).running = true;
-    }
-
-    // ── 写操作 ──
-    Process {
-        id: muteToggler
-
-        command: ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]
-    }
-
-    Process {
-        id: volUp
-
-        command: ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", "5%+"]
-    }
-
-    Process {
-        id: volDown
-
-        command: ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"]
-    }
-
-    Process {
-        id: volSetter
-    }
+    onClicked: AudioService.toggleMute()
+    onScrolled: delta => AudioService.step(delta > 0 ? 5 : -5)
 
     Row {
         id: compactLabel

@@ -6,29 +6,29 @@ QtObject {
 
     readonly property string family: "Hack Nerd Font"
     // ── 排版尺度 ──
-    readonly property int xs: 9
+    readonly property int xs: 10
     // 极小标签、状态徽标
-    readonly property int caption: 10
+    readonly property int caption: 11
     // 时间戳、分区标题、说明文字
-    readonly property int small: 11
+    readonly property int small: 12
     // 次要文本、描述
-    readonly property int body: 12
+    readonly property int body: 13
     // 正文、表单输入
-    readonly property int bodyLarge: 13
+    readonly property int bodyLarge: 14
     // 强调正文、状态栏模块
-    readonly property int icon: 14
+    readonly property int icon: 15
     // 行内图标、标准交互元素
-    readonly property int title: 15
+    readonly property int title: 16
     // 面板标题
-    readonly property int heading: 16
+    readonly property int heading: 17
     // 章节标题、搜索栏
-    readonly property int iconLarge: 18
+    readonly property int iconLarge: 19
     // 大号开关图标
-    readonly property int h3: 20
+    readonly property int h3: 22
     // 卡片标题
-    readonly property int h2: 22
+    readonly property int h2: 24
     // 个人资料、媒体控件
-    readonly property int h1: 24
+    readonly property int h1: 26
     // OSD、天气温度
     readonly property int display3: 32
     // 电源菜单

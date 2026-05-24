@@ -1,15 +1,13 @@
-import "../theme"
+import "../state"
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.Pipewire
 
-// OSD 服务 — 监听 PipeWire 音量/静音变化自动弹音量 OSD；
+// OSD 服务 — 监听 AudioService 音量/静音变化自动弹音量 OSD；
 // 亮度 OSD 与音量 OSD 由全局快捷键主动触发（requestVolumeOsd / requestBrightnessOsd）。
 Scope {
     id: root
 
-    property var _sink: Pipewire.defaultAudioSink
     property real _lastVolume: -1
 
     function volumeIcon(vol, muted) {
@@ -31,44 +29,25 @@ Scope {
 
     // 供全局快捷键调用
     function requestVolumeOsd() {
-        volumeProc.running = true;
+        root._lastVolume = AudioService.volume;
+        root.showVolumeOsd(AudioService.volume, AudioService.muted);
     }
     function requestBrightnessOsd() {
         brightnessProc.running = true;
     }
 
     Connections {
-        function onVolumesChanged() {
-            let vol = Math.round(root._sink.audio.volume * 100);
-            if (root._lastVolume >= 0 && vol !== root._lastVolume) {
-                root.showVolumeOsd(vol, root._sink.audio.muted);
-            }
+        target: AudioService
+
+        function onVolumeChanged() {
+            let vol = AudioService.volume;
+            if (root._lastVolume >= 0 && vol !== root._lastVolume)
+                root.showVolumeOsd(vol, AudioService.muted);
             root._lastVolume = vol;
         }
 
         function onMutedChanged() {
-            let vol = Math.round(root._sink.audio.volume * 100);
-            root.showVolumeOsd(vol, root._sink.audio.muted);
-        }
-
-        target: root._sink ? root._sink.audio : null
-    }
-
-    Process {
-        id: volumeProc
-
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-
-        stdout: SplitParser {
-            onRead: data => {
-                let m = data.match(/Volume:\s+([\d.]+)(\s+\[MUTED\])?/);
-                if (m) {
-                    let vol = Math.round(parseFloat(m[1]) * 100);
-                    let muted = m[2] !== undefined;
-                    root._lastVolume = vol;
-                    root.showVolumeOsd(vol, muted);
-                }
-            }
+            root.showVolumeOsd(AudioService.volume, AudioService.muted);
         }
     }
 

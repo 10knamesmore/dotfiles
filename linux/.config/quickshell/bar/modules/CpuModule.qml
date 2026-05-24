@@ -1,4 +1,5 @@
 import "../../theme"
+import "../../state"
 import "../components"
 import QtQuick
 import Quickshell
@@ -30,7 +31,14 @@ BarModule {
 
     accentColor: Colors.blue
     implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
-    onClicked: Quickshell.execDetached(["plasma-systemmonitor"])
+    onClicked: mouse => {
+        PanelState.closeAll();
+        let pos = root.mapToItem(null, mouse.x, mouse.y);
+        MorphState.morphSourceX = pos.x + 2;
+        MorphState.morphSourceY = pos.y + 6;
+        PanelState.systemMonitorTab = "cpu";
+        PanelState.systemMonitorOpen = true;
+    }
 
     // 紧凑模式宽度参考
     Row {

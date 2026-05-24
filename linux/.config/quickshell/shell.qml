@@ -19,7 +19,8 @@ import "./power"
 import "./screen-effects"
 import "./services"
 import "./settings"
-import "./theme"
+import "./systemmonitor"
+import "./state"
 import "./widgets"
 import QtQuick
 import Quickshell
@@ -218,6 +219,8 @@ ShellRoot {
     BluetoothPanel {}
 
     DisplayPanel {}
+
+    SystemMonitorPanel {}
 
     // ── 新增面板 ──
     JournalPanel {}

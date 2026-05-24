@@ -1,4 +1,4 @@
-import "../theme"
+import "../state"
 import QtQuick
 import Quickshell
 import Quickshell.Wayland

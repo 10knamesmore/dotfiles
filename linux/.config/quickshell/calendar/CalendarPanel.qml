@@ -1,5 +1,6 @@
 import "../components"
 import "../theme"
+import "../state"
 import "Lunar.js" as Lunar
 import QtQuick
 import QtQuick.Layouts
@@ -71,7 +72,7 @@ PanelOverlay {
     }
 
     showing: PanelState.calendarOpen
-    panelWidth: 320
+    panelWidth: 384
     panelHeight: col.implicitHeight + 32
     panelTargetY: 54
     closedOffsetY: -20
@@ -179,7 +180,7 @@ PanelOverlay {
                     property bool hovered: dayArea.containsMouse
 
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 42
+                    Layout.preferredHeight: 50
                     radius: Tokens.radiusL
                     color: {
                         if (modelData.isToday)
@@ -208,7 +209,7 @@ PanelOverlay {
                                 return Colors.text;
                             }
                             font.family: Fonts.family
-                            font.pixelSize: Fonts.body
+                            font.pixelSize: Fonts.bodyLarge
                             font.weight: modelData.isToday ? Font.Bold : Font.Normal
                         }
 

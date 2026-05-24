@@ -16,4 +16,10 @@ QtObject {
     property real netDownSpeed: 0
     property real netUpTotal: 0
     property real netDownTotal: 0
+    // ── 历史缓冲（系统面板曲线用，环形 60 样本）──
+    readonly property int histMax: 60
+    property var cpuHist: []
+    property var memHist: []
+    property var netUpHist: []
+    property var netDownHist: []
 }

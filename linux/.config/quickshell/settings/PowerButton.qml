@@ -1,4 +1,5 @@
 import "../theme"
+import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io

@@ -1,11 +1,12 @@
 import "../components"
+import "../services"
 import "../theme"
+import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
-import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 
 // Quick Settings — 左侧滑出面板
@@ -18,15 +19,9 @@ PanelOverlay {
     property string wifiName: ""
     property string btDevice: ""
     property int brightnessValue: 100
-    // 音量直接从 PipeWire 取，不再 40ms 轮询 wpctl
-    readonly property var _sink: Pipewire.defaultAudioSink
-    readonly property int volumePct: _sink && _sink.audio ? Math.round(_sink.audio.volume * 100) : 0
-    readonly property bool volumeMuted: _sink && _sink.audio ? _sink.audio.muted : false
-
-    // PipeWire 节点属性需要 tracker 才会实时同步，否则 volume 恒为 0
-    PwObjectTracker {
-        objects: root._sink ? [root._sink] : []
-    }
+    // 音量统一走 AudioService
+    readonly property int volumePct: AudioService.volume
+    readonly property bool volumeMuted: AudioService.muted
     property bool nightLightEnabled: false
     property bool caffeineEnabled: false
     // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
@@ -276,10 +271,7 @@ PanelOverlay {
                 value: root.volumePct / 100
                 label: "音量 " + root.volumePct + "%"
                 accentColor: Colors.blue
-                onMoved: (val) => {
-                    actionProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", Math.round(val * 100) + "%"];
-                    actionProc.running = true;
-                }
+                onMoved: (val) => AudioService.setVolume(Math.round(val * 100))
             }
 
             Divider {
@@ -347,10 +339,7 @@ PanelOverlay {
                     label: "静音"
                     status: root.volumeMuted ? "已静音" : "未静音"
                     toggled: root.volumeMuted
-                    onClicked: {
-                        actionProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"];
-                        actionProc.running = true;
-                    }
+                    onClicked: AudioService.toggleMute()
                 }
 
                 QuickToggle {
@@ -421,18 +410,7 @@ PanelOverlay {
             // ── 媒体卡片 ──
             MediaCard {
                 Layout.fillWidth: true
-                player: {
-                    let ps = Mpris.players.values;
-                    for (let i = 0; i < ps.length; i++) {
-                        if (ps[i].isPlaying) {
-                            MediaState.lastActivePlayer = ps[i];
-                            return ps[i];
-                        }
-                    }
-                    if (MediaState.lastActivePlayer && ps.indexOf(MediaState.lastActivePlayer) >= 0)
-                        return MediaState.lastActivePlayer;
-                    return ps.length > 0 ? ps[0] : null;
-                }
+                player: MediaService.activePlayer
             }
 
             // ── 天气卡片 ──

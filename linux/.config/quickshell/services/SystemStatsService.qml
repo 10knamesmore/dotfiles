@@ -1,4 +1,4 @@
-import "../theme"
+import "../state"
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -34,6 +34,16 @@ Scope {
         root._parseCpu(segs[0]);
         root._parseMem(segs[1]);
         root._parseNet(segs[2]);
+        root._pushHist();
+    }
+
+    // 环形历史缓冲：必须新数组赋值才能触发绑定（原地 push 不触发）
+    function _pushHist() {
+        let m = SystemStats.histMax;
+        SystemStats.cpuHist = SystemStats.cpuHist.concat([SystemStats.cpuUsage]).slice(-m);
+        SystemStats.memHist = SystemStats.memHist.concat([SystemStats.memUsagePct]).slice(-m);
+        SystemStats.netUpHist = SystemStats.netUpHist.concat([SystemStats.netUpSpeed]).slice(-m);
+        SystemStats.netDownHist = SystemStats.netDownHist.concat([SystemStats.netDownSpeed]).slice(-m);
     }
 
     function _parseCpu(seg) {
