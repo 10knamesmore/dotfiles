@@ -1,28 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scrolling 布局下使用 fakefullscreen，占满屏幕但不进入应用真全屏。
-# 同时在进入全屏时将 gaps 设为 0，退出时恢复。
+# 伪全屏 toggle。0.55 起 scrolling 的 maximize(mode 1) 被改成单向 expel、不可逆
+#   (src/layout/algorithm/tiled/scrolling/ScrollingAlgorithm.cpp::requestFullscreen)。
+# 改用 fullscreen_state：internal=FULLSCREEN 走可逆的全屏分支(铺满+记录列宽还原、不 expel)，
+# client=NONE 让应用无感(fakefullscreen)。按 .fullscreen 决定进/出。
 
-layout="$(hyprctl -j getoption general:layout 2>/dev/null | jq -r '.str // empty' || true)"
 win="$(hyprctl -j activewindow 2>/dev/null || true)"
 is_fullscreen="$(echo "$win" | jq -r '.fullscreen // 0')"
 
-case "$layout" in
-  scrolling)
-    hyprctl dispatch fullscreen 1
-    ;;
-  *)
-    hyprctl dispatch fullscreen 0
-    ;;
-esac
-
 if [[ "$is_fullscreen" == "0" || "$is_fullscreen" == "false" ]]; then
-  # 进入全屏 → gaps 归零
-  hyprctl keyword general:gaps_in 0 >/dev/null
-  hyprctl keyword general:gaps_out 0 >/dev/null
+  hyprctl dispatch "hl.dsp.window.fullscreen_state({ internal = 2, client = 0, action = 'set' })"
 else
-  # 退出全屏 → 恢复默认 gaps
-  hyprctl keyword general:gaps_in 3 >/dev/null
-  hyprctl keyword general:gaps_out "5,10,10,10" >/dev/null
+  hyprctl dispatch "hl.dsp.window.fullscreen_state({ internal = 0, client = 0, action = 'set' })"
 fi

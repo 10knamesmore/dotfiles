@@ -10,7 +10,7 @@ CONFIG="$HOME/.config/hypr/keybindings.conf"
 # 已有窗口则 focus
 existing="$(hyprctl -j clients 2>/dev/null | jq -r ".[] | select(.class == \"$CLASS\") | .address" | head -1)"
 if [[ -n "$existing" ]]; then
-  hyprctl dispatch focuswindow "address:$existing" >/dev/null
+  hyprctl dispatch "hl.dsp.focus('address:$existing')" >/dev/null
   exit 0
 fi
 

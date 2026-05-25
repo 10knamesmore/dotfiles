@@ -159,16 +159,18 @@ hl.curve("quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } })
 hl.curve("shellDecelerate", { type = "bezier", points = { { 0.2, 0.9 }, { 0.3, 1 } } })
 hl.curve("shellStandard", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
 
--- 0.55 新增 spring 物理动画——比 bezier 在打断时更自然
--- dampening 略高于临界阻尼(≈16.88)，过阻尼=无过冲，手感接近 easeOutQuint 的"快冲强减速不回弹"
+-- 0.55 spring 物理动画——比 bezier 在打断时更自然
+-- easy：稳重，过阻尼无弹，给工作区切换用
 hl.curve("easy", { type = "spring", mass = 1, stiffness = 71.2633, dampening = 18.0 })
+-- snappy：高刚度=固有频率高=到位快；dampening 取临界(2√90≈19)保证不过冲。给窗口移动用
+hl.curve("snappy", { type = "spring", mass = 1, stiffness = 90, dampening = 19 })
 
 hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
 hl.animation({ leaf = "border", enabled = true, speed = 5.39, bezier = "easeOutQuint" })
 
--- windows / windowsMove 用 spring（拖动 / 切列时打断也平滑）
-hl.animation({ leaf = "windows",     enabled = true, speed = 8,    spring = "easy" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 8,    spring = "easy" })
+-- windows / windowsMove 用高刚度 snappy（快速到位，打断仍平滑）
+hl.animation({ leaf = "windows",     enabled = true, speed = 8,    spring = "snappy" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 8,    spring = "snappy" })
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 4.1, bezier = "easeOutQuint", style = "popin 87%" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 1.49, bezier = "linear", style = "popin 87%" })
 
@@ -182,10 +184,10 @@ hl.animation({ leaf = "fade", enabled = true, speed = 3.03, bezier = "quick" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
 
--- scrolling 布局：工作区水平滑动 + spring，跟手感强
-hl.animation({ leaf = "workspaces",    enabled = true, speed = 7, spring = "easy", style = "slide" })
-hl.animation({ leaf = "workspacesIn",  enabled = true, speed = 7, spring = "easy", style = "slide" })
-hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy", style = "slide" })
+-- scrolling 布局：工作区水平滑动 + 淡入 + spring，跟手感强且过渡更柔
+hl.animation({ leaf = "workspaces",    enabled = true, speed = 7, spring = "easy", style = "slidefade" })
+hl.animation({ leaf = "workspacesIn",  enabled = true, speed = 7, spring = "easy", style = "slidefade" })
+hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
 
 -- ============================================================
 -- 设备配置
@@ -279,7 +281,8 @@ hl.bind(mainMod .. " + D", hl.dsp.window.close())
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/toggle_fullscreen.sh"))
 hl.bind(mainMod .. " + T", hl.dsp.global("quickshell:toggleBar"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(terminal .. " launch_yazi.sh"))
-hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
+-- float 挪到 ALT+V，对齐 macOS 的 `alt - v`，并腾出 SUPER+V 给 keyd 做粘贴
+hl.bind("ALT + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + R", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + S", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("hyprshot -m region"))
@@ -340,13 +343,12 @@ hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.group.next({ reverse = true }))
 
 -- QuickShell 全局触发
 hl.bind(mainMod .. " + slash",              hl.dsp.global("quickshell:keybindings"))
-hl.bind(mainMod .. " + A",                  hl.dsp.global("quickshell:ai"))
+hl.bind(mainMod .. " + SHIFT + A",          hl.dsp.global("quickshell:ai"))
 hl.bind(mainMod .. " + N",                  hl.dsp.global("quickshell:notes"))
 hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.global("quickshell:journal"))
 
 -- 自定义脚本
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
-hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/focus_mode.sh"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_save.sh"))
 hl.bind(mainMod .. " + CONTROL + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_restore.sh"))
 hl.bind(
@@ -409,6 +411,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("fcitx5 -d")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --watch cliphist store")
+    -- macOS 式 Super+C/V/X/A/Z（按窗口分流，终端走 Ctrl+Shift+C）
+    -- --device 显式指定键盘（KM 一体接收器不被 xremap 自动识别为键盘）；换键盘需改设备名
+    hl.exec_cmd("xremap --device 'Wireless Link-KM' " .. HOME .. "/.config/xremap/config.yml")
     hl.exec_cmd("quickshell")
     hl.exec_cmd(N .. "/hypr/screen_effects.sh apply")
     hl.exec_cmd("clash-verge")

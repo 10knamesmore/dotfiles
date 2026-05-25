@@ -229,13 +229,6 @@ ShellRoot {
 
     AiPanel {}
 
-    // ── 屏幕四角圆角遮罩 ──
-    Variants {
-        model: Quickshell.screens
-
-        delegate: ScreenCorners {}
-    }
-
     // ── 桌面浮动组件 ──
     // 保留音频频谱（常驻最前端可见）；其余 widget 多被窗口遮挡用不到，已禁用以省 CPU。
     CavaService {}

@@ -1,0 +1,28 @@
+# xremap 配置：在 Linux 上复刻 macOS 的 Super(Cmd)+C/V/X/A/Z 体验
+#
+# 原理：xremap 在 evdev 层拦截，按 Hyprland 焦点窗口的 app_id 分流——
+#   - 终端 (kitty)：Super+C/V/X → Ctrl+Shift+C/V/X（终端复制粘贴），不碰 Ctrl+C（中断保持）
+#   - 其他 GUI：Super+C/V/X/A/Z → Ctrl 等价（复制/粘贴/剪切/全选/撤销）
+#
+# 注意：application 段越靠前优先级越高，所以终端例外放在全局规则之前。
+
+keymap:
+  # ---------- 终端例外（kitty）----------
+  - name: terminal clipboard (kitty)
+    application:
+      only: [kitty]
+    remap:
+      Super-c: C-Shift-c   # 复制
+      Super-v: C-Shift-v   # 粘贴
+      Super-x: C-Shift-x   # 剪切（kitty 默认无，按需）
+      # Super-a / Super-z 在终端无通用语义，留给下方全局规则（C-a=行首, C-z=挂起）
+
+  # ---------- 全局（所有非终端 GUI）----------
+  - name: clipboard like macOS (global)
+    remap:
+      Super-c: C-c   # 复制
+      Super-v: C-v   # 粘贴
+      Super-x: C-x   # 剪切
+      Super-a: C-a   # 全选
+      Super-z: C-z   # 撤销
+      Super-Shift-z: C-Shift-z   # 重做（顺手加）
