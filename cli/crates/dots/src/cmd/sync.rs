@@ -12,7 +12,7 @@ use dots_core::{
 
 use super::{Result, current_os, expand_home, find_repo_root, home_dir, os_str};
 use crate::exec::execute;
-use crate::hooks::{EffectState, activate_host, run_phase};
+use crate::hooks::{EffectState, activate_host, call_entry_hook, run_phase};
 use crate::lua::{LuaCtx, eval_manifest};
 use crate::realfs::RealFs;
 use crate::render;
@@ -58,13 +58,52 @@ pub fn run(dry_run: bool) -> Result<()> {
             "当前主机 `{hostname}` 未在 dots.lua 的 hosts{{}} 覆盖"
         ));
     }
+    if hit {
+        run_phase(HookPhase::OnHostActivate, &manifest, &handles, &effect)?;
+    }
 
     // 3) 收集期望链接：层映射 + distribute + scripts + host extra_links
     let repo_abs = AbsPath::new(&repo_root);
     let home_abs = AbsPath::new(&home);
     let mut links = expand_layers(&fs, &repo_abs, &home_abs, os, &manifest);
-    links.extend(distribute_links(&fs, &repo_abs, &manifest, &home));
-    let (script_links, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_keep_tree);
+
+    // 3.5) 条目级 pre：返回 false 的条目，其链接整体剔除；幸存条目的 post 入队。
+    let mut entry_posts: Vec<dots_core::manifest::ClosureId> = Vec::new();
+    for (path, spec) in &manifest.granularity {
+        if let Some(pre) = spec.pre {
+            if !call_entry_hook(pre, &handles, &effect)? {
+                let prefix = repo_root.join("tree").join(path.as_path());
+                links.retain(|link| !link.source.as_path().starts_with(&prefix));
+                render::warn(&format!("⊘ 条目跳过（pre）：{}", path.as_path().display()));
+                continue;
+            }
+        }
+        if let Some(post) = spec.post {
+            entry_posts.push(post);
+        }
+    }
+    let mut blocked_distribute = rustc_hash::FxHashSet::default();
+    for (idx, spec) in manifest.distribute.iter().enumerate() {
+        if let Some(pre) = spec.pre {
+            if !call_entry_hook(pre, &handles, &effect)? {
+                blocked_distribute.insert(idx);
+                render::warn(&format!("⊘ 分发跳过（pre）：{}", spec.name));
+                continue;
+            }
+        }
+        if let Some(post) = spec.post {
+            entry_posts.push(post);
+        }
+    }
+
+    links.extend(distribute_links(
+        &fs,
+        &repo_abs,
+        &manifest,
+        &home,
+        &blocked_distribute,
+    ));
+    let (script_links, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_ignore_tree);
     for conflict in &conflicts {
         render::warn(&format!(
             "脚本重名冲突：{}（{} 个来源）",
@@ -86,12 +125,18 @@ pub fn run(dry_run: bool) -> Result<()> {
         ));
     }
 
+    // 4.5) 条目级 post（仅未被 pre 阻止的条目；dry-run 不执行——效果未发生）
+    if !dry_run {
+        for id in &entry_posts {
+            call_entry_hook(*id, &handles, &effect)?;
+        }
+    }
+
     // 5) .inject 渲染（生成型，用 host_vars + secrets）
     render_injects(&repo_root, &home, &fs, &effect, os, dry_run)?;
 
-    // 6) post_link / post_sync 钩子
+    // 6) post_link 钩子（链接与 .inject 已就绪）
     run_phase(HookPhase::PostLink, &manifest, &handles, &effect)?;
-    run_phase(HookPhase::PostSync, &manifest, &handles, &effect)?;
 
     // 7) shell 环境（stub + env.zsh + root）
     if !dry_run {
@@ -102,7 +147,10 @@ pub fn run(dry_run: bool) -> Result<()> {
     // 8) systemd user enable
     enable_systemd(&manifest, dry_run);
 
-    // 9) 保存台账。effect 的 Rc 仍被 lua 闭包持有（handles 在作用域内），
+    // 9) post_sync 钩子——一切就绪（链接/inject/env.zsh/systemd）之后、台账保存之前。
+    run_phase(HookPhase::PostSync, &manifest, &handles, &effect)?;
+
+    // 10) 保存台账。effect 的 Rc 仍被 lua 闭包持有（handles 在作用域内），
     //    故 clone 出 state 保存，而非 try_unwrap 独占。
     if !dry_run {
         let final_state = effect.borrow().state.clone();
@@ -130,18 +178,24 @@ fn take_extra_links(effect: &Rc<RefCell<EffectState>>) -> Vec<ExpectedLink> {
 }
 
 /// distribute：一源多落点。父工具目录不存在则 warn 跳过（§12 容错）。
+///
+/// `blocked` 是被条目级 pre 阻止的 spec 下标集合（status/doctor 等只读路径传空集）。
 pub(crate) fn distribute_links(
     fs: &dyn FileSystem,
     repo_abs: &AbsPath,
     manifest: &Manifest,
     home: &Path,
+    blocked: &rustc_hash::FxHashSet<usize>,
 ) -> Vec<ExpectedLink> {
     let via = Layer {
         name: "distribute".to_owned(),
         os: None,
     };
     let mut out = Vec::new();
-    for spec in &manifest.distribute {
+    for (idx, spec) in manifest.distribute.iter().enumerate() {
+        if blocked.contains(&idx) {
+            continue;
+        }
         let src_abs = repo_abs.join(spec.src.as_path());
         for to in &spec.to {
             let to_abs = AbsPath::new(expand_home(to, home));

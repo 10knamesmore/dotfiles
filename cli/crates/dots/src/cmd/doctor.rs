@@ -38,7 +38,7 @@ pub fn run() -> Result<bool> {
     // 2) scripts 重名冲突
     let repo_abs = AbsPath::new(&repo_root);
     let home_abs = AbsPath::new(&home);
-    let (_sl, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_keep_tree);
+    let (_sl, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_ignore_tree);
     for conflict in &conflicts {
         healthy = false;
         render::err(&format!(
@@ -50,8 +50,13 @@ pub fn run() -> Result<bool> {
 
     // 3) 链接漂移（外部链接）
     let mut links = expand_layers(&fs, &repo_abs, &home_abs, os, &manifest);
+    // 只读巡检不执行 pre 闭包：传空 blocked。
     links.extend(super::sync::distribute_links(
-        &fs, &repo_abs, &manifest, &home,
+        &fs,
+        &repo_abs,
+        &manifest,
+        &home,
+        &rustc_hash::FxHashSet::default(),
     ));
     let plan = resolve(&fs, &repo_abs, &links);
     for item in &plan.items {

@@ -6,6 +6,8 @@
 ---@class GranularitySpec
 ---@field mode? "dir"|"children"|"file"   # 链接粒度，缺省 "dir"
 ---@field ignore? string[]                # 下钻/逐文件时跳过的子项名
+---@field pre? fun(): boolean?            # 条目链接前执行；返回 false 则整条目跳过
+---@field post? fun()                     # 条目链接后执行（被 pre 阻止则不执行）
 
 --- 覆盖某 tree 内路径的链接粒度。
 ---@param path string                      # 相对 tree 的路径，如 "home/.config/opencode"
@@ -16,6 +18,8 @@ function granularity(path, spec) end
 ---@field src string                       # 唯一真相源（仓库内），如 "tree/home/.claude/skills"
 ---@field to string[]                      # 落点列表（$HOME 侧，可用 ~）
 ---@field mode? "dir"|"children"|"file"    # 落点粒度，缺省 "dir"
+---@field pre? fun(): boolean?             # 分发前执行；返回 false 则整个分发跳过
+---@field post? fun()                      # 分发完成后执行（被 pre 阻止则不执行）
 
 --- 一源多落点分发（接入新工具 = to 加一行 + dots sync）。
 ---@param name string
@@ -36,16 +40,18 @@ function root(name, spec) end
 function systemd_user(units) end
 
 ---@class ScriptsSpec
----@field keep_tree? string[]              # 聚合时保持树形（整目录链）的子目录名
+---@field ignore_tree? string[]            # 聚合时递归拍平其文件的子目录名（子目录默认整目录链保树形）
 
 --- scripts 聚合选项。
 ---@param spec ScriptsSpec
 function scripts(spec) end
 
+---@alias HookPhase "pre_sync"|"on_host_activate"|"post_link"|"post_sync"
+
 --- 注册生命周期钩子（effect 阶段执行）。
----@param phase "pre_sync"|"post_link"|"post_sync"|"on_host_activate"
----@param fn fun()
-function on(phase, fn) end
+--- 表形式：phase 做 key，value 是单个函数或函数数组（同 phase 多钩子按数组序执行）。
+---@param hooks table<HookPhase, fun()|fun()[]>
+function on(hooks) end
 
 --- per-host 块表：hostname → 配置闭包。未命中当前机且非空 → sync 硬报错。
 ---@param blocks table<string, fun()>

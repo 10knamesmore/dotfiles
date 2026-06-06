@@ -104,26 +104,154 @@ mod tests {
             distribute("skills", { src = "tree/home/.claude/skills",
                                    to = { "~/.codex/skills" }, mode = "children" })
             systemd_user { "mihomo.service", "napcat.service" }
-            scripts { keep_tree = { "hypr" } }
+            scripts { ignore_tree = { "snippets" } }
         "#;
         let (m, _h) = eval_manifest(src, &ctx())?;
         assert_eq!(m.granularity.len(), 1);
         assert_eq!(m.distribute.len(), 1);
         assert_eq!(m.distribute[0].to, vec!["~/.codex/skills".to_string()]);
         assert_eq!(m.systemd_user.len(), 2);
-        assert_eq!(m.scripts_keep_tree, vec!["hypr".to_string()]);
+        assert_eq!(m.scripts_ignore_tree, vec!["snippets".to_string()]);
         Ok(())
+    }
+
+    #[test]
+    fn scripts_old_keep_tree_field_errors() {
+        // 语义已反转（默认保树）：旧字段必须报错，不能静默无视。
+        let src = r#" scripts { keep_tree = { "hypr" } } "#;
+        assert!(
+            eval_manifest(src, &ctx()).is_err(),
+            "keep_tree 应报迁移错误"
+        );
     }
 
     #[test]
     fn registers_hook_without_running() -> Result<()> {
         // 钩子体内若执行会调用未定义的 dots.json（声明期未注册），故能跑通即证明未执行。
         let src = r#"
-            on("post_link", function() dots.json.merge("/x", {}) end)
+            on { post_link = function() dots.json.merge("/x", {}) end }
         "#;
         let (m, h) = eval_manifest(src, &ctx())?;
         assert_eq!(m.hooks.len(), 1);
         assert_eq!(h.closures.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn on_table_registers_multiple_phases() -> Result<()> {
+        use dots_core::manifest::HookPhase;
+        let src = r#"
+            on {
+                pre_sync = function() end,
+                post_sync = function() end,
+            }
+        "#;
+        let (m, h) = eval_manifest(src, &ctx())?;
+        assert_eq!(m.hooks.len(), 2);
+        assert_eq!(h.closures.len(), 2);
+        let phases: Vec<_> = m.hooks.iter().map(|reg| reg.phase).collect();
+        assert!(phases.contains(&HookPhase::PreSync));
+        assert!(phases.contains(&HookPhase::PostSync));
+        Ok(())
+    }
+
+    #[test]
+    fn on_table_array_value_registers_in_order() -> Result<()> {
+        use dots_core::manifest::HookPhase;
+        let src = r#"
+            on { post_sync = { function() end, function() end } }
+        "#;
+        let (m, h) = eval_manifest(src, &ctx())?;
+        assert_eq!(m.hooks.len(), 2);
+        assert_eq!(h.closures.len(), 2);
+        assert!(m.hooks.iter().all(|reg| reg.phase == HookPhase::PostSync));
+        // 同 phase 多钩子按数组下标序登记（ClosureId 递增）
+        let ids: Vec<u32> = m.hooks.iter().map(|reg| reg.closure.0).collect();
+        assert_eq!(ids, vec![0, 1]);
+        Ok(())
+    }
+
+    #[test]
+    fn on_unknown_phase_errors() {
+        let src = r#" on { nope = function() end } "#;
+        assert!(eval_manifest(src, &ctx()).is_err(), "未知 phase 应报错");
+    }
+
+    #[test]
+    fn on_non_function_value_errors() {
+        let src = r#" on { post_sync = 42 } "#;
+        assert!(eval_manifest(src, &ctx()).is_err(), "非函数 value 应报错");
+    }
+
+    #[test]
+    fn on_array_with_non_function_errors() {
+        let src = r#" on { post_sync = { function() end, "oops" } } "#;
+        assert!(
+            eval_manifest(src, &ctx()).is_err(),
+            "数组内混非函数应报错"
+        );
+    }
+
+    #[test]
+    fn on_old_two_arg_form_errors() {
+        // 旧式 on(phase, fn) 已删除，应报错而非静默接受。
+        let src = r#" on("post_sync", function() end) "#;
+        assert!(eval_manifest(src, &ctx()).is_err(), "旧式双参应报错");
+    }
+
+    #[test]
+    fn granularity_pre_post_registered_without_running() -> Result<()> {
+        // pre/post 体内调用声明期未注册的 dots.json —— 能跑通即证明只登记不执行。
+        let src = r#"
+            granularity("home/.claude", {
+                mode = "children",
+                pre = function() dots.json.merge("/x", {}) end,
+                post = function() dots.json.merge("/y", {}) end,
+            })
+        "#;
+        let (m, h) = eval_manifest(src, &ctx())?;
+        let spec = m
+            .granularity
+            .get(&dots_core::types::RepoPath::new("home/.claude"))
+            .ok_or_else(|| color_eyre::eyre::eyre!("granularity 条目缺失"))?;
+        assert!(spec.pre.is_some(), "pre 闭包应已登记");
+        assert!(spec.post.is_some(), "post 闭包应已登记");
+        assert_eq!(h.closures.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn granularity_without_hooks_has_none() -> Result<()> {
+        let src = r#" granularity("home/.config/opencode", { mode = "file" }) "#;
+        let (m, _h) = eval_manifest(src, &ctx())?;
+        let spec = m
+            .granularity
+            .get(&dots_core::types::RepoPath::new("home/.config/opencode"))
+            .ok_or_else(|| color_eyre::eyre::eyre!("granularity 条目缺失"))?;
+        assert!(spec.pre.is_none());
+        assert!(spec.post.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn distribute_pre_post_registered() -> Result<()> {
+        let src = r#"
+            distribute("skills", {
+                src = "tree/home/.claude/skills",
+                to = { "~/.codex/skills" },
+                mode = "children",
+                pre = function() end,
+                post = function() end,
+            })
+        "#;
+        let (m, h) = eval_manifest(src, &ctx())?;
+        let spec = m
+            .distribute
+            .first()
+            .ok_or_else(|| color_eyre::eyre::eyre!("distribute 条目缺失"))?;
+        assert!(spec.pre.is_some());
+        assert!(spec.post.is_some());
+        assert_eq!(h.closures.len(), 2);
         Ok(())
     }
 

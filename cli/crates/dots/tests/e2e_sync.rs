@@ -114,3 +114,240 @@ fn status_reports_missing_with_nonzero_exit() {
     // 未 sync，直接 status：应有 missing → 非零退出
     run_dots(repo, home, &["status"]).failure();
 }
+
+/// 取与 dots::hosts::current() 同源的主机名（/etc/hostname → HOSTNAME → unknown）。
+fn current_hostname() -> String {
+    fs::read_to_string("/etc/hostname")
+        .ok()
+        .map(|text| text.trim().to_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| std::env::var("HOSTNAME").unwrap_or_else(|_| "unknown".to_owned()))
+}
+
+#[test]
+fn on_host_activate_fires_after_host_block() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    let host = current_hostname();
+    fs::write(
+        repo.join("dots.lua"),
+        format!(
+            r#"
+hosts {{ ["{host}"] = function() vars {{ marker = "1" }} end }}
+on {{
+  on_host_activate = function()
+    dots.file.ensure_block(dots.home .. "/.hook-mark", "e2e", "fired")
+  end,
+}}
+"#
+        ),
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    let mark = fs::read_to_string(home.join(".hook-mark")).unwrap_or_default();
+    assert!(
+        mark.contains("fired"),
+        "on_host_activate 应在命中 host 块后触发，.hook-mark 内容：{mark:?}"
+    );
+}
+
+#[test]
+fn entry_pre_false_skips_entry_links() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // nvim 条目被 pre 阻止；其余照常链接
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+granularity("home/.config/nvim", {
+  mode = "dir",
+  pre = function() return false end,
+})
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    assert!(
+        !home.join(".config/nvim").exists(),
+        "pre 返回 false 的条目不应链接"
+    );
+    assert!(
+        home.join(".vimrc").exists(),
+        "其他条目应不受影响照常链接"
+    );
+}
+
+#[test]
+fn entry_pre_nil_links_normally() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // pre 无显式 return（nil）→ 继续链接
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+granularity("home/.config/nvim", {
+  mode = "dir",
+  pre = function() end,
+})
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    assert!(
+        home.join(".config/nvim").exists(),
+        "pre 返回 nil 应继续链接"
+    );
+}
+
+#[test]
+fn entry_post_runs_after_link() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+granularity("home/.config/nvim", {
+  mode = "dir",
+  post = function()
+    dots.file.ensure_block(dots.home .. "/.post-mark", "e2e", "post ran")
+  end,
+})
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    let mark = fs::read_to_string(home.join(".post-mark")).unwrap_or_default();
+    assert!(mark.contains("post ran"), "post 应在链接后执行：{mark:?}");
+}
+
+#[test]
+fn entry_post_skipped_when_pre_blocks() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+granularity("home/.config/nvim", {
+  mode = "dir",
+  pre = function() return false end,
+  post = function()
+    dots.file.ensure_block(dots.home .. "/.post-mark", "e2e", "post ran")
+  end,
+})
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    assert!(
+        !home.join(".post-mark").exists(),
+        "被 pre 阻止的条目其 post 不应执行"
+    );
+}
+
+#[test]
+fn entry_pre_evaluated_on_dry_run_without_writes() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+granularity("home/.config/nvim", {
+  mode = "dir",
+  pre = function() return false end,
+})
+"#,
+    )
+    .unwrap();
+
+    // dry-run：pre 照常评估（输出含跳过提示），但不写盘
+    let output = run_dots(repo, home, &["sync", "--dry-run"]).success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout).to_string();
+    assert!(
+        stdout.contains("home/.config/nvim"),
+        "dry-run 输出应包含被跳过条目的提示：{stdout}"
+    );
+    assert!(!home.join(".config/nvim").exists());
+    assert!(!home.join(".vimrc").exists(), "dry-run 不应写盘");
+}
+
+#[test]
+fn post_sync_runs_after_shell_env_and_systemd() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 顺序探针：post_sync 时 env.zsh 必须已写出。
+    // run_once 的命令退出非零会让 sync 整体报错，故 sync success 即证明顺序正确。
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    dots.run_once("probe-env", "test -f " .. dots.home .. "/.config/dots/env.zsh")
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+}
+
+#[test]
+fn on_host_activate_silent_when_hosts_table_empty() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 无 hosts 块 → on_host_activate 不触发，sync 正常
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  on_host_activate = function()
+    dots.file.ensure_block(dots.home .. "/.hook-mark", "e2e", "fired")
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+    assert!(
+        !home.join(".hook-mark").exists(),
+        "未命中 host 块时 on_host_activate 不应触发"
+    );
+}

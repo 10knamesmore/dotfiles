@@ -43,21 +43,20 @@ dots sync
 │    │    └─ 未命中 → 表非空：打印骨架 + 硬报错；表空：继续      │
 │    └─ on{ on_host_activate }    ←─ 全局钩子，紧随块闭包之后    │
 │ ③ 收集期望链接：层镜像 + distribute + scripts + hosts 的 link()│
-│ ④ resolve → Plan（每条链接的判定：链/重建/备份/漂移）          │
-│ ⑤ 条目级 pre                    ←─ spec.pre                    │
-│    └─ return false → 该条目的全部链接从 Plan 剔除，报「⊘ 跳过」│
-│ ⑥ execute Plan（建链 / 备份 / 重建 / 容器转换）                │
-│ ⑦ 条目级 post                   ←─ spec.post（仅未被阻止的条目）│
-│ ⑧ .inject 模板渲染（host.* / secret.*）                        │
-│ ⑨ on{ post_link }               ←─ 全局钩子                    │
-│ ⑩ on{ post_sync }               ←─ 全局钩子                    │
-│ ⑪ env.zsh / zshrc stub 写入                                    │
-│ ⑫ systemd --user enable                                        │
-│ ⑬ state.json 台账保存                                          │
+│    └─ 条目级 pre                ←─ spec.pre                    │
+│       return false → 该条目的全部链接整体剔除，报「⊘ 跳过」    │
+│ ④ resolve → Plan + execute（建链 / 备份 / 重建 / 容器转换）    │
+│ ⑤ 条目级 post                   ←─ spec.post（仅未被阻止的条目）│
+│ ⑥ .inject 模板渲染（host.* / secret.*）                        │
+│ ⑦ on{ post_link }               ←─ 全局钩子                    │
+│ ⑧ env.zsh / zshrc stub 写入                                    │
+│ ⑨ systemd --user enable                                        │
+│ ⑩ on{ post_sync }               ←─ 全局钩子（一切就绪后）      │
+│ ⑪ state.json 台账保存                                          │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-分工：**全局 `on{}`** 管 sync 整体节奏（①②⑨⑩），**条目级 pre/post** 跟着声明走、管单个条目的链接前后（⑤⑦），**hosts 块闭包**是 per-host 的可执行代码（②）。
+分工：**全局 `on{}`** 管 sync 整体节奏，**条目级 pre/post** 跟着声明走、管单个条目的链接前后（③⑥），**hosts 块闭包**是 per-host 的可执行代码（②）。
 
 `on_host_activate` 与 hosts 块的关系：它实质是「host 块的全局 post」——跨机器通用的命中后逻辑写它；per-host 逻辑直接写块闭包内。
 
@@ -106,10 +105,11 @@ distribute("skills", {
 })
 ```
 
-- **pre**（⑤）：按声明序执行；`return false` → 该条目展开的**全部**链接从 Plan 剔除；执行报告增加「⊘ N 跳过」。
-- **post**（⑦）：仅未被阻止的条目，紧跟 execute（在 `.inject` 和全局 post_link 之前），按声明序。
+- **pre**（③，收集链接阶段评估）：`return false` → 该条目展开的**全部**链接整体剔除，输出「⊘ 跳过」行。多个条目的 pre 相互独立，之间不保证执行顺序。
+- **post**（⑤）：仅未被阻止的条目，紧跟 execute（在 `.inject` 和全局 post_link 之前）。条目间同样不保证顺序。
 - 闭包无参数（条目路径在声明处可见）；体内可用全部写原语。
-- **dry-run**：pre 照跑（保证预览准确；闭包内原语自带 dry-run 感知，安全）；post 不跑（效果未发生）。被阻止条目在 dry-run 输出中显示「⊘ pre 跳过」。
+- **dry-run**：pre 照跑（保证预览准确；闭包内原语自带 dry-run 感知，安全）；post 不跑（效果未发生）。被阻止条目在 dry-run 输出中显示「⊘ 跳过」。
+- `dots status` / `dots doctor` 是只读巡检、不执行 pre 闭包——被 pre 长期阻止的条目会在 status 报缺失（已知限制，文档标注）。
 - `root()` 暂不加 pre/post（YAGNI，本身无使用者）。
 
 ### 4.3 `on_host_activate` 补实现

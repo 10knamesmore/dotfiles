@@ -76,6 +76,26 @@ pub fn run_phase(
     Ok(())
 }
 
+/// 执行一个条目级钩子闭包（granularity/distribute 的 pre/post）。
+///
+/// # Return:
+///   仅当闭包显式返回 `false` 时为 `false`（pre 的阻止语义）；
+///   其他返回值（含 nil/true）均为 `true`。post 调用方忽略返回值。
+pub fn call_entry_hook(
+    id: dots_core::manifest::ClosureId,
+    handles: &LuaHandles,
+    effect: &Rc<RefCell<EffectState>>,
+) -> Result<bool> {
+    primitives::install(&handles.lua, effect).map_err(to_eyre)?;
+    let key = handles
+        .closures
+        .get(id.0 as usize)
+        .ok_or_else(|| color_eyre::eyre::eyre!("条目钩子闭包 id 越界"))?;
+    let func: Function = handles.lua.registry_value(key).map_err(to_eyre)?;
+    let ret: mlua::Value = func.call(()).map_err(to_eyre)?;
+    Ok(!matches!(ret, mlua::Value::Boolean(false)))
+}
+
 /// 激活命中的 host 块（执行其闭包，收集 vars/link）。
 ///
 /// # Return:

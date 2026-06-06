@@ -321,6 +321,8 @@ mod tests {
             GranularitySpec {
                 mode: LinkMode::File,
                 ignore: vec!["node_modules".into()],
+                pre: None,
+                post: None,
             },
         );
         let links = expand_layers(&fs, &root, &home, Os::Linux, &m);
@@ -355,6 +357,8 @@ mod tests {
             GranularitySpec {
                 mode: LinkMode::Children,
                 ignore: vec!["projects".into()],
+                pre: None,
+                post: None,
             },
         );
         let links = expand_layers(&fs, &root, &home, Os::Linux, &m);

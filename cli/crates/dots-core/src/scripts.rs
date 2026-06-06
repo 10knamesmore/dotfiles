@@ -1,7 +1,8 @@
 //! scripts 聚合计划（§9）。
 //!
 //! `scripts/common` + `scripts/<os>` 聚合到 `.gen/scripts/`：顶层文件链过去；
-//! `keep_tree` 子目录整目录链（保树形）；其余子目录递归拍平其文件。重名 → 冲突（doctor 用）。
+//! 子目录默认整目录链（保持树形）；`ignore_tree` 列出的子目录递归拍平其文件。
+//! 重名 → 冲突（doctor 用）。
 
 use crate::fs::{FileSystem, NodeKind};
 use crate::layer::ExpectedLink;
@@ -22,7 +23,7 @@ pub struct ScriptConflict {
 ///   - `fs`: 文件系统
 ///   - `repo_root`: 仓库根
 ///   - `os`: 当前平台（决定 `scripts/<os>` 是否纳入）
-///   - `keep_tree`: 保持树形（整目录链）的子目录名
+///   - `ignore_tree`: 不保树形、递归拍平其文件的子目录名（子目录默认整目录链）
 ///
 /// # Return:
 ///   `(聚合链接集合, 冲突列表)`；聚合目标位于 `repo_root/.gen/scripts/`。
@@ -30,7 +31,7 @@ pub fn plan_scripts(
     fs: &dyn FileSystem,
     repo_root: &AbsPath,
     os: Os,
-    keep_tree: &[String],
+    ignore_tree: &[String],
 ) -> (Vec<ExpectedLink>, Vec<ScriptConflict>) {
     let gen_dir = repo_root.join(".gen").join("scripts");
     let via = Layer {
@@ -55,11 +56,11 @@ pub fn plan_scripts(
             };
             let src = AbsPath::new(&entry);
             match fs.classify(&entry) {
-                NodeKind::Dir if !keep_tree.iter().any(|keep| keep == name) => {
+                NodeKind::Dir if ignore_tree.iter().any(|flat| flat == name) => {
                     flatten_dir(fs, &src, &gen_dir, &via, &mut links, &mut conflicts);
                 }
                 NodeKind::Missing => {}
-                // 文件、软链、或 keep_tree 目录：直接链一条。
+                // 文件、软链、或默认保树的子目录：直接链一条。
                 _ => add_link(
                     &gen_dir.join(name),
                     &src,
@@ -147,21 +148,21 @@ mod tests {
             .file("/r/scripts/linux/hypr/c.sh");
 
         let root = AbsPath::new("/r");
-        let (links, conflicts) = plan_scripts(&fs, &root, Os::Linux, &["hypr".to_owned()]);
+        let (links, conflicts) = plan_scripts(&fs, &root, Os::Linux, &[]);
         let targets: Vec<_> = links
             .iter()
             .map(|l| l.target.as_path().to_owned())
             .collect();
         assert!(targets.contains(&Path::new("/r/.gen/scripts/a.py").to_owned()));
         assert!(targets.contains(&Path::new("/r/.gen/scripts/b.sh").to_owned()));
-        // hypr 子目录整链（保持树形），不拍平 c.sh
+        // 子目录默认整链（保持树形），无需任何声明
         assert!(targets.contains(&Path::new("/r/.gen/scripts/hypr").to_owned()));
         assert!(!targets.contains(&Path::new("/r/.gen/scripts/c.sh").to_owned()));
         assert!(conflicts.is_empty());
     }
 
     #[test]
-    fn flattens_non_keep_tree_dir() {
+    fn keeps_tree_by_default() {
         let mut fs = MemFs::new();
         fs.dir("/r/scripts").dir("/r/scripts/common");
         fs.dir("/r/scripts/common/sub")
@@ -172,8 +173,26 @@ mod tests {
             .iter()
             .map(|l| l.target.as_path().to_owned())
             .collect();
-        // 非 keep_tree 目录递归拍平
+        // 默认保持目录形态：sub 整链、deep.sh 不提到顶层
+        assert!(targets.contains(&Path::new("/r/.gen/scripts/sub").to_owned()));
+        assert!(!targets.contains(&Path::new("/r/.gen/scripts/deep.sh").to_owned()));
+    }
+
+    #[test]
+    fn flattens_ignore_tree_dir() {
+        let mut fs = MemFs::new();
+        fs.dir("/r/scripts").dir("/r/scripts/common");
+        fs.dir("/r/scripts/common/sub")
+            .file("/r/scripts/common/sub/deep.sh");
+        let root = AbsPath::new("/r");
+        let (links, _) = plan_scripts(&fs, &root, Os::Linux, &["sub".to_owned()]);
+        let targets: Vec<_> = links
+            .iter()
+            .map(|l| l.target.as_path().to_owned())
+            .collect();
+        // ignore_tree 列出的子目录递归拍平：脚本提到顶层、目录本身不整链
         assert!(targets.contains(&Path::new("/r/.gen/scripts/deep.sh").to_owned()));
+        assert!(!targets.contains(&Path::new("/r/.gen/scripts/sub").to_owned()));
     }
 
     #[test]

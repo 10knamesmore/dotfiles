@@ -30,10 +30,15 @@ pub fn run() -> Result<bool> {
     let repo_abs = AbsPath::new(&repo_root);
     let home_abs = AbsPath::new(&home);
     let mut links = expand_layers(&fs, &repo_abs, &home_abs, os, &manifest);
+    // 只读巡检不执行 pre 闭包：传空 blocked（被 pre 阻止的条目会显示为缺失，已知限制）。
     links.extend(super::sync::distribute_links(
-        &fs, &repo_abs, &manifest, &home,
+        &fs,
+        &repo_abs,
+        &manifest,
+        &home,
+        &rustc_hash::FxHashSet::default(),
     ));
-    let (script_links, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_keep_tree);
+    let (script_links, conflicts) = plan_scripts(&fs, &repo_abs, os, &manifest.scripts_ignore_tree);
     links.extend(script_links);
 
     let plan = resolve(&fs, &repo_abs, &links);

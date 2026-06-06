@@ -19,8 +19,8 @@ pub struct Manifest {
     pub roots: Vec<RootSpec>,
     /// systemd user 单元（sync 时 `systemctl --user enable`）。
     pub systemd_user: Vec<String>,
-    /// scripts 聚合时保持树形的子目录名。
-    pub scripts_keep_tree: Vec<String>,
+    /// scripts 聚合时不保树形、递归拍平的子目录名（子目录默认整目录链）。
+    pub scripts_ignore_tree: Vec<String>,
     /// per-host 块：hostname → 闭包 id（effect 阶段由 bin 执行）。
     pub host_blocks: FxHashMap<String, ClosureId>,
     /// 已注册的生命周期钩子。
@@ -34,6 +34,10 @@ pub struct GranularitySpec {
     pub mode: LinkMode,
     /// 链接时跳过的子项名（如 `node_modules`）。
     pub ignore: Vec<String>,
+    /// 条目级 pre 钩子（链接该条目前执行；返回 false 则整条目跳过）。
+    pub pre: Option<ClosureId>,
+    /// 条目级 post 钩子（该条目链接完成后执行；被 pre 阻止则不执行）。
+    pub post: Option<ClosureId>,
 }
 
 /// 多目标分发规格。
@@ -47,6 +51,10 @@ pub struct DistributeSpec {
     pub to: Vec<String>,
     /// 落点处的链接粒度（`children` 逐项 / `dir` 整目录）。
     pub mode: LinkMode,
+    /// 条目级 pre 钩子（返回 false 则整个分发跳过）。
+    pub pre: Option<ClosureId>,
+    /// 条目级 post 钩子（被 pre 阻止则不执行）。
+    pub post: Option<ClosureId>,
 }
 
 /// 非 `$HOME` 镜像的额外层（罕见，如 macOS App Support）。
@@ -74,9 +82,9 @@ pub struct HookReg {
 pub enum HookPhase {
     /// 链接落盘前。
     PreSync,
-    /// 链接全部建好后。
+    /// 链接全部建好后（含 `.inject` 渲染）。
     PostLink,
-    /// sync 末尾。
+    /// sync 末尾：链接 / inject / env.zsh / systemd enable 全部就绪后、台账保存前。
     PostSync,
     /// 命中 host 块激活时。
     OnHostActivate,
