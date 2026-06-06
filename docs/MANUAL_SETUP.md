@@ -23,21 +23,26 @@
 
 ### 涉及文件
 
+root 级文件源在仓库 `system/`（dots 不链接它们，需手动 `cp` 到 `/etc`）：
+
 | 文件 | 说明 |
 |------|------|
-| `linux/udev/99-keyboard-inhibit.rules` | udev 规则，监听已知外接键盘 |
-| `linux/scripts/hypr/keyboard_manager.sh` | 实际执行 enable/disable/sync 的脚本 |
-| `linux/systemd/keyboard-inhibit-sync.service` | 开机同步服务 |
+| `system/udev/99-keyboard-inhibit.rules` | udev 规则，监听已知外接键盘 |
+| `system/systemd/keyboard-inhibit-sync.service` | 开机同步服务 |
+| `scripts/linux/hypr/keyboard_manager.sh` | 实际执行 enable/disable/sync 的脚本 |
 
 ### 安装步骤
 
+> dots 迁移后脚本路径变为 `scripts/linux/hypr/`，旧 `/etc` 规则（指向 `linux/scripts/...`）已失效，**需重新 cp**。
+
 ```bash
+cd ~/dotfiles
 # 1. udev 规则
-sudo cp ~/dotfiles/linux/udev/99-keyboard-inhibit.rules /etc/udev/rules.d/
+sudo cp system/udev/99-keyboard-inhibit.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 
 # 2. systemd 服务（处理开机已连接的情况）
-sudo cp ~/dotfiles/linux/systemd/keyboard-inhibit-sync.service /etc/systemd/system/
+sudo cp system/systemd/keyboard-inhibit-sync.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now keyboard-inhibit-sync.service
 ```
@@ -53,8 +58,8 @@ sudo systemctl enable --now keyboard-inhibit-sync.service
 
 ```bash
 # 手动测试禁用/启用
-sudo ~/dotfiles/linux/scripts/hypr/keyboard_manager.sh disable
-sudo ~/dotfiles/linux/scripts/hypr/keyboard_manager.sh enable
+sudo ~/dotfiles/scripts/linux/hypr/keyboard_manager.sh disable
+sudo ~/dotfiles/scripts/linux/hypr/keyboard_manager.sh enable
 
 # 查看当前 inhibit 状态
 cat /sys/class/input/input2/inhibited   # AT Translated Set 2 keyboard

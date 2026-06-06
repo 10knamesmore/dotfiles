@@ -1,0 +1,5 @@
+# 工具链安装（dots bootstrap 用）。格式：name = "安装命令"。
+# name 已在 PATH（command -v name）则跳过。
+uv = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+starship = "curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
+zoxide = "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"

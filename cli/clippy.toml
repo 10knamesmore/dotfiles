@@ -1,0 +1,11 @@
+# 单函数行数上限（对应 too_many_lines）。
+too-many-lines-threshold = 300
+
+# 单字母标识符：长度 ≤ 1 触发 min_ident_chars。
+min-ident-chars-threshold = 1
+
+# 项目内部数据不面对不可信输入，hash 容器一律 Fx。
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "用 rustc_hash::FxHashMap（项目约定）" },
+    { path = "std::collections::HashSet", reason = "用 rustc_hash::FxHashSet（项目约定）" },
+]

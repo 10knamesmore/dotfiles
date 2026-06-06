@@ -2,8 +2,9 @@
 backup/*
 !backup/.gitkeep
 
-generated/*
-!generated/.gitkeep
+# dots 派生区与台账（机器本地，不入库）
+.gen/
+.dots/
 
 # OS specific
 .DS_Store
@@ -19,11 +20,6 @@ Thumbs.db
 # qmlls (QML Language Server) 本地工作区状态——每次 quickshell 构建会变
 *.qmlls.ini
 
-# Package manager backups
-*.backup.*
-macos/Brewfile.backup.*
-linux/*.backup.*
-
 # codex自动创建的
 **/skills/.system/
 
@@ -31,9 +27,12 @@ linux/*.backup.*
 btop/
 
 # opencode 自动生成的文件
-general/.config/opencode/node_modules/
-general/.config/opencode/package.json
-general/.config/opencode/bun.lock
-general/.config/opencode/.gitignore
+tree/home/.config/opencode/node_modules/
+tree/home/.config/opencode/package.json
+tree/home/.config/opencode/bun.lock
+tree/home/.config/opencode/.gitignore
 
 __pycache__
+
+# dots CLI 构建产物
+cli/target/

@@ -1,0 +1,12 @@
+# 显式安装的 pacman 包清单（每行一个，# 注释）。
+# 生成基线：pacman -Qqe > packages/pacman.txt，然后删掉非必要项。
+git
+neovim
+zsh
+kitty
+starship
+ripgrep
+eza
+zoxide
+fzf
+base-devel

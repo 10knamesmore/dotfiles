@@ -1,125 +1,92 @@
 ## 项目概述
 
-这是一个跨平台 dotfiles 仓库，当前真实安装入口是 `install.py`。
+这是一个跨平台 dotfiles 仓库。管理入口是自写的 Rust CLI **`dots`**（源码在 `cli/`）。
 
-仓库的主要职责不是包管理，而是：
-
-- 将 `general/`、`macos/`、`linux/` 中的配置链接到 `$HOME`
-- 渲染 `general/.zshrc_dotfiles.template` 到 `generated/.zshrc_dotfiles`
-- 维护一个可追加内容的 `~/.zshrc` stub
-- 聚合脚本到 `generated/scripts/`
-- 把 `general/skills/` 链接到各类 AI 工具目录
+核心机制是**软链接管理**：仓库即配置的单一真相源——`tree/` 下的目录结构镜像 `$HOME`，`dots sync` 把它们链接到位，编辑仓库即生效。仓库**不做包管理**（除 `dots bootstrap` 的装机清单外）。
 
 ## 核心命令
 
-### 安装与预览
-
 ```bash
-# 实际安装 dotfiles
-python install.py
+# 开发期透传（cargo run --release，自动编译）
+./dots.sh sync            # 把 tree/ 链接到 $HOME（幂等，可反复跑）
+./dots.sh status          # 三态巡检：已链 / 漂移 / 缺失
+./dots.sh adopt <path>    # 把 $HOME 里现成的文件收进仓库管理
+./dots.sh doctor          # 体检（漂移/未覆盖主机/脚本冲突）
 
-# 预览将执行的变更
-python install.py --dry-run
-```
+# 正式安装：bootstrap.sh 编译 release 产物，cli/target/release/dots 进 PATH
+# 新机：git clone <repo> ~/dotfiles && ~/dotfiles/bootstrap.sh
 
-### 日常开发
-
-```bash
-# 快速跳转到 dotfiles 目录
-dot
-
-# 快速跳转到 skills 目录
-skill
+# 日常跳转（zsh alias，由 .zshrc_dotfiles 提供）
+dot                       # cd 到仓库根
+skill                     # cd 到 skills 目录
 ```
 
 ## 目录架构
 
-### 配置来源
+```
+dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json；CLI 永不改它）
+cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin），lua-api/（类型标注）
+tree/             # ★ 映射根：目录结构即链接声明
+  home/           #   → $HOME（跨平台）
+  home.linux/     #   → $HOME（仅 Linux，条目级覆盖通用层）
+  home.macos/     #   → $HOME（仅 macOS）
+scripts/          # 脚本源（common/ linux/ macos/），聚合到 .gen/scripts/ 进 PATH
+hosts/            # per-host 资产：files/<host>/、secrets.age（age 加密，密文入库）
+system/           # root 级文件源（udev/systemd），dots 不链接，手动 cp 到 /etc（见 docs/MANUAL_SETUP.md）
+packages/         # bootstrap 装机清单（pacman.txt 等纯文本 + toolchains.toml）
+common/           # 手动同步参考资料（VS Code 配置；dots 不处理）
+docs/
+.gen/  (gitignore) # 派生区：scripts/（聚合软链）、injected/（minijinja 渲染产物）
+.dots/ (gitignore) # state.json 链接台账（undo/unlink/漂移检测用）
+backup/ (gitignore)# 覆盖普通文件前的时间戳备份
+```
 
-- `general/`: 跨平台通用配置
-- `macos/`: macOS 专属配置
-- `linux/`: Linux 专属配置
-- `static/`: 被模板引用但不直接链接的静态资源
-- `common/`: 共享资料，目前包含 VS Code 用户配置
+## 映射规则（dots-core 的核心，替代旧 install.py 分支）
 
-### 生成与备份
+1. **纯 $HOME 镜像**：`tree/home/X` → `$HOME/X`；`tree/home.<os>/X` 仅该平台生效，条目级覆盖通用层。
+2. **链接粒度启发式**：文件直接链；层根的一级目录是「容器」（下钻、逐子项链）；二级及更深目录整目录链。
+3. **覆盖**：启发式不对时在 `dots.lua` 写 `granularity(path, {mode=…, ignore=…})`。
+4. **链接判定**：目标已是指向仓库内的链接（含旧路径、断链）→ 无条件重建；真实文件 → 备份后链；指向仓库外 → 报漂移不动。
 
-- `generated/`: `install.py` 生成的文件
-  - `.zshrc_dotfiles`: 由 `general/.zshrc_dotfiles.template` 渲染
-  - `scripts/`: 从 `general/scripts/` 和平台 `scripts/` 聚合出的符号链接
-- `backup/`: 安装时自动备份的旧文件
+## dots.lua（例外清单）
 
-### AI 工具集成
+只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点，如 skills→codex/copilot）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{keep_tree=…}`、`hosts{<name>=function() vars{…}; link(…) end}`（per-host）、`on(phase, fn)`（生命周期钩子）。CLI 永不编辑它，需要时打印建议行让你粘贴。
 
-- `general/skills/`: 自定义 AI skills 源目录
-- 安装时会尝试链接到：
-  - `~/.codex/skills`
-  - `~/.copilot/skills`
-  - `~/.claude/skills`
+## 路径注入（已消灭模板渲染）
 
-## 模板系统
+- 配置只引用「安装后路径」（`$HOME` 侧）或自身相对路径。`$DOTFILES_DIR` 只指仓库本身。
+- `dots sync` 写 `~/.config/dots/env.zsh`（export `DOTFILES_DIR`/`DOTS_SCRIPTS` + PATH），`.zshrc_dotfiles` 首行 source 它。**不再有 `*_TEMPLATE` 占位符渲染**。
+- 读不到 shell 环境的消费者（systemd unit）才渲染：`.inject` 后缀 + minijinja `{{ }}`，产物落 `.gen/injected/`。
+- Hyprland：`hyprland.lua` 读 `os.getenv("DOTFILES_DIR")`，兜底读 `~/.config/dots/root`。
 
-### 模板变量
+## shell 栈（Oh My Zsh 已退役）
 
-在 `.template` 文件中使用以下占位符，`install.py` 会负责替换：
-
-| 变量 | 替换为 |
-| --- | --- |
-| `ZSH_CUSTOM_TEMPLATE` | `$DOTFILES_DIR/static/omz_custom` |
-| `DOT_TEMPLATE` | `cd $DOTFILES_DIR` |
-| `SCRIPTS_DIR_TEMPLATE` | `$DOTFILES_DIR/generated/scripts` |
-| `SKILLS_DIR_TEMPLATE` | `$DOTFILES_DIR/general/skills` |
-
-### 当前渲染流程
-
-1. 复制 `general/.zshrc_dotfiles.template` 到 `generated/.zshrc_dotfiles`
-2. 替换模板变量
-3. 创建 `~/.zshrc_dotfiles -> generated/.zshrc_dotfiles`
-4. 创建或保留 `~/.zshrc` stub，并在其中 `source "$HOME/.zshrc_dotfiles"`
-
-## 符号链接规则
-
-### 自动链接
-
-- `general/`、`macos/`、`linux/` 下的普通文件会映射到 `$HOME`
-- `*/.config/*` 下的一级子目录会映射到 `$HOME/.config/`
-- `general/scripts/` 和平台 `scripts/` 会聚合到 `generated/scripts/`
-
-### 特殊跳过项
-
-- `skills/` 目录不走常规链接流程，而是由 `link_skills()` 单独处理
-- `*.template` 文件不会直接链接到 `$HOME`
-- `.DS_Store` 会被忽略
+- 无框架。模块在 `tree/home/.config/zsh/`：`10-options.zsh`（历史/目录/补全/键绑定）、`20-functions.zsh`（cd-ls/allclear/copypath/copyfile 内联）、`90-syntax-highlighting.zsh`（z-sy-h 冻结 vendor）。
+- `z` → zoxide；提示符 starship + 自写 transient prompt。
+- 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `.zshrc_linux`/`.zshrc_macos`。
 
 ## 修改配置时的约定
 
-1. 修改主 shell 配置时，编辑 `general/.zshrc_dotfiles.template`
-2. 修改平台差异时，编辑 `macos/.zshrc_macos` 或 `linux/.zshrc_linux`
-3. 修改模板后，运行 `python install.py` 重新渲染
-4. 不要把 `~/.zshrc` 当作主配置文件维护，它是 install.py 生成的 stub
-5. 新增配置文件后，运行 `python install.py` 创建链接
+1. 新增/改配置：编辑 `tree/` 下对应文件，`dots sync`（多数情况是普通文件，改完直接生效，无需渲染）。
+2. 新增整目录或非标目标：放进 `tree/` 即被镜像；`dots adopt <path>` 可把 `$HOME` 现成文件收编。
+3. `~/.zshrc` 是受管 stub（首行 `# DOTS_MANAGED:`），只 source `~/.zshrc_dotfiles`，软件追加内容（conda/nvm）安全保留——不要当主配置维护。
+4. root 级配置（keyboard inhibit）在 `system/`，需 root 手动安装，见 `docs/MANUAL_SETUP.md`。
 
 ## 备份机制
 
-- 安装前若目标是普通文件或目录，会移动到 `backup/时间戳/`
-- 若目标是符号链接，会直接删除并重建
-- `--dry-run` 只预览动作，不执行写入
+- 覆盖普通文件/目录前移到 `backup/<时间戳>/`；目标是符号链接则直接重建不备份。
+- `dots sync --dry-run` 只预览不写盘。
 
 ## 当前仓库事实
 
-- 顶层 `README.md` 是 `docs/README.md` 的符号链接
-- `AGENTS.md` 是 `CLAUDE.md` 的符号链接
-- 当前仓库没有顶层 `scripts/pkg-install` 或 `scripts/pkg-export`
-- 当前仓库没有 `macos/Brewfile`、`linux/pacman.txt`、`linux/pacman-aur.txt`
-- 如果代理需要描述安装方式，应以 `python install.py` 为准，不要再引用旧的 `install.sh`
+- 顶层 `README.md` → `docs/README.md` 符号链接；`AGENTS.md` → `CLAUDE.md` 符号链接。
+- 管理入口是 `dots`（Rust CLI），旧 `install.py` 已退役删除——描述安装方式以 `dots` / `bootstrap.sh` 为准。
+- 不做日常包管理（无 pkg-install/pkg-export、无 Brewfile/pacman 清单的同步逻辑；`packages/` 仅供 `dots bootstrap` 装机）。
+- `.gen/`、`.dots/` 是机器本地派生物，不入库。
 
 ## 主要配置工具
 
-- Shell: Zsh with Oh My Zsh
-- 编辑器: Neovim / Vim
-- 终端: Kitty
-- 文件管理器: Yazi
-- 多路复用: Zellij
-- 提示符: Starship
+- Shell: Zsh（自管 conf.d，无框架）+ Starship
+- 编辑器: Neovim / Vim；终端: Kitty；文件管理器: Yazi；多路复用: Zellij
 - macOS: yabai / skhd / sketchybar / fcitx5
-- Linux: hypr / niri / waybar / systemd user config
+- Linux: Hyprland（主，0.55+ lua 入口）/ niri（备选）/ QuickShell（状态栏+控制中心）/ systemd user

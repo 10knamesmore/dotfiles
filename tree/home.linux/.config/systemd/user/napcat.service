@@ -1,0 +1,18 @@
+[Unit]
+Description=NapCat QQ Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/napcat-qq -q 2898668043
+Restart=on-failure
+RestartSec=10
+# QQ/Electron 在无头环境被终止时退出不干净，会甩 SIGTRAP coredump（无调试价值）
+# 禁掉 core 生成，避免反复重启堆满磁盘
+LimitCORE=0
+# QQ/electron 偶发崩溃时不要因为短时间内多次重启被 systemd 拉黑
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=default.target

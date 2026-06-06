@@ -1,0 +1,67 @@
+# dots 管理的 zsh 主配置（Oh My Zsh 已退役，模块在 ~/.config/zsh/*.zsh）。
+# 改主配置改 tree/home/.zshrc_dotfiles；平台差异改 .zshrc_linux/.zshrc_macos。
+
+# dots 注入：DOTFILES_DIR / DOTS_SCRIPTS / PATH（替代旧 *_TEMPLATE 模板变量）
+source "$HOME/.config/dots/env.zsh"
+
+export EDITOR="nvim"
+export KITTY_SHELL_INTEGRATION="enabled no-cursor"
+
+# 别名与跳转
+source "$HOME/.alias"
+alias dot="cd $DOTFILES_DIR"
+alias skill="cd $DOTFILES_DIR/tree/home/.claude/skills"
+
+# PATH
+[[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+
+# zsh 模块（历史/目录/补全/键绑定 + 内联函数）。compinit 在 10-options 跑，须在 uv 补全前。
+source "$HOME/.config/zsh/10-options.zsh"
+source "$HOME/.config/zsh/20-functions.zsh"
+
+# 平台差异
+if [[ -f "$HOME/.zshrc_linux" ]]; then
+    source "$HOME/.zshrc_linux"
+elif [[ -f "$HOME/.zshrc_macos" ]]; then
+    source "$HOME/.zshrc_macos"
+fi
+
+# 工具初始化（均加 command -v 守卫，缺失不报错——便于换机）
+command -v uv >/dev/null && eval "$(uv generate-shell-completion zsh)"
+proxy
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 替代旧 OMZ z 插件
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# transient prompt：命令被接受后简化历史行的提示符
+zle-line-init() {
+    emulate -L zsh
+    [[ $CONTEXT == start ]] || return 0
+
+    while true; do
+        zle .recursive-edit
+        local -i ret=$?
+        [[ $ret == 0 && $KEYS == $'\4' ]] || break
+        [[ -o ignore_eof ]] || exit 0
+    done
+
+    local saved_prompt=$PROMPT
+    local saved_rprompt=$RPROMPT
+    PROMPT="$(starship prompt --profile transient)"
+    # starship 的 rtransient 有 bug 不能显示，RPROMPT 硬编码 catppuccin lavender
+    RPROMPT=$'%{\e[38;2;180;190;254m%}[ %~]%{\e[0m%}'
+    zle .reset-prompt
+    PROMPT=$saved_prompt
+    RPROMPT=$saved_rprompt
+
+    if ((ret)); then
+        zle .send-break
+    else
+        zle .accept-line
+    fi
+    return ret
+}
+zle -N zle-line-init
+
+# 语法高亮必须最后 source（包裹所有已定义 widget）
+source "$HOME/.config/zsh/90-syntax-highlighting.zsh"

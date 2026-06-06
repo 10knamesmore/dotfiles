@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.4",
+  "workspace.library": ["cli/lua-api"],
+  "diagnostics.globals": [
+    "granularity",
+    "distribute",
+    "root",
+    "systemd_user",
+    "scripts",
+    "on",
+    "hosts",
+    "vars",
+    "link",
+    "dots"
+  ]
+}

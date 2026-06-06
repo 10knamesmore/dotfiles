@@ -1,0 +1,50 @@
+[workspace]
+members  = ["crates/dots-core", "crates/dots"]
+resolver = "2"
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2024"
+license      = "MIT"
+authors      = ["wanger <310779211wym@gmail.com>"]
+rust-version = "1.85"
+
+[workspace.dependencies]
+color-eyre  = "0.6"
+clap        = { version = "4", features = ["derive"] }
+clap_complete = "4"
+mlua        = { version = "0.10", features = ["lua54", "vendored", "serialize"] }
+minijinja   = { version = "2", features = ["loader"] }
+serde       = { version = "1", features = ["derive"] }
+serde_json  = { version = "1", features = ["preserve_order"] }
+toml_edit   = "0.22"
+age         = { version = "0.11", features = ["armor"] }
+secrecy     = "0.10"
+rustc-hash  = "2"
+owo-colors  = "4"
+walkdir     = "2"
+rpassword   = "7"
+dots-core   = { path = "crates/dots-core" }
+
+# dev
+insta       = "1"
+proptest    = "1"
+assert_cmd  = "2"
+tempfile    = "3"
+predicates  = "3"
+
+# 放宽版 lint：保留 panic 安全核心 + 体量约束 + Fx 容器约定；
+# 放宽 as_conversions/cast_lossless/indexing_slicing/missing_docs_in_private_items（文件操作噪声大）。
+[workspace.lints.rust]
+unsafe_code  = "deny"
+missing_docs = "deny"   # pub 项必须有文档
+
+[workspace.lints.clippy]
+panic                         = "deny"
+unwrap_used                   = "deny"
+expect_used                   = "deny"
+too_many_lines                = "deny"
+wildcard_imports              = "deny"
+use_self                      = "deny"
+missing_docs_in_private_items = "deny"   # 私有 fn/struct/field/mod 也要文档
+min_ident_chars               = "deny"   # 禁单字母标识符（阈值见 clippy.toml）

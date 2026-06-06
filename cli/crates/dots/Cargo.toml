@@ -1,0 +1,37 @@
+[package]
+name         = "dots"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+rust-version.workspace = true
+
+[[bin]]
+name = "dots"
+path = "src/main.rs"
+
+[dependencies]
+dots-core     = { workspace = true }
+color-eyre    = { workspace = true }
+clap          = { workspace = true }
+clap_complete = { workspace = true }
+mlua          = { workspace = true }
+minijinja     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+toml_edit     = { workspace = true }
+age           = { workspace = true }
+secrecy       = { workspace = true }
+rustc-hash    = { workspace = true }
+owo-colors    = { workspace = true }
+walkdir       = { workspace = true }
+rpassword     = { workspace = true }
+
+[dev-dependencies]
+assert_cmd  = { workspace = true }
+predicates  = { workspace = true }
+tempfile    = { workspace = true }
+insta       = { workspace = true }
+
+[lints]
+workspace = true

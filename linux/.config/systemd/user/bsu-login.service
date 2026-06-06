@@ -1,6 +1,0 @@
-  [Unit]
-  Description=BSU Login
-
-  [Service]
-  Type=oneshot
-  ExecStart=/usr/bin/python /home/wanger/dotfiles/generated/scripts/bsu_login.py --username ***REMOVED*** --password ***REMOVED***
