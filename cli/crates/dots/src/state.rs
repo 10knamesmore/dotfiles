@@ -102,6 +102,18 @@ impl State {
         }
     }
 
+    /// 修剪孤儿记录：target 在磁盘上已完全不存在（连断链都不是）的台账条目。
+    /// 判定与 status 的孤儿报告一致；断链仍算在盘（归 sync 重建管）。
+    ///
+    /// # Return:
+    ///   被剪掉的条数。
+    pub fn prune_missing(&mut self) -> usize {
+        let before = self.links.len();
+        self.links
+            .retain(|rec| rec.target.exists() || fs::symlink_metadata(&rec.target).is_ok());
+        before - self.links.len()
+    }
+
     /// 记一条所有权（去重）。
     pub fn record_own(&mut self, file: PathBuf, keypath: String) {
         let rec = OwnRecord { file, keypath };
@@ -148,6 +160,27 @@ mod tests {
         assert_eq!(loaded.links.len(), 1);
         assert_eq!(loaded.owned.len(), 1);
         assert!(loaded.has_run("zoxide-import"));
+        Ok(())
+    }
+
+    #[test]
+    fn prune_missing_drops_disk_gone_keeps_broken_symlink() -> Result<()> {
+        let dir = tempdir()?;
+        let alive = dir.path().join("alive");
+        std::fs::write(&alive, b"x")?;
+        let broken = dir.path().join("broken");
+        std::os::unix::fs::symlink(dir.path().join("nowhere"), &broken)?;
+        let gone = dir.path().join("gone");
+
+        let mut st = State::default();
+        st.record_link(alive, "/r/s1".into());
+        st.record_link(broken, "/r/s2".into());
+        st.record_link(gone, "/r/s3".into());
+
+        let pruned = st.prune_missing();
+
+        assert_eq!(pruned, 1);
+        assert_eq!(st.links.len(), 2); // alive + broken（断链仍在磁盘上，归 sync 重建管，不算孤儿）
         Ok(())
     }
 

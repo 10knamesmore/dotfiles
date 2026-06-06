@@ -15,16 +15,14 @@ granularity("home.linux/.config/systemd/user", {
     ignore = { "default.target.wants", "timers.target.wants" },
 })
 
--- ~/.claude 本体保持真实目录，逐项链；排除 CC 运行时产物与 *.local.json。
-granularity("home/.claude", {
-    mode = "children",
-    ignore = { "projects", "todos", "shell-snapshots", "statsig", "history.jsonl", "settings.local.json" },
-})
-
--- skills 一源多落点：主落点 ~/.claude/skills 走镜像；额外分发到 codex/copilot（逐 skill 链）。
 distribute("skills", {
-    src = "tree/home/.claude/skills",
-    to = { "~/.codex/skills", "~/.copilot/skills" },
+    src = "tree/home/.agent/skills",
+    to = { "~/.claude/skills", "~/.codex/skills" },
+    mode = "children",
+})
+distribute("agents", {
+    src = "tree/home/.agent/claude/agents",
+    to = { "~/.claude/agents" },
     mode = "children",
 })
 

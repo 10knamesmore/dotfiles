@@ -10,7 +10,7 @@ export KITTY_SHELL_INTEGRATION="enabled no-cursor"
 # 别名与跳转
 source "$HOME/.alias"
 alias dot="cd $DOTFILES_DIR"
-alias skill="cd $DOTFILES_DIR/tree/home/.claude/skills"
+alias skill="cd $DOTFILES_DIR/tree/home/.agent/skills"
 
 # PATH
 [[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"

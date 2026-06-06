@@ -351,3 +351,26 @@ on {
         "未命中 host 块时 on_host_activate 不应触发"
     );
 }
+
+#[test]
+fn sync_prunes_orphan_records_after_target_deleted() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 首次 sync：建链 + 记台账
+    run_dots(repo, home, &["sync"]).success();
+
+    // 用户手动删掉受管链接，仓库侧源也撤掉（声明随 tree 消失）
+    fs::remove_file(home.join(".vimrc")).unwrap();
+    fs::remove_file(repo.join("tree/home/.vimrc")).unwrap();
+
+    // 再 sync：该链接已不被期望且磁盘已无 → 台账孤儿记录应被修剪
+    run_dots(repo, home, &["sync"]).success();
+
+    let out = run_dots(repo, home, &["status"]).success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert!(stdout.contains("0 孤儿"), "status 仍报孤儿：{stdout}");
+}

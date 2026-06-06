@@ -27,7 +27,7 @@ BarModule {
     Process {
         id: reader
 
-        command: [Quickshell.env("scripts_dir") + "/network_status.sh"]
+        command: [Quickshell.env("DOTS_SCRIPTS") + "/network_status.sh"]
 
         stdout: SplitParser {
             onRead: (data) => {

@@ -152,8 +152,13 @@ pub fn run(dry_run: bool) -> Result<()> {
 
     // 10) 保存台账。effect 的 Rc 仍被 lua 闭包持有（handles 在作用域内），
     //    故 clone 出 state 保存，而非 try_unwrap 独占。
+    //    保存前修剪孤儿记录（target 磁盘已无——如用户手动删了落点目录）。
     if !dry_run {
-        let final_state = effect.borrow().state.clone();
+        let mut final_state = effect.borrow().state.clone();
+        let pruned = final_state.prune_missing();
+        if pruned > 0 {
+            println!("  ○ 台账修剪：{pruned} 条孤儿记录（磁盘已无）");
+        }
         final_state.save(&repo_root)?;
     }
     Ok(())

@@ -41,3 +41,6 @@ bindkey '^[OB' down-line-or-beginning-search
 bindkey '^[[H' beginning-of-line             # Home
 bindkey '^[[F' end-of-line                   # End
 bindkey '^[[3~' delete-char                  # Delete
+# Shift-Tab 反向补全（OMZ key-bindings 原有，退役对照表漏收）：主 keymap 起步反向，menuselect 内后退
+bindkey '^[[Z' reverse-menu-complete
+bindkey -M menuselect '^[[Z' reverse-menu-complete

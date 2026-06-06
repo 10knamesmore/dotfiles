@@ -48,7 +48,18 @@ pub fn resolve(fs: &dyn FileSystem, repo_root: &AbsPath, links: &[ExpectedLink])
     }
 
     for link in links {
-        let action = resolve_one(fs, repo_root, link);
+        // 祖先即将拆链重建为空目录：classify 此刻会穿透旧链看到仓库内真实文件，
+        // 误判出 BackupThenLink（执行时 backup 不存在的路径会失败）——直接按 Missing 处理。
+        let under_converted = proper_ancestors(link.target.as_path())
+            .iter()
+            .any(|ancestor| converted.contains(ancestor));
+        let action = if under_converted {
+            PlanAction::Link {
+                source: link.source.clone(),
+            }
+        } else {
+            resolve_one(fs, repo_root, link)
+        };
         plan.push(PlanItem {
             target: link.target.clone(),
             action,
@@ -190,6 +201,36 @@ mod tests {
         let root = AbsPath::new("/r");
         let plan = resolve(&fs, &root, &[link("/home/u/.vimrc", "/r/tree/home/.vimrc")]);
         assert_eq!(first_action(&plan, "/home/u/.vimrc"), PlanAction::Noop);
+    }
+
+    #[test]
+    fn descendant_of_converted_container_links_directly() {
+        let mut fs = MemFs::new();
+        // agents 当前是旧整链；真实 fs 上 classify 子项路径会穿透中间软链、
+        // 看到仓库里的真实文件（此处直接放 File 节点模拟穿透结果）
+        fs.symlink("/home/u/.claude/agents", "/r/tree/home/.claude/agents");
+        fs.file("/home/u/.claude/agents/x.md");
+        let root = AbsPath::new("/r");
+        let plan = resolve(
+            &fs,
+            &root,
+            &[link(
+                "/home/u/.claude/agents/x.md",
+                "/r/tree/home/.claude/agents/x.md",
+            )],
+        );
+        // 祖先拆链重建为空目录后，子项必为 Missing → 应直接 Link，
+        // 而非按计划期穿透误判出 BackupThenLink（执行时 backup 不存在的文件会崩）
+        assert!(matches!(
+            first_action(&plan, "/home/u/.claude/agents"),
+            PlanAction::ContainerConvert { .. }
+        ));
+        assert_eq!(
+            first_action(&plan, "/home/u/.claude/agents/x.md"),
+            PlanAction::Link {
+                source: AbsPath::new("/r/tree/home/.claude/agents/x.md")
+            }
+        );
     }
 
     #[test]

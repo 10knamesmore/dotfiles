@@ -15,14 +15,14 @@
 function granularity(path, spec) end
 
 ---@class DistributeSpec
----@field src string                       # 唯一真相源（仓库内），如 "tree/home/.claude/skills"
+---@field src string                       # 唯一真相源（仓库内），如 "tree/home/.agent/skills"
 ---@field to string[]                      # 落点列表（$HOME 侧，可用 ~）
 ---@field mode? "dir"|"children"|"file"    # 落点粒度，缺省 "dir"
 ---@field pre? fun(): boolean?             # 分发前执行；返回 false 则整个分发跳过
 ---@field post? fun()                      # 分发完成后执行（被 pre 阻止则不执行）
 
 --- 一源多落点分发（接入新工具 = to 加一行 + dots sync）。
----@param name string
+---@param name string                       # 分发组标识，仅用于人类可读输出（pre 跳过时的提示），不参与链接判定
 ---@param spec DistributeSpec
 function distribute(name, spec) end
 
