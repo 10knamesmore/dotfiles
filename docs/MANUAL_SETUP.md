@@ -10,7 +10,7 @@
     - [调试](#调试)
 <!--toc:end-->
 
-`install.py` 只处理符号链接和模板渲染，以下配置需要手动安装（通常需要 root 权限）。
+`dots sync` 只管理 `$HOME` 侧的符号链接，以下 root 级配置需要手动安装。
 
 ---
 
@@ -33,7 +33,8 @@ root 级文件源在仓库 `system/`（dots 不链接它们，需手动 `cp` 到
 
 ### 安装步骤
 
-> dots 迁移后脚本路径变为 `scripts/linux/hypr/`，旧 `/etc` 规则（指向 `linux/scripts/...`）已失效，**需重新 cp**。
+> 更新 `system/` 下的源文件后，需重跑安装步骤（`/etc` 是 cp 的副本，不会自动跟随仓库）。
+> 核对是否同步：`diff /etc/udev/rules.d/99-keyboard-inhibit.rules system/udev/99-keyboard-inhibit.rules`
 
 ```bash
 cd ~/dotfiles
@@ -61,9 +62,9 @@ sudo systemctl enable --now keyboard-inhibit-sync.service
 sudo ~/dotfiles/scripts/linux/hypr/keyboard_manager.sh disable
 sudo ~/dotfiles/scripts/linux/hypr/keyboard_manager.sh enable
 
-# 查看当前 inhibit 状态
-cat /sys/class/input/input2/inhibited   # AT Translated Set 2 keyboard
-cat /sys/class/input/input3/inhibited   # ITE Device(8296) Keyboard
+# 查看当前 inhibit 状态（input 编号随设备枚举漂移，先按名字找再 cat）
+grep -iE 'AT Trans|ITE.*Keyboard' /sys/class/input/input*/name
+cat /sys/class/input/input<N>/inhibited
 
 # 查看 udev 触发日志
 journalctl -f | grep keyboard_manager

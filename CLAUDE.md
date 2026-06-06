@@ -4,6 +4,8 @@
 
 核心机制是**软链接管理**：仓库即配置的单一真相源——`tree/` 下的目录结构镜像 `$HOME`，`dots sync` 把它们链接到位，编辑仓库即生效。仓库**不做包管理**（除 `dots bootstrap` 的装机清单外）。
 
+修改核心cli/lua api/的时候 同步修改 [LUA_API.md](/docs/LUA_API.md)
+
 ## 核心命令
 
 ```bash
@@ -13,7 +15,7 @@
 ./dots.sh adopt <path>    # 把 $HOME 里现成的文件收进仓库管理
 ./dots.sh doctor          # 体检（漂移/未覆盖主机/脚本冲突）
 
-# 正式安装：bootstrap.sh 编译 release 产物，cli/target/release/dots 进 PATH
+# 正式安装：bootstrap.sh 编译 release 产物
 # 新机：git clone <repo> ~/dotfiles && ~/dotfiles/bootstrap.sh
 
 # 日常跳转（zsh alias，由 .zshrc_dotfiles 提供）
@@ -50,7 +52,7 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点，如 skills→codex/copilot）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{keep_tree=…}`、`hosts{<name>=function() vars{…}; link(…) end}`（per-host）、`on(phase, fn)`（生命周期钩子）。CLI 永不编辑它，需要时打印建议行让你粘贴。
+只写约定盖不住的：`granularity`（粒度覆盖，spec 可带条目级 `pre`/`post` 钩子，pre 返回 false 跳过该条目）、`distribute`（一源多落点，如 skills→codex/copilot，同样支持 `pre`/`post`）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`hosts{<name>=function() vars{…}; link(…) end}`（per-host）、`on{phase=fn|{fn,…}}`（全局生命周期钩子：pre_sync/on_host_activate/post_link/post_sync）。CLI 永不编辑它，需要时打印建议行让你粘贴。
 
 ## 路径注入（已消灭模板渲染）
 
