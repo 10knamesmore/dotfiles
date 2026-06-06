@@ -21,7 +21,6 @@ import "./services"
 import "./settings"
 import "./systemmonitor"
 import "./state"
-import "./widgets"
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland._GlobalShortcuts
@@ -228,22 +227,4 @@ ShellRoot {
     NotesPanel {}
 
     AiPanel {}
-
-    // ── 桌面浮动组件 ──
-    // 保留音频频谱（常驻最前端可见）；其余 widget 多被窗口遮挡用不到，已禁用以省 CPU。
-    CavaService {}
-
-    Variants {
-        model: Quickshell.screens
-        delegate: AudioVisualizer {}
-    }
-
-    // 已禁用（用不到，约省 7% CPU）。如需恢复，取消对应 Variants 注释即可。
-    /*
-    Variants { model: Quickshell.screens; delegate: AnalogClock {} }
-    Variants { model: Quickshell.screens; delegate: PomodoroTimer {} }
-    Variants { model: Quickshell.screens; delegate: WeatherWidget {} }
-    Variants { model: Quickshell.screens; delegate: NowPlaying {} }
-    Variants { model: Quickshell.screens; delegate: SystemMonitor {} }
-    */
 }

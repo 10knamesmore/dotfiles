@@ -18,7 +18,8 @@ description: 协助编写和调试 QuickShell (QML) shell 配置，包括 layer 
 - QuickShell 版本：`quickshell --version`
 - 用户 shell 配置：`~/.config/quickshell/`（通常为 `~/dotfiles/linux/.config/quickshell/` 的符号链接）
 - 入口文件：`shell.qml`（固定，不可更改）
-- 日志：`/run/user/1000/quickshell/by-id/*/log.qslog`
+- 日志：`/run/user/1000/quickshell/by-pid/$(pgrep -x quickshell)/log.log`（明文，直接 tail 即可；同目录 `log.qslog` 需 `quickshell read-log` 解码）
+- 配置文件保存后 quickshell 自动 reload，日志中以 `Reloading configuration...` / `Configuration Loaded` 为界；验证改动是否有 QML 报错只看最后一次 reload 之后的行
 
 ## 调查流程
 
@@ -90,14 +91,22 @@ description: 协助编写和调试 QuickShell (QML) shell 配置，包括 layer 
 ### GlobalShortcut（Hyprland）
 
 - import 路径：`import Quickshell.Hyprland._GlobalShortcuts`（带下划线）
-- 外部工具触发：`hyprctl dispatch global quickshell:<name>`
+- 外部工具触发（Hyprland 7.0+ lua 语法）：`hyprctl dispatch 'hl.dsp.global("quickshell:<name>")'`
+  - 旧的 `hyprctl dispatch global quickshell:<name>` 已失效，会报 `')' expected near ...` 的 lua 解析错误
 - `appid` + `name` 共同构成唯一标识
 
 ### Hyprland IPC
 
 - `import Quickshell.Hyprland._Ipc` 获得 `Hyprland` singleton
-- 发送命令：`Hyprland.dispatch("keyword ...")`
+- 发送命令：`Hyprland.dispatch(...)` —— **注意 Hyprland 7.0+ 把 dispatch 参数包成 lua `hl.dispatch(...)` 执行**，旧的空格分隔串（如 `"layoutmsg colresize +0.05"`）会静默失败并在日志刷 WARN；需改用 lua dispatcher 写法
 - 监听原始事件：`Hyprland.rawEvent` 信号，事件对象有 `name` 和 `data` 属性
+
+### 网络请求（curl 外部 API）
+
+- 用户会话有 `http_proxy/https_proxy=http://127.0.0.1:7897`，quickshell 进程会继承；该代理对部分外部 API（如 `api.open-meteo.com`）TLS 握手直接超时
+- quickshell 内所有 `Process { curl ... }` 请求外部 API 必须加 `--noproxy "*"`
+- 失败要可恢复：解析失败时安排短间隔重试 Timer，不要让空 `catch` 把数据冻结在上一次成功值（曾导致天气日期停留在昨天）
+- 一次性收集 JSON 输出用 `StdioCollector { onStreamFinished: parse(text) }`，比 `SplitParser` 手动拼 buffer 干净
 
 ### FileView + JsonAdapter
 

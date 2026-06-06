@@ -666,7 +666,7 @@ PanelOverlay {
                 PowerButton {
                     icon: "󰍃"
                     label: "注销"
-                    command: "hyprctl dispatch exit"
+                    command: "hyprctl dispatch 'hl.dsp.exit()'"
                 }
 
                 PowerButton {

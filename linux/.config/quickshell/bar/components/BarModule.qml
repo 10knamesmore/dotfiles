@@ -20,6 +20,7 @@ Rectangle {
     signal rightClicked(var mouse)
     signal scrolled(int delta)
     signal progressDragged(real value)
+    signal moved(var mouse) // hover 移动（模块坐标系），配合 hovered 变 false 清理
 
     clip: true
     radius: Tokens.radiusL
@@ -190,6 +191,7 @@ Rectangle {
             else
                 root.clicked(mouse);
         }
+        onPositionChanged: mouse => root.moved(mouse)
         onWheel: wheel => {
             return root.scrolled(wheel.angleDelta.y > 0 ? 1 : -1);
         }

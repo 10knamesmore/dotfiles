@@ -121,7 +121,8 @@ BarModule {
                 if (isActive)
                     isFocusedCol = true;
                 windowList.push({
-                    active: isActive
+                    active: isActive,
+                    address: w.address
                 });
             }
 
@@ -138,11 +139,54 @@ BarModule {
         curCol = focusedColIdx + 1;
     }
 
+    // 当前 hover 命中的窗口地址（驱动方块高亮）
+    property string hoverAddress: ""
+
+    // 命中测试：找离 (mx,my) 最近的窗口微缩方块（带容差，方块只有 10px 宽）。
+    // BarModule 的 hoverArea 盖在内容之上，delegate 内 MouseArea/HoverHandler 收不到事件，
+    // 故点击/hover 都走 BarModule 信号 + 本函数。
+    function rectAt(mx, my) {
+        if (specialState !== "" || layoutData.length === 0)
+            return null;
+        let best = null, bestDist = 1e9;
+        for (let ci = 0; ci < colRepeater.count; ci++) {
+            let col = colRepeater.itemAt(ci);
+            if (!col)
+                continue;
+            for (let wi = 0; wi < col.winRepeater.count; wi++) {
+                let r = col.winRepeater.itemAt(wi);
+                if (!r)
+                    continue;
+                let p = r.mapToItem(root, r.width / 2, r.height / 2);
+                let d = Math.hypot(p.x - mx, p.y - my);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = r;
+                }
+            }
+        }
+        return bestDist < 24 ? best : null;
+    }
+
     accentColor: Colors.yellow
     implicitWidth: contentRow.implicitWidth + 32
     Component.onCompleted: fetchProc.running = true
+    onClicked: mouse => {
+        let r = rectAt(mouse.x, mouse.y);
+        if (r)
+            Hyprland.dispatch('hl.dsp.focus({ window = "address:' + r.winAddress + '" })');
+    }
+    onMoved: mouse => {
+        let r = rectAt(mouse.x, mouse.y);
+        hoverAddress = r ? r.winAddress : "";
+    }
+    onHoveredChanged: {
+        if (!hovered)
+            hoverAddress = "";
+    }
     onScrolled: delta => {
-        Hyprland.dispatch("layoutmsg " + (delta > 0 ? "colresize +0.05" : "colresize -0.05"));
+        // Hyprland 7.0+ dispatch 串按 lua 解析，须用 hl.dsp.* dispatcher 写法
+        Hyprland.dispatch('hl.dsp.layout("colresize ' + (delta > 0 ? "+" : "-") + '0.05")');
     }
 
     // 单个 Process 一次取全
@@ -193,7 +237,9 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
 
             Behavior on color {
-                ColorAnimation { duration: Tokens.animFast }
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
             }
         }
 
@@ -209,7 +255,9 @@ BarModule {
             opacity: root.hovered ? 1 : 0
 
             Behavior on opacity {
-                NumberAnimation { duration: Tokens.animNormal }
+                NumberAnimation {
+                    duration: Tokens.animNormal
+                }
             }
         }
 
@@ -219,6 +267,8 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
 
             Repeater {
+                id: colRepeater
+
                 model: root.layoutData
 
                 delegate: Column {
@@ -228,25 +278,39 @@ BarModule {
 
                     property bool colFocused: modelData.focused
                     property int winCount: modelData.windows.length
+                    property alias winRepeater: winRepeater
 
                     spacing: 1
                     anchors.verticalCenter: parent.verticalCenter
 
                     Repeater {
+                        id: winRepeater
+
                         model: colDelegate.modelData.windows
 
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
 
+                            property string winAddress: modelData.address
+                            property bool hoverHit: root.hoverAddress !== "" && root.hoverAddress === winAddress
+
                             width: 10
                             height: Math.max(4, Math.floor(24 / colDelegate.winCount) - 1)
                             radius: 2
-                            color: modelData.active ? Colors.yellow : colDelegate.colFocused ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, root.hovered ? 0.6 : 0.4) : (root.hovered ? Colors.surface1 : Colors.surface2)
+                            scale: hoverHit ? 1.25 : 1
+                            color: modelData.active ? Colors.yellow : hoverHit ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.85) : colDelegate.colFocused ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, root.hovered ? 0.6 : 0.4) : (root.hovered ? Colors.surface1 : Colors.surface2)
 
                             Behavior on color {
                                 ColorAnimation {
                                     duration: Tokens.animFast
+                                }
+                            }
+
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: Tokens.animFast
+                                    easing.type: Easing.OutCubic
                                 }
                             }
                         }
@@ -254,6 +318,5 @@ BarModule {
                 }
             }
         }
-
     }
 }
