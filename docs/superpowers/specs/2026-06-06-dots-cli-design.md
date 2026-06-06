@@ -288,7 +288,10 @@ bootstrap.sh（~15 行 sh）：有 cargo 跳过 rustup → `cargo build --releas
 
 ## 15. 三场景演练
 
-**A. 给 Claude Code 全局加 hook**：`~/.claude/hooks/` 里调通 → `dots adopt ~/.claude/hooks/on-stop.sh` → 完（1 条命令，0 清单，0 代码）。
+**A. 给 Claude Code 全局加 hook**（已核实机制：hook 须在 `~/.claude/settings.json` 的 `"hooks"` 键注册，CC 不扫描 hooks 目录；脚本路径仅为约定）：
+
+- 前提（迁移时一次完成）：`settings.json` 已纳管——`tree/home/.claude/settings.json` 成链后，其中的 hooks 注册改动直通仓库。CC 运行时不改写 `hooks`/`permissions` 键（权限写 `~/.claude.json`，不纳管），无 git 噪音；`/model` 等显式命令的改写恰好是想跨机同步的内容。
+- 日常：写脚本 + settings.json 注册（开发 hook 本来就要做）→ `dots adopt ~/.claude/hooks/on-stop.sh` → settings.json 改动已自动在仓库里，commit 即可。仍是 1 条命令，0 清单，0 安装器代码。
 
 **B. 新装 Linux 机器**：`git clone … && ./bootstrap.sh` → 装包+工具链自动完成 → 首次 sync 报"hostname 未覆盖"并打印 `hosts{}` 骨架 → 粘进 dots.lua 填显示器/背光 → `dots secret set bsu_pass` → `dots sync && exec zsh`。
 
