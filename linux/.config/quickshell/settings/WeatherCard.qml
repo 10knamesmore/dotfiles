@@ -93,7 +93,6 @@ Rectangle {
             }
 
             ColumnLayout {
-                Layout.fillWidth: true
                 spacing: 0
 
                 RowLayout {
@@ -129,58 +128,66 @@ Rectangle {
 
             }
 
-            ColumnLayout {
+            // 弹性间隔：把 AQI + 箭头推到卡片右缘
+            // （嵌套布局的 maximumWidth 传播会让 fillWidth 列推不到底，显式 spacer 最可靠）
+            Item {
+                Layout.fillWidth: true
+            }
+
+            // AQI 胶囊徽标（锚右上）
+            Rectangle {
                 Layout.alignment: Qt.AlignTop
-                spacing: 6
+                visible: WeatherService.aqiLoaded
+                implicitWidth: aqiRow.implicitWidth + 14
+                implicitHeight: 20
+                radius: Tokens.radiusFull
+                color: Qt.rgba(aqiColor(WeatherService.usAqi).r, aqiColor(WeatherService.usAqi).g, aqiColor(WeatherService.usAqi).b, 0.15)
 
-                // AQI 胶囊徽标
-                Rectangle {
-                    Layout.alignment: Qt.AlignRight
-                    visible: WeatherService.aqiLoaded
-                    implicitWidth: aqiRow.implicitWidth + 14
-                    implicitHeight: 20
-                    radius: Tokens.radiusFull
-                    color: Qt.rgba(aqiColor(WeatherService.usAqi).r, aqiColor(WeatherService.usAqi).g, aqiColor(WeatherService.usAqi).b, 0.15)
+                RowLayout {
+                    id: aqiRow
 
-                    RowLayout {
-                        id: aqiRow
+                    anchors.centerIn: parent
+                    spacing: 4
 
-                        anchors.centerIn: parent
-                        spacing: 4
+                    Rectangle {
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: root.aqiColor(WeatherService.usAqi)
+                    }
 
-                        Rectangle {
-                            width: 6
-                            height: 6
-                            radius: 3
-                            color: root.aqiColor(WeatherService.usAqi)
-                        }
-
-                        Text {
-                            text: "AQI " + WeatherService.usAqi + " " + WeatherService.aqiDesc(WeatherService.usAqi)
-                            color: root.aqiColor(WeatherService.usAqi)
-                            font.family: Fonts.family
-                            font.pixelSize: Fonts.xs
-                            font.weight: Font.DemiBold
-                        }
-
+                    Text {
+                        text: "AQI " + WeatherService.usAqi + " " + WeatherService.aqiDesc(WeatherService.usAqi)
+                        color: root.aqiColor(WeatherService.usAqi)
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.xs
+                        font.weight: Font.DemiBold
                     }
 
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignRight
-                    text: "󰅀"
-                    color: Colors.overlay1
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.icon
-                    rotation: root.expanded ? 180 : 0
+            }
 
-                    Behavior on rotation {
-                        NumberAnimation {
-                            duration: Tokens.animFast
-                            easing.type: Easing.OutCubic
-                        }
+            // 展开提示箭头（垂直居中于 hero 行最右）
+            Text {
+                Layout.alignment: Qt.AlignVCenter
+                text: "󰅀"
+                color: cardHover.containsMouse ? Colors.text : Colors.overlay1
+                font.family: Fonts.family
+                font.pixelSize: Fonts.icon
+                rotation: root.expanded ? 180 : 0
 
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: Tokens.animFast
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
                     }
 
                 }

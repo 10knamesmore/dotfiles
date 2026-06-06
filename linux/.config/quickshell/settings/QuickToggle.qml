@@ -15,6 +15,9 @@ Rectangle {
     signal rightClicked()
 
     Layout.fillWidth: true
+    // 拉伸到行高：不同图标字形的 bounding box 高度有差异，
+    // 若按 implicitHeight 各自为政，GridLayout 同行 cell 会上下错位
+    Layout.fillHeight: true
     implicitHeight: toggleCol.implicitHeight + 16
     radius: Tokens.radiusM
     color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.25 : 0.15) : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
