@@ -23,35 +23,40 @@
 
 ## 1. 心智模型（一句话）
 
-> **文件放进 `tree/` 的对应位置 = 声明了链接；约定盖不住的例外写进 `dots.toml`；日常操作用 CLI 动词（adopt/sync/status/undo），永远不改安装器代码。**
+> **镜像 = 声明：文件放进 `tree/` 的对应位置即链接，零配置；例外 = 手写 `dots.lua`（LuaLS 类型标注，编辑器补全）；机器 = 只碰 `.dots/state.json` 台账，永不编辑清单。**
+
+三条线完全分离：人写的进 Lua，机器写的进 JSON，90% 的日常操作两者都不碰。
 
 ## 2. 仓库结构
 
 ```
 dotfiles/
 ├── bootstrap.sh              # 极薄（~15 行）：装 rustup → cargo build → exec dots bootstrap
-├── dots.toml                 # 例外清单（只记约定盖不住的东西，人可读可手编，预期 < 50 行）
+├── dots.lua                  # 例外清单（100% 人手编辑，LuaLS 类型补全，CLI 永不修改）
+├── .luarc.json               # 指向 cli/lua-api/，让 LuaLS 对 dots.lua 生效
 ├── cli/                      # Rust workspace
+│   ├── lua-api/dots.meta.lua #   ---@meta 类型标注（DSL 的"schema"，随仓库走）
 │   └── crates/
-│       ├── dots/             #   bin：命令行、彩色输出
-│       └── dots-core/        #   lib：纯逻辑（清单解析、Plan 计算），无 IO 副作用，可单测
+│       ├── dots/             #   bin：命令行、彩色输出（mlua 沙箱求值清单）
+│       └── dots-core/        #   lib：纯逻辑（清单求值结果→Plan 计算），无 IO 副作用，可单测
 ├── tree/                     # ★ 映射根：目录结构即链接声明，纯 $HOME 镜像
 │   ├── home/                 #   → $HOME（跨平台）
 │   ├── home.linux/           #   → $HOME（仅 Linux，条目级覆盖通用层）
 │   └── home.macos/           #   → $HOME（仅 macOS）
 ├── scripts/                  # 脚本源
 │   ├── common/  linux/  macos/
-├── hosts/                    # per-host 层
-│   ├── <hostname>.toml       #   本机变量 + 本机专属链接
+├── hosts/                    # per-host 资产
 │   ├── files/<hostname>/     #   本机专属配置文件（如 monitors.conf）
 │   └── secrets.age           #   age 加密 secrets（密文入库，明文永不入库）
-├── packages/                 # bootstrap 清单（纯文本/TOML，不硬编码在代码里）
+├── packages/                 # bootstrap 清单（纯文本，不硬编码在代码里）
 │   ├── pacman.txt  aur.txt  brew.txt  apt.txt  toolchains.toml
 ├── docs/
 ├── .gen/        (gitignore)  # 派生区：scripts/（聚合）、injected/（渲染产物）
 ├── .dots/       (gitignore)  # state.json 链接台账（谁建/何时/什么模式）→ undo/unlink/漂移检测
 └── backup/      (gitignore)  # 时间戳备份（沿用现机制）
 ```
+
+注：per-host 条件直接写在 dots.lua 的 `hosts{}` 块里（§10），不再有 `hosts/<hostname>.toml` 文件族与深合并语义。
 
 注意：`static/` 目录随 OMZ 退役一并消失（见 §7）；`generated/` 被 `.gen/` 替代。
 
@@ -61,7 +66,7 @@ dotfiles/
 - `tree/home` → `$HOME`，所有平台。
 - `tree/home.<os>` → `$HOME`，仅该平台；同一目标路径**平台层条目级覆盖通用层**（同现状行为），被遮蔽项 `dots status` 可见。
 - 没有任何工具专属概念。`~/.claude/...` 就住在 `tree/home/.claude/...`。
-- 真正非 `$HOME` 的目标（如 macOS `~/Library/Application Support/...`）用 `dots.toml [roots]` 声明额外层，按需出现。
+- 真正非 `$HOME` 的目标（如 macOS `~/Library/Application Support/...`）用 dots.lua 的 `root(...)` 声明额外层，按需出现。
 
 **规则 2 —— 链接粒度启发式**：
 - 文件 → 直接链。
@@ -76,62 +81,76 @@ dotfiles/
 | `tree/home/.claude/` | 容器，下钻 | skills/hooks/agents/settings.json 各自成链 |
 | `tree/home/.claude/hooks/` | 整目录链 | `~/.claude` 本体保持真实目录，Claude Code 运行时数据（projects/、todos/）不进仓库 |
 
-**规则 3 —— 清单覆盖**：启发式不对时在 `dots.toml` 写 `[granularity]`（`mode = "dir"|"children"|"file"` + `ignore`）。
+**规则 3 —— 清单覆盖**：启发式不对时在 dots.lua 写一条 `granularity(...)`（`mode = "dir"|"children"|"file"` + `ignore`）。
 
-## 4. dots.toml（例外清单）
+## 4. dots.lua（例外清单：Lua + LuaLS 类型标注，纯手编）
 
-```toml
-[roots]
-# 仅当目标不在 $HOME 镜像内时声明额外层：
-# vscode = { path = "~/Library/Application Support/Code/User", os = "macos" }
+**决策**：清单用 Lua 而非 TOML，且 **CLI 永不编辑清单**（无 `dist add` 类命令，无 append-only 写入）。理由：
 
-[granularity."home/.config/opencode"]
-mode   = "file"                # 逐文件链
-ignore = ["node_modules", "package.json", "bun.lock", ".gitignore"]
-# opencode 在配置目录生成运行时垃圾，整目录链会拖进仓库视图
+- 与用户技术栈一致（hyprland.lua、nvim 全家 Lua），零新语法。
+- 条件逻辑原生 `if`/`hosts{}`，**整个 per-host 叠加合并语义归零**（原 TOML 设计需要 hosts/*.toml 文件族 + 深合并规则）。
+- "机器写回 Lua 无 toml_edit 等价物"这一硬伤，通过**彻底去掉机器编辑**消灭而非绕开。
+- 编辑体验优于 TOML：仓库自带 `cli/lua-api/dots.meta.lua`（`---@meta` 标注）+ `.luarc.json`，nvim/LuaLS 对 `dots.lua` 提供字段补全、签名提示、类型检查，写错字段当场标红。
 
-[granularity."home.linux/.config/systemd/user"]
-mode = "file"                  # 只链 *.service/*.timer 单文件；.wants/ 由 systemctl 管（§10）
+**求值环境**：mlua（vendored，cargo build 自包含，需 C 编译器——bootstrap 装的 base-devel/Xcode CLT 已含）。沙箱：锁掉 io/os.execute 等副作用 stdlib，注入只读全局 `dots.host`、`dots.os`、`dots.home`。保证 dry-run 与 sync 求值确定一致。语法/类型错误编辑期由 LuaLS 拦，语义错误（src 不存在、目标冲突）运行期由 sync/doctor 报。
 
-[distribute.skills]
-src  = "tree/home/.claude/skills"   # 唯一真相源（主落点走镜像 → ~/.claude/skills）
-to   = ["~/.codex/skills", "~/.copilot/skills", "~/.config/opencode/skill"]
-mode = "children"              # 逐 skill 链，防 codex 的 skills/.system 运行垃圾污染
+```lua
+-- dots.lua —— 例外清单，预期长期 < 60 行
 
-[distribute.agents]
-src = "tree/home/.claude/agents"
-to  = []                       # 将来加目标：dots dist add agents <path>
+-- 链接粒度覆盖（启发式不对时才写）
+granularity("home/.config/opencode", {
+  mode = "file",               -- 逐文件链
+  ignore = { "node_modules", "package.json", "bun.lock", ".gitignore" },
+  -- opencode 在配置目录生成运行时垃圾，整目录链会拖进仓库视图
+})
+granularity("home.linux/.config/systemd/user", {
+  mode = "file",               -- 只链 *.service/*.timer；.wants/ 由 systemctl 管（§10）
+})
 
-[systemd]
-user-units = ["napcat.service", "mihomo.service", "bsu-login.service", "bsu-login.timer"]
-# sync 时执行 systemctl --user enable（幂等）；.wants/ 软链不再入库
+-- 多目标分发：一份源多落点。接入新工具 = 在 to 里加一行（LuaLS 补全）+ dots sync
+distribute("skills", {
+  src  = "tree/home/.claude/skills",   -- 唯一真相源（主落点走镜像 → ~/.claude/skills）
+  to   = { "~/.codex/skills", "~/.copilot/skills", "~/.config/opencode/skill" },
+  mode = "children",           -- 逐 skill 链，防 codex 的 skills/.system 运行垃圾污染
+})
+distribute("agents", {
+  src = "tree/home/.claude/agents",
+  to  = {},
+})
 
-[scripts]
-keep-tree = ["hypr"]           # hypr/ 子目录保持树形（键位用 $scripts_dir/hypr/xxx.sh 引用）
+-- systemd user 单元：sync 时 systemctl --user enable（幂等）；.wants/ 软链不再入库
+systemd_user { "napcat.service", "mihomo.service", "bsu-login.service", "bsu-login.timer" }
+
+scripts { keep_tree = { "hypr" } }   -- hypr/ 保持树形（键位用 $scripts_dir/hypr/xxx.sh）
+
+-- 非 $HOME 镜像目标才声明额外层（罕见）：
+-- root("vscode", { path = "~/Library/Application Support/Code/User", os = "macos" })
+
+-- per-host 见 §10 的 hosts{} 块
 ```
 
 ## 5. CLI 命令面
 
 ```
 dots sync [--dry-run]      幂等收敛：建链/渲染注入/聚合脚本/systemctl enable/护 stub
-dots adopt <path>...       ★ 收编：搬进 tree 正确位置 + 原地反链 + 记台账（+必要时写清单）
+dots adopt <path>...       ★ 收编：搬进 tree 正确位置 + 原地反链 + 记台账（永不写清单）
 dots status                三态巡检：✔ 已链 / ~ 漂移 / ✘ 缺失 + 孤儿链接；非零退出码可挂 CI
-dots doctor                深检：hostname 未命中、注入变量未解析、distribute 目标父目录缺失、
-                           脚本重名、被遮蔽条目、台账与磁盘漂移
-dots dist add <name> <to>  给分发组加一个落点（一条命令，写清单+建链）
-dots undo                  撤销上一次 mutating 操作（靠 .dots/state.json 操作日志）
+dots doctor                深检：hosts{} 未覆盖当前机、注入变量未解析、distribute 目标父目录
+                           缺失、脚本重名、被遮蔽条目、台账与磁盘漂移、清单建议未粘贴的漂移
+dots undo                  撤销上一次 adopt/unlink 的文件搬运与链接（靠 .dots/state.json）
 dots unlink <path> [--keep-in-repo]   解除纳管，文件搬回 $HOME
 dots secret set|edit <key> age 加密读写 hosts/secrets.age
-dots host init             生成本机 hosts/<hostname>.toml 模板
 dots bootstrap             装机：packages/* + toolchains + 末尾自动 sync
 dots completions zsh       补全
 ```
 
+**CLI 永不编辑 dots.lua**。需要清单配合的场景（granularity、distribute 加落点、root 层），CLI **打印建议的 Lua 行**让用户粘贴（有 LuaLS 补全，粘贴即校验）；忘记粘贴造成的"已建链但未声明"漂移由 doctor 检出。`dist add` 命令因此取消——接入新工具 = dots.lua 的 `to` 列表加一行 + `dots sync`。
+
 `adopt` 的智能（全部可被 `--layer/--mode` 参数覆盖）：
 - 按路径自动推断层：`~/.claude/hooks/x` → `tree/home/.claude/hooks/`；平台歧义时询问。
 - grep 到文件内含仓库绝对路径 → 提醒转 `.inject`（防 systemd unit 类文件换机失效）。
-- 检测到目录含 node_modules/lock 文件 → 建议 `mode="file"+ignore`。
-- 输出附 `dots undo` 提示。
+- 检测到目录含 node_modules/lock 文件 → 打印建议的 `granularity(...)` 行。
+- 输出附 `dots undo` 提示（undo 只逆向文件搬运与链接，不涉清单——清单本来就没被动过）。
 
 ## 6. 路径注入：渲染降级为最后手段
 
@@ -214,16 +233,20 @@ source "$HOME/.zshrc_dotfiles"
 
 ## 10. per-host 与 secrets
 
-**hosts/<hostname>.toml**（按 `hostname()` 命中；**未命中且本机有 host 引用时 sync 硬报错**，不静默回落——堵死"渲错显示器坐标不报错"）：
+**per-host 写在 dots.lua 的 `hosts{}` 块**（不再有 hosts/*.toml 文件族与合并语义）：
 
-```toml
-[vars]                          # 供 .inject 文件引用
-backlight = "amdgpu_bl1"
-ddc_index = "1"
-
-[links]                         # 本机专属链接（纯链接，不渲染）
-"hosts/files/xz07/monitors.conf" = "~/.config/hypr/monitors.conf"
+```lua
+hosts {
+  xz07 = function()
+    vars { backlight = "amdgpu_bl1", ddc_index = "1" }   -- 供 .inject 文件引用
+    link("hosts/files/xz07/monitors.conf", "~/.config/hypr/monitors.conf")  -- 纯链接
+  end,
+  -- 当前 hostname 未在表中 → sync 硬报错，不静默回落（堵死"渲错显示器坐标不报错"）
+  -- 显式逃生门：default = function() end
+}
 ```
+
+新机器首次 sync 报错时，CLI 打印建议的 `hosts{}` 骨架（含待填的 vars 键名）供粘贴。
 
 显示器等整段配置**优先走"per-host 文件 + 主配置 source 引用"纯链接方案**（hyprland.lua 加 source monitors.conf），不走变量渲染——hostname 失配最坏是文件缺失报错，绝不静默渲出错误值。
 
@@ -248,7 +271,7 @@ bootstrap.sh（~15 行 sh）：有 cargo 跳过 rustup → `cargo build --releas
 
 ## 13. 测试策略
 
-- `dots-core`：纯逻辑单测（清单解析、粒度启发式、层覆盖、Plan 计算），proptest 跑路径边界。
+- `dots-core`：纯逻辑单测（清单求值、粒度启发式、层覆盖、Plan 计算），proptest 跑路径边界；mlua 沙箱确定性测试（同输入两次求值结果全等、副作用 stdlib 不可达）。
 - `dots` bin：assert_cmd + 临时 $HOME 跑 e2e（adopt→status→undo 全链路），insta 快照锁 status 输出格式。
 - **迁移对拍闸**：`dots sync --dry-run` 链接集合与 `install.py --dry-run` 全等（target→source 逐对比对），通过才允许切换。
 
@@ -260,24 +283,25 @@ bootstrap.sh（~15 行 sh）：有 cargo 跳过 rustup → `cargo build --releas
 4. 模板消灭：`.zshrc_dotfiles.template` → 普通文件 + `$DOTFILES_DIR`；`hyprland.lua` 改 getenv+兜底文件。
 5. shell 栈改造：OMZ 退役、conf.d 模块化、§7.3 补齐表逐项落地与手测、zoxide 数据迁移。
 6. systemd：`.wants` 链接删除（含暂存的 napcat 那条），改 `[systemd]` 声明；bsu-login 密码 → `dots secret`。
-7. per-host：显示器/背光/ddc 抽进 `hosts/xz07.toml` + `monitors.conf`。
+7. per-host：显示器/背光/ddc 抽进 dots.lua 的 `hosts{}` 块 + `hosts/files/xz07/monitors.conf`。
 8. 全绿后删 `install.py`、`generated/`、`static/`，更新 CLAUDE.md/README 对应章节。
 
 ## 15. 三场景演练
 
 **A. 给 Claude Code 全局加 hook**：`~/.claude/hooks/` 里调通 → `dots adopt ~/.claude/hooks/on-stop.sh` → 完（1 条命令，0 清单，0 代码）。
 
-**B. 新装 Linux 机器**：`git clone … && ./bootstrap.sh` → 装包+工具链+建链自动完成 → `dots host init` 填显示器/背光 → `dots secret set bsu_pass` → `exec zsh`。
+**B. 新装 Linux 机器**：`git clone … && ./bootstrap.sh` → 装包+工具链自动完成 → 首次 sync 报"hostname 未覆盖"并打印 `hosts{}` 骨架 → 粘进 dots.lua 填显示器/背光 → `dots secret set bsu_pass` → `dots sync && exec zsh`。
 
-**C. opencode 接入 skills**：`dots dist add skills ~/.config/opencode/skill` → 完（1 条命令；对比现状要改 link_skills() 的 Python 元组）。
+**C. opencode 接入 skills**：dots.lua 里 `distribute("skills").to` 加一行（LuaLS 补全）→ `dots sync` → 完（对比现状要改 link_skills() 的 Python 元组与安装器代码）。
 
 ## 16. 已知弱点（诚实清单）
 
 - 三种链接来源（镜像约定/distribute/inject）并存，CLI 实现复杂度最高，doctor 必须同时理解三者——用强测试基建对冲。
-- 改 CLI 要重编译，迭代环比 Python 长。
+- 改 CLI 要重编译，迭代环比 Python 长；mlua vendored 构建需 C 编译器（bootstrap 已覆盖）。
 - adopt 推断可能猜错（有 --layer/--mode 覆盖 + undo 兜底）。
+- 清单 100% 手编是刻意决策：CLI 打印建议行但不能替你粘贴，"忘记粘贴"造成的漂移要靠 doctor 检出（非阻断）。
+- Lua 清单只有跑解释器才能读，第三方工具不能像 TOML 一样直接解析（对单人仓库影响极小）。
 - age 私钥安全到达新机无银弹（手动拷贝/密码管理器）。
-- 清单极少数情况仍需手编（granularity），不是 100% 命令化。
 - z-sy-h 冻结后不获上游修复；兼容问题出现时退路是 packages/ 加官方包一行。
 
 ## 17. 范围外（明确不做）
