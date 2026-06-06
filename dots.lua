@@ -15,6 +15,10 @@ granularity("home.linux/.config/systemd/user", {
     ignore = { "default.target.wants", "timers.target.wants" },
 })
 
+-- Claude hooks：目录保持真实、逐子项链（同 systemd user/ 的理由）——
+-- post_sync 会把机器本地编译的 cc-hook bin 软链进来，不污染仓库。
+granularity("home/.claude/hooks", { mode = "children" })
+
 distribute("skills", {
     src = "tree/home/.agent/skills",
     to = { "~/.claude/skills", "~/.codex/skills" },
@@ -29,6 +33,16 @@ distribute("agents", {
 -- systemd user 单元：sync 时 systemctl --user enable（幂等）。
 -- bsu-login.service 无 WantedBy（由 bsu-login.timer 触发），不在此 enable。
 systemd_user({ "mihomo.service", "bsu-login.timer", "napcat.service" })
+
+-- 每次 sync 保持 cc-hook（Claude Code hooks 入口）新鲜并复制到 ~/.claude/hooks/。
+on({
+    post_sync = function()
+        local bin = dots.cargo.build(dots.repo .. "/cli", "cc-hook")
+        if bin then
+            dots.file.install(bin, dots.home .. "/.claude/hooks/cc-hook")
+        end
+    end,
+})
 
 -- per-host：本机变量（供 .inject 引用）。monitors.conf 链接见 B7 抽取后补。
 hosts({

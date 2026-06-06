@@ -27,7 +27,7 @@ skill                     # cd 到 skills 目录
 
 ```
 dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json；CLI 永不改它）
-cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin），lua-api/（类型标注）
+cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin）+ cc-hooks（bin: cc-hook，Claude hooks 入口），lua-api/（类型标注）
 tree/             # ★ 映射根：目录结构即链接声明
   home/           #   → $HOME（跨平台）
   home.linux/     #   → $HOME（仅 Linux，条目级覆盖通用层）

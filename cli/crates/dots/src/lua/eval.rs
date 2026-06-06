@@ -20,6 +20,8 @@ pub struct LuaCtx {
     pub os: String,
     /// `$HOME`（`dots.home`）。
     pub home: String,
+    /// 仓库根（`dots.repo`）。
+    pub repo: String,
 }
 
 /// 持有 mlua 运行时与登记的闭包（effect 阶段查回执行）。
@@ -74,12 +76,13 @@ fn sandbox(lua: &Lua) -> mlua::Result<()> {
     Ok(())
 }
 
-/// 注入只读 `dots.{host,os,home}`。
+/// 注入只读 `dots.{host,os,home,repo}`。
 fn inject_context(lua: &Lua, ctx: &LuaCtx) -> mlua::Result<()> {
     let dots = lua.create_table()?;
     dots.set("host", ctx.host.clone())?;
     dots.set("os", ctx.os.clone())?;
     dots.set("home", ctx.home.clone())?;
+    dots.set("repo", ctx.repo.clone())?;
     lua.globals().set("dots", dots)?;
     Ok(())
 }
@@ -94,6 +97,7 @@ mod tests {
             host: "xz07".into(),
             os: "linux".into(),
             home: "/home/u".into(),
+            repo: "/home/u/dotfiles".into(),
         }
     }
 

@@ -374,3 +374,280 @@ fn sync_prunes_orphan_records_after_target_deleted() {
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
     assert!(stdout.contains("0 孤儿"), "status 仍报孤儿：{stdout}");
 }
+
+#[test]
+fn dots_run_executes_every_sync_and_skips_dry_run() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    dots.run("echo ran >> " .. dots.home .. "/probe.log")
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    // dry-run 不执行
+    run_dots(repo, home, &["sync", "--dry-run"]).success();
+    assert!(!home.join("probe.log").exists(), "dry-run 不应执行 dots.run");
+
+    // 与 run_once 的区别：每次 sync 都执行
+    run_dots(repo, home, &["sync"]).success();
+    run_dots(repo, home, &["sync"]).success();
+    let log = fs::read_to_string(home.join("probe.log")).unwrap();
+    assert_eq!(log.lines().count(), 2, "应每次 sync 都执行：{log}");
+}
+
+#[test]
+fn dots_run_failure_warns_but_sync_succeeds() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 返回值必须是 false；失败不致命（sync 仍 success），但要在输出留痕
+    // 富返回：code/stdout/stderr/ok 四字段；断言写在 Lua 里，不符即 error → sync 失败
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local r = dots.run("echo outprobe; echo errprobe >&2; exit 3")
+    if r.code ~= 3 then error("code 应为 3: " .. tostring(r.code)) end
+    if not r.stdout:find("outprobe", 1, true) then error("stdout 丢失: " .. r.stdout) end
+    if not r.stderr:find("errprobe", 1, true) then error("stderr 丢失: " .. r.stderr) end
+    if r.ok then error("ok 应为 false") end
+    local good = dots.run("true")
+    if not (good.ok and good.code == 0) then error("true 应 ok") end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    let out = run_dots(repo, home, &["sync"]).success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert!(stdout.contains("dots.run 退出码 3"), "非零退出应留痕：{stdout}");
+}
+
+#[test]
+fn dots_repo_exposes_repo_root() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // dots.repo 应指向仓库根：读 tree 下已知文件验证
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local probe = dots.run("cat " .. dots.repo .. "/tree/home/.vimrc")
+    if not probe.ok then error("dots.repo 不可用: " .. tostring(dots.repo)) end
+    if not probe.stdout:find("nocompatible") then error("内容不符: " .. probe.stdout) end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+}
+
+/// 在仓库内搭一个最小 cargo bin 项目（无依赖，离线可编译）。
+/// `[workspace]` 空表：避免被外层 workspace 误收编。
+fn setup_minibin(repo: &Path, main_rs: &str) {
+    let dir = repo.join("minibin");
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(
+        dir.join("Cargo.toml"),
+        "[package]\nname = \"minibin\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[workspace]\n",
+    )
+    .unwrap();
+    fs::write(dir.join("src/main.rs"), main_rs).unwrap();
+}
+
+#[test]
+fn dots_cargo_build_compiles_and_returns_bin_path() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+    setup_minibin(repo, "fn main() {}\n");
+
+    // 断言写在 Lua 里：返回产物绝对路径，且可执行
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local bin, err = dots.cargo.build(dots.repo .. "/minibin", "minibin")
+    if not bin then error("build 应返回路径，err: " .. tostring(err)) end
+    if not bin:find("minibin", 1, true) then error("路径不含 bin 名: " .. bin) end
+    if not dots.run("test -x '" .. bin .. "'").ok then error("产物不可执行: " .. bin) end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+}
+
+#[test]
+fn dots_cargo_build_failure_returns_nil_and_err() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+    setup_minibin(repo, "fn main() { 编译不过 }\n");
+
+    // 编译失败：nil + 错误信息，sync 整体不炸（优雅降级交给调用方分支）
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local bin, err = dots.cargo.build(dots.repo .. "/minibin", "minibin")
+    if bin ~= nil then error("编译失败应返回 nil，得到: " .. tostring(bin)) end
+    if type(err) ~= "string" or #err == 0 then error("第二返回值应带错误信息") end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+}
+
+#[test]
+fn dots_cargo_build_skipped_on_dry_run() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+    setup_minibin(repo, "fn main() {}\n");
+
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local bin, why = dots.cargo.build(dots.repo .. "/minibin", "minibin")
+    if bin ~= nil then error("dry-run 不应编译") end
+    if why ~= "dry-run" then error("原因应为 dry-run: " .. tostring(why)) end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync", "--dry-run"]).success();
+    assert!(
+        !repo.join("minibin/target").exists(),
+        "dry-run 不应真的跑 cargo build"
+    );
+}
+
+#[test]
+fn dots_file_install_atomic_idempotent_preserves_mode() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 源：带可执行位的「二进制」
+    let src = repo.join("payload.bin");
+    fs::write(&src, "v1").unwrap();
+    fs::set_permissions(&src, fs::Permissions::from_mode(0o755)).unwrap();
+
+    // dest 用 ~ 路径，验证展开
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    dots.file.install(dots.repo .. "/payload.bin", "~/bin/payload")
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    // dry-run 不落盘
+    run_dots(repo, home, &["sync", "--dry-run"]).success();
+    let dest = home.join("bin/payload");
+    assert!(!dest.exists(), "dry-run 不应安装");
+
+    // 真装：普通文件（非链）、内容、可执行位
+    run_dots(repo, home, &["sync"]).success();
+    let meta = fs::symlink_metadata(&dest).unwrap();
+    assert!(meta.file_type().is_file(), "应为普通文件而非软链");
+    assert_eq!(fs::read_to_string(&dest).unwrap(), "v1");
+    assert_ne!(meta.permissions().mode() & 0o111, 0, "应保留可执行位");
+
+    // 幂等：内容无差异不重写（rename 必换 inode，inode 不变即证明跳写）
+    let ino_before = meta.ino();
+    run_dots(repo, home, &["sync"]).success();
+    assert_eq!(
+        fs::metadata(&dest).unwrap().ino(),
+        ino_before,
+        "无差异应跳写"
+    );
+
+    // 源变更 → 内容跟进且 inode 更换（原子替换）
+    fs::write(&src, "v2").unwrap();
+    run_dots(repo, home, &["sync"]).success();
+    assert_eq!(fs::read_to_string(&dest).unwrap(), "v2");
+    assert_ne!(fs::metadata(&dest).unwrap().ino(), ino_before);
+}
+
+#[test]
+fn dots_json_decode_parses_into_lua_table() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // 断言全写在 Lua 里：标量/数组/嵌套各型 + null→nil + 坏 JSON 双返回
+    fs::write(
+        repo.join("dots.lua"),
+        r#"
+on {
+  post_sync = function()
+    local obj = dots.json.decode('{"name":"cc-hook","num":3,"arr":[1,2],"nested":{"k":"v"},"nul":null}')
+    if obj.name ~= "cc-hook" then error("string 字段: " .. tostring(obj.name)) end
+    if obj.num ~= 3 then error("number 字段") end
+    if obj.arr[2] ~= 2 then error("数组下标") end
+    if obj.nested.k ~= "v" then error("嵌套表") end
+    if obj.nul ~= nil then error("JSON null 必须映射为 Lua nil，得到: " .. tostring(obj.nul)) end
+
+    local bad, err = dots.json.decode("not json")
+    if bad ~= nil then error("坏 JSON 应返回 nil") end
+    if type(err) ~= "string" or #err == 0 then error("第二返回值应带错误信息") end
+  end,
+}
+"#,
+    )
+    .unwrap();
+
+    run_dots(repo, home, &["sync"]).success();
+}

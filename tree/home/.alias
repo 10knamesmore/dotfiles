@@ -1,4 +1,12 @@
 # ================================
+# 🤖 Agent 守卫
+# ================================
+# Claude Code 等 agent 会把交互 shell 的 alias/函数快照进自己的 Bash 工具：
+# rm -i 在无 TTY 下静默失败（exit 0 但没删）、sed -E / grep→rg 偷改语义、
+# tree() 吃不了 -L。agent 环境（CLAUDECODE=1）直接不加载本文件，模型用原生命令。
+[[ -n "$CLAUDECODE" ]] && return
+
+# ================================
 # 🧰 通用命令替代 & 默认行为增强
 # ================================
 alias activate="source ./.venv/bin/activate"
@@ -15,7 +23,6 @@ alias remove='rm -Iv' # 更强交互模式
 alias rm='rm -iv'     # 删除确认
 alias sed="sed -E"
 alias sudoed='sudo nvim'
-alias tt="taskwarrior-tui"
 alias umount='umount -v'
 alias venv="python -m venv .venv"
 alias bim='vim'

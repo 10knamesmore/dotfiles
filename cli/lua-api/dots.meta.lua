@@ -69,17 +69,31 @@ function link(src, target) end
 ---@class DotsJson
 ---@field merge fun(path: string, tbl: table)              # 读-改-写 JSON：合并 tbl、保留其余键
 ---@field set fun(path: string, keypath: string, value: any) # 设某 keypath（如 "hooks.Stop"）
+---@field decode fun(text: string): table|nil, string?     # JSON 文本 → Lua 表（null→nil）；坏 JSON 返回 nil + 错误信息
 
 ---@class DotsFile
 ---@field ensure_block fun(path: string, marker: string, content: string) # 文本 managed-block 幂等替换
+---@field install fun(src: string, dest: string)      # 原子安装文件：无差异跳写；temp+rename（免 ETXTBSY）、保留权限位
+
+---@class DotsCargo
+---@field build fun(dir: string, bin: string): string|nil, string? # release 编译 dir 下的 bin，返回产物绝对路径；失败/dry-run 返回 nil + 原因
+
+---@class DotsRunResult
+---@field code integer                     # 退出码（被信号杀死等无退出码 → -1）
+---@field stdout string                    # 捕获的标准输出
+---@field stderr string                    # 捕获的标准错误
+---@field ok boolean                       # code == 0 的便捷判断
 
 ---@class Dots
 ---@field host string                      # 当前主机名（只读）
 ---@field os "linux"|"macos"               # 当前平台（只读）
 ---@field home string                      # $HOME（只读）
+---@field repo string                      # 仓库根（只读）
 ---@field json DotsJson                    # JSON 写原语（effect 阶段）
 ---@field file DotsFile                    # 文本写原语（effect 阶段）
+---@field cargo DotsCargo                  # cargo 集成（effect 阶段）
 ---@field run_once fun(key: string, cmd: string): boolean # 幂等执行一次性命令
+---@field run fun(cmd: string): DotsRunResult # 每次 sync 都执行（dry-run 跳过、ok=true）；非零退出留一行告警不致命
 
 ---@type Dots
 dots = {}

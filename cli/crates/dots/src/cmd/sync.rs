@@ -31,6 +31,7 @@ pub fn run(dry_run: bool) -> Result<()> {
         host: hostname.clone(),
         os: os_str(os).to_owned(),
         home: home.display().to_string(),
+        repo: repo_root.display().to_string(),
     };
     let (manifest, handles) = eval_manifest(&dots_lua, &ctx)?;
 

@@ -23,6 +23,7 @@ pub fn run() -> Result<bool> {
         host: hostname.clone(),
         os: os_str(os).to_owned(),
         home: home.display().to_string(),
+        repo: repo_root.display().to_string(),
     };
     let (manifest, _handles) = eval_manifest(&dots_lua, &ctx)?;
     let fs = RealFs::new(repo_root.clone(), "status".to_owned());

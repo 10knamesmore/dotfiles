@@ -1,0 +1,64 @@
+{
+  "permissions": {
+    "defaultMode": "auto",
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.npmrc)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.codex/auth.json)",
+      "Bash(sudo *)",
+      "Bash(mkfs *)",
+      "Bash(dd *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/cc-hook bash-guard"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "alwaysThinkingEnabled": true,
+  "enableAllProjectMcpServers": false,
+  "cleanupPeriodDays": 365,
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
+  },
+  "language": "中文",
+  "effortLevel": "high",
+  "skipWorkflowUsageWarning": true,
+  "theme": "dark",
+  "preferredNotifChannel": "kitty",
+  "agentPushNotifEnabled": false,
+  "skipAutoPermissionPrompt": true,
+  "version": 1,
+  "autoUpdater": false,
+  "analytics": false,
+  "mcpServers": []
+}

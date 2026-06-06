@@ -1,5 +1,5 @@
 [workspace]
-members  = ["crates/dots-core", "crates/dots"]
+members  = ["crates/dots-core", "crates/dots", "crates/cc-hooks"]
 resolver = "2"
 
 [workspace.package]
@@ -24,6 +24,9 @@ rustc-hash  = "2"
 owo-colors  = "4"
 walkdir     = "2"
 rpassword   = "7"
+shlex       = "1"
+toml        = "0.8"
+regex-lite  = "0.1"
 dots-core   = { path = "crates/dots-core" }
 
 # dev

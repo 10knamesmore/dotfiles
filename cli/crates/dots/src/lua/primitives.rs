@@ -124,6 +124,38 @@ fn install_dots_table(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
         dots.set("run_once", func)?;
     }
 
+    // dots.run(cmd)：每次 sync 都执行（dry-run 跳过），捕获输出富返回
+    // { code, stdout, stderr, ok }。非零退出留一行告警但不致命——分支逻辑交给调用方。
+    {
+        let effect_ref = effect.clone();
+        let func = lua.create_function(move |lua, cmd: String| {
+            let result = lua.create_table()?;
+            if effect_ref.borrow().dry_run {
+                result.set("code", 0)?;
+                result.set("stdout", "")?;
+                result.set("stderr", "")?;
+                result.set("ok", true)?;
+                return Ok(result);
+            }
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&cmd)
+                .output()
+                .map_err(mlua::Error::external)?;
+            // 被信号杀死等无退出码的情况归一为 -1
+            let code = output.status.code().unwrap_or(-1);
+            if code != 0 {
+                crate::render::warn(&format!("dots.run 退出码 {code}：{cmd}"));
+            }
+            result.set("code", code)?;
+            result.set("stdout", lua.create_string(&output.stdout)?)?;
+            result.set("stderr", lua.create_string(&output.stderr)?)?;
+            result.set("ok", code == 0)?;
+            Ok(result)
+        })?;
+        dots.set("run", func)?;
+    }
+
     // dots.json = { merge = fn, set = fn }
     let json = lua.create_table()?;
     {
@@ -155,9 +187,52 @@ fn install_dots_table(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
         )?;
         json.set("set", func)?;
     }
+
+    // dots.json.decode(text) → (table|nil, err?)：纯解析不碰盘。
+    // JSON null 映射为 Lua nil（serialize_unit_to_null(false)），
+    // 否则 truthy 的 null 哨兵会骗过 `if obj.field then` 判断。
+    {
+        let func = lua.create_function(|lua, text: String| {
+            match serde_json::from_str::<serde_json::Value>(&text) {
+                Ok(parsed) => {
+                    let options = mlua::SerializeOptions::new()
+                        .serialize_none_to_null(false)
+                        .serialize_unit_to_null(false);
+                    let value = lua.to_value_with(&parsed, options)?;
+                    Ok((value, Value::Nil))
+                }
+                Err(error) => Ok((
+                    Value::Nil,
+                    Value::String(lua.create_string(error.to_string())?),
+                )),
+            }
+        })?;
+        json.set("decode", func)?;
+    }
     dots.set("json", json)?;
 
-    // dots.file = { ensure_block = fn }
+    // dots.cargo = { build = fn }：release 编译某 bin，返回产物绝对路径。
+    // 走 --message-format=json 而非猜 target/ 路径——兼容 CARGO_TARGET_DIR 重定向。
+    let cargo = lua.create_table()?;
+    {
+        let effect_ref = effect.clone();
+        let func = lua.create_function(move |lua, (dir, bin): (String, String)| {
+            if effect_ref.borrow().dry_run {
+                return Ok((Value::Nil, Value::String(lua.create_string("dry-run")?)));
+            }
+            match cargo_build_bin(&dir, &bin) {
+                Ok(path) => Ok((Value::String(lua.create_string(&path)?), Value::Nil)),
+                Err(reason) => {
+                    crate::render::warn(&format!("dots.cargo.build 失败：{bin}"));
+                    Ok((Value::Nil, Value::String(lua.create_string(&reason)?)))
+                }
+            }
+        })?;
+        cargo.set("build", func)?;
+    }
+    dots.set("cargo", cargo)?;
+
+    // dots.file = { ensure_block = fn, install = fn }
     let file = lua.create_table()?;
     {
         let effect_ref = effect.clone();
@@ -173,9 +248,70 @@ fn install_dots_table(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
         )?;
         file.set("ensure_block", func)?;
     }
+    {
+        let effect_ref = effect.clone();
+        let func = lua.create_function(move |_, (src, dest): (String, String)| {
+            let st = effect_ref.borrow();
+            let src = expand_home(&src, &st.home);
+            let dest = expand_home(&dest, &st.home);
+            let dry = st.dry_run;
+            drop(st);
+            if dry {
+                println!("  ⇄ will install {} → {}", src.display(), dest.display());
+                return Ok(());
+            }
+            install_file(&src, &dest).map_err(mlua::Error::external)?;
+            Ok(())
+        })?;
+        file.set("install", func)?;
+    }
     dots.set("file", file)?;
 
     Ok(())
+}
+
+/// `cargo build --release --bin <bin>` 并从 JSON 消息流取产物绝对路径。
+/// 错误（spawn 失败/编译失败/找不到工件）统一归为 `Err(原因字符串)`，由 Lua 侧分支。
+fn cargo_build_bin(dir: &str, bin: &str) -> Result<String, String> {
+    let manifest = format!("{dir}/Cargo.toml");
+    let output = std::process::Command::new("cargo")
+        .args(["build", "--release", "--bin", bin, "--message-format=json"])
+        .args(["--quiet", "--manifest-path", &manifest])
+        .output()
+        .map_err(|err| format!("无法启动 cargo：{err}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
+    }
+    // 逐行 JSON：取 compiler-artifact 中 target.name == bin 且 executable 非空的那条
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if msg["reason"] == "compiler-artifact" && msg["target"]["name"] == bin {
+            if let Some(path) = msg["executable"].as_str() {
+                return Ok(path.to_owned());
+            }
+        }
+    }
+    Err(format!("编译成功但未找到 bin `{bin}` 的产物路径"))
+}
+
+/// 原子安装文件：内容无差异跳写；否则 temp + rename（免 ETXTBSY），保留源权限位。
+fn install_file(src: &Path, dest: &Path) -> std::io::Result<bool> {
+    let bytes = fs::read(src)?;
+    if let Ok(existing) = fs::read(dest) {
+        if existing == bytes {
+            return Ok(false);
+        }
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = dest.with_extension("dots-tmp");
+    fs::write(&tmp, &bytes)?;
+    fs::set_permissions(&tmp, fs::metadata(src)?.permissions())?;
+    fs::rename(&tmp, dest)?;
+    Ok(true)
 }
 
 /// 把 `a.b.c` + value 包成嵌套 object。

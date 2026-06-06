@@ -1,0 +1,27 @@
+[package]
+name         = "cc-hooks"
+description  = "Claude Code hooks 统一入口（bin: cc-hook），子命令 = 各 hook 用途"
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "cc-hook"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace       = true
+serde.workspace      = true
+serde_json.workspace = true
+toml.workspace       = true
+shlex.workspace      = true
+regex-lite.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+tempfile.workspace   = true
