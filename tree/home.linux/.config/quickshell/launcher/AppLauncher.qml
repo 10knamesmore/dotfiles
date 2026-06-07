@@ -122,12 +122,21 @@ PanelOverlay {
         root.selectedIndex = Math.min(root.selectedIndex, Math.max(0, results.length - 1));
     }
 
+    // 模型变更后缓存失效：quickshell 重扫 .desktop 时部分 DesktopEntry 对象会被
+    // 销毁重建（尤其同 id 多文件冲突的条目），缓存里的旧引用读属性全是 undefined
+    function invalidateApps() {
+        appsLoaded = false;
+        if (showing)
+            reloadDebounce.restart();
+    }
+
     function launchSelected() {
-        if (_results.length === 0)
+        let item = _results[selectedIndex];
+        // entry 可能是已销毁对象的悬空引用（command 读出 undefined），判空兜底
+        if (!item || !item.entry || !item.entry.command || item.entry.command.length === 0)
             return;
 
-        let entry = _results[selectedIndex].entry;
-        launchProc.command = entry.command;
+        launchProc.command = item.entry.command;
         launchProc.running = true;
         PanelState.launcherOpen = false;
     }
@@ -144,12 +153,22 @@ PanelOverlay {
         onTriggered: searchInput.forceActiveFocus()
     }
 
+    // 重扫时 diffUpdate 会连发多个 insert/remove 信号，debounce 合并成一次重建
+    Timer {
+        id: reloadDebounce
+        interval: 100
+        onTriggered: {
+            root.ensureAppsLoaded();
+            root.updateFilter();
+        }
+    }
+
     Connections {
         function onObjectInsertedPost() {
-            if (root.showing && !root.appsLoaded) {
-                root.ensureAppsLoaded();
-                root.updateFilter();
-            }
+            root.invalidateApps();
+        }
+        function onObjectRemovedPost() {
+            root.invalidateApps();
         }
         target: DesktopEntries.applications
     }
