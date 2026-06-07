@@ -6,6 +6,8 @@
 
 修改核心cli/lua api/的时候 同步修改 [LUA_API.md](/docs/LUA_API.md)
 
+修改 AI 工具链（`cli/crates/cc-hooks/`、`tree/home/.claude/`、`tree/home/.agents/`、`cc-hook-test`）的时候 同步修改 [AI_TOOLING.md](/docs/AI_TOOLING.md)
+
 ## 核心命令
 
 ```bash
