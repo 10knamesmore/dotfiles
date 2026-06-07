@@ -35,7 +35,8 @@ proxy
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 替代旧 OMZ z 插件
 # 补全覆盖：`z 词<Tab>` 直接进 fzf（默认要「空格+Tab」才进，词贴着光标时只补本地子目录）。
 # init 已 compdef z → __zoxide_z_complete，重定义函数体即可生效；选中后由 init 的 helper 直接跳转。
-if command -v zoxide >/dev/null; then
+# 须同时有 fzf：query --interactive 底层调 fzf，无 fzf 的服务器保留 zoxide 默认补全（补本地目录）。
+if command -v zoxide >/dev/null && command -v fzf >/dev/null; then
     function __zoxide_z_complete() {
         [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0  # 仅在光标位于行尾时补全
         __zoxide_result="$(\command zoxide query --exclude "$(__zoxide_pwd || \builtin true)" --interactive -- ${words[2,-1]})" || __zoxide_result=''
