@@ -1,4 +1,75 @@
-# Homebrew 包清单（每行一个，# 注释）。仅 macOS 生效。
+# Homebrew 包清单（每行一个，# 注释须独立成行——解析器不剥行内注释）。仅 macOS 生效。
 # 清单非空时 dots bootstrap 自动确保 brew（缺则官方脚本 NONINTERACTIVE 自举，
 # 顺带装 Xcode CLT），故 brew 本身不必列在这里。
-# 生成基线：在 Mac 上 brew leaves（只列显式安装的顶层包），待填。
+# 裸名 brew install 自动解析 cask（同名 formula 不存在时），GUI 应用直接写裸名即可。
+# 第三方 tap 包写全限定名（user/repo/formula），brew install 自动 tap——无需单独 tap 步骤。
+# 基线对账：在 Mac 上 brew leaves（只列显式安装的顶层包）对照本清单合并。
+# 本清单由 pacman.txt 映射生成（2026-06），改名项：github-cli→gh、7zip→sevenzip、
+# tree-sitter-cli→tree-sitter、openai-codex→codex（cask）、unrar→rar（cask）。
+
+# —— 基础 / 构建（base-devel→Xcode CLT 随 brew 自举；cronie→launchd 原生）——
+git
+git-delta
+gh
+zsh
+vim
+neovim
+
+# —— 终端 / Shell 栈（kitty 是 cask；xclip/wl-clipboard 不需要——pbcopy 原生）——
+kitty
+starship
+zellij
+yazi
+zoxide
+fzf
+ripgrep
+fd
+eza
+bat
+btop
+fastfetch
+lazygit
+lazydocker
+tldr
+cloc
+chafa
+jq
+bash-completion
+
+# —— 压缩（rar 是 cask，unrar 因许可证不在 core）——
+sevenzip
+unzip
+rar
+
+# —— 运行时 / 包管理器（docker-desktop 是 cask——brew 的 docker formula 只有 CLI 没引擎）——
+uv
+bun
+docker-desktop
+docker-compose
+luarocks
+
+# —— 开发工具 ——
+tree-sitter
+stylua
+typst
+tinymist
+
+# —— AI CLI（codex 是 cask）——
+codex
+opencode
+
+# —— 桌面栈（全限定名自动 tap）——
+koekeishiya/formulae/yabai
+koekeishiya/formulae/skhd
+FelixKratz/formulae/sketchybar
+# fcitx5-macos 不在 brew 生态（自有 installer，需 GUI 交互），见 docs/MANUAL_SETUP.md §3
+
+# —— 字体（font-* cask；CJK 不列——macOS 自带苹方/宋体）——
+font-hack-nerd-font
+font-victor-mono-nerd-font
+font-symbols-only-nerd-font
+
+# —— 媒体 ——
+mpv
+ffmpeg
+imagemagick

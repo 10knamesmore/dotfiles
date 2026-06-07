@@ -32,7 +32,9 @@ lazydocker
 tldr
 cloc
 chafa
+jq
 xclip
+wl-clipboard
 bash-completion
 man-db
 man-pages-zh_cn
@@ -92,10 +94,12 @@ ttf-hack-nerd
 ttf-nerd-fonts-symbols-mono
 ttf-victor-mono-nerd
 
-# —— 音频 / 媒体 ——
+# —— 音频 / 媒体（ffmpeg/imagemagick 兼作 yazi 视频/图片预览依赖）——
 pipewire-alsa
 gst-plugin-pipewire
 mpv
+ffmpeg
+imagemagick
 
 # —— 日常应用 ——
 firefox
