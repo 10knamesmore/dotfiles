@@ -63,17 +63,16 @@
 
 - 避免仅复述函数名或类型名。
 - 公共 API 必须有文档注释；私有项按需要补充。
+- 若 workspace lint 开启 `missing_docs` / `clippy::missing_docs_in_private_items`（deny），则**所有**项（含私有）都必须有文档注释，不再按需省略。
 - 示例应与实际签名一致，避免过度复杂。
 - 在同一仓库内统一使用同一组标题命名，不混用 `# Arguments`/`# Params`、`# Errors`/`# Error`。
 - 当项目模板要求固定段落顺序时，补全文档时保持该顺序，不随意重排。
 
 ## Rust 代码块示例
 
-注意自行补齐可能缺失的 ` 符号
-
 ### 函数注释示例
 
-```rust
+````rust
 /// 将输入字符串解析为用户 ID。
 ///
 /// # Params:
@@ -90,18 +89,18 @@
 /// let user_id = parse_user_id("42")?;
 /// assert_eq!(user_id, 42);
 /// # Ok::<(), ParseUserIdError>(())
-/// ``
+/// ```
 ///
 /// # Notes:
 ///   该函数只接受十进制数字输入。
 pub fn parse_user_id(raw: &str) -> Result<u64, ParseUserIdError> {
     raw.parse().map_err(|_| ParseUserIdError)
 }
-```
+````
 
 ### 无参数函数示例
 
-```rust
+````rust
 /// 返回当前构建目标使用的默认 API 地址。
 ///
 /// # Return:
@@ -110,15 +109,15 @@ pub fn parse_user_id(raw: &str) -> Result<u64, ParseUserIdError> {
 /// # Examples:
 /// ```rust
 /// assert!(default_endpoint().starts_with("https://"));
-/// ``
+/// ```
 pub fn default_endpoint() -> &'static str {
     "https://api.example.com"
 }
-```
+````
 
 ### 类型注释示例
 
-```rust
+````rust
 /// 保存工作进程运行时所需的配置。
 ///
 /// # Fields:
@@ -132,12 +131,12 @@ pub fn default_endpoint() -> &'static str {
 ///     retry_limit: 3,
 /// };
 /// assert_eq!(config.retry_limit, 3);
-/// ``
+/// ```
 pub struct WorkerConfig {
     pub name: String,
     pub retry_limit: u8,
 }
-```
+````
 
 ### 文件级注释示例
 

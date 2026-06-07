@@ -9,25 +9,30 @@ description: 当提到 `为代码文件或目录批量添加/补全文档注释`
 
 为指定文件或目录中的代码元素添加或补全文档注释，遵循对应语言规范并尽量保持原有风格与结构。
 
-## 适用范围
+## 语言路由（按扩展名选读规范，只读命中的那份）
 
-- Rust：`*.rs`
-- TypeScript：`*.ts`、`*.tsx`
-- Python：`*.py`
+| 语言 | 扩展名 | 规范文件 |
+| --- | --- | --- |
+| Rust | `*.rs` | `references/rust_spec.md` |
+| TypeScript | `*.ts` `*.tsx` | `references/typescript_spec.md` |
+| JavaScript（纯 JS，JSDoc 承担类型） | `*.js` `*.mjs` `*.cjs` | `references/jsdoc_spec.md` |
+| Python | `*.py` | `references/python_spec.md` |
+| Lua | `*.lua` | `references/lua_spec.md` |
+| QML | `*.qml` | `references/qml_spec.md` |
+| Shell（bash/zsh） | `*.sh` `*.zsh`、无扩展名脚本（看 shebang） | `references/shell_spec.md` |
+
+表外语言：参考最接近的规范（如 Kotlin → typescript_spec 的标签风格），并向用户说明无专属规范。
 
 ## 使用流程
 
-1. 明确范围：确定是单文件还是目录递归处理，并获取目标路径列表。
-2. 判断语言：根据文件扩展名选择规范文件。
-   - Rust 规范：读取 `references/rust_spec.md`。
-   - TypeScript 规范：读取 `references/typescript_spec.md`。
-   - Python 规范：读取 `references/python_spec.md`。
-   - Lua 规范: 读取 `references/lua_spec.md`
-3. 分析代码结构：识别需要文档注释的元素（模块、函数、结构体/类、字段/属性、类型别名、枚举、常量、接口等）。
+1. 明确范围：单文件还是目录递归；获取目标路径列表。
+2. 按上表路由读取对应规范文件（一个任务可能涉及多门语言，逐份按需读）。
+3. 分析代码结构：识别需要文档注释的元素（模块、函数、结构体/类、字段/属性、类型别名、枚举、常量、接口、signal/property 等）。
 4. 决定策略：
    - 已有文档注释：保留并仅在明显缺失关键信息时补充。
    - 无文档注释：按规范新增最小但完整的说明。
    - 生成内容要与命名、参数、返回值、错误/异常、可见性、使用场景一致。
+   - **项目已有风格优先于规范**：同一仓库内既有注释风格与规范冲突时，跟随仓库。
 5. 写入注释：按语言规范选择注释形式、位置与格式（多行/单行、段落/列表、示例代码块等）。
 6. 复核一致性：同一文件内保持风格一致；跨文件遵循规范优先。
 
@@ -38,12 +43,5 @@ description: 当提到 `为代码文件或目录批量添加/补全文档注释`
 ## 输出要求
 
 - 仅修改需要补充文档注释的部分，避免无关格式化。
-- 语义准确、简洁、避免“自明”或重复代码名的空洞描述。
+- 语义准确、简洁、避免「自明」或重复代码名的空洞描述。
 - 对公共 API 与关键业务逻辑优先补齐说明。
-
-## 资源
-
-- Rust 规范：`references/rust_spec.md`
-- TypeScript 规范：`references/typescript_spec.md`
-- Python 规范：`references/python_spec.md`
-- Lua 规范: `references/lua_spec.md`

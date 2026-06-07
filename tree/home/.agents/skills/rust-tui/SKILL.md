@@ -1,5 +1,5 @@
 ---
-name: tui
+name: rust-tui
 description: 编写 Rust TUI 应用的最佳实践。使用 ratatui 库时、需要设计 TUI 架构/事件系统/widget/布局/状态管理/性能优化时使用。涵盖从项目结构到生产级架构的完整指南。
 ---
 

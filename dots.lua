@@ -20,13 +20,18 @@ granularity("home.linux/.config/systemd/user", {
 granularity("home/.claude/hooks", { mode = "children" })
 
 distribute("skills", {
-    src = "tree/home/.agent/skills",
+    src = "tree/home/.agents/skills",
     to = { "~/.claude/skills", "~/.codex/skills" },
     mode = "children",
 })
 distribute("agents", {
-    src = "tree/home/.agent/claude/agents",
+    src = "tree/home/.agents/claude/agents",
     to = { "~/.claude/agents" },
+    mode = "children",
+})
+distribute("commands", {
+    src = "tree/home/.agents/claude/commands",
+    to = { "~/.claude/commands" },
     mode = "children",
 })
 

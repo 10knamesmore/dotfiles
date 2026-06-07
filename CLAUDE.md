@@ -52,7 +52,7 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖，spec 可带条目级 `pre`/`post` 钩子，pre 返回 false 跳过该条目）、`distribute`（一源多落点，如 `tree/home/.agent/skills` → claude/codex，同样支持 `pre`/`post`；AI skills/agents 源统一住 `tree/home/.agent/`，各工具落点全走 distribute 订阅）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`hosts{<name>=function() vars{…}; link(…) end}`（per-host）、`on{phase=fn|{fn,…}}`（全局生命周期钩子：pre_sync/on_host_activate/post_link/post_sync）。CLI 永不编辑它，需要时打印建议行让你粘贴。
+只写约定盖不住的：`granularity`（粒度覆盖，spec 可带条目级 `pre`/`post` 钩子，pre 返回 false 跳过该条目）、`distribute`（一源多落点，如 `tree/home/.agents/skills` → claude/codex，同样支持 `pre`/`post`；AI skills/agents/commands 源统一住 `tree/home/.agents/`，各工具落点全走 distribute 订阅）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`hosts{<name>=function() vars{…}; link(…) end}`（per-host）、`on{phase=fn|{fn,…}}`（全局生命周期钩子：pre_sync/on_host_activate/post_link/post_sync）。CLI 永不编辑它，需要时打印建议行让你粘贴。
 
 ## 路径注入（已消灭模板渲染）
 

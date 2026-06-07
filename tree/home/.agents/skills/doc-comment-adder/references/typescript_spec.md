@@ -1,5 +1,8 @@
 # TypeScript 文档注释规范（TSDoc / JSDoc 风格）
 
+> 适用 `.ts` / `.tsx`：类型已在签名里，注释**不重复类型**。
+> 纯 JavaScript 文件（`.js` / `.mjs` / `.cjs`）走 `jsdoc_spec.md`——那里 JSDoc 承担类型职责，策略相反。
+
 ## 基本形式
 
 * 使用 `/** ... */` 作为文档注释。

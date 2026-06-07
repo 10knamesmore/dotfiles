@@ -152,6 +152,70 @@ Example:
 
 ---
 
+### 4.7 Yields（生成器）
+
+生成器函数用 `Yields` 替代 `Returns`，说明每次产出的值语义：
+
+```python
+def iter_batches(items: Sequence[T], size: int) -> Iterator[list[T]]:
+    """按固定大小切分序列并逐批产出。
+
+    Args:
+        size: 每批数量，必须大于 0；最后一批可能不足 size。
+
+    Yields:
+        当前批次的元素列表。
+    """
+```
+
+---
+
+### 4.8 Attributes（类/dataclass 属性）
+
+类级 docstring 中用 `Attributes` 段说明公共属性；dataclass 优先用此段而非逐字段注释：
+
+```python
+@dataclass
+class RetryPolicy:
+    """任务重试策略。
+
+    Attributes:
+        max_attempts: 最大尝试次数（含首次执行）。
+        backoff_base: 退避基数（秒），按指数增长。
+    """
+
+    max_attempts: int
+    backoff_base: float = 1.0
+```
+
+---
+
+### 4.9 async 函数
+
+* 结构与同步函数一致（`Args`/`Returns`/`Raises`），不需要在摘要里写「异步地…」。
+* 需要说明的是 await 语义之外的行为：是否并发安全、是否持有锁、取消（`asyncio.CancelledError`）时的清理行为。
+
+```python
+async def fetch_quote(symbol: str, *, timeout: float = 5.0) -> Quote:
+    """拉取单只标的的实时报价。
+
+    Args:
+        symbol: 标的代码。
+        timeout: 单次请求超时（秒）。
+
+    Returns:
+        最新报价快照。
+
+    Raises:
+        QuoteTimeoutError: 超时未返回时。
+
+    Notes:
+        可并发调用；内部连接池限流 10 并发。
+    """
+```
+
+---
+
 ## 5. 函数示例（完整示范）
 
 ```python
