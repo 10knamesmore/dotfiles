@@ -1,6 +1,15 @@
 {
+  "cleanupPeriodDays": 365,
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
-    "defaultMode": "auto",
     "deny": [
       "Read(~/.ssh/**)",
       "Read(~/.config/gh/hosts.yml)",
@@ -9,8 +18,10 @@
       "Bash(sudo *)",
       "Bash(mkfs *)",
       "Bash(dd *)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
+  "enableAllProjectMcpServers": false,
   "hooks": {
     "PreToolUse": [
       {
@@ -24,18 +35,6 @@
       }
     ]
   },
-  "env": {
-    "DISABLE_TELEMETRY": "1",
-    "DISABLE_ERROR_REPORTING": "1",
-    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
-  },
-  "attribution": {
-    "commit": "",
-    "pr": ""
-  },
-  "alwaysThinkingEnabled": true,
-  "enableAllProjectMcpServers": false,
-  "cleanupPeriodDays": 365,
   "worktree": {
     "baseRef": "fresh"
   },
@@ -49,6 +48,7 @@
     "frontend-design@claude-plugins-official": true
   },
   "language": "中文",
+  "alwaysThinkingEnabled": true,
   "effortLevel": "high",
   "skipWorkflowUsageWarning": true,
   "theme": "dark",

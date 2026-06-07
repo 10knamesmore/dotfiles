@@ -191,8 +191,11 @@ opt.tabstop = 4 -- Number of spaces tabs count for
 -- True color support
 opt.termguicolors = true
 
--- Lower than default (1000) to quickly trigger which-key
-opt.timeoutlen = vim.g.vscode and 1000 or 100
+-- 按键序列等待窗口。曾为加速 which-key 弹窗设为 100ms，但 100ms 小于
+-- g→Shift+Y 这类换挡序列的天然指间隔，导致不经 which-key 的原生 buffer-local
+-- 映射（如 mini.files 的 gY）几乎必然超时失效、gy 偶发失效（取决于打字节奏）。
+-- which-key 弹窗时机由其自身 opts.delay 控制，与 timeoutlen 无关。
+opt.timeoutlen = vim.g.vscode and 1000 or 500
 
 -- undo
 opt.undofile = true
