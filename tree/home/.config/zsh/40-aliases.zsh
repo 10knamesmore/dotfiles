@@ -29,7 +29,6 @@ alias bim='vim'
 alias vim='nvim -V1'
 alias grep="rg"
 alias rg="rg -i"
-# alias grep="grep --color=auto"
 
 # ================================
 # 🧠  系统信息
@@ -67,15 +66,14 @@ alias ls="eza --icons --git --group-directories-first"
 alias la='eza -lahHiM --icons --git --group-directories-first'
 alias l='eza -lh --icons --git --group-directories-first'
 alias ll='eza -lh --icons --git --group-directories-first'
-# alias tree="eza -T --icons --git --level=2"
 tree() {
     local level=${1:-2}
     eza -T --icons --git --level="${level}"
 }
 
-# # ================================
-# # 🧪 Git 快捷命令
-# # ================================
+# ================================
+# 🧪 Git 快捷命令
+# ================================
 alias lg="lazygit"
 alias g="git"
 alias ga='git add'
@@ -96,30 +94,7 @@ gline() {
         awk '{ added += $1; removed += $2 } END { print "Added:", added, "Removed:", removed }'
 }
 
-# # ================================
-# # 🦀 Rust / C++ 开发相关
-# # ================================
-alias cwarn="RUSTFLAGS=\"-Awarnings\" cargo check"
-
-function proxy() {
-    export http_proxy="http://127.0.0.1:7897"
-    export https_proxy="http://127.0.0.1:7897"
-    export ftp_proxy="http://127.0.0.1:7897"
-    #     echo 启动代理
-}
-
-no_proxy() {
-    # 同时清理大小写代理变量，避免 requests/httpx/urllib 走代理
-    unset http_proxy https_proxy ftp_proxy all_proxy
-    unset HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY
-
-    # 可选：给内网和本地地址显式 no_proxy
-    export NO_PROXY="127.0.0.1,localhost,::1,xz07"
-    export no_proxy="$NO_PROXY"
-
-    echo "proxy disabled"
-  }
-
+# yazi 退出时 cd 到浏览位置
 function y() {
     local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
     yazi "$@" --cwd-file="$tmp"
@@ -129,14 +104,13 @@ function y() {
     \rm -f -- "$tmp"
 }
 
+# ================================
+# 🪟 作业控制 / Zellij
+# ================================
 alias f="fg"
 alias b="bg"
 alias j="jobs"
 alias jobs="jobs -l"
-
-# ================================
-# 🪟 Zellij
-# ================================
 alias zj="zellij"
 alias zjl="zellij list-sessions"
 alias zja="zellij attach"

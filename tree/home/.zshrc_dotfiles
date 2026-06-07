@@ -7,18 +7,19 @@ source "$HOME/.config/dots/env.zsh"
 export EDITOR="nvim"
 export KITTY_SHELL_INTEGRATION="enabled no-cursor"
 
-# 别名与跳转
-source "$HOME/.alias"
+# 跳转（别名主体在 ~/.config/zsh/40-aliases.zsh）
 alias dot="cd $DOTFILES_DIR"
-alias skill="cd $DOTFILES_DIR/tree/home/.agent/skills"
+alias skill="cd $DOTFILES_DIR/tree/home/.agents/skills"
 
 # PATH
 [[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
-# zsh 模块（历史/目录/补全/键绑定 + 内联函数）。compinit 在 10-options 跑，须在 uv 补全前。
+# zsh 模块（历史/目录/补全/键绑定 + 内联函数 + 历史建议）。compinit 在 10-options 跑，须在 uv 补全前。
 source "$HOME/.config/zsh/10-options.zsh"
 source "$HOME/.config/zsh/20-functions.zsh"
+source "$HOME/.config/zsh/30-autosuggestions.zsh"
+source "$HOME/.config/zsh/40-aliases.zsh"
 
 # 平台差异
 if [[ -f "$HOME/.zshrc_linux" ]]; then
@@ -31,6 +32,19 @@ fi
 command -v uv >/dev/null && eval "$(uv generate-shell-completion zsh)"
 proxy
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 替代旧 OMZ z 插件
+# 补全覆盖：`z 词<Tab>` 直接进 fzf（默认要「空格+Tab」才进，词贴着光标时只补本地子目录）。
+# init 已 compdef z → __zoxide_z_complete，重定义函数体即可生效；选中后由 init 的 helper 直接跳转。
+if command -v zoxide >/dev/null; then
+    function __zoxide_z_complete() {
+        [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0  # 仅在光标位于行尾时补全
+        __zoxide_result="$(\command zoxide query --exclude "$(__zoxide_pwd || \builtin true)" --interactive -- ${words[2,-1]})" || __zoxide_result=''
+        compadd -Q ""                                       # 占位，阻止补全系统继续走其他 completer
+        \builtin bindkey '\e[0n' '__zoxide_z_complete_helper'
+        \builtin printf '\e[5n'                             # 触发 helper：拿 __zoxide_result 回填并 accept-line
+        return 0
+    }
+fi
+command -v fzf >/dev/null && source <(fzf --zsh)            # Ctrl-R 模糊历史 / Ctrl-T 文件 / Alt-C cd
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
 # transient prompt：命令被接受后简化历史行的提示符

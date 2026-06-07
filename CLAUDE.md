@@ -65,7 +65,7 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 
 ## shell 栈（Oh My Zsh 已退役）
 
-- 无框架。模块在 `tree/home/.config/zsh/`：`10-options.zsh`（历史/目录/补全/键绑定）、`20-functions.zsh`（cd-ls/allclear/copypath/copyfile 内联）、`90-syntax-highlighting.zsh`（z-sy-h 冻结 vendor）。
+- 无框架，显式 emacs 键模式（`bindkey -e`；Ctrl-S/Q/W/U 四键解绑留白）。模块在 `tree/home/.config/zsh/`：`10-options.zsh`（历史/目录/补全/键绑定）、`20-functions.zsh`（cd-ls/allclear/copypath/copyfile/proxy 内联，剪贴板走 `_dots_clipcopy` 平台分派）、`30-autosuggestions.zsh`（历史内联建议，冻结 vendor）、`40-aliases.zsh`（别名与交互函数，原 `~/.alias` 已退役迁入；**头部有 CLAUDECODE Agent 守卫**，agent 环境不加载）、`90-syntax-highlighting.zsh`（z-sy-h 冻结 vendor）。fzf 键绑定（Ctrl-R/T、Alt-C）在 `.zshrc_dotfiles` 工具初始化段。
 - `z` → zoxide；提示符 starship + 自写 transient prompt。
 - 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `.zshrc_linux`/`.zshrc_macos`。
 
