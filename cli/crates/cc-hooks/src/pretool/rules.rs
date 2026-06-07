@@ -125,6 +125,9 @@ pub struct Matcher {
     /// 正则兜底（仅在上述词汇表达不了时用）
     #[serde(default)]
     pub re: Option<OneOrMany>,
+    /// 反向匹配器：内层命中则整体不中（如 glob 命中 `.env.*` 但排除 `.example`）
+    #[serde(default)]
+    pub not: Option<Box<Self>>,
 }
 
 /// 规则集（TOML 顶层 `[[bash]]` 与 `[[tool]]`）。

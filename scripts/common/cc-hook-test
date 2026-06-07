@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# cc-hook pretool 黑盒测试：对部署的二进制 + 生产规则表喂 PreToolUse JSON，
+# 断言决策（deny/ask/silent）与 exit 0（fail-open 契约）。
+#
+# 与 cargo test 的分工：e2e 测 cargo 产物 + fixture 规则；本脚本测
+# ~/.claude/hooks/ 里真实部署的二进制 + 真实 pretool.toml——部署链路的最后一公里。
+#
+# 用法：cc-hook-test [hook二进制路径]   # 缺省 ~/.claude/hooks/cc-hook
+set -u
+HOOK="${1:-$HOME/.claude/hooks/cc-hook}"
+command -v jq >/dev/null || { echo "需要 jq" >&2; exit 1; }
+[ -x "$HOOK" ] || { echo "找不到可执行的 hook: $HOOK" >&2; exit 1; }
+pass=0; fail=0
+
+# check <label> <expected: deny|ask|silent> <stdin-json> [extra-args...]
+check() {
+  local label="$1" want="$2" json="$3"; shift 3
+  local out code got
+  out=$(printf '%s' "$json" | "$HOOK" pretool "$@" 2>/dev/null); code=$?
+  if [ -n "$out" ]; then
+    got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision // "BAD_JSON"')
+  else
+    got=silent
+  fi
+  [ "$code" -ne 0 ] && got="$got(exit=$code)"
+  if [ "$got" = "$want" ]; then
+    pass=$((pass+1)); printf 'PASS  %-46s → %s\n' "$label" "$got"
+  else
+    fail=$((fail+1)); printf 'FAIL  %-46s → got=%s want=%s\n' "$label" "$got" "$want"
+  fi
+}
+
+# bashc <label> <expected> <command-string>
+bashc() {
+  local json
+  json=$(jq -cn --arg c "$3" '{tool_name:"Bash",tool_input:{command:$c}}')
+  check "$1" "$2" "$json"
+}
+
+# toolc <label> <expected> <tool_name> <input-json>
+toolc() {
+  local json
+  json=$(jq -cn --arg t "$3" --argjson i "$4" '{tool_name:$t,tool_input:$i}')
+  check "$1" "$2" "$json"
+}
+
+echo "═══ A. 规则表预期行为 ═══"
+bashc "rm -rf"                       deny   'rm -rf /tmp/foo'
+bashc "rm 长旗标"                    deny   'rm --recursive --force x'
+bashc "链式 rm -fr"                  deny   'cd /tmp && rm -fr build'
+bashc "rm -r 无 -f"                  silent 'rm -r /tmp/foo'
+bashc "rm 单文件"                    silent 'rm foo.txt'
+bashc "git push"                     ask    'git push origin main'
+bashc "git reset --hard"             ask    'git reset --hard HEAD~1'
+bashc "git reset 默认"               silent 'git reset HEAD~1'
+bashc "git clean -fd"                ask    'git clean -fd'
+bashc "git clean -n"                 silent 'git clean -n'
+bashc "grep"                         deny   'grep foo file.txt'
+bashc "管道 grep"                    deny   'ps aux | grep ssh'
+bashc "find"                         deny   'find . -name *.rs'
+bashc "pip"                          deny   'pip install requests'
+bashc "pip3"                         deny   'pip3 list'
+bashc "python"                       deny   'python script.py'
+bashc "python3 -c"                   deny   'python3 -c print(1)'
+bashc "uv run python"                silent 'uv run python x.py'
+bashc "rg 放行"                      silent 'rg foo src/'
+bashc "fd 放行"                      silent 'fd pattern .'
+bashc "echo 引号内 rm"               silent 'echo "rm -rf /"'
+toolc "WebFetch github.com"          deny   WebFetch '{"url":"https://github.com/foo/bar","prompt":"x"}'
+toolc "WebFetch gist 子域"           deny   WebFetch '{"url":"https://gist.github.com/x","prompt":"x"}'
+toolc "WebFetch 大写域名"            deny   WebFetch '{"url":"HTTPS://GITHUB.COM/UP","prompt":"x"}'
+toolc "WebFetch 带端口"              deny   WebFetch '{"url":"https://github.com:443/x","prompt":"x"}'
+toolc "WebFetch githubusercontent"   silent WebFetch '{"url":"https://raw.githubusercontent.com/a/b","prompt":"x"}'
+toolc "WebFetch 伪装域"              silent WebFetch '{"url":"https://github.com.evil.com/x","prompt":"x"}'
+toolc "Read .env"                    deny   Read '{"file_path":"/home/u/proj/.env"}'
+toolc "Read .env.local"              deny   Read '{"file_path":"/home/u/proj/.env.local"}'
+toolc "Read env.zsh"                 silent Read '{"file_path":"/home/u/.config/dots/env.zsh"}'
+
+echo "═══ B. 误伤回归（引号/heredoc/--/not 排除）═══"
+bashc "引号内分号不误伤"             silent 'git commit -m "fix; rm -rf temp; done"'
+bashc "heredoc 正文不误伤"           silent 'cat <<EOF
+rm -rf /tmp/x
+EOF'
+bashc "heredoc后真命令仍拦"          deny   'cat <<EOF
+text
+EOF
+rm -rf /tmp/x'
+bashc "herestring 不误伤"            silent 'cat <<< "rm -rf x"'
+bashc "rm -- -rf 不误伤"             silent 'rm -- -rf'
+toolc "Read .env.example 放行"       silent Read '{"file_path":"/home/u/proj/.env.example"}'
+toolc "Edit .env"                    deny   Edit '{"file_path":"/x/.env","old_string":"a","new_string":"b"}'
+toolc "Write .env"                   deny   Write '{"file_path":"/x/.env","content":"K=v"}'
+toolc "Edit .env.example 放行"       silent Edit '{"file_path":"/x/.env.example","old_string":"a","new_string":"b"}'
+bashc "cat .env(bash侧无规则)"       silent 'cat /x/.env'
+
+echo "═══ C. 已知绕过（守卫定位=引导模型，不拦蓄意）═══"
+bashc "绝对路径 /bin/rm"             silent '/bin/rm -rf /tmp/x'
+bashc "env 前缀"                     silent 'env rm -rf /tmp/x'
+bashc "exec 前缀"                    silent 'exec rm -rf /tmp/x'
+bashc "command 前缀(已剥)"           deny   'command rm -rf x'
+bashc "xargs rm"                     silent 'echo /tmp/x | xargs rm -rf'
+bashc "命令替换内 grep"              silent 'echo $(grep foo bar)'
+
+echo "═══ D. fail-open 契约 ═══"
+check "空 stdin"          silent ''
+check "坏 JSON"           silent 'not json'
+check "缺 tool_name"      silent '{"tool_input":{"command":"rm -rf /"}}'
+check "command 非字符串"  silent '{"tool_name":"Bash","tool_input":{"command":42}}'
+json=$(jq -cn '{tool_name:"Bash",tool_input:{command:"rm -rf /"}}')
+check "规则文件缺失"      silent "$json" --rules /nonexistent/rules.toml
+broken=$(mktemp --suffix=.toml)
+trap 'rm "$broken"' EXIT
+printf 'not [ valid toml' > "$broken"
+out_err=$(printf '%s' "$json" | "$HOOK" pretool --rules "$broken" 2>&1 >/dev/null)
+if printf '%s' "$out_err" | rg -q '规则解析失败'; then
+  pass=$((pass+1)); echo "PASS  坏规则 stderr 留痕"
+else
+  fail=$((fail+1)); echo "FAIL  坏规则 stderr 留痕 → $out_err"
+fi
+check "坏规则仍放行"      silent "$json" --rules "$broken"
+
+echo
+echo "结果: $pass pass, $fail fail"
+[ "$fail" -eq 0 ]

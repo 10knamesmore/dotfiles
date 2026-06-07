@@ -8,9 +8,9 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use cc_hooks::envelope::{self, PreToolUseOutput};
-use cc_hooks::outcome::HookRun;
-use cc_hooks::{engine, rules};
+use cc_hooks::common::outcome::HookRun;
+use cc_hooks::pretool::envelope::{self, PreToolUseOutput};
+use cc_hooks::pretool::{engine, rules};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 

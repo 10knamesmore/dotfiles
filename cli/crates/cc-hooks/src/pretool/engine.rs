@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 
 use regex_lite::Regex;
 
-use crate::argv;
-use crate::rules::{BashRule, Config, Matcher, ToolRule};
+use crate::pretool::argv;
+use crate::pretool::rules::{BashRule, Config, Matcher, ToolRule};
 
 /// 对原始命令串逐段（链式命令拆开）逐规则匹配，返回首条命中。
 ///
@@ -74,6 +74,11 @@ fn matcher_hit(matcher: &Matcher, value: &str) -> bool {
     }
     if let Some(alts) = &matcher.re
         && !alts.any(|alt| Regex::new(alt).is_ok_and(|regex| regex.is_match(value)))
+    {
+        return false;
+    }
+    if let Some(inner) = &matcher.not
+        && matcher_hit(inner, value)
     {
         return false;
     }
@@ -156,7 +161,7 @@ fn strip_command_prefix(segment: &[String]) -> &[String] {
 mod tests {
     #![allow(clippy::min_ident_chars, clippy::missing_docs_in_private_items)]
     use super::*;
-    use crate::rules::Decision;
+    use crate::pretool::rules::Decision;
 
     /// bash 规则 fixture（与 tree/home/.claude/hooks/pretool.toml 同步维护）。
     const RULES: &str = r#"
@@ -240,6 +245,10 @@ reason   = "GitHub 一律 gh"
         ("rm my-perf-report.txt", None),
         (r#"echo "rm -rf /""#, None),
         ("rm -1 weird", None),
+        // ── 引号/heredoc/`--` 不误伤 ──
+        (r#"git commit -m "fix; rm -rf temp; done""#, None),
+        ("cat <<EOF\nrm -rf /\nEOF", None),
+        ("rm -- -rf", None),
     ];
 
     #[test]
@@ -314,6 +323,10 @@ reason   = "GitHub 一律 gh"
         let both = matcher("prefix = \"a\"\nsuffix = \"z\"");
         assert!(matcher_hit(&both, "a-to-z"));
         assert!(!matcher_hit(&both, "a-to-b"));
+        // not 反向：内层命中则整体不中
+        let except = matcher("glob = \"**/.env.*\"\nnot = { suffix = \".example\" }");
+        assert!(matcher_hit(&except, "/a/.env.local"));
+        assert!(!matcher_hit(&except, "/a/.env.example"));
         // 全空匹配器恒真（只断言字段存在）
         assert!(matcher_hit(&Matcher::default(), "anything"));
     }

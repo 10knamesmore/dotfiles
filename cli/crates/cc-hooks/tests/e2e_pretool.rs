@@ -45,7 +45,7 @@ reason   = "GitHub 一律 gh CLI"
 [[tool]]
 name     = "no-dotenv-read"
 tool     = "Read"
-where    = { file_path = { glob = ["**/.env", "**/.env.*"] } }
+where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥"
 
@@ -118,6 +118,10 @@ fn bash_verdict_table_end_to_end() {
         ("git add -A", None),
         ("rm -r /tmp/foo", None),
         (r#"echo "rm -rf /""#, None),
+        // 引号/heredoc/`--` 不误伤
+        (r#"git commit -m "fix; rm -rf temp; done""#, None),
+        ("cat <<EOF\nrm -rf /\nEOF", None),
+        ("rm -- -rf", None),
     ];
     let rules = rules_file();
     for (command, expected) in cases {
@@ -153,6 +157,7 @@ fn read_glob_rule_end_to_end() {
         ("/home/u/proj/.env", Some("deny")),
         ("/home/u/proj/.env.local", Some("deny")),
         (".env", Some("deny")),
+        ("/home/u/proj/.env.example", None), // not 排除：模板可读
         ("/home/u/.config/dots/env.zsh", None),
         ("/home/u/proj/environment.md", None),
     ];

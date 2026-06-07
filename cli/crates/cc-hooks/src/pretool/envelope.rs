@@ -5,7 +5,7 @@
 
 use serde::Serialize;
 
-use crate::rules::Decision;
+use crate::pretool::rules::Decision;
 
 /// 从 PreToolUse 的 stdin JSON 提取 `(tool_name, tool_input)`。
 ///

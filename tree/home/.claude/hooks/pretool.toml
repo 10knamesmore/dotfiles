@@ -4,8 +4,10 @@
 # 两种规则：
 #   [[bash]] —— Bash 命令的 argv 引擎：条件 AND；any/all 内层 OR；
 #               词形 `-x`（单杠单字母）= 短旗标，可命中合写簇（-rf 含 r、f）。
+#               切段引号感知（引号内 ; | & 不切）；heredoc 正文与 `--` 后的操作数不参与匹配。
 #   [[tool]] —— 任意工具：tool 精确匹配 tool_name，where 各字段匹配器 AND。
-#               匹配器词汇：equals/contains/prefix/suffix/glob/domain/re（数组内 OR）。
+#               匹配器词汇：equals/contains/prefix/suffix/glob/domain/re（数组内 OR）；
+#               not = { … } 反向（内层命中则整体不中，如 glob 命中但排除 .example）。
 # 决策：deny = 直接拦（reason 喂回模型让它改方案）；ask = 弹确认框给用户。
 # 同类规则自上而下首条命中生效；Bash 先过 [[bash]] 再过 [[tool]]。
 
@@ -91,6 +93,20 @@ reason   = "GitHub 操作一律用 gh CLI."
 [[tool]]
 name     = "no-dotenv-read"
 tool     = "Read"
-where    = { file_path = { glob = ["**/.env", "**/.env.*"] } }
+where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥，不直接读。需要时让用户摘录非敏感字段，或读 .env.example。"
+
+[[tool]]
+name     = "no-dotenv-edit"
+tool     = "Edit"
+where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
+decision = "deny"
+reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
+
+[[tool]]
+name     = "no-dotenv-write"
+tool     = "Write"
+where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
+decision = "deny"
+reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
