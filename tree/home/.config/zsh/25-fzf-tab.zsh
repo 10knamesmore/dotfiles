@@ -1,4 +1,7 @@
 # fzf 键绑定 + fzf-tab 补全菜单（v1.3.0 冻结 vendor、不跟上游更新）。
+# 无 fzf（如最小化的服务器）整模块跳过：Tab 回落 10-options 的原生菜单补全。
+# 注意 fzf 需 ≥0.48（--zsh 子命令），apt 的化石版本会在 source 处报错。
+command -v fzf >/dev/null || return
 # 顺序敏感：fzf --zsh 会绑 Tab（** 触发的模糊补全），fzf-tab 必须在它之后 source
 # 才能接管 Tab；而 fzf-tab 又要求在 compinit（10-options）之后、autosuggestions
 # （30）之前——所以 fzf 全家都住在这个 25 号缝里。
@@ -59,7 +62,7 @@ export FZF_ALT_C_OPTS="--preview 'eza -T --level=2 --color=always --icons {}'"
 # 预览窗在下方、高 3 行、默认隐藏（90% 的搜索用不到），Ctrl-/ 现场开关
 export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window=down:3:hidden:wrap --bind 'ctrl-/:toggle-preview'"
 
-command -v fzf >/dev/null && source <(fzf --zsh)   # Ctrl-R 模糊历史 / Alt-C cd（Ctrl-T 已禁用）
+source <(fzf --zsh)   # Ctrl-R 模糊历史 / Alt-C cd（Ctrl-T 已禁用；fzf 存在性由文件头守卫）
 source "${0:A:h}/vendor/fzf-tab/fzf-tab.zsh"
 
 zstyle ':fzf-tab:*' switch-group '<' '>'           # 默认 F1/F2 够不着，< > 顺手

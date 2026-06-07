@@ -54,4 +54,8 @@ hosts({
     ["wanger-arch-16p"] = function()
         vars({ backlight = "amdgpu_bl1", ddc_index = "1" })
     end,
+    -- 腾讯云服务器：只装 shell 基线，dev/ai/js 工具链跳过（组见 packages/toolchains.toml）
+    ["VM-0-6-ubuntu"] = function()
+        toolchains({ only = { "core" } })
+    end,
 })

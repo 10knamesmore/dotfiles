@@ -8,8 +8,9 @@
 # tree-sitter-cli→tree-sitter、openai-codex→codex（cask）、unrar→rar（cask）。
 
 # —— 基础 / 构建（base-devel→Xcode CLT 随 brew 自举；cronie→launchd 原生）——
+# （uv/git-delta/starship/zoxide/ripgrep/fd/bat/eza/dust 不在此：已统一走
+#   toolchains.toml [core] 的 cargo install，三平台单一渠道）
 git
-git-delta
 gh
 zsh
 vim
@@ -17,15 +18,9 @@ neovim
 
 # —— 终端 / Shell 栈（kitty 是 cask；xclip/wl-clipboard 不需要——pbcopy 原生）——
 kitty
-starship
 zellij
 yazi
-zoxide
 fzf
-ripgrep
-fd
-eza
-bat
 btop
 fastfetch
 lazygit

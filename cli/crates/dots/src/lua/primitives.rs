@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 
-use crate::hooks::EffectState;
+use crate::hooks::{EffectState, ToolchainFilter};
 
 /// 共享 effect 上下文。
 type Eff = Rc<RefCell<EffectState>>;
@@ -63,6 +63,7 @@ fn merge_json(base: &mut serde_json::Value, overlay: serde_json::Value) {
 pub fn install(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
     install_vars(lua, effect)?;
     install_link(lua, effect)?;
+    install_toolchains(lua, effect)?;
     install_dots_table(lua, effect)?;
     Ok(())
 }
@@ -79,6 +80,32 @@ fn install_vars(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
         Ok(())
     })?;
     lua.globals().set("vars", func)?;
+    Ok(())
+}
+
+/// 安装 `toolchains` 原语：声明 bootstrap 工具链安装范围（only/skip 二选一，组名对应
+/// toolchains.toml 的 `[节头]`）。声明只记内存，由 `dots bootstrap` 读取过滤。
+fn install_toolchains(lua: &Lua, effect: &Eff) -> mlua::Result<()> {
+    let effect_ref = effect.clone();
+    let func = lua.create_function(move |_, table: Table| {
+        let only: Option<Vec<String>> = table.get("only")?;
+        let skip: Option<Vec<String>> = table.get("skip")?;
+        let filter = match (only, skip) {
+            (Some(groups), None) => ToolchainFilter::Only(groups),
+            (None, Some(groups)) => ToolchainFilter::Skip(groups),
+            (Some(_), Some(_)) => {
+                return Err(mlua::Error::runtime(
+                    "toolchains: only 与 skip 互斥，二选一",
+                ));
+            }
+            (None, None) => {
+                return Err(mlua::Error::runtime("toolchains: 需要 only 或 skip 之一"));
+            }
+        };
+        effect_ref.borrow_mut().toolchain_filter = Some(filter);
+        Ok(())
+    })?;
+    lua.globals().set("toolchains", func)?;
     Ok(())
 }
 
@@ -420,5 +447,71 @@ mod tests {
         let snapshot = a.clone();
         merge_json(&mut a, o);
         assert_eq!(a, snapshot); // fn(fn(x)) == fn(x)
+    }
+
+    /// 测试用 effect：dry-run、空路径即可（toolchains 声明不触盘）。
+    fn test_effect() -> Eff {
+        Rc::new(RefCell::new(EffectState::new(
+            PathBuf::new(),
+            PathBuf::new(),
+            "test".to_owned(),
+            /*dry_run*/ true,
+            crate::state::State::default(),
+        )))
+    }
+
+    #[test]
+    fn toolchains_decl_records_only_filter() -> color_eyre::Result<()> {
+        let lua = Lua::new();
+        let effect = test_effect();
+        install_toolchains(&lua, &effect).map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        lua.load(r#"toolchains({ only = { "core" } })"#)
+            .exec()
+            .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        assert_eq!(
+            effect.borrow().toolchain_filter,
+            Some(ToolchainFilter::Only(vec!["core".to_owned()]))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn toolchains_decl_records_skip_filter() -> color_eyre::Result<()> {
+        let lua = Lua::new();
+        let effect = test_effect();
+        install_toolchains(&lua, &effect).map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        lua.load(r#"toolchains({ skip = { "ai", "js" } })"#)
+            .exec()
+            .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        assert_eq!(
+            effect.borrow().toolchain_filter,
+            Some(ToolchainFilter::Skip(vec![
+                "ai".to_owned(),
+                "js".to_owned()
+            ]))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn toolchains_decl_rejects_only_and_skip_together() -> color_eyre::Result<()> {
+        let lua = Lua::new();
+        let effect = test_effect();
+        install_toolchains(&lua, &effect).map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        let result = lua
+            .load(r#"toolchains({ only = { "core" }, skip = { "ai" } })"#)
+            .exec();
+        assert!(result.is_err(), "only 与 skip 互斥，应当报错");
+        Ok(())
+    }
+
+    #[test]
+    fn toolchains_decl_rejects_empty_table() -> color_eyre::Result<()> {
+        let lua = Lua::new();
+        let effect = test_effect();
+        install_toolchains(&lua, &effect).map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+        let result = lua.load(r#"toolchains({})"#).exec();
+        assert!(result.is_err(), "缺 only/skip 应当报错");
+        Ok(())
     }
 }

@@ -18,6 +18,15 @@ use crate::state::State;
 /// 通用 Result 别名。
 pub type Result<T> = color_eyre::Result<T>;
 
+/// toolchains 安装范围（dots.lua host 块内 `toolchains{}` 声明；bootstrap 读取）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ToolchainFilter {
+    /// 白名单：只装列出的组。
+    Only(Vec<String>),
+    /// 黑名单：列出的组不装。
+    Skip(Vec<String>),
+}
+
 /// effect 阶段共享可变上下文：原语经它落盘/收集。
 pub struct EffectState {
     /// 仓库根。
@@ -32,6 +41,8 @@ pub struct EffectState {
     pub host_vars: FxHashMap<String, String>,
     /// `link()` 收集的额外链接 `(source_abs, target_abs)`。
     pub extra_links: Vec<(PathBuf, PathBuf)>,
+    /// `toolchains()` 声明的安装范围（None = 全装）。
+    pub toolchain_filter: Option<ToolchainFilter>,
     /// 台账（run_once / ownership）。
     pub state: State,
 }
@@ -52,6 +63,7 @@ impl EffectState {
             stamp,
             host_vars: FxHashMap::default(),
             extra_links: Vec::new(),
+            toolchain_filter: None,
             state,
         }
     }

@@ -1,32 +1,55 @@
-# 工具链安装（dots bootstrap 用）。格式：name = "安装命令"。
+# 工具链安装（dots bootstrap 用）。格式：name = "安装命令"，[节头] 给条目分组。
 # name 已在 PATH（command -v name）则跳过；键写成 "name!"（引号必须，
-# TOML 裸键不允许 !）则跳过探测每次执行（rustup target 等无 binary 可探测
+# TOML 裸键不允许 !）则跳过探测每次执行（rustup 组件等无 binary 可探测
 # 的条目，靠命令自身幂等）。
+# 分组消费方：dots.lua 的 host 块里 toolchains({ only = {…} }) / ({ skip = {…} })
+# 圈定安装范围；不声明 = 全装；首个节头前的裸条目归 core。
+# 渠道优先级：crates.io（走 ~/.cargo 的 rsproxy 镜像，裸服务器唯一稳定渠道）
+# > 自有 CDN 脚本 > github raw（国内裸连基本必挂）。
+# 纯 Rust 工具一律 cargo install --locked：能到这一步 cargo 必然可用（bootstrap 刚编完 dots）。
 
-# —— 跨平台兜底（Arch 上已由 pacman.txt 覆盖，幂等跳过）——
-uv = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-starship = "curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
-zoxide = "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"
+[core]
+# 任何机器都装：shell 体验基线（Arch/macOS 包管理器已去重这些条目，本渠道为唯一渠道；
+# Ubuntu 的 apt 版本化石级且二进制名还不同——batcat/fdfind，一律 crates.io 编译）。
+# 键名 = command -v 探测的二进制名，crate 名写在命令里（ripgrep→rg、fd-find→fd、git-delta→delta）。
+uv                   = "cargo install --locked uv"
+starship             = "cargo install --locked starship"
+zoxide               = "cargo install --locked zoxide"
+dust                 = "cargo install --locked du-dust"
+rg                   = "cargo install --locked ripgrep"
+fd                   = "cargo install --locked fd-find"
+bat                  = "cargo install --locked bat"
+eza                  = "cargo install --locked eza"
+# gitconfig 的 core.pager 指向 delta——缺它 git 分页直接报错，必须保底
+delta                = "cargo install --locked git-delta"
+# fzf 是 Go 写的、不在 crates.io，无可靠国内渠道：25-fzf-tab.zsh 有缺失守卫
+# （无 fzf 时整模块跳过、Tab 回落原生补全）。服务器要装的话 proxy on 后跑官方
+# 安装脚本；apt 的 fzf 过旧（<0.48 不支持 --zsh）会报错，勿用。
 
-# —— AI CLI ——
-claude = "curl -fsSL https://claude.ai/install.sh | bash"
-
-# —— JS ——
-pnpm = "curl -fsSL https://get.pnpm.io/install.sh | sh -"
-# nvm 是 shell 函数，command -v 探测不到 → 总是执行 + 命令内自带存在性守卫
-"nvm!" = "[ -s ~/.nvm/nvm.sh ] || curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash"
-# —— Rust 开发工具（cargo install 源码编译，新机首跑较慢）——
-cargo-nextest = "cargo install cargo-nextest"
-cargo-insta = "cargo install cargo-insta"
-cargo-watch = "cargo install cargo-watch"
-dust = "cargo install du-dust"
-samply = "cargo install samply"
-
-# —— rustup 组件 / target（! = 总是执行；TOML 裸键不允许 !，须引号）——
+[dev]
+# 开发机才装：rustup 组件 + cargo 工具 + git hooks。
+# stable 先对齐最新：cargo install 按 MSRV 挑版本，陈旧 stable 会装到旧版甚至失败
+# （实例：服务器 rustc 1.93 装不上 prek 0.4.4）——顺序敏感，本条必须在 cargo 工具之前
+"rustup-stable!"     = "rustup update --no-self-update stable"
 # bootstrap.sh 用 minimal profile 装 rustup，clippy/rustfmt 不随附，须显式补
 "rustup-components!" = "rustup component add rust-src rust-analyzer clippy rustfmt"
-"rustup-wasm32!" = "rustup target add wasm32-unknown-unknown"
-"rustup-nightly!" = "rustup toolchain install nightly --profile minimal"
+"rustup-nightly!"    = "rustup toolchain install nightly --profile minimal"
+# --locked 按上游 lockfile 复现构建（兜底渠道要可复现，不赌传递依赖的新版本）
+cargo-nextest        = "cargo install --locked cargo-nextest"
+cargo-insta          = "cargo install --locked cargo-insta"
+cargo-watch          = "cargo install --locked cargo-watch"
+samply               = "cargo install --locked samply"
+# 装完在各仓库内 prek install 激活；纯 Rust，走 cargo 甩掉对 uv 的依赖链
+prek                 = "cargo install --locked prek"
+# cargo 工具自身的管理面：批量更新（cargo install-update -a）+ 缓存 GC（cargo cache --autoclean）。
+# 键名 = 各自落地的二进制名（cargo 子命令本体），可被 command -v 探测
+cargo-install-update = "cargo install --locked cargo-update"
+cargo-cache          = "cargo install --locked cargo-cache"
 
-# —— git hooks（装完在各仓库内 prek install 激活）——
-prek = "uv tool install prek"
+[ai]
+claude               = "curl -fsSL https://claude.ai/install.sh | bash"
+
+[js]
+pnpm                 = "curl -fsSL https://get.pnpm.io/install.sh | sh -"
+# nvm 是 shell 函数，command -v 探测不到 → 总是执行 + 命令内自带存在性守卫
+"nvm!"               = "[ -s ~/.nvm/nvm.sh ] || curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash"

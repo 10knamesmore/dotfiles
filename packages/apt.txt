@@ -1,0 +1,8 @@
+# apt 包清单（每行一个，# 注释）。仅 Debian/Ubuntu 生效（dots bootstrap 的 Apt 后端）。
+# 哲学：apt 只拿「版本不敏感的系统底座」；现代终端工具一律走 toolchains.toml 的
+# crates.io 渠道——apt 里的 bat/fd/fzf 版本化石级，二进制名还不同（batcat/fdfind）。
+build-essential
+git
+curl
+zsh
+unzip

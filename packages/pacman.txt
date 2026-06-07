@@ -4,9 +4,10 @@
 # （steam/libreoffice/obs 等）不入清单，新机按需手装。
 
 # —— 基础 / 构建 ——
+# （uv/git-delta/starship/zoxide/ripgrep/fd/bat/eza/dust 不在此：已统一走
+#   toolchains.toml [core] 的 cargo install，单一渠道避免双头管理）
 base-devel
 git
-git-delta
 github-cli
 zsh
 vim
@@ -16,15 +17,9 @@ cronie
 
 # —— 终端 / Shell 栈 ——
 kitty
-starship
 zellij
 yazi
-zoxide
 fzf
-ripgrep
-fd
-eza
-bat
 btop
 fastfetch
 lazygit
@@ -45,7 +40,6 @@ unzip
 unrar
 
 # —— 运行时 / 包管理器 ——
-uv
 bun
 docker
 docker-compose

@@ -420,7 +420,7 @@ dots sync ──读取──→ ┤  hostname == "macbook" ───────
 
 ## 2. per-host API（仅 `hosts{}` 块 / 钩子内可用）
 
-这两个函数在 effect 期才被注入 Lua 环境——**在顶层调用会报 `nil` 调用错误**，这是两阶段模型的直接体现。
+这些函数在 effect 期才被注入 Lua 环境——**在顶层调用会报 `nil` 调用错误**，这是两阶段模型的直接体现。
 
 ### `vars(tbl)` — 设置注入变量
 
@@ -480,6 +480,38 @@ hosts/files/wanger-arch-16p/
 追加进期望链接集合，与镜像产生的链接走同一套 resolve/execute（同样有备份、漂移检测、state.json 记账）。
 
 为什么不用 `vars` 渲染显示器坐标而是整文件 per-host：hostname 失配时**缺文件会报错**，绝不静默渲出别台机器的显示器布局。
+
+### `toolchains(spec)` — 圈定 bootstrap 工具链范围
+
+```lua
+toolchains({ only = { "core" } })        -- 白名单：只装 core 组（服务器典型）
+toolchains({ skip = { "ai", "js" } })    -- 黑名单：除 ai/js 都装
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `only` | 白名单：只装列出的组（与 `skip` 互斥，二选一必填） |
+| `skip` | 黑名单：列出的组不装 |
+
+组名 = `packages/toolchains.toml` 的 `[节头]`；host 块不声明 = 全装（旧行为）。引用了清单中不存在的组，bootstrap 时警告（防拼写错静默漏装）。
+
+```text
+packages/toolchains.toml             dots.lua                          dots bootstrap @ VM-0-6-ubuntu
+════════════════════════             ════════                          ═════════════════════════════
+[core]                               hosts {                           ✔ 安装 uv…
+uv = "curl …"            ──┐           ["VM-0-6-ubuntu"] =             ✔ 安装 starship…
+starship = "cargo …"       ├─ 装 ──→     function()                    ✔ 安装 zoxide…
+zoxide = "cargo …"       ──┘             toolchains({                  ✔ 安装 dust…
+                                           only = { "core" },
+[dev]                    ──┐             })                            （dev/ai/js 不出现）
+cargo-nextest / prek / …   │           end,
+[ai]                       ├─ 跳过    }
+claude                     │
+[js]                       │
+pnpm / nvm!              ──┘
+```
+
+执行时序：bootstrap 在装工具链**之前**单独 eval dots.lua 并以 dry-run 激活当前 host 块（只收集声明、不落盘副作用），读到 filter 后过滤清单；收尾的 sync 会再次正常激活 host 块——`vars`/`link` 等真正的副作用属于 sync 阶段。
 
 ---
 

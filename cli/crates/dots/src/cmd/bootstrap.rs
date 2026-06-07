@@ -2,11 +2,16 @@
 //!
 //! 包清单进 `packages/*.txt`（加包改文本不改代码）；toolchains 逐项幂等探测跳过。
 
+use std::cell::RefCell;
 use std::fs;
 use std::process::Command;
+use std::rc::Rc;
 
-use super::{Result, find_repo_root};
+use super::{Result, current_os, find_repo_root, home_dir, os_str};
+use crate::hooks::{EffectState, ToolchainFilter, activate_host};
+use crate::lua::{LuaCtx, eval_manifest};
 use crate::render;
+use crate::state::State;
 
 /// 包后端。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,7 +65,8 @@ pub fn run() -> Result<()> {
     if backend == Backend::Pacman {
         install_aur_packages(&repo_root);
     }
-    install_toolchains(&repo_root);
+    let filter = host_toolchain_filter(&repo_root);
+    install_toolchains(&repo_root, filter.as_ref());
 
     render::header("收尾：dots sync");
     crate::cmd::sync::run(false)
@@ -200,42 +206,100 @@ struct ToolchainEntry {
     cmd: String,
     /// 名带 `!` 后缀：跳过探测每次执行（rustup target 等无 binary 可探测，靠命令自身幂等）。
     always: bool,
+    /// 所属组（toml `[节头]`；首个节头前的裸条目归 "core"）。
+    group: String,
 }
 
-/// 解析 toolchains.toml（从简：每行 `name = "shell 命令"`，`name!` 表示总是执行）。
+/// 解析 toolchains.toml（从简：每行 `name = "shell 命令"`，`name!` 表示总是执行；
+/// `[组名]` 节头切换其后条目的归属组）。
 fn parse_toolchains(content: &str) -> Vec<ToolchainEntry> {
-    content
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                return None;
-            }
-            let (name, cmd) = line.split_once('=')?;
-            // TOML 裸键不允许 `!`，带 `!` 的键写成 "name!" 引号形式，此处剥掉。
-            let name = name.trim().trim_matches('"');
-            let cmd = cmd.trim().trim_matches('"');
-            let (name, always) = match name.strip_suffix('!') {
-                Some(stripped) => (stripped, true),
-                None => (name, false),
-            };
-            Some(ToolchainEntry {
-                name: name.to_owned(),
-                cmd: cmd.to_owned(),
-                always,
-            })
+    let mut group = "core".to_owned();
+    let mut entries = Vec::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        // 节头（允许行尾注释）：之后的条目归该组
+        if let Some(rest) = line.strip_prefix('[')
+            && let Some((name, _)) = rest.split_once(']')
+        {
+            group = name.trim().to_owned();
+            continue;
+        }
+        let Some((name, cmd)) = line.split_once('=') else {
+            continue;
+        };
+        // TOML 裸键不允许 `!`，带 `!` 的键写成 "name!" 引号形式，此处剥掉。
+        let name = name.trim().trim_matches('"');
+        let cmd = cmd.trim().trim_matches('"');
+        let (name, always) = match name.strip_suffix('!') {
+            Some(stripped) => (stripped, true),
+            None => (name, false),
+        };
+        entries.push(ToolchainEntry {
+            name: name.to_owned(),
+            cmd: cmd.to_owned(),
+            always,
+            group: group.clone(),
+        });
+    }
+    entries
+}
+
+/// 按 dots.lua 的 `toolchains{}` 声明过滤条目。
+///
+/// # Return:
+///   `(保留条目, 未知组名)`——声明里引用了清单中不存在的组按未知上报（防拼写错静默漏装）。
+fn filter_toolchains(
+    entries: Vec<ToolchainEntry>,
+    filter: Option<&ToolchainFilter>,
+) -> (Vec<ToolchainEntry>, Vec<String>) {
+    let Some(filter) = filter else {
+        return (entries, Vec::new());
+    };
+    let known: rustc_hash::FxHashSet<&str> =
+        entries.iter().map(|entry| entry.group.as_str()).collect();
+    let listed = match filter {
+        ToolchainFilter::Only(groups) | ToolchainFilter::Skip(groups) => groups,
+    };
+    let unknown: Vec<String> = listed
+        .iter()
+        .filter(|name| !known.contains(name.as_str()))
+        .cloned()
+        .collect();
+    let kept = entries
+        .into_iter()
+        .filter(|entry| match filter {
+            ToolchainFilter::Only(groups) => groups.contains(&entry.group),
+            ToolchainFilter::Skip(groups) => !groups.contains(&entry.group),
         })
-        .collect()
+        .collect();
+    (kept, unknown)
 }
 
 /// 安装 toolchains（uv/starship/zoxide…），逐项 `which` 幂等跳过；`name!` 条目每次执行。
-fn install_toolchains(repo_root: &std::path::Path) {
+fn install_toolchains(repo_root: &std::path::Path, filter: Option<&ToolchainFilter>) {
     let path = repo_root.join("packages").join("toolchains.toml");
     let Ok(content) = fs::read_to_string(&path) else {
         render::warn("无 toolchains.toml，跳过工具链");
         return;
     };
-    for entry in parse_toolchains(&content) {
+    let (entries, unknown) = filter_toolchains(parse_toolchains(&content), filter);
+    if !unknown.is_empty() {
+        render::warn(&format!(
+            "toolchains{{}} 引用了清单中不存在的组：{}（检查 dots.lua 拼写）",
+            unknown.join(", ")
+        ));
+    }
+    if let Some(filter) = filter {
+        let desc = match filter {
+            ToolchainFilter::Only(groups) => format!("only: {}", groups.join(", ")),
+            ToolchainFilter::Skip(groups) => format!("skip: {}", groups.join(", ")),
+        };
+        render::ok(&format!("toolchains 范围（dots.lua）：{desc}"));
+    }
+    for entry in entries {
         if !entry.always && which(&entry.name) {
             render::ok(&format!("{} 已装，跳过", entry.name));
             continue;
@@ -243,6 +307,33 @@ fn install_toolchains(repo_root: &std::path::Path) {
         render::ok(&format!("安装 {}…", entry.name));
         run_cmd("sh", &["-c", &entry.cmd]);
     }
+}
+
+/// 读 dots.lua 并激活当前 host 块，取 `toolchains{}` 声明。
+///
+/// 任何一步失败/未命中 host → `None`（= 全装，保持无声明时的旧行为）。
+/// 以 dry-run 构造 EffectState：host 块若调用 `dots.run` 等 effect 原语，
+/// 此处只声明不落盘——真正的副作用属于收尾的 sync 阶段。
+fn host_toolchain_filter(repo_root: &std::path::Path) -> Option<ToolchainFilter> {
+    let src = fs::read_to_string(repo_root.join("dots.lua")).ok()?;
+    let home = home_dir().ok()?;
+    let hostname = crate::hosts::current();
+    let ctx = LuaCtx {
+        host: hostname.clone(),
+        os: os_str(current_os()).to_owned(),
+        home: home.display().to_string(),
+        repo: repo_root.display().to_string(),
+    };
+    let (manifest, handles) = eval_manifest(&src, &ctx).ok()?;
+    let effect = Rc::new(RefCell::new(EffectState::new(
+        repo_root.to_path_buf(),
+        home,
+        crate::timestamp(),
+        /* dry_run */ true,
+        State::default(),
+    )));
+    activate_host(&hostname, &manifest, &handles, &effect).ok()?;
+    effect.borrow().toolchain_filter.clone()
 }
 
 /// `command -v` 探测。
@@ -319,5 +410,58 @@ mod tests {
         let entries = parse_toolchains(content);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "foo");
+    }
+
+    #[test]
+    fn toolchain_groups_default_core_and_follow_headers() {
+        // 节头前的裸条目归 core（向后兼容）；节头可带行尾注释
+        let content = "uv = \"u\"\n[dev]  # 开发机才装\ncargo-watch = \"c\"\n[ai]\nclaude = \"x\"";
+        let entries = parse_toolchains(content);
+        let got: Vec<(&str, &str)> = entries
+            .iter()
+            .map(|e| (e.name.as_str(), e.group.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![("uv", "core"), ("cargo-watch", "dev"), ("claude", "ai")]
+        );
+    }
+
+    #[test]
+    fn toolchain_filter_only_keeps_listed_groups() {
+        let entries = parse_toolchains("uv = \"u\"\n[dev]\nprek = \"p\"");
+        let filter = ToolchainFilter::Only(vec!["core".to_owned()]);
+        let (kept, unknown) = filter_toolchains(entries, Some(&filter));
+        let names: Vec<&str> = kept.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, vec!["uv"]);
+        assert!(unknown.is_empty());
+    }
+
+    #[test]
+    fn toolchain_filter_skip_drops_listed_groups() {
+        let entries = parse_toolchains("uv = \"u\"\n[ai]\nclaude = \"x\"\n[js]\npnpm = \"p\"");
+        let filter = ToolchainFilter::Skip(vec!["ai".to_owned(), "js".to_owned()]);
+        let (kept, unknown) = filter_toolchains(entries, Some(&filter));
+        let names: Vec<&str> = kept.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, vec!["uv"]);
+        assert!(unknown.is_empty());
+    }
+
+    #[test]
+    fn toolchain_filter_reports_unknown_groups() {
+        // 拼写错的组名要浮出来，不能静默装了个寂寞
+        let entries = parse_toolchains("uv = \"u\"\n[dev]\nprek = \"p\"");
+        let filter = ToolchainFilter::Only(vec!["croe".to_owned()]);
+        let (kept, unknown) = filter_toolchains(entries, Some(&filter));
+        assert!(kept.is_empty());
+        assert_eq!(unknown, vec!["croe".to_owned()]);
+    }
+
+    #[test]
+    fn toolchain_no_filter_keeps_all() {
+        let entries = parse_toolchains("uv = \"u\"\n[dev]\nprek = \"p\"");
+        let (kept, unknown) = filter_toolchains(entries, None);
+        assert_eq!(kept.len(), 2);
+        assert!(unknown.is_empty());
     }
 }

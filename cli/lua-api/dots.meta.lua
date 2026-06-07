@@ -66,6 +66,15 @@ function vars(tbl) end
 ---@param target string                    # $HOME 侧目标（可用 ~）
 function link(src, target) end
 
+---@class ToolchainsSpec
+---@field only? string[]                   # 白名单：只装这些组（与 skip 互斥）
+---@field skip? string[]                   # 黑名单：这些组不装
+
+--- 声明 bootstrap 工具链安装范围（仅在 hosts 块内调用）。
+--- 组名 = packages/toolchains.toml 的 [节头]；不声明 = 全装；未知组名 bootstrap 时警告。
+---@param spec ToolchainsSpec
+function toolchains(spec) end
+
 ---@class DotsJson
 ---@field merge fun(path: string, tbl: table)              # 读-改-写 JSON：合并 tbl、保留其余键
 ---@field set fun(path: string, keypath: string, value: any) # 设某 keypath（如 "hooks.Stop"）
