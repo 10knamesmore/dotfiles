@@ -42,13 +42,16 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'm:{a-zA-Z}={A-Za-z} l
 zstyle ':completion:*' menu select                      # 候选 >1 时进入方向键可选的高亮菜单
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}" # 候选文件按 LS_COLORS 着色
 zstyle ':completion:*' group-name ''                    # 候选按类型分组（命令/别名/文件分开列）
-zstyle ':completion:*:descriptions' format '%F{yellow}── %d ──%f' # 分组标题行样式
+# 分组标题行（纯文本！%F 类 prompt 转义只有原生菜单认识，fzf-tab 会原样漏出；
+# 颜色由 fzf-tab 的 group-colors 自动按组分配）
+zstyle ':completion:*:descriptions' format '── %d ──'
 zstyle ':completion:*' use-cache true                   # 慢补全（docker/systemctl…）结果落盘缓存
 zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 zstyle ':completion:*' special-dirs true                # .. 和 . 也作为补全候选（cd ..<Tab> 成立）
 zstyle ':completion:*' squeeze-slashes true             # 补全时 // 折叠为 /
 setopt complete_in_word # 光标在词中间也能补全：右半截当后缀约束而非无视
 setopt always_to_end    # 补全成功后光标跳到词尾（默认停在插入点）
+LISTMAX=1000            # 候选超过此数才问「是否显示全部」；默认 100 太小，长列表交给菜单滚动
 
 # --- 键绑定 ---
 # 显式 emacs 模式：zsh 见 $EDITOR 含 "vi"（nvim）会自动切 viins，曾导致 Ctrl-A/E 等全部失效

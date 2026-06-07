@@ -58,10 +58,12 @@ proxy() {
 }
 
 # 补全计算慢时显示红点（原 COMPLETION_WAITING_DOTS）
-_dots_complete_waiting() {
-    print -Pn "%F{red}…%f"
-    zle expand-or-complete
-    zle redisplay
-}
-zle -N _dots_complete_waiting
-bindkey '^I' _dots_complete_waiting
+# 2026-06 起死代码：Tab 已被 25-fzf-tab.zsh 接管（source 顺序在后，^I 绑定被覆盖）。
+# 若将来弃用 fzf-tab 可解开注释恢复。
+# _dots_complete_waiting() {
+#     print -Pn "%F{red}…%f"
+#     zle expand-or-complete
+#     zle redisplay
+# }
+# zle -N _dots_complete_waiting
+# bindkey '^I' _dots_complete_waiting

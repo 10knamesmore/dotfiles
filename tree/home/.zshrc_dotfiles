@@ -18,6 +18,7 @@ export PATH="$HOME/.local/bin:$PATH"
 # zsh 模块（历史/目录/补全/键绑定 + 内联函数 + 历史建议）。compinit 在 10-options 跑，须在 uv 补全前。
 source "$HOME/.config/zsh/10-options.zsh"
 source "$HOME/.config/zsh/20-functions.zsh"
+source "$HOME/.config/zsh/25-fzf-tab.zsh"
 source "$HOME/.config/zsh/30-autosuggestions.zsh"
 source "$HOME/.config/zsh/40-aliases.zsh"
 
@@ -44,7 +45,6 @@ if command -v zoxide >/dev/null; then
         return 0
     }
 fi
-command -v fzf >/dev/null && source <(fzf --zsh)            # Ctrl-R 模糊历史 / Ctrl-T 文件 / Alt-C cd
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
 # transient prompt：命令被接受后简化历史行的提示符
