@@ -58,7 +58,8 @@ LISTMAX=1000            # 候选超过此数才问「是否显示全部」；默
 bindkey -e
 # 释放 tty 流控遗产：默认 Ctrl-S 冻结终端输出（误按假死元凶）、Ctrl-Q 解冻；关掉后按键到达 zle
 setopt no_flow_control
-# 四键留白（按 2026-06 决定）：S/Q（原流控/搜索）、W/U（原删词/删整行）均解绑，待将来自定义
+# 释放四键（原流控 S/Q、删词 W、删整行 U）：S 在 25-fzf-tab 启用为 live-grep、
+# Q 在 20-functions 启用为 scratch（sc），W/U 仍留白待自定义
 bindkey -r '^S' '^Q' '^W' '^U'
 KEYTIMEOUT=1                      # 多字节键序列等待窗 400ms→10ms，Esc 类组合键不再迟滞
 WORDCHARS=${WORDCHARS//\//}       # 「词」不再含 /：Ctrl-←/→（及将来的删词键）按路径段移动

@@ -57,6 +57,17 @@ proxy() {
     esac
 }
 
+# 即用即丢临时文件：/tmp（tmpfs）重启即清，不保存则连文件都不留。
+# 默认 .md，`sc py` / `sc json` 换扩展名（nvim 高亮跟扩展名走）。
+# 持久便签走 nvim 内 snacks scratch（`.`），与这里互不相干。
+sc() { nvim "/tmp/scratch-$$-$(date +%H%M%S).${1:-md}" }
+
+# Ctrl-Q 直达 sc（留白键启用，Q=Quick note；10-options 已 no_flow_control + 解绑）。
+# 回填 BUFFER 再 accept-line 而非直接调函数：进 shell 历史，prompt 流程正常走
+_dots_scratch_widget() { BUFFER="sc"; zle accept-line }
+zle -N _dots_scratch_widget
+bindkey '^Q' _dots_scratch_widget
+
 # 补全计算慢时显示红点（原 COMPLETION_WAITING_DOTS）
 # 2026-06 起死代码：Tab 已被 25-fzf-tab.zsh 接管（source 顺序在后，^I 绑定被覆盖）。
 # 若将来弃用 fzf-tab 可解开注释恢复。

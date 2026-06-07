@@ -65,8 +65,9 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 
 ## shell 栈（Oh My Zsh 已退役）
 
-- 无框架，显式 emacs 键模式（`bindkey -e`；Ctrl-S/Q/W/U 四键解绑留白）。模块在 `tree/home/.config/zsh/`：`10-options.zsh`（历史/目录/补全/键绑定）、`20-functions.zsh`（cd-ls/allclear/copypath/copyfile/proxy 内联，剪贴板走 `_dots_clipcopy` 平台分派）、`25-fzf-tab.zsh`（fzf 键绑定 Ctrl-R/T、Alt-C + fzf-tab 补全菜单，冻结 vendor；顺序敏感——compinit 之后、autosuggestions 之前、fzf --zsh 之后）、`30-autosuggestions.zsh`（历史内联建议，冻结 vendor）、`40-aliases.zsh`（别名与交互函数，原 `~/.alias` 已退役迁入；**头部有 CLAUDECODE Agent 守卫**，agent 环境不加载）、`90-syntax-highlighting.zsh`（z-sy-h 冻结 vendor）。
+- 无框架，显式 emacs 键模式（`bindkey -e`；解绑遗留四键后 Ctrl-S 已启用为 live-grep、Ctrl-Q 为 scratch，W/U 留白）。模块在 `tree/home/.config/zsh/`：`10-options.zsh`（历史/目录/补全/键绑定）、`20-functions.zsh`（cd-ls/allclear/copypath/copyfile/proxy/sc 临时文件 内联，剪贴板走 `_dots_clipcopy` 平台分派）、`25-fzf-tab.zsh`（fzf 键绑定 Ctrl-R、Alt-C + 自写 widget Ctrl-F 找文件/Ctrl-S live-grep 选中直接进 nvim（官方 Ctrl-T 路径插入已禁用）+ fzf-tab 补全菜单，冻结 vendor；顺序敏感——compinit 之后、autosuggestions 之前、fzf --zsh 之后）、`30-autosuggestions.zsh`（历史内联建议，冻结 vendor）、`40-aliases.zsh`（别名与交互函数，原 `~/.alias` 已退役迁入；**头部有 CLAUDECODE Agent 守卫**，agent 环境不加载）、`90-syntax-highlighting.zsh`（z-sy-h 冻结 vendor）。
 - `z` → zoxide；提示符 starship + 自写 transient prompt。
+- git diff 走 delta（`tree/home/.gitconfig` 受管，syntax-theme 复用 bat 主题库）；bat 主题 Catppuccin Mocha（`tree/home/.config/bat/config`），与 kitty/fzf 同色板。
 - 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `.zshrc_linux`/`.zshrc_macos`。
 
 ## 修改配置时的约定

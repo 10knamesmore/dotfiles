@@ -1,0 +1,4 @@
+# bat 配置（bat --config-file 指向这里）。
+# 主题对齐终端全家桶：kitty / fzf / delta 统一 Catppuccin Mocha。
+# bat 0.25+ 内置该主题（bat --list-themes 可查），无需 vendor 主题文件。
+--theme="Catppuccin Mocha"

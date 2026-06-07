@@ -1,0 +1,19 @@
+[user]
+	email = 310779211wym@gmail.com
+	name = wanger
+[core]
+	editor = nvim
+	pager = delta                       ; diff/log/blame 等分页输出全走 delta
+[init]
+	defaultBranch = main
+[interactive]
+	diffFilter = delta --color-only     ; git add -p 逐块界面也上色（不能带行号等装饰，否则补丁解析坏掉）
+[delta]
+	navigate = true                     ; 分页器里 n/N 在文件间跳转
+	line-numbers = true                 ; 左侧双栏行号（旧行/新行）
+	syntax-theme = Catppuccin Mocha     ; 复用 bat 的主题库，与 bat/fzf 预览同色板
+	zero-style = syntax                 ; 未改动的上下文行也做语法高亮
+[merge]
+	conflictstyle = zdiff3              ; 冲突块多一段 ||| 共同祖先，看得出双方各改了什么
+[diff]
+	colorMoved = default                ; 纯移动的代码块用区别于增删的颜色标出

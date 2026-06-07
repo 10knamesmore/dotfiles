@@ -4,6 +4,8 @@
 # Claude Code 等 agent 会把交互 shell 的 alias/函数快照进自己的 Bash 工具：
 # rm -i 在无 TTY 下静默失败（exit 0 但没删）、sed -E / grep→rg 偷改语义、
 # tree() 吃不了 -L。agent 环境（CLAUDECODE=1）直接不加载本文件，模型用原生命令。
+# 注意：不能换成 [[ -o interactive ]]——CC 捕快照用的就是交互式 zsh（否则
+# .zshrc 不会被 source），交互检查拦不住它；CLAUDECODE 是唯一区分信号。
 [[ -n "$CLAUDECODE" ]] && return
 
 # ================================
@@ -42,21 +44,12 @@ alias showPath="echo \$PATH | sed 's/:/\\n/g'"
 # ================================
 alias zsh_config="nvim ~/.zshrc"
 alias nvim_config="nvim ~/.config/nvim/init.lua"
-alias neo_config='neo ~/.config/nvim/init.lua'
 
 # ================================
 # 🖥️ GUI 程序快捷启动（后台）
 # ================================
 neo() {
   neovide --frame none </dev/null >/dev/null 2>&1 & disown
-}
-alias nread="neo -- -c 'set nomodifiable'"
-function fe() {
-    local file
-    file=$(fzf "$@")
-    if [ -n "$file" ]; then
-        neo "$file"
-    fi
 }
 
 # ================================
