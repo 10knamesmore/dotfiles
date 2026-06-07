@@ -1,0 +1,18 @@
+# cargo 镜像：rsproxy.cn（字节跳动 crates 专用镜像，sparse 协议按需拉索引）。
+# bootstrap.sh 会在首次编译前写入同款配置（鸡生蛋：sync 链接本文件晚于 cargo build），
+# 之后 dots sync 收编为软链，两边以本文件为准。换镜像改这里：
+#   清华  sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/
+#   中科大 sparse+https://mirrors.ustc.edu.cn/crates.io-index/
+
+[source.crates-io]
+replace-with = 'rsproxy-sparse'
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy]
+index = "sparse+https://rsproxy.cn/index/"
+
+# git 依赖改用系统 git 拉取（代理/镜像环境下比 libgit2 内建实现可靠）
+[net]
+git-fetch-with-cli = true

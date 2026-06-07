@@ -12,6 +12,29 @@ if command -v pacman >/dev/null 2>&1 && ! command -v cc >/dev/null 2>&1; then
     sudo pacman -S --needed --noconfirm base-devel
 fi
 
+# cargo/rustup 镜像（rsproxy.cn）：首次编译发生在 dots sync 链接配置之前，
+# 这里先落一份真实文件解决鸡生蛋；sync 时会备份并收编为软链（源：tree/home/.cargo/config.toml）。
+# 已有配置（自带或软链）则不动；海外机器想直连可先自建空配置跳过。
+if [ ! -e "$HOME/.cargo/config.toml" ]; then
+    echo "写入 cargo 镜像配置（rsproxy.cn）…"
+    mkdir -p "$HOME/.cargo"
+    cat > "$HOME/.cargo/config.toml" << 'EOF'
+[source.crates-io]
+replace-with = 'rsproxy-sparse'
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy]
+index = "sparse+https://rsproxy.cn/index/"
+
+[net]
+git-fetch-with-cli = true
+EOF
+fi
+export RUSTUP_DIST_SERVER="${RUSTUP_DIST_SERVER:-https://rsproxy.cn}"
+export RUSTUP_UPDATE_ROOT="${RUSTUP_UPDATE_ROOT:-https://rsproxy.cn/rustup}"
+
 if ! command -v cargo >/dev/null 2>&1; then
     echo "未检测到 cargo，安装 rustup（minimal）…"
     curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
