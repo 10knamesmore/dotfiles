@@ -1,61 +1,97 @@
-//! hook JSON 边界：stdin 解析与 `hookSpecificOutput` 渲染。
+//! hook JSON 边界：stdin 解析与结构化输出类型。
+//!
+//! 输出是 named struct（serde 序列化），不在业务函数里手拼/打印 JSON——
+//! 落地（println/eprintln/exit）统一由 bin 的 wire 层完成。
 
-use crate::rules::Rule;
+use serde::Serialize;
 
-/// 从 PreToolUse 的 stdin JSON 提取 Bash 命令。
+use crate::rules::Decision;
+
+/// 从 PreToolUse 的 stdin JSON 提取 `(tool_name, tool_input)`。
 ///
-/// 取不出合法字符串（坏 JSON / 字段缺失 / 类型不对）一律 `None`——fail-open。
+/// 取不出（坏 JSON / 字段缺失 / 类型不对）一律 `None`——fail-open。
 #[must_use]
-pub fn extract_command(stdin_text: &str) -> Option<String> {
+pub fn parse_pretool(stdin_text: &str) -> Option<(String, serde_json::Value)> {
     let value: serde_json::Value = serde_json::from_str(stdin_text).ok()?;
-    Some(value.get("tool_input")?.get("command")?.as_str()?.to_owned())
+    let tool_name = value.get("tool_name")?.as_str()?.to_owned();
+    let tool_input = value.get("tool_input")?.clone();
+    Some((tool_name, tool_input))
 }
 
-/// 渲染单行决策 JSON（`hookSpecificOutput.permissionDecision`）。
-#[must_use]
-pub fn render(rule: &Rule) -> String {
-    serde_json::json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": rule.decision.as_str(),
-            "permissionDecisionReason": rule.reason,
+/// PreToolUse 的结构化输出（整条 stdout JSON）。
+#[derive(Debug, Serialize)]
+pub struct PreToolUseOutput {
+    /// CC hook 协议的决策载荷
+    #[serde(rename = "hookSpecificOutput")]
+    pub hook_specific_output: PreToolUseDecision,
+}
+
+/// `hookSpecificOutput` 载荷。
+#[derive(Debug, Serialize)]
+pub struct PreToolUseDecision {
+    /// 恒为 "PreToolUse"
+    #[serde(rename = "hookEventName")]
+    pub hook_event_name: &'static str,
+    /// "deny" | "ask"
+    #[serde(rename = "permissionDecision")]
+    pub permission_decision: &'static str,
+    /// 喂回模型/展示给用户的理由
+    #[serde(rename = "permissionDecisionReason")]
+    pub permission_decision_reason: String,
+}
+
+impl PreToolUseOutput {
+    /// 由命中规则的决策与理由构造。
+    #[must_use]
+    pub fn new(decision: Decision, reason: &str) -> Self {
+        Self {
+            hook_specific_output: PreToolUseDecision {
+                hook_event_name: "PreToolUse",
+                permission_decision: decision.as_str(),
+                permission_decision_reason: reason.to_owned(),
+            },
         }
-    })
-    .to_string()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::min_ident_chars, clippy::missing_docs_in_private_items)]
     use super::*;
-    use crate::rules::{Config, Decision};
 
     #[test]
-    fn extracts_command() {
-        let payload = r#"{"tool_input":{"command":"rm -rf /tmp"}}"#;
-        assert_eq!(extract_command(payload).as_deref(), Some("rm -rf /tmp"));
+    fn parses_tool_name_and_input() {
+        let payload = r#"{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp"}}"#;
+        let parsed = parse_pretool(payload);
+        assert!(parsed.is_some());
+        let (tool_name, tool_input) = parsed.unwrap_or(("?".into(), serde_json::Value::Null));
+        assert_eq!(tool_name, "Bash");
+        assert_eq!(tool_input["command"], "rm -rf /tmp");
     }
 
     #[test]
     fn malformed_inputs_yield_none() {
-        let bads = ["", "not json", "{}", r#"{"tool_input":{}}"#, r#"{"tool_input":{"command":42}}"#];
+        let bads = [
+            "",
+            "not json",
+            "{}",
+            r#"{"tool_input":{"command":"x"}}"#, // 缺 tool_name
+            r#"{"tool_name":42,"tool_input":{}}"#,
+            r#"{"tool_name":"Bash"}"#, // 缺 tool_input
+        ];
         for bad in bads {
-            assert_eq!(extract_command(bad), None, "input: {bad}");
+            assert!(parse_pretool(bad).is_none(), "input: {bad}");
         }
     }
 
     #[test]
-    fn renders_decision_envelope() -> Result<(), Box<dyn std::error::Error>> {
-        let config = Config::from_toml(
-            "[[rules]]\nname='x'\ncmd='rm'\ndecision='deny'\nreason='理由'",
-        )?;
-        let rule = config.rules.first().ok_or("fixture 至少一条规则")?;
-        let value: serde_json::Value = serde_json::from_str(&render(rule))?;
-        let output = &value["hookSpecificOutput"];
-        assert_eq!(output["hookEventName"], "PreToolUse");
-        assert_eq!(output["permissionDecision"], "deny");
-        assert_eq!(output["permissionDecisionReason"], "理由");
-        assert_eq!(rule.decision, Decision::Deny);
+    fn output_serializes_to_protocol_shape() -> Result<(), serde_json::Error> {
+        let output = PreToolUseOutput::new(Decision::Deny, "理由");
+        let value: serde_json::Value = serde_json::from_str(&serde_json::to_string(&output)?)?;
+        let payload = &value["hookSpecificOutput"];
+        assert_eq!(payload["hookEventName"], "PreToolUse");
+        assert_eq!(payload["permissionDecision"], "deny");
+        assert_eq!(payload["permissionDecisionReason"], "理由");
         Ok(())
     }
 }

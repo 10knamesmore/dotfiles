@@ -27,6 +27,7 @@ rpassword   = "7"
 shlex       = "1"
 toml        = "0.8"
 regex-lite  = "0.1"
+globset     = "0.4"
 dots-core   = { path = "crates/dots-core" }
 
 # dev

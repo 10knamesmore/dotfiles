@@ -1,0 +1,96 @@
+# cc-hook pretool 规则表（PreToolUse，matcher *）。
+# 改这里即生效（hook 注册本身需新会话）；引擎见 cli/crates/cc-hooks/。
+#
+# 两种规则：
+#   [[bash]] —— Bash 命令的 argv 引擎：条件 AND；any/all 内层 OR；
+#               词形 `-x`（单杠单字母）= 短旗标，可命中合写簇（-rf 含 r、f）。
+#   [[tool]] —— 任意工具：tool 精确匹配 tool_name，where 各字段匹配器 AND。
+#               匹配器词汇：equals/contains/prefix/suffix/glob/domain/re（数组内 OR）。
+# 决策：deny = 直接拦（reason 喂回模型让它改方案）；ask = 弹确认框给用户。
+# 同类规则自上而下首条命中生效；Bash 先过 [[bash]] 再过 [[tool]]。
+
+# ════ 高危命令 ════
+
+[[bash]]
+name     = "rm-recursive-force"
+cmd      = "rm"
+all      = [["-r", "--recursive"], ["-f", "--force"]]
+decision = "deny"
+reason   = "守卫拦截：rm 递归+强制。改用更窄的具体路径并去掉 -f，或说明理由让用户手动执行。"
+
+[[bash]]
+name     = "git-push"
+cmd      = "git"
+subcmd   = "push"
+decision = "ask"
+reason   = "git 推送需要用户确认"
+
+[[bash]]
+name     = "git-reset-hard"
+cmd      = "git"
+subcmd   = "reset"
+any      = ["--hard"]
+decision = "ask"
+reason   = "该操作会丢弃工作区改动，需要用户确认"
+
+[[bash]]
+name     = "git-clean-force"
+cmd      = "git"
+subcmd   = "clean"
+all      = [["-f", "--force"]]
+decision = "ask"
+reason   = "该操作会丢弃工作区改动，需要用户确认"
+
+# ════ 工具偏好重定向：deny 的 reason 喂回模型，模型自动换工具重试 ════
+
+[[bash]]
+name     = "prefer-rg"
+cmd      = "grep"
+decision = "deny"
+reason   = "工具偏好：用 rg 替代 grep（管道过滤同样可用：cmd | rg PATTERN）。确需 grep 独有特性时说明理由请用户手动执行。"
+
+[[bash]]
+name     = "prefer-fd"
+cmd      = "find"
+decision = "deny"
+reason   = "工具偏好：用 fd 替代 find（fd PATTERN PATH；-name 直接写模式；-exec → fd -x）。确需 find 独有特性时说明理由。"
+
+[[bash]]
+name     = "uv-not-pip"
+cmd      = "pip"
+decision = "deny"
+reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
+
+[[bash]]
+name     = "uv-not-pip3"
+cmd      = "pip3"
+decision = "deny"
+reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
+
+[[bash]]
+name     = "uv-not-python"
+cmd      = "python"
+decision = "deny"
+reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
+
+[[bash]]
+name     = "uv-not-python3"
+cmd      = "python3"
+decision = "deny"
+reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
+
+# ════ 通用工具规则 ════
+
+[[tool]]
+name     = "gh-not-webfetch-github"
+tool     = "WebFetch"
+where    = { url = { domain = "github.com" } }
+decision = "deny"
+reason   = "GitHub 操作一律用 gh CLI."
+
+[[tool]]
+name     = "no-dotenv-read"
+tool     = "Read"
+where    = { file_path = { glob = ["**/.env", "**/.env.*"] } }
+decision = "deny"
+reason   = ".env 可能含密钥，不直接读。需要时让用户摘录非敏感字段，或读 .env.example。"

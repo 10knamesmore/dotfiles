@@ -16,11 +16,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/cc-hook bash-guard"
+            "command": "~/.claude/hooks/cc-hook pretool"
           }
         ]
       }

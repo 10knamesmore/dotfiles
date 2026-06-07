@@ -606,7 +606,7 @@ on {
 源（易失区，cargo clean 会清空）          落点 before              落点 after
 ════════════════════════════════          ═══════════              ══════════
 <repo>/cli/target/release/                ~/.claude/hooks/         ~/.claude/hooks/
-└── cc-hook  ────────复制────────→        └── bash-guard.toml      ├── bash-guard.toml
+└── cc-hook  ────────复制────────→        └── pretool.toml         ├── pretool.toml
                                                                    └── cc-hook  ★ 真实文件非软链，
                                                                                   源被清也照常工作
 ```
