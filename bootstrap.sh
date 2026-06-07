@@ -5,6 +5,13 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+# 裸 Arch base 没有 cc，cargo build（mlua vendored 编 C）会挂，先补编译前置。
+# git 不在此装：能跑到这里说明仓库已到手；后续 paru 自举要的 git 由 pacman.txt 先行提供。
+if command -v pacman >/dev/null 2>&1 && ! command -v cc >/dev/null 2>&1; then
+    echo "安装编译前置（base-devel）…"
+    sudo pacman -S --needed --noconfirm base-devel
+fi
+
 if ! command -v cargo >/dev/null 2>&1; then
     echo "未检测到 cargo，安装 rustup（minimal）…"
     curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal

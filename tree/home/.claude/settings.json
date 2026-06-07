@@ -4,8 +4,6 @@
     "deny": [
       "Read(~/.ssh/**)",
       "Read(~/.config/gh/hosts.yml)",
-      "Read(~/.docker/config.json)",
-      "Read(~/.npmrc)",
       "Read(~/.claude/.credentials.json)",
       "Read(~/.codex/auth.json)",
       "Bash(sudo *)",

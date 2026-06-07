@@ -1,12 +1,102 @@
 # 显式安装的 pacman 包清单（每行一个，# 注释）。
-# 生成基线：pacman -Qqe > packages/pacman.txt，然后删掉非必要项。
+# 生成基线：pacman -Qqen > /tmp/base.txt 后人工筛选。
+# 收编原则：核心筛选——硬件特定（nvidia/ucode/grub/固件）与大型 GUI 应用
+# （steam/libreoffice/obs 等）不入清单，新机按需手装。
+
+# —— 基础 / 构建 ——
+base-devel
 git
-neovim
+git-delta
+github-cli
 zsh
+vim
+neovim
+tmux
+cronie
+
+# —— 终端 / Shell 栈 ——
 kitty
 starship
-ripgrep
-eza
+zellij
+yazi
 zoxide
 fzf
-base-devel
+ripgrep
+fd
+eza
+bat
+btop
+fastfetch
+lazygit
+lazydocker
+tldr
+cloc
+chafa
+xclip
+bash-completion
+man-db
+man-pages-zh_cn
+
+# —— 压缩 ——
+7zip
+unzip
+unrar
+
+# —— 运行时 / 包管理器 ——
+uv
+bun
+docker
+docker-compose
+python-pip
+luarocks
+
+# —— 开发工具 ——
+tree-sitter-cli
+stylua
+typst
+tinymist
+
+# —— AI CLI ——
+openai-codex
+opencode
+
+# —— 桌面栈（Hyprland / niri / QuickShell）——
+hyprland
+hyprshot
+hyprsunset
+hyprshutdown
+uwsm
+xdg-desktop-portal-hyprland
+niri
+xwayland-satellite
+quickshell
+waybar
+wofi
+swaybg
+cava
+
+# —— 输入法 ——
+fcitx5
+fcitx5-chinese-addons
+fcitx5-configtool
+fcitx5-pinyin-zhwiki
+fcitx5-rime
+
+# —— 字体 ——
+adobe-source-han-sans-cn-fonts
+adobe-source-han-serif-cn-fonts
+noto-fonts-cjk
+wqy-zenhei
+ttf-dejavu
+ttf-hack-nerd
+ttf-nerd-fonts-symbols-mono
+ttf-victor-mono-nerd
+
+# —— 音频 / 媒体 ——
+pipewire-alsa
+gst-plugin-pipewire
+mpv
+
+# —— 日常应用 ——
+firefox
+telegram-desktop

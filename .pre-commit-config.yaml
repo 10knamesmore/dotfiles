@@ -1,0 +1,23 @@
+# git hooks（prek 执行，pre-commit 兼容格式）。激活：prek install。
+# types: [rust] —— 仅暂存区含 Rust 文件时才跑，改文档/清单不触发。
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt --check
+        entry: cargo fmt --manifest-path cli/Cargo.toml --all --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --manifest-path cli/Cargo.toml --workspace --all-targets -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --manifest-path cli/Cargo.toml --workspace
+        language: system
+        types: [rust]
+        pass_filenames: false

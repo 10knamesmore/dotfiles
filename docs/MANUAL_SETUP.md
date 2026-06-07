@@ -8,6 +8,7 @@
     - [安装步骤](#安装步骤)
     - [已知外接键盘（keyboard_manager.sh 中维护）](#已知外接键盘keyboardmanagersh-中维护)
     - [调试](#调试)
+  - [2. archlinuxcn 软件源（可选）](#2-archlinuxcn-软件源可选)
 <!--toc:end-->
 
 `dots sync` 只管理 `$HOME` 侧的符号链接，以下 root 级配置需要手动安装。
@@ -69,3 +70,23 @@ cat /sys/class/input/input<N>/inhibited
 # 查看 udev 触发日志
 journalctl -f | grep keyboard_manager
 ```
+
+---
+
+## 2. archlinuxcn 软件源（可选）
+
+`packages/aur.txt` 中注释掉的 `archlinuxcn-keyring` 依赖此源。需要时手动配置：
+
+```bash
+# 1. 追加源到 /etc/pacman.conf
+sudo tee -a /etc/pacman.conf << 'CONF'
+
+[archlinuxcn]
+Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
+CONF
+
+# 2. 装 keyring（首次需信任密钥）
+sudo pacman -Sy archlinuxcn-keyring
+```
+
+配置后可把 `packages/aur.txt` 里的 `archlinuxcn-keyring` 取消注释，部分 AUR 包（如 quickshell 生态）也可改走该源的二进制包。

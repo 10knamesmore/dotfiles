@@ -1,0 +1,21 @@
+# AUR 包清单（每行一个，# 注释）。仅 Arch 生效。
+# 清单非空时 dots bootstrap 自动确保 paru（缺则 git clone + makepkg 自举），
+# 故 paru 本身不必列在这里。
+# 生成基线：pacman -Qqm（注意会混入 archlinuxcn 等第三方源的包）。
+
+# —— 浏览器 / 日常应用 ——
+google-chrome
+visual-studio-code-bin
+clash-verge-rev-bin
+wechat-appimage
+linuxqq-appimage
+go-musicfox-bin
+
+# —— 桌面 ——
+xremap-hypr-bin
+wl-screenrec-git
+adw-gtk-theme-git
+fcitx5-skin-fluentdark-git
+
+# —— archlinuxcn（需先在 /etc/pacman.conf 配源，见 docs/MANUAL_SETUP.md）——
+# archlinuxcn-keyring

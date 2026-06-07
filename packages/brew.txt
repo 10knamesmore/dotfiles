@@ -1,0 +1,4 @@
+# Homebrew 包清单（每行一个，# 注释）。仅 macOS 生效。
+# 清单非空时 dots bootstrap 自动确保 brew（缺则官方脚本 NONINTERACTIVE 自举，
+# 顺带装 Xcode CLT），故 brew 本身不必列在这里。
+# 生成基线：在 Mac 上 brew leaves（只列显式安装的顶层包），待填。

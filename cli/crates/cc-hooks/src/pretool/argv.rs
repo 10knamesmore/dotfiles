@@ -207,12 +207,7 @@ mod tests {
         let segments = each_command(r#"git commit -m "fix; rm -rf temp; done""#);
         assert_eq!(
             segments,
-            vec![owned(&[
-                "git",
-                "commit",
-                "-m",
-                "fix; rm -rf temp; done"
-            ])]
+            vec![owned(&["git", "commit", "-m", "fix; rm -rf temp; done"])]
         );
         let single = each_command("echo 'a && b | c'");
         assert_eq!(single, vec![owned(&["echo", "a && b | c"])]);

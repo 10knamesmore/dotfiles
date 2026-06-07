@@ -1,5 +1,32 @@
 # 工具链安装（dots bootstrap 用）。格式：name = "安装命令"。
-# name 已在 PATH（command -v name）则跳过。
+# name 已在 PATH（command -v name）则跳过；键写成 "name!"（引号必须，
+# TOML 裸键不允许 !）则跳过探测每次执行（rustup target 等无 binary 可探测
+# 的条目，靠命令自身幂等）。
+
+# —— 跨平台兜底（Arch 上已由 pacman.txt 覆盖，幂等跳过）——
 uv = "curl -LsSf https://astral.sh/uv/install.sh | sh"
 starship = "curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
 zoxide = "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"
+
+# —— AI CLI ——
+claude = "curl -fsSL https://claude.ai/install.sh | bash"
+
+# —— JS ——
+pnpm = "curl -fsSL https://get.pnpm.io/install.sh | sh -"
+# nvm 是 shell 函数，command -v 探测不到 → 总是执行 + 命令内自带存在性守卫
+"nvm!" = "[ -s ~/.nvm/nvm.sh ] || curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash"
+# —— Rust 开发工具（cargo install 源码编译，新机首跑较慢）——
+cargo-nextest = "cargo install cargo-nextest"
+cargo-insta = "cargo install cargo-insta"
+cargo-watch = "cargo install cargo-watch"
+dust = "cargo install du-dust"
+samply = "cargo install samply"
+
+# —— rustup 组件 / target（! = 总是执行；TOML 裸键不允许 !，须引号）——
+# bootstrap.sh 用 minimal profile 装 rustup，clippy/rustfmt 不随附，须显式补
+"rustup-components!" = "rustup component add rust-src rust-analyzer clippy rustfmt"
+"rustup-wasm32!" = "rustup target add wasm32-unknown-unknown"
+"rustup-nightly!" = "rustup toolchain install nightly --profile minimal"
+
+# —— git hooks（装完在各仓库内 prek install 激活）——
+prek = "uv tool install prek"
