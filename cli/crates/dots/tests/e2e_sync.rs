@@ -181,10 +181,7 @@ granularity("home/.config/nvim", {
         !home.join(".config/nvim").exists(),
         "pre 返回 false 的条目不应链接"
     );
-    assert!(
-        home.join(".vimrc").exists(),
-        "其他条目应不受影响照常链接"
-    );
+    assert!(home.join(".vimrc").exists(), "其他条目应不受影响照常链接");
 }
 
 #[test]
@@ -397,7 +394,10 @@ on {
 
     // dry-run 不执行
     run_dots(repo, home, &["sync", "--dry-run"]).success();
-    assert!(!home.join("probe.log").exists(), "dry-run 不应执行 dots.run");
+    assert!(
+        !home.join("probe.log").exists(),
+        "dry-run 不应执行 dots.run"
+    );
 
     // 与 run_once 的区别：每次 sync 都执行
     run_dots(repo, home, &["sync"]).success();
@@ -436,7 +436,10 @@ on {
 
     let out = run_dots(repo, home, &["sync"]).success();
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
-    assert!(stdout.contains("dots.run 退出码 3"), "非零退出应留痕：{stdout}");
+    assert!(
+        stdout.contains("dots.run 退出码 3"),
+        "非零退出应留痕：{stdout}"
+    );
 }
 
 #[test]

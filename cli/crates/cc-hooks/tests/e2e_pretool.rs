@@ -73,7 +73,10 @@ fn run(rules_path: &std::path::Path, stdin_json: &str) -> (String, bool) {
         .write_stdin(stdin_json)
         .output()
         .unwrap();
-    (String::from_utf8_lossy(&output.stdout).into_owned(), output.status.success())
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        output.status.success(),
+    )
 }
 
 /// Bash 工具的 hook JSON 信封。
@@ -135,7 +138,10 @@ fn webfetch_domain_rule_end_to_end() {
         ("https://example.com/github.com/decoy", None),
     ];
     for (url, expected) in cases {
-        let stdin = tool_envelope("WebFetch", serde_json::json!({"url": url, "prompt": "读一下"}));
+        let stdin = tool_envelope(
+            "WebFetch",
+            serde_json::json!({"url": url, "prompt": "读一下"}),
+        );
         assert_verdict(&rules, &stdin, *expected, url);
     }
 }
@@ -161,11 +167,20 @@ fn matcher_kinds_and_or_semantics() {
     let rules = rules_file();
     // 同字段多匹配器 AND（prefix 且 suffix）；数组 OR（contains 任一）；字段间 AND
     let cases: &[(serde_json::Value, Option<&str>)] = &[
-        (serde_json::json!({"alpha": "pre-x-end", "beta": "has midA inside"}), Some("ask")),
-        (serde_json::json!({"alpha": "pre-x-end", "beta": "has midB inside"}), Some("ask")),
-        (serde_json::json!({"alpha": "pre-x-end", "beta": "no hit"}), None), // beta 不中
-        (serde_json::json!({"alpha": "pre-x", "beta": "midA"}), None),       // suffix 不中
-        (serde_json::json!({"beta": "midA"}), None),                          // 字段缺失
+        (
+            serde_json::json!({"alpha": "pre-x-end", "beta": "has midA inside"}),
+            Some("ask"),
+        ),
+        (
+            serde_json::json!({"alpha": "pre-x-end", "beta": "has midB inside"}),
+            Some("ask"),
+        ),
+        (
+            serde_json::json!({"alpha": "pre-x-end", "beta": "no hit"}),
+            None,
+        ), // beta 不中
+        (serde_json::json!({"alpha": "pre-x", "beta": "midA"}), None), // suffix 不中
+        (serde_json::json!({"beta": "midA"}), None),                   // 字段缺失
     ];
     for (input, expected) in cases {
         let stdin = tool_envelope("Probe", input.clone());
@@ -182,8 +197,10 @@ fn unmatched_tool_passes_silently() {
 
 #[test]
 fn missing_rules_file_fails_open() {
-    let (stdout, ok) =
-        run(std::path::Path::new("/nonexistent/rules.toml"), &bash_envelope("rm -rf /"));
+    let (stdout, ok) = run(
+        std::path::Path::new("/nonexistent/rules.toml"),
+        &bash_envelope("rm -rf /"),
+    );
     assert!(ok);
     assert!(stdout.is_empty(), "规则缺失必须放行");
 }

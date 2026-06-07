@@ -38,14 +38,21 @@ mod tests {
         let segments = each_command("cd /tmp && rm -fr build | cat");
         assert_eq!(
             segments,
-            vec![owned(&["cd", "/tmp"]), owned(&["rm", "-fr", "build"]), owned(&["cat"])]
+            vec![
+                owned(&["cd", "/tmp"]),
+                owned(&["rm", "-fr", "build"]),
+                owned(&["cat"])
+            ]
         );
     }
 
     #[test]
     fn newline_splits_commands() {
         let segments = each_command("echo hi\nrm -rf x");
-        assert_eq!(segments, vec![owned(&["echo", "hi"]), owned(&["rm", "-rf", "x"])]);
+        assert_eq!(
+            segments,
+            vec![owned(&["echo", "hi"]), owned(&["rm", "-rf", "x"])]
+        );
     }
 
     #[test]

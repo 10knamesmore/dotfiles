@@ -95,7 +95,10 @@ fn domain_hit(domain: &str, url: &str) -> bool {
     let host = authority.rsplit('@').next().unwrap_or(authority);
     let host = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
     let domain = domain.to_ascii_lowercase();
-    host == domain || host.strip_suffix(&domain).is_some_and(|head| head.ends_with('.'))
+    host == domain
+        || host
+            .strip_suffix(&domain)
+            .is_some_and(|head| head.ends_with('.'))
 }
 
 /// 单段 argv 是否命中 bash 规则的全部条件（条件间 AND）。
@@ -198,16 +201,37 @@ reason   = "GitHub 一律 gh"
     /// (输入命令, 期望命中：None=静默放行)
     const BASH_CASES: &[(&str, Option<(&str, Decision)>)] = &[
         // ── deny ──
-        ("rm -rf /tmp/foo", Some(("rm-recursive-force", Decision::Deny))),
-        ("cd /tmp && rm -fr build", Some(("rm-recursive-force", Decision::Deny))),
-        ("cd /tmp\nrm -rf build", Some(("rm-recursive-force", Decision::Deny))),
-        ("cat list | rm -rf x", Some(("rm-recursive-force", Decision::Deny))),
-        ("command rm -rf x", Some(("rm-recursive-force", Decision::Deny))),
-        ("rm --recursive --force x", Some(("rm-recursive-force", Decision::Deny))),
+        (
+            "rm -rf /tmp/foo",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
+        (
+            "cd /tmp && rm -fr build",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
+        (
+            "cd /tmp\nrm -rf build",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
+        (
+            "cat list | rm -rf x",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
+        (
+            "command rm -rf x",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
+        (
+            "rm --recursive --force x",
+            Some(("rm-recursive-force", Decision::Deny)),
+        ),
         // ── ask ──
         ("git push origin dev", Some(("git-push", Decision::Ask))),
         ("git push -f origin dev", Some(("git-push", Decision::Ask))),
-        ("git reset --hard HEAD~1", Some(("git-reset-hard", Decision::Ask))),
+        (
+            "git reset --hard HEAD~1",
+            Some(("git-reset-hard", Decision::Ask)),
+        ),
         ("git clean -fd", Some(("git-clean-force", Decision::Ask))),
         // ── 静默放行 ──
         ("git add -A", None),
@@ -250,27 +274,41 @@ reason   = "GitHub 一律 gh"
     fn tool_rule_requires_matching_tool_name_and_field() -> Result<(), toml::de::Error> {
         let config = Config::from_toml(RULES)?;
         let input = serde_json::json!({ "url": "https://github.com/x" });
-        assert!(check_tool(&config, "WebSearch", &input).is_none(), "工具名不同不命中");
+        assert!(
+            check_tool(&config, "WebSearch", &input).is_none(),
+            "工具名不同不命中"
+        );
         let no_field = serde_json::json!({ "prompt": "hi" });
-        assert!(check_tool(&config, "WebFetch", &no_field).is_none(), "字段缺失不命中");
+        assert!(
+            check_tool(&config, "WebFetch", &no_field).is_none(),
+            "字段缺失不命中"
+        );
         let wrong_type = serde_json::json!({ "url": 42 });
-        assert!(check_tool(&config, "WebFetch", &wrong_type).is_none(), "非字符串不命中");
+        assert!(
+            check_tool(&config, "WebFetch", &wrong_type).is_none(),
+            "非字符串不命中"
+        );
         Ok(())
     }
 
     #[test]
     fn matcher_kinds_cover_vocabulary() {
-        let matcher = |toml_text: &str| -> Matcher {
-            toml::from_str(toml_text).unwrap_or_default()
-        };
+        let matcher =
+            |toml_text: &str| -> Matcher { toml::from_str(toml_text).unwrap_or_default() };
         assert!(matcher_hit(&matcher(r#"equals = "main""#), "main"));
         assert!(!matcher_hit(&matcher(r#"equals = "main""#), "main2"));
         assert!(matcher_hit(&matcher(r#"contains = ["aa", "bb"]"#), "xbbx"));
         assert!(matcher_hit(&matcher(r#"prefix = "pre-""#), "pre-x"));
         assert!(matcher_hit(&matcher(r#"suffix = ".age""#), "secrets.age"));
-        assert!(matcher_hit(&matcher(r#"glob = "**/.env""#), ".env"), "** 可匹配空前缀");
+        assert!(
+            matcher_hit(&matcher(r#"glob = "**/.env""#), ".env"),
+            "** 可匹配空前缀"
+        );
         assert!(matcher_hit(&matcher(r#"glob = "**/.env""#), "/a/b/.env"));
-        assert!(!matcher_hit(&matcher(r#"glob = "**/.env""#), "/a/b/env.zsh"));
+        assert!(!matcher_hit(
+            &matcher(r#"glob = "**/.env""#),
+            "/a/b/env.zsh"
+        ));
         assert!(matcher_hit(&matcher(r#"re = "^v\\d+$""#), "v42"));
         // 同匹配器多种类 AND
         let both = matcher("prefix = \"a\"\nsuffix = \"z\"");

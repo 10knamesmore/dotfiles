@@ -21,13 +21,21 @@ impl<T: Serialize> HookRun<T> {
     /// 无意见：静默放行。
     #[must_use]
     pub fn silent() -> Self {
-        Self { output: None, notice: None, code: 0 }
+        Self {
+            output: None,
+            notice: None,
+            code: 0,
+        }
     }
 
     /// 输出一条结构化决策。
     #[must_use]
     pub fn decision(output: T) -> Self {
-        Self { output: Some(output), notice: None, code: 0 }
+        Self {
+            output: Some(output),
+            notice: None,
+            code: 0,
+        }
     }
 
     /// 附加 stderr 留痕。
@@ -48,8 +56,7 @@ mod tests {
         let silent: HookRun<serde_json::Value> = HookRun::silent();
         assert!(silent.output.is_none() && silent.notice.is_none() && silent.code == 0);
 
-        let noticed: HookRun<serde_json::Value> =
-            HookRun::silent().with_notice("解析失败".into());
+        let noticed: HookRun<serde_json::Value> = HookRun::silent().with_notice("解析失败".into());
         assert_eq!(noticed.notice.as_deref(), Some("解析失败"));
         assert_eq!(noticed.code, 0, "fail-open：留痕不改退出码");
 

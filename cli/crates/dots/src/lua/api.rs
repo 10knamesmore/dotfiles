@@ -173,9 +173,12 @@ fn register_on(lua: &Lua, builder: &Builder, closures: &Closures) -> Result<()> 
             };
             let funcs: Vec<Function> = match value {
                 mlua::Value::Function(func) => vec![func],
-                mlua::Value::Table(seq) => seq.sequence_values::<Function>().collect::<mlua::Result<_>>().map_err(|_| {
-                    mlua::Error::external(format!("on.{phase_str} 的数组元素必须都是函数"))
-                })?,
+                mlua::Value::Table(seq) => seq
+                    .sequence_values::<Function>()
+                    .collect::<mlua::Result<_>>()
+                    .map_err(|_| {
+                        mlua::Error::external(format!("on.{phase_str} 的数组元素必须都是函数"))
+                    })?,
                 other => {
                     return Err(mlua::Error::external(format!(
                         "on.{phase_str} 的值必须是函数或函数数组，得到 {}",

@@ -89,11 +89,14 @@ fn pretool(rules_path: Option<PathBuf>) -> HookRun<PreToolUseOutput> {
 
     // Bash：argv 引擎（词法/旗标簇）；命中即返回
     if tool_name == "Bash"
-        && let Some(command) = tool_input.get("command").and_then(serde_json::Value::as_str)
+        && let Some(command) = tool_input
+            .get("command")
+            .and_then(serde_json::Value::as_str)
         && let Some(rule) = engine::check_bash(&config, command)
     {
         return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason));
     }
+
     // 通用工具规则（含 Bash 的非 command 字段场景）
     if let Some(rule) = engine::check_tool(&config, &tool_name, &tool_input) {
         return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason));

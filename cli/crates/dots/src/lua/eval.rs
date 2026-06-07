@@ -190,10 +190,7 @@ mod tests {
     #[test]
     fn on_array_with_non_function_errors() {
         let src = r#" on { post_sync = { function() end, "oops" } } "#;
-        assert!(
-            eval_manifest(src, &ctx()).is_err(),
-            "数组内混非函数应报错"
-        );
+        assert!(eval_manifest(src, &ctx()).is_err(), "数组内混非函数应报错");
     }
 
     #[test]
