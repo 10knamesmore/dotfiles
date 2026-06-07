@@ -1,8 +1,8 @@
 return {
-    "neovim/nvim-lspconfig",
-    opts = {
-        servers = {
-            taplo = {},
-        },
+  "neovim/nvim-lspconfig",
+  opts = {
+    servers = {
+      taplo = {},
     },
+  },
 }

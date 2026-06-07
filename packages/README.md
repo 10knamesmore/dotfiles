@@ -65,3 +65,19 @@ cargo cache --autoclean          # GC：删可再生缓存（解压源码/git ch
 cargo 走 rsproxy（`tree/home/.cargo/config.toml`，bootstrap.sh 首编前会先落一份真实文件
 解鸡生蛋）；rustup 下载走 `RUSTUP_DIST_SERVER=https://rsproxy.cn`。github raw 渠道
 （nvm 等）国内裸连基本必挂，需要时 `proxy on` 再跑。
+
+## fzf（唯一的手动项）
+
+Go 写的、不在 crates.io，无国内稳定渠道；不进 toolchains——bootstrap 跑的时候代理
+往往还没接上，清单条目必须不依赖代理。Arch/macOS 由 pacman/brew 提供；apt 机器
+（apt 的 fzf <0.48 不支持 `--zsh`，不能用）等代理就绪后手动跑：
+
+```bash
+proxy on    # 代理地址不同就先 export DOTS_PROXY_URL=http://…
+rm -rf /tmp/fzf-src && git clone --depth 1 https://github.com/junegunn/fzf.git /tmp/fzf-src
+/tmp/fzf-src/install --bin          # 官方脚本：探测平台 → 下载 release 二进制，不碰 shellrc
+install -Dm755 /tmp/fzf-src/bin/fzf ~/.local/bin/fzf
+```
+
+装完开新 shell 即可——`25-fzf-tab.zsh` 的存在性守卫会自动启用整套 fzf 功能
+（缺 fzf 时则整模块跳过，Tab 回落原生补全，配置不报错）。

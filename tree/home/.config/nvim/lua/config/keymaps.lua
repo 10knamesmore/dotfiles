@@ -1,17 +1,17 @@
 local map = vim.keymap.set
 local function opts(desc)
-    local opts = { noremap = true, silent = true }
+  local opts = { noremap = true, silent = true }
 
-    if desc then
-        opts.desc = desc
-    end
-    return opts
+  if desc then
+    opts.desc = desc
+  end
+  return opts
 end
 
 map({ "i", "n", "s" }, "<esc>", function()
-    vim.cmd("noh")
-    vim.snippet.stop()
-    return "<esc>"
+  vim.cmd("noh")
+  vim.snippet.stop()
+  return "<esc>"
 end, { expr = true, desc = "Escape and Clear hlsearch" })
 
 -- highlightgroup under cursor
@@ -19,25 +19,25 @@ map("n", "<leader>ui", vim.show_pos, { desc = "Inspect Pos" })
 
 -- treesitter inspect tree
 map("n", "<leader>uI", function()
-    vim.treesitter.inspect_tree({
-        command = (math.floor(vim.o.columns * 0.4)) .. "vnew",
-    })
-    vim.api.nvim_input("I")
+  vim.treesitter.inspect_tree({
+    command = (math.floor(vim.o.columns * 0.4)) .. "vnew",
+  })
+  vim.api.nvim_input("I")
 end, { desc = "Inspect Tree" })
 
 map("n", "<leader>uf", function()
-    utils.format.toggle()
+  utils.format.toggle()
 end, { desc = "Toggle Auto Format" })
 
 map("n", "<leader>uh", function()
-    local bufnr = vim.api.nvim_get_current_buf()
-    local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr })
-    local new_enabled = not enabled
-    vim.lsp.inlay_hint.enable(new_enabled, { bufnr = bufnr })
-    vim.api.nvim_echo({
-        { "inlay_hint ", "Normal" },
-        { new_enabled and "ENABLED" or "DISABLED", new_enabled and "DiagnosticOk" or "DiagnosticWarn" },
-    }, false, {})
+  local bufnr = vim.api.nvim_get_current_buf()
+  local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr })
+  local new_enabled = not enabled
+  vim.lsp.inlay_hint.enable(new_enabled, { bufnr = bufnr })
+  vim.api.nvim_echo({
+    { "inlay_hint ", "Normal" },
+    { new_enabled and "ENABLED" or "DISABLED", new_enabled and "DiagnosticOk" or "DiagnosticWarn" },
+  }, false, {})
 end, { desc = "Toggle Inlay Hints" })
 
 -- better up/down
@@ -56,10 +56,10 @@ map("n", "<leader>wd", "<C-W>c", { desc = "Delete Window", remap = true })
 
 -- 重绘
 map(
-    "n",
-    "<leader>ur",
-    "<Cmd>nohlsearch<Bar>diffupdate<Bar>normal! <C-L><CR>",
-    { desc = "Redraw / Clear hlsearch / Diff Update" }
+  "n",
+  "<leader>ur",
+  "<Cmd>nohlsearch<Bar>diffupdate<Bar>normal! <C-L><CR>",
+  { desc = "Redraw / Clear hlsearch / Diff Update" }
 )
 
 -- n总是向前搜索，N总是向后搜索，并且展开折叠

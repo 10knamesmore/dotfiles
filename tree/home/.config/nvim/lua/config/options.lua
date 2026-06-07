@@ -34,21 +34,21 @@ opt.cursorline = true -- Enable highlighting of the current line
 opt.expandtab = true
 
 opt.fillchars = {
-    foldopen = "",
-    foldclose = "",
-    fold = " ",
-    foldsep = " ",
-    diff = "╱",
-    eob = " ",
+  foldopen = "",
+  foldclose = "",
+  fold = " ",
+  foldsep = " ",
+  diff = "╱",
+  eob = " ",
 }
 
 opt.listchars = {
-    tab = "<->",
-    trail = "-", -- trailing space
-    nbsp = "␣",
-    -- 开了wrap, 下面应当不需要
-    extends = "⟩",
-    precedes = "⟨",
+  tab = "<->",
+  trail = "-", -- trailing space
+  nbsp = "␣",
+  -- 开了wrap, 下面应当不需要
+  extends = "⟩",
+  precedes = "⟨",
 }
 
 opt.foldcolumn = "0"
@@ -106,23 +106,23 @@ opt.scrolloff = 4
 
 -- session包含哪些内容
 opt.sessionoptions = {
-    -- 缓冲区
-    "buffers",
-    -- cwd
-    "curdir",
-    -- tabs
-    "tabpages",
-    -- 窗口
-    "winsize",
-    "winpos",
-    -- :help 窗口
-    "help",
-    -- 全局变量
-    "globals",
-    "skiprtp",
-    "folds",
-    -- size
-    "resize",
+  -- 缓冲区
+  "buffers",
+  -- cwd
+  "curdir",
+  -- tabs
+  "tabpages",
+  -- 窗口
+  "winsize",
+  "winpos",
+  -- :help 窗口
+  "help",
+  -- 全局变量
+  "globals",
+  "skiprtp",
+  "folds",
+  -- size
+  "resize",
 }
 
 -- 缩进舍入到 `shiftwidth` 的倍数。

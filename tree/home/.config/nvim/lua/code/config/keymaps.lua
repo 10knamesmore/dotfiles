@@ -5,7 +5,7 @@ local opts = { noremap = true, silent = true }
 ---@param command string
 ---@return string
 local codeAction = function(command)
-    return "<Cmd>lua require('vscode').action('" .. command .. "')<Cr>"
+  return "<Cmd>lua require('vscode').action('" .. command .. "')<Cr>"
 end
 
 keymap("n", "<Space>", "", opts)
@@ -18,13 +18,13 @@ vim.g.maplocalleader = " "
 -- 2. 关闭 snippet（如果有的话）
 -- 3. 返回 normal 模式
 keymap({ "i", "n", "s" }, "<esc>", function()
-    vim.cmd("nohlsearch")
-    -- VSCode 没有 vim.snippet，所以跳过
-    -- 调用 VSCode 的关闭小部件命令
-    vim.fn.VSCodeNotify("closeFindWidget")
-    vim.fn.VSCodeNotify("closeParameterHints")
-    codeAction("workbench.action.closeSideBar")
-    return "<esc>"
+  vim.cmd("nohlsearch")
+  -- VSCode 没有 vim.snippet，所以跳过
+  -- 调用 VSCode 的关闭小部件命令
+  vim.fn.VSCodeNotify("closeFindWidget")
+  vim.fn.VSCodeNotify("closeParameterHints")
+  codeAction("workbench.action.closeSideBar")
+  return "<esc>"
 end, { expr = true, desc = "Escape and Clear hlsearch" })
 
 -- ========== 基础移动 ==========
