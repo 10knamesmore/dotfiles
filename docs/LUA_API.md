@@ -402,19 +402,30 @@ hosts {
 ```text
                     ┌─ hostname == "wanger-arch-16p" ──→ 执行该闭包（vars + link 生效）
 dots sync ──读取──→ ┤  hostname == "macbook" ──────────→ 执行 macbook 闭包
-                    └─ hostname == 其他 ───────────────→ ✗ 硬报错 + 打印骨架：
-                                                           hosts {
-                                                             ["new-host"] = function()
-                                                               -- vars { ... }
-                                                             end,
-                                                           }
+                    └─ hostname == 其他 ───────────────→ ⚠ 打印骨架 + warn，继续链通用项
+                                                           （per-host 增量跳过，非致命）
 ```
 
-行为细节（`cmd/sync.rs:53-60`）：
+行为细节（`cmd/sync.rs`）：
 
 - 只有匹配当前 hostname 的闭包会执行（effect 期）。
-- **当前机器未命中且表非空 → sync 打印该机的骨架建议后硬报错**。这是故意的：新机器跑 sync 会逼你显式建块，而不是悄悄跳过 per-host 配置渲出错误的显示器坐标。
+- **当前机器未命中且表非空 → 打印骨架建议 + warn，但不致命**：照常链接通用配置，仅跳过 per-host 增量。装机的核心是链配置，不能押在主机名探测/登记上。（曾经是硬报错，已改）
 - `dots doctor` 也检查 hostname 覆盖（`cmd/doctor.rs:31`）。
+
+#### 主机名解析与新机 onboarding
+
+`hosts{}` 的匹配 key = `hosts::current()`，按优先级解析（前者命中即用，空白跳过）：
+
+1. `$DOTS_HOST` 环境变量——显式覆盖，便于测试/临时切换。
+2. `~/.config/dots/host`——**别名文件**（机器本地，不入 git）。
+3. `/etc/hostname` → 4. `$HOSTNAME` → 5. `"unknown"`。
+
+**B 方案（别名 + 本地覆盖）**：`dots bootstrap` 在**未登记主机 + 交互终端**时跑一次 host 引导
+（`onboard.rs`）：问别名 + 工具链组 → 写 `~/.config/dots/host=<别名>` + 把 host 块**插进 dots.lua**
+（现有 `hosts({` 行下方，否则文件尾追加）。于是别名进 git、真实主机名/内网名不进；`current()` 靠本地
+文件命中别名块。非交互（CI/`curl|sh`）或回车跳过 → 不写，靠上面的「未命中非致命」兜底。
+
+> 这是 CLI 唯一会写 `dots.lua` 的路径；其余一切仍人手编辑。
 
 ---
 

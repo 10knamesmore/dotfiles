@@ -8,4 +8,4 @@ if [ -z "$WINDOW_INFO" ]; then
   WINDOW_INFO="Desktop"
 fi
 
-sketchybar --set "$NAME" label="$WINDOW_INFO"
+sketchybar --animate tanh 9 --set "$NAME" label="$WINDOW_INFO"

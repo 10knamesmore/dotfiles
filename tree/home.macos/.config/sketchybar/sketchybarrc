@@ -1,21 +1,22 @@
 PLUGIN_DIR="$CONFIG_DIR/plugins"
 
-BASE=0xff24273a
-MANTLE=0xff1e2030
-SURFACE0=0xff363a4f
-SURFACE1=0xff494d64
-TEXT=0xffcad3f5
-SUBTEXT=0xffb8c0e0
-OVERLAY=0xff8087a2
-BLUE=0xff8aadf4
-SAPPHIRE=0xff7dc4e4
-SKY=0xff91d7e3
-MAUVE=0xffc6a0f6
-GREEN=0xffa6da95
-YELLOW=0xffeed49f
-PEACH=0xfff5a97f
-RED=0xffed8796
-TEAL=0xff8bd5ca
+# Catppuccin Mocha — 与 kitty/bat/fzf 及 Linux quickshell 同色板
+BASE=0xff1e1e2e
+MANTLE=0xff181825
+SURFACE0=0xff313244
+SURFACE1=0xff45475a
+TEXT=0xffcdd6f4
+SUBTEXT=0xffbac2de
+OVERLAY=0xff7f849c
+BLUE=0xff89b4fa
+SAPPHIRE=0xff74c7ec
+SKY=0xff89dceb
+MAUVE=0xffcba6f7
+GREEN=0xffa6e3a1
+YELLOW=0xfff9e2af
+PEACH=0xfffab387
+RED=0xfff38ba8
+TEAL=0xff94e2d5
 
 sketchybar --bar \
   position=top \
@@ -32,8 +33,8 @@ sketchybar --bar \
   sticky=on
 
 default=(
-  icon.font="Hack Nerd Font:Bold:17.0"
-  label.font="Hack Nerd Font:Bold:15.0"
+  icon.font="Hack Nerd Font:Bold:15.0"
+  label.font="Hack Nerd Font:Bold:14.0"
   icon.color="$TEXT"
   label.color="$TEXT"
   icon.padding_left=10
@@ -43,7 +44,7 @@ default=(
   padding_left=3
   padding_right=3
   background.height=28
-  background.corner_radius=14
+  background.corner_radius=12
   background.color="$SURFACE0"
   background.border_width=0
   scroll_texts=on

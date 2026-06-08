@@ -7,6 +7,8 @@
 
 ## 工具偏好
 
-- GitHub 操作一律用 `gh` CLI, 涉及深入研究仓库时clone到 /tmp 研究
-- Python 一律走 `uv`（`uv run` / `uv add`），不直接 pip/python
-- 搜索优先 `rg` / `fd`
+!! 请务必遵守下面的约定，使用不被推荐的工具会被hook拦截
+
+- GitHub 操作用 `gh` CLI, 涉及深入研究仓库时clone到 /tmp 研究, 不要WebFetch
+- Python 一律走 `uv`（`uv run` / `uv add`），不要 pip/python
+- 搜索优先 `rg` / `fd`, 非必要不用`grep`

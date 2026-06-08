@@ -654,3 +654,38 @@ on {
 
     run_dots(repo, home, &["sync"]).success();
 }
+
+#[test]
+fn sync_nonfatal_when_host_unmatched_still_links_generic() {
+    let repo_dir = tempdir().unwrap();
+    let home_dir = tempdir().unwrap();
+    let repo = repo_dir.path();
+    let home = home_dir.path();
+    setup_repo(repo);
+
+    // dots.lua 有 host 块，但当前机（用 DOTS_HOST 钉死）不在其中。
+    fs::write(
+        repo.join("dots.lua"),
+        r#"hosts({ ["some-other-host"] = function() vars({ x = "1" }) end })"#,
+    )
+    .unwrap();
+
+    // 未命中不再致命：sync 成功，且通用链接照建。
+    Command::cargo_bin("dots")
+        .unwrap()
+        .args(["sync"])
+        .env("DOTFILES_DIR", repo)
+        .env("HOME", home)
+        .env("NO_COLOR", "1")
+        .env("DOTS_HOST", "this-machine-not-in-list")
+        .assert()
+        .success();
+
+    assert!(
+        fs::symlink_metadata(home.join(".vimrc"))
+            .unwrap()
+            .file_type()
+            .is_symlink(),
+        "host 未命中也应链接通用配置"
+    );
+}

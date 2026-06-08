@@ -55,6 +55,10 @@ pub fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     render::header("dots bootstrap");
 
+    // 0) 新机 host 引导：未登记 + 交互终端 → 问别名/工具链组，写 ~/.config/dots/host + dots.lua。
+    //    必须在 host_toolchain_filter 与末尾 sync 之前——它们会重读 dots.lua/别名文件，从而命中新块。
+    crate::onboard::maybe_onboard(&repo_root, &home_dir()?)?;
+
     let Some(backend) = Backend::detect() else {
         render::warn("无法识别包后端（仅支持 pacman/brew/apt），跳过装包");
         return crate::cmd::sync::run(false);

@@ -50,6 +50,8 @@ on({
 })
 
 -- per-host：本机变量（供 .inject 引用）。monitors.conf 链接见 B7 抽取后补。
+-- 未登记的新机跑 `dots bootstrap`（交互终端）会自动在此插入一个别名块（onboard.rs）；
+-- 别名 key 对应机器本地 ~/.config/dots/host（真名不入 git）。未命中非致命，仅跳过 per-host。
 hosts({
     ["wanger-arch-16p"] = function()
         vars({ backlight = "amdgpu_bl1", ddc_index = "1" })
@@ -57,5 +59,7 @@ hosts({
     -- 腾讯云服务器：只装 shell 基线，dev/ai/js 工具链跳过（组见 packages/toolchains.toml）
     ["VM-0-6-ubuntu"] = function()
         toolchains({ only = { "core" } })
+    end,
+    ["unknown"] = function()
     end,
 })

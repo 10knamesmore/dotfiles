@@ -15,7 +15,7 @@ git clone <your-repo-url> ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
-`bootstrap.sh` 很薄：Arch 上缺 cc 则先补 base-devel（裸 base 没有编译器；git 必然已存在——仓库就是它 clone 来的）→ 缺 cargo 则装 rustup（minimal profile）→ `cargo build --release` 编出 `dots` → 转交 `dots bootstrap`。后者探测包后端（pacman / apt / brew）、按 `packages/<backend>.txt` 装包、Arch 上若 `packages/aur.txt` 非空则确保 paru（缺则 git clone + makepkg 自举）再装 AUR 包、macOS 上若 `packages/brew.txt` 非空则确保 brew（缺则官方脚本 NONINTERACTIVE 自举）、按 `packages/toolchains.toml` 幂等装工具链（AI CLI / pnpm / cargo 工具集 / rustup 组件等；条目名带 `!` 后缀表示跳过 `command -v` 探测每次执行），最后自动跑 `dots sync`。
+`bootstrap.sh` 很薄：Arch 上缺 cc 则先补 base-devel（裸 base 没有编译器；git 必然已存在——仓库就是它 clone 来的）→ 缺 cargo 则装 rustup（minimal profile）→ `cargo build --release` 编出 `dots` → 转交 `dots bootstrap`。后者探测包后端（pacman / apt / brew）、按 `packages/<backend>.txt` 装包、Arch 上若 `packages/aur.txt` 非空则确保 paru（缺则 git clone + makepkg 自举）再装 AUR 包、macOS 上若 `packages/brew.txt` 非空则确保 brew（缺则官方脚本 NONINTERACTIVE 自举）、按 `packages/toolchains.toml` 幂等装工具链（AI CLI / pnpm / cargo 工具集 / rustup 组件等；条目名带 `!` 后缀表示跳过 `command -v` 探测每次执行），最后自动跑 `dots sync`。装机最前还有一步**新机 host 引导**：当前机未在 `dots.lua` 的 `hosts{}` 登记且 stdin 是交互终端时，问别名 + 工具链组，写机器本地 `~/.config/dots/host`（真名不入 git）并把 host 块插进 `dots.lua`（详见 `docs/LUA_API.md` 的 hosts 节）；非交互或跳过则照常装机，host 未命中只 warn 不致命。
 
 已有环境只想链配置：
 

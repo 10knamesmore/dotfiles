@@ -45,6 +45,6 @@ yabai -m signal --add event=window_destroyed active=yes action="yabai -m query -
 
 # JankyBorder settings, 用来给窗口加边框
 # https://github.com/FelixKratz/JankyBorders/wiki/Man-Page
-borders active_color=0xff5ac8fa inactive_color=0xff3c3c3c width=5.0 hidpi=on &
+borders active_color=0xffcba6f7 inactive_color=0xff45475a width=5.0 hidpi=on &
 
 echo "yabai configuration loaded.."

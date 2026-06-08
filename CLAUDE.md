@@ -28,7 +28,7 @@ skill                     # cd 到 skills 目录
 ## 目录架构
 
 ```
-dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json；CLI 永不改它）
+dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json；唯一例外：bootstrap 的 host 引导会插入 host 块）
 cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin）+ cc-hooks（bin: cc-hook，Claude hooks 入口），lua-api/（类型标注）
 tree/             # ★ 映射根：目录结构即链接声明
   home/           #   → $HOME（跨平台）
@@ -54,7 +54,7 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖，spec 可带条目级 `pre`/`post` 钩子，pre 返回 false 跳过该条目）、`distribute`（一源多落点，如 `tree/home/.agents/skills` → claude/codex，同样支持 `pre`/`post`；AI skills/agents/commands 源统一住 `tree/home/.agents/`，各工具落点全走 distribute 订阅）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`hosts{<name>=function() vars{…}; link(…); toolchains{only|skip={…}} end}`（per-host；`toolchains` 圈定 bootstrap 工具链组，组名 = toolchains.toml 节头，服务器 `only={"core"}`）、`on{phase=fn|{fn,…}}`（全局生命周期钩子：pre_sync/on_host_activate/post_link/post_sync）。CLI 永不编辑它，需要时打印建议行让你粘贴。
+只写约定盖不住的：`granularity`（粒度覆盖，spec 可带条目级 `pre`/`post` 钩子，pre 返回 false 跳过该条目）、`distribute`（一源多落点，如 `tree/home/.agents/skills` → claude/codex，同样支持 `pre`/`post`；AI skills/agents/commands 源统一住 `tree/home/.agents/`，各工具落点全走 distribute 订阅）、`systemd_user`（sync 时 `systemctl --user enable`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`hosts{<name>=function() vars{…}; link(…); toolchains{only|skip={…}} end}`（per-host；`toolchains` 圈定 bootstrap 工具链组，组名 = toolchains.toml 节头，服务器 `only={"core"}`）、`on{phase=fn|{fn,…}}`（全局生命周期钩子：pre_sync/on_host_activate/post_link/post_sync）。CLI 基本不编辑它（需要时打印建议行让你粘贴）；**唯一例外**：`dots bootstrap` 在未登记主机 + 交互终端时跑 host 引导（`onboard.rs`），问别名/工具链组后把 host 块插进现有 `hosts({` 下方，并把真实主机名写进机器本地 `~/.config/dots/host`（不入 git，`hosts::current()` 优先读它匹配别名块——B 方案）。host 未命中现为非致命（warn + 继续链通用项），不再硬报错。
 
 ## 路径注入（已消灭模板渲染）
 

@@ -3,7 +3,8 @@
   "env": {
     "DISABLE_TELEMETRY": "1",
     "DISABLE_ERROR_REPORTING": "1",
-    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+    "DISABLE_AUTOUPDATER": "1"
   },
   "attribution": {
     "commit": "",
@@ -12,9 +13,26 @@
   "permissions": {
     "deny": [
       "Read(~/.ssh/**)",
+      "Write(~/.ssh/**)",
+      "Edit(~/.ssh/**)",
       "Read(~/.config/gh/hosts.yml)",
       "Read(~/.claude/.credentials.json)",
+      "Write(~/.claude/.credentials.json)",
+      "Edit(~/.claude/.credentials.json)",
       "Read(~/.codex/auth.json)",
+      "Write(~/.codex/auth.json)",
+      "Edit(~/.codex/auth.json)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.netrc)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.gnupg/**)",
+      "Read(**/*.pem)",
+      "Read(~/.zsh_history)",
+      "Read(~/.bash_history)",
       "Bash(sudo *)",
       "Bash(mkfs *)",
       "Bash(dd *)"
@@ -54,9 +72,5 @@
   "theme": "dark",
   "preferredNotifChannel": "kitty",
   "agentPushNotifEnabled": false,
-  "skipAutoPermissionPrompt": true,
-  "version": 1,
-  "autoUpdater": false,
-  "analytics": false,
-  "mcpServers": []
+  "skipAutoPermissionPrompt": true
 }

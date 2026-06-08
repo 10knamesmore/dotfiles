@@ -5,6 +5,7 @@ pub mod exec;
 pub mod hooks;
 pub mod hosts;
 pub mod inject;
+pub mod onboard;
 pub mod realfs;
 pub mod render;
 pub mod secret;

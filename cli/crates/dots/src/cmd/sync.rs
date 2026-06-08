@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use color_eyre::eyre::eyre;
 use dots_core::manifest::{DistributeSpec, HookPhase, Manifest};
 use dots_core::{
     AbsPath, ExpectedLink, FileSystem, Layer, LinkMode, Os, expand_layers, plan_scripts, resolve,
@@ -51,12 +50,14 @@ pub fn run(dry_run: bool) -> Result<()> {
     // 1) pre_sync 钩子
     run_phase(HookPhase::PreSync, &manifest, &handles, &effect)?;
 
-    // 2) host 激活（收集 vars / extra_links）。未命中且存在 host 块 → 硬报错。
+    // 2) host 激活（收集 vars / extra_links）。未命中且存在 host 块 → 非致命：
+    //    打印骨架 + warn，继续链接通用配置（per-host 增量本就可选；装机的核心是链配置，
+    //    不能押在主机名探测/登记上）。bootstrap 会在更早阶段交互引导补 host 块。
     let hit = activate_host(&hostname, &manifest, &handles, &effect)?;
     if !hit && !manifest.host_blocks.is_empty() {
         print_host_skeleton(&hostname);
-        return Err(eyre!(
-            "当前主机 `{hostname}` 未在 dots.lua 的 hosts{{}} 覆盖"
+        render::warn(&format!(
+            "主机 `{hostname}` 未在 hosts{{}} 覆盖——跳过 per-host 配置，仅链接通用项"
         ));
     }
     if hit {
@@ -316,6 +317,10 @@ fn walk_files(dir: &Path) -> Vec<std::path::PathBuf> {
 
 /// systemctl --user enable（幂等）；dry-run 仅打印；失败 warn 不致命。
 fn enable_systemd(manifest: &Manifest, dry_run: bool) {
+    if cfg!(not(target_os = "linux")) {
+        return;
+    };
+
     for unit in &manifest.systemd_user {
         if dry_run {
             render::suggest(&format!("systemctl --user enable {unit}"));
