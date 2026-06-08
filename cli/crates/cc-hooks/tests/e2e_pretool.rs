@@ -11,7 +11,8 @@ use std::io::Write as _;
 use assert_cmd::Command;
 use tempfile::NamedTempFile;
 
-/// 生产规则集的等价 fixture（与 tree/home/.claude/hooks/pretool.toml 同步维护）。
+/// 引擎语义 fixture（含生产表没有的 Probe 等探针规则），只测匹配引擎，**无需镜像生产表**。
+/// 生产规则正确性见 e2e_production_rules.rs（include_str! 读真 pretool.toml）。
 const RULES: &str = r#"
 [[bash]]
 name     = "rm-recursive-force"
@@ -64,12 +65,13 @@ fn rules_file() -> NamedTempFile {
     file
 }
 
-/// 跑一次 pretool：返回 (stdout, exit success)。
+/// 跑一次 pretool：返回 (stdout, exit success)。审计日志导向 /dev/null，隔离真实 ~/.claude。
 fn run(rules_path: &std::path::Path, stdin_json: &str) -> (String, bool) {
     let output = Command::cargo_bin("cc-hook")
         .unwrap()
         .args(["pretool", "--rules"])
         .arg(rules_path)
+        .env("CC_HOOK_AUDIT_LOG", "/dev/null")
         .write_stdin(stdin_json)
         .output()
         .unwrap();
@@ -218,6 +220,7 @@ fn broken_rules_file_fails_open_with_stderr_notice() {
         .unwrap()
         .args(["pretool", "--rules"])
         .arg(file.path())
+        .env("CC_HOOK_AUDIT_LOG", "/dev/null")
         .write_stdin(bash_envelope("rm -rf /"))
         .output()
         .unwrap();
@@ -243,4 +246,37 @@ fn malformed_stdin_fails_open() {
         assert!(ok, "stdin: {bad}");
         assert!(stdout.is_empty(), "stdin: {bad}");
     }
+}
+
+#[test]
+fn audit_log_records_decisions_only() {
+    let rules = rules_file();
+    let log = NamedTempFile::new().unwrap();
+    let run_with_audit = |stdin: &str| {
+        Command::cargo_bin("cc-hook")
+            .unwrap()
+            .args(["pretool", "--rules"])
+            .arg(rules.path())
+            .env("CC_HOOK_AUDIT_LOG", log.path())
+            .write_stdin(stdin)
+            .assert()
+            .success();
+    };
+
+    // deny 命中 → 审计记一行（决策 + 规则名 + 命令摘要）
+    run_with_audit(&bash_envelope("rm -rf /tmp/x"));
+    let after_deny = std::fs::read_to_string(log.path()).unwrap();
+    assert!(
+        after_deny.contains("decision=deny") && after_deny.contains("rule=rm-recursive-force"),
+        "审计应记录 deny 决策与规则名: {after_deny}"
+    );
+    assert!(
+        after_deny.contains("cmd="),
+        "审计应含命令摘要: {after_deny}"
+    );
+
+    // 静默放行 → 不写审计（只记拦了/问了的，不记放行的）
+    run_with_audit(&bash_envelope("git add -A"));
+    let after_silent = std::fs::read_to_string(log.path()).unwrap();
+    assert_eq!(after_deny, after_silent, "静默放行不应追加审计行");
 }

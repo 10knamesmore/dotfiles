@@ -163,7 +163,8 @@ mod tests {
     use super::*;
     use crate::pretool::rules::Decision;
 
-    /// bash 规则 fixture（与 tree/home/.claude/hooks/pretool.toml 同步维护）。
+    /// 引擎语义 fixture：只为覆盖匹配逻辑（含生产表没有的探针规则），**无需镜像生产表**。
+    /// 生产规则的正确性由 tests/e2e_production_rules.rs 读真 pretool.toml 覆盖。
     const RULES: &str = r#"
 [[bash]]
 name     = "rm-recursive-force"

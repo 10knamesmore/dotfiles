@@ -166,6 +166,8 @@ fn read_line(chars: &mut Peekable<Chars>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::min_ident_chars, clippy::missing_docs_in_private_items)]
+    use proptest::prelude::*;
+
     use super::*;
 
     /// 便捷构造：&str 列表 → Vec<String>。
@@ -284,5 +286,22 @@ mod tests {
             short_flags(&owned(&["rm", "-rf", "--", "x"])),
             BTreeSet::from(['r', 'f'])
         );
+    }
+
+    proptest! {
+        /// fail-open 不变量：任意命令串（含未闭合引号/heredoc/控制字符）都不 panic、必终止，
+        /// 且产出的每段 argv 非空。守住「词法层绝不崩、绝不锁死」。
+        #[test]
+        fn each_command_never_panics_and_segments_nonempty(raw in any::<String>()) {
+            for segment in each_command(&raw) {
+                prop_assert!(!segment.is_empty());
+            }
+        }
+
+        /// 任意 argv：短旗标收集纯函数恒终止、不 panic。
+        #[test]
+        fn short_flags_never_panics(words in prop::collection::vec(any::<String>(), 0..8)) {
+            let _ = short_flags(&words);
+        }
     }
 }

@@ -5,7 +5,7 @@
 //! [`cc_hooks::outcome::HookRun`]，由 [`wire`] 落地（stdout/stderr/exit code）。
 //! **任何失败都静默放行（exit 0）**——fail-open 铁律。
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use cc_hooks::common::outcome::HookRun;
@@ -41,12 +41,16 @@ fn main() {
     }
 }
 
-/// 统一落地：notice → stderr，output → 序列化进 stdout，code → 退出码。
+/// 统一落地：notice → stderr，audit/notice → 审计日志，output → stdout，code → 退出码。
 ///
 /// 序列化失败吞掉（fail-open：宁可静默放行也不输出半截 JSON）。
 fn wire<T: Serialize>(run: HookRun<T>) {
-    if let Some(notice) = run.notice {
+    if let Some(notice) = &run.notice {
         eprintln!("{notice}");
+        append_audit_log(notice);
+    }
+    if let Some(audit) = &run.audit {
+        append_audit_log(audit);
     }
     if let Some(output) = run.output
         && let Ok(line) = serde_json::to_string(&output)
@@ -56,6 +60,43 @@ fn wire<T: Serialize>(run: HookRun<T>) {
     if run.code != 0 {
         std::process::exit(run.code);
     }
+}
+
+/// 把审计行追加进审计日志（best-effort，任何 IO 失败都静默——守 fail-open 铁律）。
+///
+/// 行首补 epoch 秒时间戳。路径见 [`audit_log_path`]。
+fn append_audit_log(line: &str) {
+    let Some(path) = audit_log_path() else {
+        return;
+    };
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0);
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(file, "{stamp} {line}");
+    }
+}
+
+/// 审计日志路径：`CC_HOOK_AUDIT_LOG` 优先（可指向 /dev/null 禁用），否则 `$HOME/.claude/cc-hook.log`。
+fn audit_log_path() -> Option<PathBuf> {
+    if let Some(custom) = std::env::var_os("CC_HOOK_AUDIT_LOG") {
+        return Some(PathBuf::from(custom));
+    }
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".claude/cc-hook.log"))
+}
+
+/// 命令摘要：截断到 200 字符、换行压成空格，避免审计日志被长命令撑爆。
+fn snippet(command: &str) -> String {
+    command
+        .chars()
+        .take(200)
+        .collect::<String>()
+        .replace('\n', " ")
 }
 
 /// pretool 业务：读规则 → 解析负载 → Bash 走 argv 引擎，其余工具走字段匹配器。
@@ -94,12 +135,26 @@ fn pretool(rules_path: Option<PathBuf>) -> HookRun<PreToolUseOutput> {
             .and_then(serde_json::Value::as_str)
         && let Some(rule) = engine::check_bash(&config, command)
     {
-        return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason));
+        let audit = format!(
+            "decision={} tool=Bash rule={} cmd={}",
+            rule.decision.as_str(),
+            rule.name,
+            snippet(command)
+        );
+        return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason))
+            .with_audit(audit);
     }
 
     // 通用工具规则（含 Bash 的非 command 字段场景）
     if let Some(rule) = engine::check_tool(&config, &tool_name, &tool_input) {
-        return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason));
+        let audit = format!(
+            "decision={} tool={} rule={}",
+            rule.decision.as_str(),
+            tool_name,
+            rule.name
+        );
+        return HookRun::decision(PreToolUseOutput::new(rule.decision, &rule.reason))
+            .with_audit(audit);
     }
     HookRun::silent()
 }

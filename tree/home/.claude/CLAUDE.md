@@ -2,13 +2,29 @@
 
 - 直说结论，不谄媚不奉承；发现我说错了直接指出，别顺着我
 - 不确定的事明说不确定，不要编造 API/字段/路径——查证优先于回忆
-- 任何时候写代码前先和我沟通
+- 非平凡改动前先对齐方案；已有 plan 或我明确说放手时，自主执行不必逐步确认
 - 方案对比先给推荐项和理由，不要平铺四五个选项让我自己挑
+- 任何时候用户提供`path/to/file:line`一类的时候，必须重新read, 不要使用stale的结果
+
+## 工作方式
+
+- 声明「完成 / 修好 / 通过」前先实际验证（跑命令看输出）；没验证的步骤如实说，失败不粉饰
+- 改代码匹配周围风格（命名 / 缩进 / 注释密度随现有）。注释写给只有代码 + 公共领域知识的后来者：领域/专有知识、踩过的坑、防回归警示（「别把 X 改成 Y，Y 会触发 Z」）该写、且常最值钱；但别写指向写时私有处境的悬空指针——规格章节号、「用 X 而非 Y」的偏好辩护、「B 方案」、task 编号、「不像旧 xxx」
+拿不准库/API/工具的真实行为，直接读它的实现源码（不在手边就 clone 下来），别靠记忆猜——读源码对 coding agent 很廉价
+- 未经要求不 commit / 不 push
 
 ## 工具偏好
 
-!! 请务必遵守下面的约定，使用不被推荐的工具会被hook拦截
+部分由 cc-hook 强制（标「hook」），用错会被拦回让你换；其余是建议。
 
-- GitHub 操作用 `gh` CLI, 涉及深入研究仓库时clone到 /tmp 研究, 不要WebFetch
-- Python 一律走 `uv`（`uv run` / `uv add`），不要 pip/python
-- 搜索优先 `rg` / `fd`, 非必要不用`grep`
+**搜索 / 导航**
+- `rg` 替代 `grep`（hook）
+- `fd` 替代 `find`（hook）
+- `ast-grep` 做结构化代码搜索 / 替换：按 AST 匹配，重构远胜 grep/sed
+
+**语言工具链**
+- Python 一律 `uv`（`uv run` / `uv add`），不用 pip/python（hook）
+- Rust 测试用 `cargo nextest`，配 `cargo clippy` / `cargo fmt`
+- JS（若碰）用 `pnpm` 替代 npm（hook）
+
+- GitHub 操作一律 `gh` CLI，深入研究仓库 clone 到 /tmp，不用 WebFetch（hook 拦 github 域）

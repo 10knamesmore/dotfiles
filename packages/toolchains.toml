@@ -39,6 +39,8 @@ cargo-nextest        = "cargo install --locked cargo-nextest"
 cargo-insta          = "cargo install --locked cargo-insta"
 cargo-watch          = "cargo install --locked cargo-watch"
 samply               = "cargo install --locked samply"
+# 结构化代码搜索/替换（按 AST 匹配）
+ast-grep             = "cargo install --locked ast-grep"
 # 装完在各仓库内 prek install 激活；纯 Rust，走 cargo 甩掉对 uv 的依赖链
 prek                 = "cargo install --locked prek"
 # cargo 工具自身的管理面：批量更新（cargo install-update -a）+ 缓存 GC（cargo cache --autoclean）。

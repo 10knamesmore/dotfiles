@@ -259,6 +259,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "globset",
+ "proptest",
  "regex-lite",
  "serde",
  "serde_json",

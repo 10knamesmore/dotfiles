@@ -8,6 +8,7 @@
 # 用法：cc-hook-test [hook二进制路径]   # 缺省 ~/.claude/hooks/cc-hook
 set -u
 HOOK="${1:-$HOME/.claude/hooks/cc-hook}"
+export CC_HOOK_AUDIT_LOG=/dev/null   # 黑盒测试不污染真实审计日志 ~/.claude/cc-hook.log
 command -v jq >/dev/null || { echo "需要 jq" >&2; exit 1; }
 [ -x "$HOOK" ] || { echo "找不到可执行的 hook: $HOOK" >&2; exit 1; }
 pass=0; fail=0
@@ -55,6 +56,14 @@ bashc "git reset --hard"             ask    'git reset --hard HEAD~1'
 bashc "git reset 默认"               silent 'git reset HEAD~1'
 bashc "git clean -fd"                ask    'git clean -fd'
 bashc "git clean -n"                 silent 'git clean -n'
+bashc "git commit --no-verify"       ask    'git commit --no-verify -m wip'
+bashc "git commit -n"                ask    'git commit -n -m wip'
+bashc "git commit -nm 合写"          ask    'git commit -nm wip'
+bashc "git commit 正常"              silent 'git commit -m fix'
+bashc "chmod 777"                    ask    'chmod 777 file'
+bashc "chmod -R 777"                 ask    'chmod -R 777 dir'
+bashc "chmod o+w"                    ask    'chmod o+w file'
+bashc "chmod 644 正常"               silent 'chmod 644 file'
 bashc "grep"                         deny   'grep foo file.txt'
 bashc "管道 grep"                    deny   'ps aux | grep ssh'
 bashc "find"                         deny   'find . -name *.rs'
@@ -63,6 +72,10 @@ bashc "pip3"                         deny   'pip3 list'
 bashc "python"                       deny   'python script.py'
 bashc "python3 -c"                   deny   'python3 -c print(1)'
 bashc "uv run python"                silent 'uv run python x.py'
+bashc "npm install"                  deny   'npm install left-pad'
+bashc "npm run"                      deny   'npm run build'
+bashc "npx 不拦"                     silent 'npx prettier -w x'
+bashc "pnpm 放行"                    silent 'pnpm install'
 bashc "rg 放行"                      silent 'rg foo src/'
 bashc "fd 放行"                      silent 'fd pattern .'
 bashc "echo 引号内 rm"               silent 'echo "rm -rf /"'
@@ -108,7 +121,7 @@ check "缺 tool_name"      silent '{"tool_input":{"command":"rm -rf /"}}'
 check "command 非字符串"  silent '{"tool_name":"Bash","tool_input":{"command":42}}'
 json=$(jq -cn '{tool_name:"Bash",tool_input:{command:"rm -rf /"}}')
 check "规则文件缺失"      silent "$json" --rules /nonexistent/rules.toml
-broken=$(mktemp --suffix=.toml)
+broken=$(mktemp)   # 不用 GNU 专有的 --suffix，BSD/GNU 通吃
 trap 'rm "$broken"' EXIT
 printf 'not [ valid toml' > "$broken"
 out_err=$(printf '%s' "$json" | "$HOOK" pretool --rules "$broken" 2>&1 >/dev/null)
