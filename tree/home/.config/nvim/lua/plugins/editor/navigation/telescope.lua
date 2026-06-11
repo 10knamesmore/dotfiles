@@ -1,4 +1,13 @@
-local ignore_patterns = { "node_modules", "target/", ".venv" }
+local ignore_patterns = {
+  "node_modules",
+  "target/", -- 锚成目录段，避免误伤含 target 的文件名
+  "%.venv/",
+  "%.git/", -- %. 转义点，/ 防 .github/.gitignore 被误杀
+  -- ↓ 通用缓存噪音
+  "/__pycache__/",
+  "%.DS_Store", -- macOS
+}
+
 return {
   {
     "nvim-telescope/telescope.nvim",
