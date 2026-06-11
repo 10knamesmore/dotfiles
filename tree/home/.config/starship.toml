@@ -70,7 +70,7 @@ format                = '[ $user ]($style)'
 
 [directory]
 style                 = "bg:peach fg:crust"
-format                = "[$read_only]($read_only_style)[ $path ]($style)"
+format                = "[](fg:red bg:peach)[$read_only]($read_only_style)[ $path ]($style)"
 read_only             = " "
 truncate_to_repo      = false
 read_only_style       = "bg:yellow fg:crust"
