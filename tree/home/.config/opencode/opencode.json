@@ -1,15 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "chrome-devtools": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "chrome-devtools-mcp@latest"
-      ]
-    }
-  },
   "permission": {
     "edit": "ask",
     "bash": "ask",
@@ -20,5 +10,33 @@
     "list": "allow",
     "lsp": "allow",
     "skill": "allow",
+  },
+  "provider": {
+    "ft-cli": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "ft-ci",
+      "options": {
+        "apiKey": "{env:OPENCODE_FT_CLI_API_KEY}",
+        "baseURL": "https://llm-proxy.ftai.chat/v1"
+      },
+      "models": {
+        "gpt-5.3-codex-spark": {
+          "name": "gpt-5.3-spark"
+        },
+        "kimi-for-coding": {},
+        "glm-5.2-auto": {}
+      },
+    },
+    "ft-ft": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "ft-ft",
+      "options": {
+        "apiKey": "{env:OPENCODE_FT_FT_API_KEY}",
+        "baseURL": "https://llm-proxy.ftai.chat/v1"
+      },
+      "models": {
+        "deepseek-v4-pro": {}
+      }
+    }
   }
 }
