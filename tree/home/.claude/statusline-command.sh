@@ -74,7 +74,7 @@ if [ -n "$cwd" ]; then
     home_dir="$HOME"
     display_dir="${cwd#"$home_dir"}"
     if [ "$display_dir" != "$cwd" ]; then
-        display_dir=" ~/${display_dir}"
+        display_dir=" ~${display_dir}"
     fi
 else
     display_dir=" $(pwd)"
