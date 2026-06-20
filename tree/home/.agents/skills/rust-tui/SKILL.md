@@ -17,9 +17,17 @@ description: 编写 Rust TUI 应用的最佳实践。使用 ratatui 库时、需
 |------|--------|
 | 简单工具 / 单视图 | 扁平 App struct + 直接事件处理 |
 | 复杂交互 / 状态机清晰 | **Elm Architecture (TEA)** |
-| 多个独立 UI 模块 | **Component Architecture** |
 | 异步 I/O 密集 | **Action Pattern** (TEA 变体) |
 | 中央状态 + 多视图 | Flux Architecture |
+
+**正交维度——多页面 / 焦点 / 分层路由**（叠加在上面任意一种之上，不是第五种架构）：
+
+| 场景 | 推荐做法 |
+|------|--------|
+| 页多 / 有深下钻回退 | **view-stack**（`Vec<Box<dyn Layer>>`，栈顶即页即焦点） |
+| 少量互斥页（不叠加） | 派生 **`active_layer()`**（单函数按优先级算当前层） |
+| 同屏多面板互切焦点 | 该页**私有 focus 枚举** + 相邻对成环 `next/previous` |
+| 多组件事件路由 | **有序层逆序冒泡，第一个 `Consumed` 短路**——切忌广播给所有组件 |
 
 详见 `references/architecture-patterns.md`。
 
@@ -28,6 +36,7 @@ description: 编写 Rust TUI 应用的最佳实践。使用 ratatui 库时、需
 | 文件 | 加载时机 |
 |------|--------|
 | `references/architecture-patterns.md` | 设计整体架构 / 选型决策 |
+| `references/page-focus-routing.md` | 设计多页面 / 焦点 / 分层按键路由时 |
 | `references/project-structure.md` | 组织文件和模块 |
 | `references/event-handling.md` | 实现事件循环 / 键鼠处理 |
 | `references/widget-system.md` | 编写自定义 Widget / 使用内置 Widget |

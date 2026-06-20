@@ -148,88 +148,86 @@ pub fn update(model: Model, msg: Message) -> (Model, Command) {
 
 ## Component Architecture
 
-面向对象风格，每个组件封装自身的状态、事件和渲染。适合多个独立 UI 区域。
+面向对象风格，每个组件封装自身的状态、事件和渲染。适合有多页面 / 分层浮层 / 焦点路由的应用。
 
-### Component Trait
+### 默认范式：有序栈/层 + 逆序冒泡 + 第一个 Consumed 短路
+
+**结论先行：把事件「广播给所有组件、各组件自己 `if !is_focused return`」是反模式。**
+13 个生产 ratatui 应用调研里 **0 个**真用并行广播：11/13 是「只把事件路由给当前聚焦者 / 栈顶层，未消费才向外冒泡」。唯二「广播」的例外都不构成反例——gitui 是**有序链 + 首个 Consumed 截停**（仍是短路，不是并行），bubbletea 是 Go 无借用检查才广播 + 组件自 gate。广播的代价：每键全组件 `update` 开销 + 焦点逻辑散落各组件自 gate、极易漂移失配；只有 zellij 的「同步输入到所有 pane」这种**显式 opt-in** 才该广播。
+
+正解是组件 / 页返回一个**响应枚举**，顶层按层级逆序派发、第一个 `Consumed` 即停：
 
 ```rust
-pub trait Component {
-    /// 初始化，返回可选的首次 Action
-    fn init(&mut self) -> Result<Option<Action>> {
-        Ok(None)
-    }
-
-    /// 处理终端事件，返回可选 Action
-    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
-        match event {
-            Some(Event::Key(key)) => self.handle_key_event(key),
-            Some(Event::Mouse(mouse)) => self.handle_mouse_event(mouse),
-            _ => Ok(None),
-        }
-    }
-
-    fn handle_key_event(&mut self, _key: KeyEvent) -> Result<Option<Action>> {
-        Ok(None)
-    }
-
-    fn handle_mouse_event(&mut self, _mouse: MouseEvent) -> Result<Option<Action>> {
-        Ok(None)
-    }
-
-    /// 更新组件状态，返回可选 Action（支持链式响应）
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        Ok(None)
-    }
-
-    /// 渲染到指定区域
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
+/// 一次输入在某一层的处理结果。
+pub enum Response {
+    /// 已吃掉，停止向外冒泡。
+    Consumed,
+    /// 本层不关心，继续冒泡给下一层 / 全局。
+    Pass,
+    /// 已吃掉，并请求顶层执行一个意图（真副作用在顶层做，见下文）。
+    Do(Intent),
 }
 ```
 
-### 完整组件示例
+```rust
+/// 一层 UI（页 / 浮层 / 编辑器）。注意没有 `is_focused` 字段——
+/// 谁在栈顶谁就是焦点，由栈位置隐式决定。
+pub trait Layer {
+    fn on_key(&mut self, key: KeyEvent) -> Response;
+
+    /// `focused` 在渲染时传入，组件不自存一份（见「焦点即时派生」一节）。
+    fn render(&self, frame: &mut Frame, area: Rect, focused: bool);
+}
+
+pub struct App {
+    /// 层栈：layers[0] 是基底页，越靠后越上层（浮层 / 子页）。栈顶即焦点。
+    layers: Vec<Box<dyn Layer>>,
+}
+
+impl App {
+    fn dispatch_key(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
+        // 逆序：从最上层往下冒泡，第一个 Consumed/Do 即短路。
+        for layer in self.layers.iter_mut().rev() {
+            match layer.on_key(key) {
+                Response::Consumed => return Ok(()),
+                Response::Do(intent) => return self.run_intent(intent),
+                Response::Pass => continue, // 本层放行，交给下一层
+            }
+        }
+        self.global_key(key) // 所有层都放行 → 全局快捷键兜底
+    }
+}
+```
+
+**实证锚点**：
+- **helix** `compositor.rs`：`for layer in self.layers.iter_mut().rev()`，第一个返回 `Consumed` 立即 `break`，EditorView 恒为 `layers[0]` 兜底。
+- **lazygit**：聚焦 view → 其父 view → global，逐级冒泡（不是广播）。
+- **yazi** `core.rs`：派生 `layer()` 选出当前活跃层，**只把事件喂那一层**。
+- **spotify-player**：先按 `popup.is_none()` 在「浮层 / 页面」二选一路由，未命中再 fallback 到 global。
+
+### 焦点即时派生：别把 `is_focused` 存成组件字段
+
+即时模式下「谁聚焦」每帧都能算出来，**不该每个组件存一份 `is_focused: bool`**——那是双写漂移源（焦点切换时漏更新某个组件就花屏）。正解：焦点是渲染时从一个集中的 focus 枚举**瞬时派生**的 bool，作为参数喂给组件：
 
 ```rust
+// ❌ 反模式：组件自存焦点，焦点切换要逐个组件同步，漏一个就错
 pub struct FileList {
     items: Vec<PathBuf>,
     state: ListState,
-    is_focused: bool,
+    is_focused: bool, // 双写源：和 App 的 focus 枚举两头记，迟早不一致
 }
 
-impl Component for FileList {
-    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if !self.is_focused { return Ok(None); }
-        match key.code {
-            KeyCode::Down | KeyCode::Char('j') => {
-                // saturating_sub 防空列表下溢:len()==0 时 len()-1 会 usize 回绕成
-                // 巨大值,(i+1).min(那个) 不再夹住 → 选择越界。
-                let max = self.items.len().saturating_sub(1);
-                let next = self.state.selected().map(|i| (i + 1).min(max)).unwrap_or(0);
-                self.state.select(Some(next));
-                Ok(None)
-            }
-            KeyCode::Enter => {
-                // 用 .get() 不用 self.items[i]:选择索引相对 items 会**过期**——
-                // 列表异步刷新/筛选后变短,旧 selected 就指向越界,索引直接 panic。
-                let path = self.state.selected()
-                    .and_then(|i| self.items.get(i))
-                    .cloned();
-                Ok(path.map(Action::OpenFile))
-            }
-            _ => Ok(None),
-        }
-    }
+// ✅ 焦点不进组件状态；渲染时由集中 focus 派生后传入
+pub struct FileList {
+    items: Vec<PathBuf>,
+    state: ListState,
+}
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let items: Vec<ListItem> = self.items.iter()
-            .map(|p| ListItem::new(p.to_string_lossy().to_string()))
-            .collect();
-
-        let border_style = if self.is_focused {
-            Style::new().cyan()
-        } else {
-            Style::default()
-        };
-
+impl FileList {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, focused: bool) {
+        let border_style = if focused { Style::new().cyan() } else { Style::default() };
+        let items = self.items.iter()
+            .map(|p| ListItem::new(p.to_string_lossy().into_owned()));
         frame.render_stateful_widget(
             List::new(items)
                 .block(Block::bordered().border_style(border_style).title("Files"))
@@ -237,47 +235,44 @@ impl Component for FileList {
             area,
             &mut self.state,
         );
-        Ok(())
     }
+}
+
+// 顶层渲染：focused 由「页是否激活 && 集中 focus 指向本面板」当场算出
+fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    let focused = self.is_active && self.focus == Focus::Files;
+    self.file_list.render(frame, area, focused);
 }
 ```
 
-### App 组装多个组件
+**实证锚点**：spotify-player `ui/page.rs` 渲染时算 `is_active && focus == This`；joshuto 渲染时把 `focused` 当参数传给目录列表；tui-textarea 焦点状态全外置、库自身不存。反面：bubbletea / gitui / tui-realm 都存 `is_focused`，且都伴随手动双写同步的负担。
+
+> 路由组件返回意图、顶层执行副作用、`Consumed/Pass/Do` 的完整设计与「优先级单一真相源」铁律，见 `references/page-focus-routing.md`。
+
+### 组件内列表导航的两个防回归点
+
+无论用哪种架构，列表组件常踩这两个坑（异步刷新 / 筛选会让旧选择越界）：
 
 ```rust
-pub struct App {
-    components: Vec<Box<dyn Component>>,
-    focused: usize,
-}
-
-impl App {
-    pub fn run(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
-        loop {
-            terminal.draw(|f| {
-                let chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-                    .split(f.area());
-
-                for (i, (component, area)) in
-                    self.components.iter_mut().zip(chunks.iter()).enumerate()
-                {
-                    component.draw(f, *area).unwrap();
-                }
-            })?;
-
-            if let Some(event) = read_event()? {
-                let mut actions = vec![];
-                for component in &mut self.components {
-                    if let Some(action) = component.handle_events(Some(event.clone()))? {
-                        actions.push(action);
-                    }
-                }
-                for action in actions {
-                    self.handle_action(action)?;
-                }
+fn on_key(&mut self, key: KeyEvent) -> Response {
+    match key.code {
+        KeyCode::Down | KeyCode::Char('j') => {
+            // saturating_sub 防空列表下溢：len()==0 时 len()-1 会 usize 回绕成
+            // 巨大值，(i+1).min(那个) 不再夹住 → 选择越界。
+            let max = self.items.len().saturating_sub(1);
+            let next = self.state.selected().map_or(0, |i| (i + 1).min(max));
+            self.state.select(Some(next));
+            Response::Consumed
+        }
+        KeyCode::Enter => {
+            // 用 .get() 不用 self.items[i]：选择索引相对 items 会**过期**——
+            // 列表异步刷新 / 筛选后变短，旧 selected 就指向越界，裸索引直接 panic。
+            match self.state.selected().and_then(|i| self.items.get(i)) {
+                Some(path) => Response::Do(Intent::OpenFile(path.clone())),
+                None => Response::Consumed,
             }
         }
+        _ => Response::Pass, // 不关心的键放行，交给下一层 / 全局
     }
 }
 ```
@@ -370,13 +365,21 @@ async fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
 需要异步操作（网络/DB）？
 ├─ 是 → Action Pattern（tokio + mpsc channel）
 └─ 否
-    ├─ 有多个独立 UI 区域？
-    │   └─ 是 → Component Architecture
     ├─ 强调可测试性/函数式？
     │   └─ 是 → Elm Architecture (TEA)
     └─ 简单工具
         └─ 扁平 App struct 即可
+
+正交维度——只要有「多页面 / 深下钻回退 / 分层浮层 / 同屏多面板焦点」：
+├─ 页多 / 有回退栈        → view-stack（Vec<Box<dyn Layer>>，栈顶即页即焦点）
+├─ 少量互斥页（不叠加）    → 派生 active_layer()（单函数按优先级算当前层）
+├─ 同屏多面板互切焦点      → 该页私有一个 focus 枚举 + 相邻对成环 next/previous
+└─ 事件路由               → 有序层逆序冒泡，第一个 Consumed 短路（切忌广播）
+                           详见 references/page-focus-routing.md
 ```
+
+> 「多页面 + 焦点」不是上面四种顶层架构的第五种，而是叠加在任意一种之上的**正交维度**。
+> 别用一个 enum 同时兼任「顶层架构 + 页面身份 + 面板焦点 + 输入路由」——拆开。
 
 ---
 
@@ -384,10 +387,12 @@ async fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
 
 | 项目 | 架构 | 特点 |
 |------|------|------|
-| [gitui](https://github.com/extrawurst/gitui) | 集中式 App State | 同步轮询，状态机清晰 |
-| [yazi](https://github.com/sxyazi/yazi) | Action + tokio LocalSet | Micro/Macro 任务队列，极高性能 |
-| [bottom](https://github.com/ClementTsang/bottom) | 扁平 + tick 驱动 | 实时监控，定时刷新 |
-| [spotify-tui](https://github.com/Rigellute/spotify-tui) | 异步线程分离 | UI 线程和网络线程解耦 |
+| [spotify-player](https://github.com/aome510/spotify-player) | 闭集 enum 页栈 + 焦点宏 | `history: Vec<PageState>` 闭集枚举栈下钻回退；`impl_focusable!` 按相邻对生成焦点环；LineInput 输入原语 |
+| [helix](https://github.com/helix-editor/helix) | compositor 层栈 | `compositor.rs` 逆序冒泡、第一个 `Consumed` 短路；EditorView 恒为 `layers[0]` 兜底 |
+| [yazi](https://github.com/sxyazi/yazi) | Action + tokio LocalSet | `core.rs` 派生 `layer()` 选活跃层、只路由那一层；Micro/Macro 任务队列，极高性能 |
+| [ncspot](https://github.com/hrkfdn/ncspot) | 泛型 ListView + CommandResult | `ListView<I>` 一份选择/滚动逻辑复用全列表；命令返回 `CommandResult` 顶层执行 |
+| [tui-input](https://github.com/sayanarijit/tui-input) | 输入原语三段式 | 事件解码 `InputRequest` 与纯态更新 `StateChanged` 分离，核心零 ratatui 依赖、好测 |
+| [gitui](https://github.com/extrawurst/gitui) | 集中式 App State | 有序链 + 首个 Consumed 截停（非广播）；同步轮询，状态机清晰 |
 
 ## 参考链接
 
