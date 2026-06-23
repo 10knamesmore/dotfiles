@@ -238,6 +238,26 @@ time_left_str() {
     fi
 }
 
+# usage: elapsed_time_pct_str <resets_at_epoch> <window_secs>  → sets $time_left
+elapsed_time_pct_str() {
+    now=$(date +%s)
+    secs=$(($1 - now))
+    window_secs=$2
+    if [ "$secs" -le 0 ] || [ "$window_secs" -le 0 ]; then
+        time_left=""
+    else
+        elapsed_secs=$((window_secs - secs))
+        if [ "$elapsed_secs" -lt 0 ]; then
+            elapsed_secs=0
+        elif [ "$elapsed_secs" -gt "$window_secs" ]; then
+            elapsed_secs=$window_secs
+        fi
+        elapsed_h=$((elapsed_secs / 3600))
+        elapsed_pct=$((elapsed_secs * 100 / window_secs))
+        time_left="${OVERLAY2}(${elapsed_h}h:${elapsed_pct}%)${RESET}"
+    fi
+}
+
 # ---------- Rate limit color ----------
 rate_color() {
     if [ "$1" -ge 80 ]; then
@@ -268,7 +288,7 @@ if [ -n "$week_pct" ]; then
     col=$(rate_color "$week_int")
     week_part="${col}168h:${week_int}%${RESET}"
     if [ -n "$week_resets" ]; then
-        time_left_str "$week_resets"
+        elapsed_time_pct_str "$week_resets" 604800
         week_part="${week_part}${time_left}"
     fi
 fi
