@@ -245,6 +245,36 @@ return {
       yank_to_clipboard("path", filepath)
     end
 
+    --- 复制 visual 选区内所有有效条目到系统剪贴板，每行一项，经 `transform` 提取目标文本。
+    --- 在 visual keymap 中 `'<`/`'>` 尚未更新，故用 `line("v")`/`line(".")` 实时取选区两端。
+    ---@param label string
+    ---@param transform fun(path: string): string
+    local yank_selection = function(label, transform)
+      local buf_id = vim.api.nvim_get_current_buf()
+      local line_start, line_end = vim.fn.line("v"), vim.fn.line(".")
+      if line_start > line_end then
+        line_start, line_end = line_end, line_start
+      end
+
+      -- 退出 visual 模式，避免选区高亮残留（行号已在上面读取，feedkeys 异步退出不影响）。
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+
+      local items = {}
+      for line = line_start, line_end do
+        local fs_entry = MiniFiles.get_fs_entry(buf_id, line)
+        if fs_entry then
+          table.insert(items, transform(fs_entry.path))
+        end
+      end
+
+      if #items == 0 then
+        vim.notify("No valid entries in selection", vim.log.levels.WARN)
+        return
+      end
+
+      yank_to_clipboard(("%d %s"):format(#items, label), table.concat(items, "\n"))
+    end
+
     --- 为 mini.files 缓冲区补齐专属按键。
     --- `MiniFilesBufferCreate` 已保证目标就是 mini.files buffer，不依赖 filetype 已就绪。
     ---@param buf_id integer
@@ -256,6 +286,14 @@ return {
       vim.keymap.set("n", ".", toggle_dotfiles, { buffer = buf_id, desc = "Toggle hidden files" })
       vim.keymap.set("n", "gy", yank_filename, { buffer = buf_id, desc = "Yank Filename" })
       vim.keymap.set("n", "gY", yank_filepath, { buffer = buf_id, desc = "Yank Absolute Path" })
+      vim.keymap.set("x", "gy", function()
+        yank_selection("filenames", vim.fs.basename)
+      end, { buffer = buf_id, desc = "Yank Filenames (selection)" })
+      vim.keymap.set("x", "gY", function()
+        yank_selection("paths", function(path)
+          return path
+        end)
+      end, { buffer = buf_id, desc = "Yank Absolute Paths (selection)" })
       map_split(buf_id, "<C-s>", "belowright horizontal")
       map_split(buf_id, "<C-v>", "belowright vertical")
     end
