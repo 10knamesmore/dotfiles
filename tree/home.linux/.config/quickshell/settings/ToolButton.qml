@@ -13,6 +13,7 @@ Rectangle {
     property string label: ""
     property string command: ""
     property bool closeOnClick: true
+    signal clicked()
 
     Layout.fillWidth: true
     implicitHeight: 48
@@ -55,8 +56,12 @@ Rectangle {
             if (root.closeOnClick)
                 PanelState.settingsOpen = false;
 
-            proc.command = ["sh", "-c", root.command];
-            proc.running = true;
+            root.clicked();
+
+            if (root.command !== "") {
+                proc.command = ["sh", "-c", root.command];
+                proc.running = true;
+            }
         }
     }
 

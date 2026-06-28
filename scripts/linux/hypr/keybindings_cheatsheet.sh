@@ -95,7 +95,6 @@ format_keybindings() {
             *screen_record_toggle*) desc="切换录屏" ;;
             *workspace_save*)     desc="保存工作区布局" ;;
             *workspace_restore*)  desc="恢复工作区布局" ;;
-            *monitor_profile*)    desc="显示器模式切换" ;;
             *keybindings_cheatsheet*) desc="快捷键速查 (本窗口)" ;;
             *killall*waybar*)     desc="切换 Waybar 显示" ;;
             *launch_yazi*)        desc="打开文件管理器 (Yazi)" ;;

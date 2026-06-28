@@ -1,5 +1,6 @@
 singleton BarState 1.0 BarState.qml
 singleton LyricsState 1.0 LyricsState.qml
+singleton MonitorState 1.0 MonitorState.qml
 singleton MorphState 1.0 MorphState.qml
 singleton OsdState 1.0 OsdState.qml
 singleton PanelState 1.0 PanelState.qml

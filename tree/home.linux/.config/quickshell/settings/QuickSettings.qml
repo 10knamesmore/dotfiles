@@ -455,32 +455,16 @@ PanelOverlay {
 
             }
 
-            // ── 显示器切换 ──
+            // ── 显示器设置 ──（打开可视化显示器管理面板）
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Tokens.spaceS
 
                 ToolButton {
                     icon: "󰍹"
-                    label: "双屏"
-                    command: root._home + "/dotfiles/.gen/scripts/hypr/monitor_profile.sh dual"
-                    closeOnClick: false
+                    label: "显示器设置"
+                    onClicked: PanelState.toggleDisplay()
                 }
-
-                ToolButton {
-                    icon: "󰶐"
-                    label: "外接"
-                    command: root._home + "/dotfiles/.gen/scripts/hypr/monitor_profile.sh external"
-                    closeOnClick: false
-                }
-
-                ToolButton {
-                    icon: "󰌢"
-                    label: "笔记本"
-                    command: root._home + "/dotfiles/.gen/scripts/hypr/monitor_profile.sh laptop"
-                    closeOnClick: false
-                }
-
             }
 
             Divider {

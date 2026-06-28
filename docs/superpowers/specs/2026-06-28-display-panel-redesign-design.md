@@ -21,7 +21,7 @@
 | 维度 | 决定 |
 | --- | --- |
 | 整体布局 | B 方案：左侧可拖拽画布 + 右侧选中屏参数控件（类 macOS） |
-| 持久化落点 | 机器本地 `~/.config/hypr/monitors.local.lua`（开机恢复）+ `~/.local/state/quickshell/monitor-profiles.json`（按组合存档）。**均不入 git** |
+| 持久化落点 | 机器本地 `~/.local/state/hypr/monitors.local.lua`（开机恢复）+ `~/.local/state/quickshell/monitor-profiles.json`（按组合存档）。**均落 XDG state，不入 git**（`~/.config/hypr` 是整目录软链进仓库，故开机文件不能落那里） |
 | 热插拔 | 按「显示器组合签名」记忆布局、插上自动恢复 |
 | apply 安全 | apply 后 15 秒回滚确认（防错误配置黑屏） |
 | 未知新组合 | 不自动应用，保持 Hyprland 默认 + 发通知「新显示器组合，点此配置」 |
@@ -76,11 +76,17 @@ display/RevertConfirm.qml     新·回滚倒计时条
 
 ## 数据获取（事件驱动）
 
-- 优先使用 `Quickshell.Hyprland` 模块的原生绑定（它已包装 socket2，可能直接暴露 monitor 列表与显示器增删/变更事件）。**实现时须先读 quickshell 源码/文档验证该模块暴露的具体 API**；能用则不自己 spawn `socat`/`hyprctl`。
-- 兜底：`hyprctl monitors -j` 取数 + 监听 socket2（`monitoradded` / `monitorremoved` 等）。
-- 取消一切定时轮询。
+已验证 `Quickshell.Hyprland` 的 `Hyprland` 单例 API（`/usr/lib/qt6/qml/Quickshell/Hyprland/_Ipc/quickshell-hyprland-ipc.qmltypes`）：
 
-`hyprctl monitors -j` 关键字段：`name`、`description`、`make`、`model`、`serial`、`width`、`height`、`refreshRate`、`x`、`y`、`scale`、`transform`、`disabled`、`focused`、`availableModes`。
+- `Hyprland` 单例：`monitors`、`focusedMonitor`、`rawEvent(event)` 信号、`refreshMonitors()`、`dispatch(request)`、`eventSocketPath`。
+- `HyprlandMonitor` 对象：`id`/`name`/`description`/`x`/`y`/`width`/`height`/`scale`/`focused`，外加 **`lastIpcObject`**——即 `hyprctl monitors -j` 那条 JSON 原对象，**全字段都在**（`refreshRate`/`transform`/`availableModes`/`make`/`model`/`serial`/`disabled` 等）。
+
+方案：
+- 事件检测：`Connections { target: Hyprland; function onRawEvent(e) {...} }`，对 monitor 相关事件去抖后调用 `Hyprland.refreshMonitors()`。**事件驱动，无定时轮询**，不自己 spawn `socat`。
+- 取数：读 `Hyprland.monitors[*].lastIpcObject` 拿全字段。
+- 应用：`hyprctl eval '<hl.monitor(...) lua chunk>'`。**注意**：Hyprland lua 模式（non-legacy parser）下运行时 `hyprctl keyword` 已被禁用（报 `keyword can't work with non-legacy parsers. Use eval.`），必须用 `hyprctl eval` 跑 `hl.monitor({...})`。多屏拼成一个 lua chunk 一次 eval；chunk 作为单个 argv 直传，免 shell 转义。判错看 stdout（成功 `ok`、失败 `error: ...`，退出码均 0，不可靠）。
+
+`lastIpcObject` 关键字段：`name`、`description`、`make`、`model`、`serial`、`width`、`height`、`refreshRate`、`x`、`y`、`scale`、`transform`、`disabled`、`focused`、`availableModes`。
 
 ## 组合签名
 
@@ -124,12 +130,10 @@ display/RevertConfirm.qml     新·回滚倒计时条
 Hyprland 的 lua 入口「一旦存在即完全接管、忽略所有 .conf」，故持久化只能走 lua。`hyprland.lua` 显示器段：
 
 ```lua
-local mlocal = HOME .. "/.config/hypr/monitors.local.lua"
-local f = io.open(mlocal, "r")
-if f then
-    f:close()
-    dofile(mlocal)                                   -- 上次 apply 的完整布局，开机即恢复
-else
+local mlocal = HOME .. "/.local/state/hypr/monitors.local.lua"
+local chunk = loadfile(mlocal)            -- 文件缺失返回 nil
+local ok = chunk and pcall(chunk)         -- 解析/运行错误被兜住
+if not ok then
     hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })  -- 安全默认
 end
 ```
@@ -148,8 +152,7 @@ end
 3. 「保留」→ 提交：写 `profiles.json[签名]` + 回写 `monitors.local.lua` + 取消定时器。
 4. 「恢复」或 15 秒超时 → 重放快照、丢弃 pending。
 
-monitor 串格式（与现有一致并扩展）：
-`NAME,RES@RATE,POSXxPOSY,SCALE[,transform,N]`，禁用为 `NAME,disable`。
+应用走 `hyprctl eval`（见上）；`monitorModel.serializeMonitorString`（`NAME,RES@RATE,XxY,SCALE[,transform,N]` / `NAME,disable`）现仅用于 `_differsFromCurrent` 的状态比对，不再用于实际应用。实际应用用 `monitorModel.monitorLuaLine` 生成的 `hl.monitor({...})`。
 
 ## 热插拔自动应用
 

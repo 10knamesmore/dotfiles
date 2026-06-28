@@ -41,6 +41,8 @@ ShellRoot {
 
     SystemStatsService {}
 
+    MonitorService {}
+
     // ── 每个显示器生成一个 Bar ──
     Variants {
         model: Quickshell.screens

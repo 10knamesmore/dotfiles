@@ -30,8 +30,14 @@ local mainMod = "SUPER"
 -- 显示器
 -- ============================================================
 
-hl.monitor({ output = "eDP-1", mode = "2560x1600@60", position = "640x2160", scale = 1 })
-hl.monitor({ output = "DP-3", mode = "3840x2160@60", position = "0x0", scale = 1, transform = 0 })
+-- 优先加载 QuickShell MonitorService 回写的机器本地布局（按当前显示器组合，开机即恢复、无闪烁）。
+-- 文件缺失或出错则退回安全默认。完整可视化管理见 QuickShell「显示器」面板（侧边栏打开）。
+local mlocal = HOME .. "/.local/state/hypr/monitors.local.lua"
+local chunk = loadfile(mlocal)
+local ok = chunk and pcall(chunk)
+if not ok then
+    hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })
+end
 
 -- ============================================================
 -- 环境变量
@@ -363,14 +369,6 @@ hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.global("quickshell:journal"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_save.sh"))
 hl.bind(mainMod .. " + CONTROL + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_restore.sh"))
-hl.bind(
-    mainMod .. " + SHIFT + D",
-    hl.dsp.exec_cmd(
-        [[bash -c 'echo -e "dual\nexternal\nlaptop" | fuzzel --dmenu --prompt "Monitor: " | xargs -I{} ]]
-            .. SCRIPTS
-            .. [[/hypr/monitor_profile.sh {}']]
-    )
-)
 
 -- 鼠标拖动 / 调整大小（bindm 等价：mouse = true）
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })

@@ -79,7 +79,7 @@
   },
   "language": "中文",
   "alwaysThinkingEnabled": true,
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "preferredNotifChannel": "kitty",

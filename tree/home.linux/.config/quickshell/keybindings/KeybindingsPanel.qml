@@ -184,7 +184,6 @@ PanelOverlay {
             if (args.includes("focus_mode")) return "专注模式";
             if (args.includes("workspace_save")) return "保存工作区";
             if (args.includes("workspace_restore")) return "恢复工作区";
-            if (args.includes("monitor_profile")) return "显示器切换";
             if (args.includes("layout_dispatch")) {
                 let dir = args.includes(" h") ? "←" : args.includes(" l") ? "→" : args.includes(" k") ? "↑" : "↓";
                 if (args.includes("shift")) return "移动窗口 " + dir;

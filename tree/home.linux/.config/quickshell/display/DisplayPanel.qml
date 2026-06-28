@@ -4,128 +4,85 @@ import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 
-// 显示器管理面板 — 查看和修改多显示器配置
+// 显示器管理面板（B 布局：左可拖拽画布 + 右参数控件 + 底部应用/回滚）。
+// 状态/IPC 在 MonitorService(常驻) + MonitorState(单例)；本面板只持有编辑态 draft。
 PanelOverlay {
     id: root
 
-    property var monitors: []
+    // draft：MonitorState.monitors 的可编辑深拷贝；应用前不回写 live 状态
+    property var draft: []
     property int selectedIndex: 0
-    property bool applying: false
-    property string errorMsg: ""
-    property string _jsonBuf: ""
+    readonly property var selected: (selectedIndex >= 0 && selectedIndex < draft.length) ? draft[selectedIndex] : null
 
-    function queryMonitors() {
-        root._jsonBuf = "";
-        queryProc.running = true;
+    function _loadDraft() {
+        root.draft = (MonitorState.monitors || []).map(function (m) {
+            return {
+                "name": m.name, "description": m.description, "enabled": m.enabled,
+                "mode": m.mode, "x": m.x, "y": m.y, "scale": m.scale, "transform": m.transform,
+                "width": m.width, "height": m.height, "refreshRate": m.refreshRate,
+                "availableModes": m.availableModes, "primary": m.primary
+            };
+        });
+        if (root.selectedIndex >= root.draft.length)
+            root.selectedIndex = 0;
     }
 
-    function applyConfig(config) {
-        root.applying = true;
-        root.errorMsg = "";
-        if (!config.enabled) {
-            applyProc.command = ["hyprctl", "keyword", "monitor", config.name + ",disable"];
-        } else {
-            let monStr = config.name
-                + "," + config.res + "@" + config.rate
-                + "," + config.x + "x" + config.y
-                + "," + config.scale;
-            if (config.transform > 0)
-                monStr += ",transform," + config.transform;
-            applyProc.command = ["hyprctl", "keyword", "monitor", monStr];
-        }
-        applyProc.running = true;
+    function _setField(i, key, val) {
+        if (i < 0 || i >= draft.length)
+            return;
+        draft[i][key] = val;
+        root.draft = draft.slice();
+    }
+
+    function _setPos(i, x, y) {
+        if (i < 0 || i >= draft.length)
+            return;
+        draft[i].x = x;
+        draft[i].y = y;
+        root.draft = draft.slice();
+    }
+
+    function _setPrimary(i) {
+        for (var k = 0; k < draft.length; k++)
+            draft[k].primary = (k === i);
+        root.draft = draft.slice();
+    }
+
+    function _apply() {
+        var primary = "";
+        var layouts = draft.map(function (d) {
+            if (d.primary)
+                primary = d.name;
+            return { "name": d.name, "enabled": d.enabled, "mode": d.mode, "x": d.x, "y": d.y, "scale": d.scale, "transform": d.transform, "mirror": null };
+        });
+        MonitorState.requestApply(layouts, primary);
     }
 
     showing: PanelState.displayOpen
-    panelWidth: 520
-    panelHeight: root.height * 0.75
-    panelTargetX: (root.width - 520) / 2
+    panelWidth: 720
+    panelHeight: root.height * 0.7
+    panelTargetX: (root.width - 720) / 2
     panelTargetY: 54
     closedOffsetY: -20
     onCloseRequested: PanelState.displayOpen = false
     onShowingChanged: {
         if (showing) {
-            errorMsg = "";
-            applying = false;
-            queryMonitors();
+            MonitorState.refresh();
+            _loadDraft();
         }
     }
 
-    // 定时刷新（热插拔检测）
-    Timer {
-        running: root.showing
-        interval: 10000
-        repeat: true
-        onTriggered: queryMonitors()
-    }
-
-    // ── 查询显示器 ──
-    Process {
-        id: queryProc
-        command: ["hyprctl", "monitors", "-j"]
-        onStarted: root._jsonBuf = ""
-        stdout: SplitParser {
-            onRead: (data) => { root._jsonBuf += data + "\n"; }
-        }
-        onExited: (code, status) => {
-            if (code !== 0) {
-                root.errorMsg = "查询失败";
-                return;
-            }
-            try {
-                let arr = JSON.parse(root._jsonBuf);
-                root.monitors = arr.map(m => ({
-                    "name": m.name,
-                    "description": m.description || "",
-                    "model": m.model || "",
-                    "width": m.width,
-                    "height": m.height,
-                    "refreshRate": m.refreshRate,
-                    "x": m.x,
-                    "y": m.y,
-                    "scale": m.scale,
-                    "transform": m.transform,
-                    "disabled": m.disabled || false,
-                    "availableModes": m.availableModes || []
-                }));
-                if (root.selectedIndex >= root.monitors.length)
-                    root.selectedIndex = 0;
-            } catch (e) {
-                root.errorMsg = "JSON 解析失败";
-            }
+    // 面板打开期间，若热插拔/恢复导致 live 状态变化且当前没有未决回滚，则同步 draft
+    Connections {
+        target: MonitorState
+        function onMonitorsChanged() {
+            if (root.showing && MonitorState.revertSecs === 0 && !MonitorState.applying)
+                root._loadDraft();
         }
     }
 
-    // ── 应用配置 ──
-    Process {
-        id: applyProc
-        property string _errBuf: ""
-        onStarted: _errBuf = ""
-        onExited: (code, status) => {
-            root.applying = false;
-            if (code === 0) {
-                root.errorMsg = "";
-                // 延迟刷新，等 Hyprland 重排
-                refreshDelay.start();
-            } else {
-                root.errorMsg = applyProc._errBuf || "应用失败";
-            }
-        }
-        stderr: SplitParser {
-            onRead: (data) => { applyProc._errBuf += data; }
-        }
-    }
-
-    Timer {
-        id: refreshDelay
-        interval: 500
-        onTriggered: root.queryMonitors()
-    }
-
-    // ── UI ──
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Tokens.spaceL
@@ -134,120 +91,120 @@ PanelOverlay {
         // ── 标题 ──
         RowLayout {
             Layout.fillWidth: true
-
-            Text {
-                text: "󰍹"
-                color: Colors.blue
-                font.family: Fonts.family
-                font.pixelSize: Fonts.title
-            }
-
-            Text {
-                text: "显示器"
-                font.family: Fonts.family
-                font.pixelSize: Fonts.title
-                font.bold: true
-                color: Colors.text
-            }
-
+            Text { text: "󰍹"; color: Colors.blue; font.family: Fonts.family; font.pixelSize: Fonts.title }
+            Text { text: "显示器"; color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.title; font.bold: true }
             Item { Layout.fillWidth: true }
-
-            // 刷新
             Rectangle {
-                width: 28
-                height: 28
-                radius: Tokens.radiusFull
-                color: dispRefreshArea.containsMouse ? Colors.surface2 : "transparent"
-
+                width: 28; height: 28; radius: Tokens.radiusFull
+                color: refreshArea.containsMouse ? Colors.surface2 : "transparent"
                 Text {
-                    anchors.centerIn: parent
-                    text: "󰑓"
-                    color: dispRefreshArea.containsMouse ? Colors.blue : Colors.subtext0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.icon
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    anchors.centerIn: parent; text: "󰑓"
+                    color: refreshArea.containsMouse ? Colors.blue : Colors.subtext0
+                    font.family: Fonts.family; font.pixelSize: Fonts.icon
                 }
-
                 MouseArea {
-                    id: dispRefreshArea
-                    anchors.fill: parent
-                    hoverEnabled: true
+                    id: refreshArea; anchors.fill: parent; hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.queryMonitors()
+                    onClicked: { MonitorState.refresh(); root._loadDraft(); }
                 }
-
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
             }
-
             Text {
-                text: root.monitors.length + " 台显示器"
-                color: Colors.subtext0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.small
+                text: root.draft.length + " 台"
+                color: Colors.subtext0; font.family: Fonts.family; font.pixelSize: Fonts.small
             }
         }
 
-        // ── 布局预览 ──
-        MonitorPreview {
+        // ── 主体：左画布 + 右控件 ──
+        RowLayout {
             Layout.fillWidth: true
-            implicitHeight: 150
-            monitors: root.monitors
-            selectedIndex: root.selectedIndex
-            onMonitorClicked: (idx) => root.selectedIndex = idx
+            Layout.fillHeight: true
+            spacing: Tokens.spaceM
+
+            MonitorCanvas {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                monitors: root.draft
+                selectedIndex: root.selectedIndex
+                onMonitorSelected: (index) => root.selectedIndex = index
+                onMonitorMoved: (index, x, y) => root._setPos(index, x, y)
+            }
+
+            Rectangle {
+                Layout.preferredWidth: 280
+                Layout.fillHeight: true
+                radius: Tokens.radiusM
+                color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.06)
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: Tokens.spaceM
+                    contentHeight: controls.implicitHeight
+                    clip: true
+
+                    MonitorControls {
+                        id: controls
+                        width: parent.width
+                        monitor: root.selected
+                        onModeEdited: (mode) => root._setField(root.selectedIndex, "mode", mode)
+                        onScaleEdited: (scale) => root._setField(root.selectedIndex, "scale", scale)
+                        onTransformEdited: (transform) => root._setField(root.selectedIndex, "transform", transform)
+                        onPrimaryToggled: root._setPrimary(root.selectedIndex)
+                        onEnabledToggled: root._setField(root.selectedIndex, "enabled", !root.selected.enabled)
+                    }
+                }
+            }
         }
 
         Divider { Layout.fillWidth: true }
 
-        // ── 选中显示器的配置 ──
-        Flickable {
+        // ── 回滚确认条（应用后倒计时内显示）──
+        RevertConfirm {}
+
+        // ── 应用区（无未决回滚时显示）──
+        RowLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            contentHeight: cardCol.implicitHeight
-            clip: true
+            visible: MonitorState.revertSecs === 0
+            spacing: Tokens.spaceM
 
-            ColumnLayout {
-                id: cardCol
-                width: parent.width
-                spacing: 0
-
-                // 无显示器
-                Text {
-                    visible: root.monitors.length === 0
-                    text: "未检测到显示器"
-                    color: Colors.overlay0
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.bodyLarge
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 20
-                }
-
-                // 显示器配置卡片
-                MonitorCard {
-                    visible: root.monitors.length > 0 && root.selectedIndex < root.monitors.length
-                    Layout.fillWidth: true
-                    monitor: root.monitors.length > root.selectedIndex ? root.monitors[root.selectedIndex] : null
-                    onApplyRequested: (config) => root.applyConfig(config)
-                }
+            Text {
+                Layout.fillWidth: true
+                text: MonitorState.errorMsg !== "" ? ("⚠ " + MonitorState.errorMsg)
+                    : (MonitorState.applying ? "正在应用…" : "改动将记入当前显示器组合")
+                color: MonitorState.errorMsg !== "" ? Colors.red : Colors.subtext0
+                font.family: Fonts.family; font.pixelSize: Fonts.small
+                wrapMode: Text.WordWrap
             }
-        }
 
-        // ── 状态信息 ──
-        Text {
-            visible: root.applying
-            text: "正在应用..."
-            color: Colors.blue
-            font.family: Fonts.family
-            font.pixelSize: Fonts.small
-        }
+            // 重置
+            Rectangle {
+                implicitWidth: resetLbl.implicitWidth + Tokens.spaceL; implicitHeight: 30
+                radius: Tokens.radiusS
+                color: resetArea.containsMouse ? Colors.surface2 : Colors.surface1
+                Text { id: resetLbl; anchors.centerIn: parent; text: "重置"; color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.small }
+                MouseArea {
+                    id: resetArea; anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root._loadDraft()
+                }
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            }
 
-        Text {
-            visible: root.errorMsg !== ""
-            text: "⚠ " + root.errorMsg
-            color: Colors.red
-            font.family: Fonts.family
-            font.pixelSize: Fonts.small
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
+            // 应用
+            Rectangle {
+                implicitWidth: applyLbl.implicitWidth + Tokens.spaceL; implicitHeight: 30
+                radius: Tokens.radiusS
+                color: applyArea.containsMouse ? Qt.lighter(Colors.blue, 1.1) : Colors.blue
+                Text { id: applyLbl; anchors.centerIn: parent; text: "应用"; color: Colors.base; font.family: Fonts.family; font.pixelSize: Fonts.small; font.bold: true }
+                MouseArea {
+                    id: applyArea; anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root._apply()
+                }
+                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            }
         }
     }
 }

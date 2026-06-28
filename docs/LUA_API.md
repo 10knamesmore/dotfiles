@@ -313,7 +313,7 @@ scripts/
 │   ├── plasma              ─────────→  plasma ──────────→ scripts/linux/plasma
 │   ├── hypr/               ─────────→  hypr ────────────→ scripts/linux/hypr
 │   │   ├── focus_mode.sh               │ ★ 默认行为：整目录一根链、树形保住，
-│   │   ├── monitor_profile.sh          │   无需任何声明；键位里用
+│   │   ├── opacity_toggle.sh           │   无需任何声明；键位里用
 │   │   └── screen_effects.sh           │   $DOTS_SCRIPTS/hypr/focus_mode.sh 引用
 │   └── snippets/（假设，列入 ignore_tree）
 │       └── fixup.sh        ─────────→  fixup.sh ────────→ scripts/linux/snippets/fixup.sh
