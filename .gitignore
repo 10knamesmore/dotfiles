@@ -36,3 +36,6 @@ __pycache__
 
 # dots CLI 构建产物
 cli/target/
+
+# 可视化伴侣临时产物
+.superpowers/
