@@ -1,0 +1,73 @@
+# ~/.config/ghostty/config (macOS)
+#
+# 「氛围终端」：与 kitty 并存，主力 driver 仍是 kitty。
+# 这份配置把 kitty 里能平移的项翻译过来，并叠加 neon/glow 着色器
+# （kitty 不支持自定义着色器，做不到真正的辉光，这是换 ghostty 的唯一动机）。
+#
+# 需要 ghostty >= 1.2.0（cursor shader uniforms 在 1.2.0 才有）。
+# 校验：ghostty +validate-config --config-file=$HOME/.config/ghostty/config
+
+# ── 主题 / 配色（与 kitty 的 Catppuccin Mocha 同源）──
+theme = catppuccin-mocha
+# 若提示无此主题：ghostty +list-themes | grep -i mocha 查准确名字
+
+# ── 字体（ghostty 自动选 italic/bold 变体，无需像 kitty 那样点名）──
+font-family = Victor Mono
+font-size = 14
+
+# ── 窗口 ──
+background-opacity = 0.85
+background-blur = 20                      # kitty 用 30；ghostty 标度不同（true=20），过高会有渲染/性能问题，想更浓再往上调
+window-padding-x = 4
+window-padding-y = 4
+macos-titlebar-style = hidden             # ≈ kitty hide_window_decorations titlebar-only
+confirm-close-surface = false             # ≈ kitty confirm_os_window_close 0
+window-inherit-working-directory = true   # 新 tab/split 继承 cwd（≈ kitty 的 *_with_cwd）
+
+# ── 光标 ──
+cursor-style = block                      # cursor shader 仅对 block 光标生效，别改
+cursor-style-blink = false
+# 拖尾由下方 custom-shader 实现（≈ kitty cursor_trail）
+
+# ── 滚动 ──
+scrollback-limit = 10000000               # 单位是字节（非行）；这是 ghostty 默认值，≈ kitty scrollback_lines 10000 的量级
+
+# ── split（注意：ghostty 没有 kitty 的自动平铺 Tall/Grid，只有手动 split）──
+split-divider-color = #FF8700             # ≈ kitty active_border_color
+unfocused-split-opacity = 0.9             # ≈ kitty inactive_text_alpha
+unfocused-split-fill = #1E1E2E            # 钉死成主题背景，规避 split-divider-color 渗色 bug
+
+# ── shell 集成（OSC 7 cwd 继承 / OSC 133 命令标记）──
+shell-integration = zsh
+
+# ── 剪贴板（≈ kitty clipboard_control 全开）──
+clipboard-read = allow
+clipboard-write = allow
+
+# ── macOS ──
+macos-option-as-alt = true                # ≈ macos_option_as_alt
+quit-after-last-window-closed = true      # ≈ macos_quit_when_last_window_closed
+
+# ── 键位（沿用 kitty 的 ctrl+shift 肌肉记忆）──
+keybind = ctrl+shift+enter=new_split:auto # kitty 的 new_window ≈ ghostty 的 split
+keybind = ctrl+shift+t=new_tab
+keybind = ctrl+shift+n=new_window         # kitty 的 os_window ≈ ghostty 的 window
+keybind = alt+backspace=text:\x1b[3~      # 模拟 Delete（≈ kitty send_text \x1b[3~）
+
+# scrollback → 外部编辑器：ghostty 没有 kitty 的 @screen_scrollback 管道。
+# write_screen_file:open 把当前屏幕(含scrollback)写临时文件，用系统默认程序打开。
+# 注意：① 会丢颜色 ② 想进 nvim 得把 .txt 的系统默认程序设成 nvim/wrapper
+#       ③ 没有 @last_cmd_output / show_last_command_output 的对应（这块只能回 kitty）
+keybind = ctrl+shift+h=write_screen_file:open
+
+# f2 改 tab 标题：未确认 ghostty 有交互式改标题 action，先注释。
+# 装好后 `ghostty +list-actions | grep -i title` 确认名字再启用。
+# keybind = f2=<action>
+
+# ═══════════ neon / glow 着色器 ═══════════
+# 顺序 = 应用顺序：先画光标拖尾，再对整画面做辉光（拖尾也会跟着发光）。
+# 性能：一旦启用 custom-shader，ghostty 每帧重绘(vsync)，笔记本更耗电。
+# 路径相对本配置文件目录解析（整个 ~/.config/ghostty 由 dots 整目录软链，相对路径安全）。
+custom-shader = shaders/cursor_smear.glsl  # 光标拖尾（≈ cursor_trail）
+custom-shader = shaders/bloom.glsl         # 辉光：亮像素向外晕染，调强弱见该文件顶部注释
+custom-shader-animation = true             # 仅 active 窗口跑动画；要所有窗口都动画改 always（更耗电）

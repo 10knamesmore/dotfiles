@@ -39,3 +39,9 @@ cli/target/
 
 # 可视化伴侣临时产物
 .superpowers/
+
+# mpv 运行时续播状态（~/.config/mpv 软链进仓库，mpv 会往里写；机器本地，不入库）
+tree/home/.config/mpv/watch_later/
+
+# uosc 缩略图助手 ziggy（多平台二进制，uosc 运行时按需自取；不入库）
+tree/home/.config/mpv/scripts/uosc/bin/
