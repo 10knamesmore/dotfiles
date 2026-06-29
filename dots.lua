@@ -7,16 +7,8 @@ granularity("home/.config/opencode", {
     ignore = { "node_modules", "package.json", "bun.lock", ".gitignore" },
 })
 
--- systemd user：systemd 容器下钻，user/ 逐文件链（保持 user/ 是真实目录，
--- 这样 systemctl --user enable 写的 *.wants/ 软链落在真实目录、不污染仓库）。
-granularity("home.linux/.config/systemd", { mode = "children" })
-granularity("home.linux/.config/systemd/user", {
-    mode = "file",
-    ignore = { "default.target.wants", "timers.target.wants" },
-})
-
--- Claude hooks：目录保持真实、逐子项链（同 systemd user/ 的理由）——
--- post_sync 会把机器本地编译的 cc-hook bin 软链进来，不污染仓库。
+-- Claude hooks：目录保持真实、逐子项链——让 post_sync 软链进来的机器本地
+-- cc-hook bin 落在真实目录、不污染仓库。
 granularity("home/.claude/hooks", { mode = "children" })
 
 distribute("skills", {
@@ -34,10 +26,6 @@ distribute("commands", {
     to = { "~/.claude/commands" },
     mode = "children",
 })
-
--- systemd user 单元：sync 时 systemctl --user enable（幂等）。
--- bsu-login.service 无 WantedBy（由 bsu-login.timer 触发），不在此 enable。
-systemd_user({ "mihomo.service", "bsu-login.timer", "napcat.service" })
 
 -- 每次 sync 保持 cc-hook（Claude Code hooks 入口）新鲜并复制到 ~/.claude/hooks/。
 on({
