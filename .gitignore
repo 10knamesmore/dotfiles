@@ -27,7 +27,9 @@ Thumbs.db
 btop/
 
 # opencode 自动生成的文件
-tree/home/.config/opencode/node_modules/
+# node_modules 不带尾斜杠：dots.lua 的 post 钩子会在此放一条反向软链（不是目录），
+# 尾斜杠只匹配目录、漏掉软链，会让它意外进 git。
+tree/home/.config/opencode/node_modules
 tree/home/.config/opencode/package.json
 tree/home/.config/opencode/bun.lock
 tree/home/.config/opencode/.gitignore

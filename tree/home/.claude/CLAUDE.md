@@ -1,3 +1,11 @@
+
+不管在哪个系统
+
+- ~/Documents 是我存放编程项目的地方
+- ~/Documents/repos 是我存放一些remote仓库的地方(一般是需要参考一些开源项目的时候就clone到这里)
+- ~/dotfiles 是我存放全局 dotfiles 的manager 仓库目录
+
+
 ## 沟通
 
 - 直说结论，不谄媚不奉承；发现我说错了直接指出，别顺着我
@@ -20,7 +28,6 @@
 部分由 cc-hook 强制（标「hook」），用错会被拦回让你换；其余是建议。
 
 **搜索 / 导航**
-- `rg` 替代 `grep`（hook）
 - `fd` 替代 `find`（hook）
 - `ast-grep` 做结构化代码搜索 / 替换：按 AST 匹配，重构远胜 grep/sed
 

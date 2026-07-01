@@ -2,9 +2,17 @@
 -- 镜像规则覆盖不到的才写这里；预期长期 < 60 行。
 
 -- opencode 在配置目录生成运行时垃圾，逐文件链 + 忽略它们。
+-- post：自定义 tool 经 symlink 加载时，Bun 按 realpath 从仓库侧向上找 node_modules，
+-- 但它是 ignore 的运行时垃圾、只在 $HOME 侧 → 断链，tool 里 import "@opencode-ai/plugin"
+-- 会 Cannot find module，连带整个 opencode server 在 resolveTools 阶段崩、任何模型都 500。
+-- 补一条仓库侧 → $HOME 侧的反向软链桥过去（软链自身在上面的 ignore + .gitignore 里）。
 granularity("home/.config/opencode", {
     mode = "file",
     ignore = { "node_modules", "package.json", "bun.lock", ".gitignore" },
+    post = function()
+        dots.run("ln -sfn '" .. dots.home .. "/.config/opencode/node_modules' '"
+            .. dots.repo .. "/tree/home/.config/opencode/node_modules'")
+    end,
 })
 
 -- Claude hooks：目录保持真实、逐子项链——让 post_sync 软链进来的机器本地
