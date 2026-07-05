@@ -59,6 +59,18 @@ decision = "ask"
 reason   = "chmod 777 / o+w 把文件设为全局可写，风险高。改用更窄的权限位（755/644）；确需放宽请用户确认。"
 
 # ════ 工具偏好重定向：deny 的 reason 喂回模型，模型自动换工具重试 ════
+[[bash]]
+name     = "prefer-ripgrep"
+cmd      = "grep"
+decision = "deny"
+reason   = "工具偏好：用 rg 替代 grep"
+
+[[bash]]
+name     = "rg-no-replace"
+cmd      = "rg"
+any      = ["-r", "--replace"]
+decision = "deny"
+reason   = "rg 的 -r/--replace 是替换文本不是递归（递归本就是默认）——`-rn` 是「替换成 n」不是「递归+行号」。要行号用 -n。确需 replace 请说明理由让用户手动执行。"
 
 [[bash]]
 name     = "prefer-fd"
