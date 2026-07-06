@@ -99,6 +99,37 @@ local shorten_home_path = function(path)
   return (path:gsub("^" .. vim.pesc(home), "~/"))
 end
 
+--- 返回条目文件名；若为符号链接则追加 ` -> 目标`（目标经 home 折叠），与行尾 virt_text 显示一致。
+---@param path string
+---@return string
+local filename_with_link = function(path)
+  local name = vim.fs.basename(path)
+  local stat = vim.uv.fs_lstat(path)
+  if stat and stat.type == "link" then
+    local target = vim.uv.fs_readlink(path)
+    if target and target ~= "" then
+      return name .. " -> " .. shorten_home_path(target)
+    end
+  end
+
+  return name
+end
+
+--- 返回条目绝对路径；若为符号链接则追加 ` -> 目标`（目标经 home 折叠）。
+---@param path string
+---@return string
+local path_with_link = function(path)
+  local stat = vim.uv.fs_lstat(path)
+  if stat and stat.type == "link" then
+    local target = vim.uv.fs_readlink(path)
+    if target and target ~= "" then
+      return path .. " -> " .. shorten_home_path(target)
+    end
+  end
+
+  return path
+end
+
 --- 为符号链接返回专用图标，其余条目沿用默认前缀。
 ---@param fs_entry { path: string }
 ---@return string, string
@@ -231,7 +262,7 @@ return {
         return
       end
 
-      yank_to_clipboard("filename", vim.fs.basename(filepath))
+      yank_to_clipboard("filename", filename_with_link(filepath))
     end
 
     --- 复制光标所在条目的绝对路径到系统剪贴板。
@@ -242,7 +273,7 @@ return {
         return
       end
 
-      yank_to_clipboard("path", filepath)
+      yank_to_clipboard("path", path_with_link(filepath))
     end
 
     --- 复制 visual 选区内所有有效条目到系统剪贴板，每行一项，经 `transform` 提取目标文本。
@@ -287,12 +318,10 @@ return {
       vim.keymap.set("n", "gy", yank_filename, { buffer = buf_id, desc = "Yank Filename" })
       vim.keymap.set("n", "gY", yank_filepath, { buffer = buf_id, desc = "Yank Absolute Path" })
       vim.keymap.set("x", "gy", function()
-        yank_selection("filenames", vim.fs.basename)
+        yank_selection("filenames", filename_with_link)
       end, { buffer = buf_id, desc = "Yank Filenames (selection)" })
       vim.keymap.set("x", "gY", function()
-        yank_selection("paths", function(path)
-          return path
-        end)
+        yank_selection("paths", path_with_link)
       end, { buffer = buf_id, desc = "Yank Absolute Paths (selection)" })
       map_split(buf_id, "<C-s>", "belowright horizontal")
       map_split(buf_id, "<C-v>", "belowright vertical")

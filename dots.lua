@@ -21,7 +21,7 @@ granularity("home/.claude/hooks", { mode = "children" })
 
 distribute("skills", {
     src = "tree/home/.agents/skills",
-    to = { "~/.claude/skills", "~/.codex/skills" },
+    to = { "~/.claude/skills", "~/.codex/skills", "~/.kimi/skills" },
     mode = "children",
 })
 distribute("agents", {
