@@ -162,39 +162,40 @@ return {
           end,
           desc = "search in current buffer",
         },
-        {
-          "gd",
-          function()
-            require("telescope.builtin").lsp_definitions({
-              show_line = false,
-            })
-          end,
-          desc = "Goto Definition",
-        },
-        {
-          "gi",
-          function()
-            require("telescope.builtin").lsp_implementations()
-          end,
-          desc = "Goto Implementations",
-        },
-        {
-          "gr",
-          function()
-            require("telescope.builtin").lsp_references({
-              show_line = false,
-            })
-          end,
-          desc = "References",
-          nowait = true,
-        },
-        {
-          "<leader>/",
-          function()
-            require("telescope.builtin").live_grep()
-          end,
-          desc = "Live Grep",
-        },
+        -- ↓↓↓ 已迁到 fzf-lua（见 fzf-lua.lua）：LSP 定义/实现/引用、live_grep。想退回就取消注释、并去 fzf-lua.lua 注释掉同名键。
+        -- {
+        --   "gd",
+        --   function()
+        --     require("telescope.builtin").lsp_definitions({
+        --       show_line = false,
+        --     })
+        --   end,
+        --   desc = "Goto Definition",
+        -- },
+        -- {
+        --   "gi",
+        --   function()
+        --     require("telescope.builtin").lsp_implementations()
+        --   end,
+        --   desc = "Goto Implementations",
+        -- },
+        -- {
+        --   "gr",
+        --   function()
+        --     require("telescope.builtin").lsp_references({
+        --       show_line = false,
+        --     })
+        --   end,
+        --   desc = "References",
+        --   nowait = true,
+        -- },
+        -- {
+        --   "<leader>/",
+        --   function()
+        --     require("telescope.builtin").live_grep()
+        --   end,
+        --   desc = "Live Grep",
+        -- },
         {
           "<leader>s:",
           function()
@@ -202,16 +203,17 @@ return {
           end,
           desc = "Command History",
         },
-        {
-          "<leader><space>",
-          function()
-            require("telescope.builtin").find_files({
-              hidden = true,
-              no_ignore = true,
-            })
-          end,
-          desc = "Find Files (Root Dir)",
-        },
+        -- ↓ 已迁到 fzf-lua：find_files（看到一切）
+        -- {
+        --   "<leader><space>",
+        --   function()
+        --     require("telescope.builtin").find_files({
+        --       hidden = true,
+        --       no_ignore = true,
+        --     })
+        --   end,
+        --   desc = "Find Files (Root Dir)",
+        -- },
         {
           "<leader>sw",
           function()
@@ -303,20 +305,21 @@ return {
           end,
           desc = "Colorscheme",
         },
-        {
-          "<leader>ss",
-          function()
-            require("telescope.builtin").lsp_document_symbols({ symbol_width = 40 })
-          end,
-          desc = "Symbol",
-        },
-        {
-          "<leader>sS",
-          function()
-            require("telescope.builtin").lsp_dynamic_workspace_symbols({})
-          end,
-          desc = "Symbol (Workspace)",
-        },
+        -- ↓ 已迁到 fzf-lua：LSP 文档/工作区符号
+        -- {
+        --   "<leader>ss",
+        --   function()
+        --     require("telescope.builtin").lsp_document_symbols({ symbol_width = 40 })
+        --   end,
+        --   desc = "Symbol",
+        -- },
+        -- {
+        --   "<leader>sS",
+        --   function()
+        --     require("telescope.builtin").lsp_dynamic_workspace_symbols({})
+        --   end,
+        --   desc = "Symbol (Workspace)",
+        -- },
       }
     end,
   },

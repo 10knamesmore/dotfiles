@@ -39,7 +39,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
   "enableAllProjectMcpServers": false,
   "hooks": {
     "PreToolUse": [
@@ -66,7 +65,8 @@
     ]
   },
   "worktree": {
-    "baseRef": "fresh"
+    "baseRef": "head",
+    "bgIsolation": "none"
   },
   "statusLine": {
     "type": "command",
