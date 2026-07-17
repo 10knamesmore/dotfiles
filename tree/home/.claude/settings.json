@@ -13,14 +13,11 @@
   "permissions": {
     "deny": [
       "Read(~/.ssh/**)",
-      "Write(~/.ssh/**)",
       "Edit(~/.ssh/**)",
       "Read(~/.config/gh/hosts.yml)",
       "Read(~/.claude/.credentials.json)",
-      "Write(~/.claude/.credentials.json)",
       "Edit(~/.claude/.credentials.json)",
       "Read(~/.codex/auth.json)",
-      "Write(~/.codex/auth.json)",
       "Edit(~/.codex/auth.json)",
       "Read(~/.aws/**)",
       "Read(~/.config/gcloud/**)",
