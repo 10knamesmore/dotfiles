@@ -6,7 +6,14 @@ local dashboard_sections = {
     return {
       padding = 2,
       align = "center",
-      -- 预留 20 行真实 buffer 行，每行 40 空格。
+      -- 终端不支持图形协议时整段跳过：否则 img_h 行占位空白照样铺出来，
+      -- 顶部就是一片空白且居中偏移全白算。Zellij 被 snacks 标为 supported=false
+      -- （image/terminal.lua 的 environments 表），kitty 直连才为 true。
+      -- enabled 支持函数且在渲染时才求值，此刻 Snacks 全局已就绪。
+      enabled = function()
+        return Snacks.image.terminal.env().supported == true
+      end,
+      -- 预留 img_h 行真实 buffer 行，每行 img_w 个空格。
       -- 配合 conceal + range 让 snacks.image 走 overlay 分支（覆盖现有行），
       -- 避免 virt_lines 导致 dashboard 垂直居中计算偏差。
       text = (string.rep(" ", img_w) .. "\n"):rep(img_h - 1) .. string.rep(" ", img_w),
@@ -56,8 +63,13 @@ return {
   opts = function()
     ---@type snacks.Config
     local opts = {
-      animate = { enabled = true, fps = 180 }, -- 启用动画效果，帧率为 180
-      bigfile = { enabled = false }, -- 启用大文件处理优化, 交给bigfil.lua处理
+      -- fps 只压低步进下限、不缩短动画时长，调高只是在同样时长里多画帧和
+      -- extmark；终端跟不上 180Hz，纯白烧（indent 的 scope/chunk 跟光标跑，受影响最大）。
+      animate = { enabled = true, fps = 120 },
+      -- 大文件降级：关 matchparen/fold/statuscolumn/conceal、停 completion 与 mini.animate，
+      -- 并把 treesitter 换成正则 syntax。别改回交给 LunarVim/bigfile.nvim——那个插件靠
+      -- after/plugin 自举，在 lazy 下没有 event 就永不加载，等于零保护。
+      bigfile = { enabled = true, size = 5 * 1024 * 1024 },
       dashboard = {
         enabled = true,
         sections = dashboard_sections,
@@ -101,6 +113,10 @@ return {
       image = { enabled = true }, -- Kitty 图形协议渲染（markdown/html 内联图片等）
       input = { enabled = true }, -- 启用输入增强（如 float 弹窗输入）
       profiler = { enabled = false },
+      -- 必须显式出现在 opts 里才会被 setup：snacks/init.lua 只对 opts 中存在的
+      -- key 补 enabled=true，缺席的模块 M.config[snack] 为 nil、UIEnter 时跳过。
+      -- setup 之后其 ui_select 默认为 true，接管 vim.ui.select（替掉 telescope-ui-select）。
+      picker = { enabled = true },
       indent = {
         indent = {
           enabled = true, -- 启用缩进线
@@ -139,7 +155,7 @@ return {
       },
       notifier = { enabled = false }, -- 禁用，交给 noice + nvim-notify 处理
       quickfile = { enabled = true }, -- 启用快速文件访问
-      scroll = { enabled = false },
+      scroll = { enabled = true }, -- 平滑滚动（替代 mini.animate 的 scroll，见 mini-animate.lua）
       scratch = {
         enabled = true,
         name = "草稿",

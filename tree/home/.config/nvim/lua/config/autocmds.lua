@@ -20,7 +20,7 @@ vim.api.nvim_create_autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
 vim.api.nvim_create_autocmd("TextYankPost", {
   group = augroup("highlight_yank"), -- highlight_yank 组
   callback = function()
-    (vim.hl or vim.highlight).on_yank() -- 高亮复制区域
+    vim.hl.on_yank() -- 高亮复制区域（vim.hl 自 0.11 起是正名，无需再兜 vim.highlight）
   end,
 })
 

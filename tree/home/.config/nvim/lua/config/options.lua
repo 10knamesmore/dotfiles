@@ -6,7 +6,10 @@ local opt = vim.opt
 -- 运行 next等 自动写入
 opt.autowrite = true
 
--- 允许项目根目录的 .nvim.lua 提供本地配置
+-- 允许 .nvim.lua 提供本地配置。注意 0.12 的语义是「从 cwd 一路向上找到根」，
+-- 不是只看项目根目录——这个仓库嵌套很深（~/dotfiles/tree/home/.config/nvim），
+-- 上层任何一个 .nvim.lua 都会被拉进来。想截断就在外层写 vim.o.exrc = false。
+-- 另外首次遇到未信任文件已无 (a)llow，要先 (v)iew 再 :trust。
 opt.exrc = true
 
 -- 在SSH下用OSC 等插件处理剪切板.
@@ -15,7 +18,9 @@ opt.clipboard = vim.env.SSH_CONNECTION and "" or "unnamedplus" -- Sync with syst
 --- **menu**: 使用弹出菜单显示补全项
 --- **menuone**: 即使只有一个匹配项也显示菜单
 --- **noselect**: 不自动选择第一个补全项
-opt.completeopt = "menu,menuone,noselect"
+--- **popup**: 0.12 默认值之一，有它才显示 completionItem/resolve 的文档预览；
+---            整体赋值时容易连它一起丢掉
+opt.completeopt = "menu,menuone,noselect,popup"
 
 -- 理论上应该被markdown插件接管, 不知道为什么要有
 --- **0**: 正常显示所有文本
@@ -51,6 +56,8 @@ opt.listchars = {
   precedes = "⟨",
 }
 
+-- 留一列给 ufo/treesitter 画 fillchars 里的 foldopen/foldclose 图标；
+-- 设回 "0" 那两个图标就永远没有落脚点（原先 ufo 的 init 想设 "1"，被这里盖掉过）。
 opt.foldcolumn = "0"
 
 -- 小于这个level的被折叠
@@ -62,7 +69,8 @@ opt.foldmethod = "manual"
 opt.foldtext = ""
 opt.formatexpr = "v:lua.utils.format.formatexpr()"
 opt.formatoptions = "jcroqlnt" -- tcqj
-opt.grepformat = "%f:%l:%c:%m"
+-- grepformat 与本体默认逐字相同，无需重设。
+-- grepprg 则是有意偏离默认（默认带 -uu）：去掉 -uu 让 :grep 尊重 .gitignore。
 opt.grepprg = "rg --vimgrep"
 
 -- Ignore case
@@ -71,8 +79,10 @@ opt.ignorecase = true
 -- subsiture时 在同一个窗口里预览
 opt.inccommand = "nosplit"
 
--- 跳转时尽量恢复view
-opt.jumpoptions = "view"
+-- view: 跳转时尽量恢复视图；clean 是 0.12 默认值，整体赋值会丢掉它——
+-- 它负责把已卸载 buffer 从 jumplist 移除，而 H/L 被绑成了 <C-o>/<C-i>，
+-- 跳回一堆已关 buffer 的场景很常见。
+opt.jumpoptions = "view,clean"
 
 --每个窗口都有一个状态栏
 opt.laststatus = 2
@@ -149,9 +159,10 @@ opt.shiftwidth = 4
 --- **q**：录制宏时不显示“recording @a”。
 --- **F**：编辑文件时不显示文件信息（如用 `:silent`）。
 --- **S**：搜索时不显示搜索计数（如“[1/5]”）。
--- opt.shortmess:append({ W = true, I = true, c = true, C = true })
--- opt.shortmess = "CcFtIlOTWoa"
-opt.shortmess = "IlcCF"
+-- 用 append 而不是整体赋值：0.12 默认是 "ltToOCF"，直接写 "IlcCF" 会丢掉
+-- t/T（长消息截断）和 o/O（读写文件消息互相覆盖），少了它们更容易撞上
+-- hit-enter 提示。noice 接管了大部分消息路径，但它覆盖不到的早期路径仍会漏。
+opt.shortmess:append({ I = true, c = true, C = true })
 
 -- Dont show mode since we have a statusline
 opt.showmode = false
@@ -212,6 +223,11 @@ opt.wildmode = "longest:full,full"
 
 -- Minimum window width
 opt.winminwidth = 5
+
+-- 0.12 的全局浮窗边框兜底：所有没显式指定 border 的浮窗都吃这个值。
+-- 本体侧的 vim.diagnostic.open_float / vim.show_pos / inspect_tree /
+-- lsp.util.open_floating_preview 原先一律裸奔，插件浮窗则各自硬编码 rounded。
+opt.winborder = "rounded"
 
 -- 一行超出范围换行
 opt.wrap = true

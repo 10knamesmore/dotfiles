@@ -44,7 +44,14 @@ function M.request(cfg, prompt, suffix, on_result)
 
   local ok, proc = pcall(vim.system, args, { text = true }, function(res)
     if res.code ~= 0 then
-      on_result(nil, "curl exit " .. tostring(res.code) .. ": " .. (res.stderr or res.stdout or ""))
+      -- stdout 优先：--fail-with-body 把 API 的 JSON 错误体(如 "Authentication Fails")
+      -- 写到 stdout，而 -sS 保证 curl 自己的错误走 stderr。原先 `stderr or stdout`
+      -- 永远只拿到 "curl: (22)" 这种没有信息量的壳。
+      local detail = res.stdout
+      if not detail or detail == "" then
+        detail = res.stderr or ""
+      end
+      on_result(nil, "curl exit " .. tostring(res.code) .. ": " .. detail)
       return
     end
     local decoded_ok, decoded = pcall(vim.json.decode, res.stdout)

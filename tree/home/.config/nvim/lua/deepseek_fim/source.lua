@@ -58,7 +58,9 @@ local function build_items(text, context)
       },
       documentation = {
         kind = "markdown",
-        value = string.format("```%s\n%s\n```", vim.bo.filetype, text),
+        -- 用 context.bufnr 而非当前 buffer：本函数在 vim.schedule 回调里跑，
+        -- 那时用户可能已经切窗口了。
+        value = string.format("```%s\n%s\n```", vim.bo[context.bufnr].filetype, text),
       },
     },
   }
@@ -123,8 +125,12 @@ function M:get_completions(context, callback)
         end
         if err or not text then
           core.log("  <- error: " .. tostring(err))
-          return empty(callback, true)
+          core.report_error(err)
+          -- 这里必须是 incomplete=false：置 true 会让 blink 在下次按键立刻重发，
+          -- key 失效/余额不足/模型下线这类持续性错误会变成无退避的无限重试。
+          return empty(callback)
         end
+        core.report_ok()
         core.log("  <- ok text=[" .. text:gsub("\n", "\\n") .. "]")
         core.cache_set(cache_key, text)
         callback({
@@ -140,7 +146,13 @@ function M:get_completions(context, callback)
   return function()
     cancelled = true
     pcall(function()
+      -- 必须 close 不只是 stop：vim.defer_fn 的 close 只发生在回调真正触发时
+      -- ($VIMRUNTIME/lua/vim/_core/editor.lua)，而 debounce 400ms 让「发起→被取消」
+      -- 才是常态路径。只 stop 的话每次取消都漏一个 uv handle，长会话稳定累积。
       timer:stop()
+      if not timer:is_closing() then
+        timer:close()
+      end
     end)
     if cancel_curl then
       cancel_curl()

@@ -36,12 +36,6 @@ return {
       return newVirtText
     end,
   },
-  init = function()
-    vim.opt.foldcolumn = "1"
-    vim.opt.fillchars = {
-      foldopen = "",
-      foldclose = "",
-      fold = " ",
-    }
-  end,
+  -- foldcolumn / fillchars 统一在 config/options.lua 设。别在这里写 init：
+  -- vim.opt.fillchars = {...} 是整表替换，会把 options.lua 的 foldsep/diff/eob 抹掉。
 }

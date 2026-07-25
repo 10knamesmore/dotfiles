@@ -7,16 +7,6 @@ return {
     event = "VeryLazy",
     cond = vim.g.neovide == nil,
     opts = function(_, opts)
-      -- don't use animate when scrolling with the mouse
-      local mouse_scrolled = false
-      for _, scroll in ipairs({ "Up", "Down" }) do
-        local key = "<ScrollWheel" .. scroll .. ">"
-        vim.keymap.set({ "", "i" }, key, function()
-          mouse_scrolled = true
-          return key
-        end, { expr = true })
-      end
-
       local animate = require("mini.animate")
       return vim.tbl_deep_extend("force", opts, {
         cursor = {
@@ -31,18 +21,12 @@ return {
         close = {
           timing = animate.gen_timing.cubic({ duration = 50, unit = "total" }),
         },
-        scroll = {
-          timing = animate.gen_timing.cubic({ duration = 150, unit = "total" }),
-          subscroll = animate.gen_subscroll.equal({
-            predicate = function(total_scroll)
-              if mouse_scrolled then
-                mouse_scrolled = false
-                return false
-              end
-              return total_scroll > 1
-            end,
-          }),
-        },
+        -- 滚动动画交给 snacks.scroll，别在这里重新打开。
+        -- mini.animate 的滚动动画是固定时长的：连按 J/K（间隔 < 动画时长）时，
+        -- 新动画会接管未跑完的旧动画，且开头 winrestview 把视图拉回起点，
+        -- 于是视图被反复拉回、光标每帧被夹回可视区 —— 表现为光标抽动、画面滚不动。
+        -- snacks.scroll 有 animate_repeat：检测到连按时把动画压到 50ms，避开这个竞态。
+        scroll = { enable = false },
       })
     end,
   },

@@ -64,7 +64,8 @@ return {
             checkOnSave = true,
             diagnostics = {
               enable = true,
-              warningAsHint = { "inactive-code" },
+              -- schema 里是复数 warningsAsHint（rust-analyzer --print-config-schema）
+              warningsAsHint = { "inactive-code" },
             },
             inlayHints = {
               closureCaptureHints = {

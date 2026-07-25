@@ -96,15 +96,10 @@ return {
   opts = function()
     vim.o.laststatus = vim.g.lualine_laststatus
 
-    local symbols = require("trouble").statusline({
-      mode = "symbols",
-      groups = {},
-      title = false,
-      filter = { range = true },
-      format = "{kind_icon}{symbol.name:Normal}",
-      hl_group = "lualine_c_normal",
-    })
-
+    -- 这里原先建了一个 trouble.statusline({mode="symbols"})，唯一消费点在下面
+    -- lualine_c 里、且早已注释掉（改用 dropbar）。但 trouble 的 section:listen()
+    -- 照样在跑：lsp_document_symbols 的 events 含 CursorMoved，于是每次移动光标
+    -- 都重建一次 node 树并强制全量 lualine refresh——纯白烧。别加回来。
     local opts = {
       options = {
         theme = my_theme,
@@ -145,16 +140,6 @@ return {
           { utils.lualine.pretty_path(), separator = "" },
 
           { "filetype", icon_only = true, padding = { left = 0, right = 0 } },
-
-          -- deprecated 使用 dropbar 替代
-          -- trouble 提供的当前 symbol
-          -- {
-          --     symbols and symbols.get,
-          --
-          --     cond = function()
-          --         return symbols.has()
-          --     end,
-          -- },
 
           {
             "diagnostics",

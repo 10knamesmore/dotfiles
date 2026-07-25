@@ -38,8 +38,9 @@ return {
           settings = {
             formatterMode = "typstyle",
             projectResolution = "lockDatabase",
+            -- tinymist 的键是 enabled 不是 enable，写错等于 lint 一直关着
             lint = {
-              enable = true,
+              enabled = true,
             },
           },
         },

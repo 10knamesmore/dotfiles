@@ -56,18 +56,11 @@ function M.format(component, text, hl_group)
 end
 
 --- 规范化文件路径，展开 `~` 并统一路径分隔符。
+--- 实现在 utils/init.lua，这里只转发——两份拷贝曾经分叉过（那边缺 home 为 nil 的守卫）。
 ---@param path string
 ---@return string
 function M.norm(path)
-  if path:sub(1, 1) == "~" then
-    local home = vim.uv.os_homedir()
-    if home and (home:sub(-1) == "\\" or home:sub(-1) == "/") then
-      home = home:sub(1, -2)
-    end
-    path = home .. path:sub(2)
-  end
-  path = path:gsub("\\", "/"):gsub("/+", "/")
-  return path:sub(-1) == "/" and path:sub(1, -2) or path
+  return require("utils").norm(path)
 end
 
 --- 生成用于 lualine 的紧凑路径显示函数。

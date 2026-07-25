@@ -139,7 +139,9 @@ return {
   },
   {
     "mason-org/mason.nvim",
-    opts = { ensure_installed = { "markdownlint-cli2", "markdown-toc" } },
+    -- prettier 是上面 formatters_by_ft 里 markdown 链的第一环，必须一起装：
+    -- conform 对不可用的 formatter 是静默跳过、其余照跑，换机后只会「排版无声消失」。
+    opts = { ensure_installed = { "prettier", "markdownlint-cli2", "markdown-toc" } },
   },
   -- markdown 不lint
   -- {

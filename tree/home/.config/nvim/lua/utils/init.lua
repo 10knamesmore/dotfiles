@@ -56,7 +56,20 @@ function M.opts(name)
   return Plugin.values(plugin, "opts", false)
 end
 
---- 通知函数（带默认标题）
+--- 通知函数（带默认标题）。动态生成的三个函数拿不到 LuaLS 补全，
+--- 这里补上签名——它们是全仓用得最多的 utils 成员，而 utils 的惰性加载
+--- 对拼错的名字只会静默返回 nil，类型标注是第一道防线。
+---@class utils
+---@field info fun(msg: string|string[], opts?: table)
+---@field warn fun(msg: string|string[], opts?: table)
+---@field error fun(msg: string|string[], opts?: table)
+---@field format table
+---@field lsp table
+---@field lualine table
+---@field math table
+---@field os table
+---@field path table
+---@field treesitter table
 for _, level in ipairs({ "info", "warn", "error" }) do
   M[level] = function(msg, opts)
     opts = opts or {}
@@ -72,7 +85,7 @@ end
 function M.norm(path)
   if path:sub(1, 1) == "~" then
     local home = vim.uv.os_homedir()
-    if home:sub(-1) == "\\" or home:sub(-1) == "/" then
+    if home and (home:sub(-1) == "\\" or home:sub(-1) == "/") then
       home = home:sub(1, -2)
     end
     path = home .. path:sub(2)
@@ -99,17 +112,22 @@ function M.try(fn, opts)
   return ok
 end
 
---- 在本地选项尚未设置时写入默认值。
+--- 在本地选项尚未被显式设置过时写入默认值。
+---
+--- 判据是「有没有被设过」（`nvim_get_option_info2().was_set`），不是「值是不是空串」。
+--- 旧实现比较空串，而 'foldmethod' 的取值域是 manual/indent/expr/marker/… 永远非空，
+--- 于是 treesitter 和 LSP 的折叠分支全成了死代码。'indentexpr' 那侧行为不变：
+--- 有 ftplugin 的语言（lua 的 GetLuaIndent()）was_set 为真，照旧让位给 ftplugin。
 ---@param option string
 ---@param value any
----@return boolean
+---@return boolean 是否实际写入
 function M.set_default(option, value)
-  local current = vim.api.nvim_get_option_value(option, { scope = "local" })
-  if current == "" or current == nil then
-    vim.api.nvim_set_option_value(option, value, { scope = "local" })
-    return true
+  local ok, info = pcall(vim.api.nvim_get_option_info2, option, {})
+  if not ok or info.was_set then
+    return false
   end
-  return false
+  vim.api.nvim_set_option_value(option, value, { scope = "local" })
+  return true
 end
 
 -- 原有的 icons

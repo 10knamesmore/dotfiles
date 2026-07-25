@@ -1,6 +1,13 @@
 return {
   "folke/todo-comments.nvim",
-  dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
+  -- 只挂 keys 的话，signs/keywords/highlight 全是死配置——打开文件时 TODO 既没
+  -- sign 也没高亮，要按一次 ]t 才「突然」亮起来。高亮必须在 buffer 打开时就装上。
+  event = { "BufReadPost", "BufNewFile" },
+  cmd = { "TodoTelescope", "TodoQuickFix", "TodoLocList", "TodoTrouble" },
+  -- 别把 telescope 写进 dependencies：有了上面的 event，它会连带把整个 telescope
+  -- 栈拽到 BufReadPost，抵消掉 telescope 自身的懒加载。:TodoTelescope 内部
+  -- require("telescope") 时，lazy 的 require hook 会按需把它拉起来。
+  dependencies = { "nvim-lua/plenary.nvim" },
   opts = {
     signs = true, -- show icons in the signs column
     sign_priority = 8, -- sign priority

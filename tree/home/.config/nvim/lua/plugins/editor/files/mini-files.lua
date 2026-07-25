@@ -3,18 +3,21 @@
 --
 local path_utils = require("utils.path")
 
---- 显示所有文件系统条目。
----@param _ { fs_type: string, name: string, path: string }?
----@return boolean
-local filter_show = function(_)
-  return true
-end
+--- dotfiles 是否可见（`.` 切换）。这是唯一真相源：filter 和右下角 footer 都读它。
+---
+--- 别改回「filter_show / filter_hide 两个静态函数 + 一个影子布尔」的写法：
+--- MiniFiles.open 在 files.lua:797 是 `explorer.opts = H.normalize_opts(nil, opts)`,
+--- 第一个参数写死 nil —— 即使 use_latest 从 history 取回了旧 explorer，也会丢弃它
+--- 累积的 opts、用全局 setup 配置重建。于是 refresh 换上去的 filter_show 只活到本次
+--- 关闭为止，而闭包里的布尔值永远不重置：关掉重开、或在新 tab 打开，footer 就会
+--- 声称「显示」而实际仍在过滤。
+local show_dotfiles = false
 
---- 隐藏以 `.` 开头的文件。
+--- 过滤器在**调用时**读 show_dotfiles，所以无论 explorer 被重建多少次都不会脱节。
 ---@param fs_entry { fs_type: string, name: string, path: string }
 ---@return boolean
-local filter_hide = function(fs_entry)
-  return not vim.startswith(fs_entry.name, ".")
+local filter_dotfiles = function(fs_entry)
+  return show_dotfiles or not vim.startswith(fs_entry.name, ".")
 end
 
 local root_augroup = vim.api.nvim_create_augroup("MiniFilesTabRoot", { clear = false })
@@ -214,7 +217,7 @@ return {
       width_preview = 80,
     },
     content = {
-      filter = filter_hide,
+      filter = filter_dotfiles,
       prefix = prefix_with_symlink_icon,
     },
     mappings = {
@@ -229,14 +232,13 @@ return {
   config = function(_, opts)
     require("mini.files").setup(opts)
 
-    -- 默认显示
-    local show_dotfiles = false
-
     --- 切换 mini.files 中隐藏文件的显示状态。
+    --- 传 content.filter 是必须的：refresh 靠 `#vim.tbl_keys(content_opts) > 0`
+    --- 判断要不要 force_update（files.lua:834），不传就不会重跑过滤器。
+    --- 传的仍是同一个函数——它自己会读新的 show_dotfiles。
     local toggle_dotfiles = function()
       show_dotfiles = not show_dotfiles
-      local new_filter = show_dotfiles and filter_show or filter_hide
-      require("mini.files").refresh({ content = { filter = new_filter } })
+      require("mini.files").refresh({ content = { filter = filter_dotfiles } })
     end
 
     --- 写入 `+` 寄存器并回读校验。
@@ -375,8 +377,7 @@ return {
       callback = function(args)
         local win_id = args.data.win_id
         local config = vim.api.nvim_win_get_config(win_id)
-        config.footer = show_dotfiles and { { " 󰈈 dot", "MiniFilesTitleFocused" } }
-          or { { " 󰈉 dot", "Comment" } }
+        config.footer = show_dotfiles and { { " 󰈈 dot", "MiniFilesTitleFocused" } } or { { " 󰈉 dot", "Comment" } }
         config.footer_pos = "right"
         vim.api.nvim_win_set_config(win_id, config)
       end,

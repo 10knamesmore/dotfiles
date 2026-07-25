@@ -28,10 +28,12 @@ require("lazy").setup({
     -- version = "*", -- try installing the latest stable version for plugins that support semver
   },
   install = { colorscheme = { "tokyonight", "habamax" } },
-  checker = {
-    enabled = true, -- check for plugin updates periodically
-    notify = false, -- notify on update
-  }, -- automatically check for plugin updates
+  -- 关掉自动检查更新：start() 第一步是同步的 fast_check()，对 85 个插件逐个
+  -- Git.info + get_target，实测 ~50ms（比整个 lazy 启动还大一倍）；之后每次启动
+  -- 还要 spawn 约 85 个 git 子进程，到期时是 85 个不限并发的 git fetch。
+  -- 而 notify=false 让结果只出现在 :Lazy 面板里，等于付了钱没拿货。
+  -- 版本由 lazy-lock.json 钉着，需要时手动 :Lazy check。
+  checker = { enabled = false },
   performance = {
     rtp = {
       -- disable some rtp plugins
@@ -39,9 +41,13 @@ require("lazy").setup({
         "gzip",
         -- "matchit",
         -- "matchparen",
-        -- "netrwPlugin",
+        -- netrw 注册 47 条 autocmd，而文件浏览已归 mini.files/snacks，
+        -- 远端文件在 0.12 由内置 runtime/plugin/net.lua 接管；
+        -- gx 也不靠它（来自 vim/_core/defaults.lua 的内置映射）。
+        "netrwPlugin",
         "tarPlugin",
-        "tohtml",
+        -- "tohtml" 在 0.12 已从 runtime/plugin 移走（改为 pack/dist/opt/nvim.tohtml），
+        -- 写在这里是空操作，删掉免得看起来还在生效。
         "tutor",
         "zipPlugin",
       },

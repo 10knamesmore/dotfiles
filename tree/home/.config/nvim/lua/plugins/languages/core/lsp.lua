@@ -3,7 +3,11 @@ return {
   --
   {
     "neovim/nvim-lspconfig",
-    event = "VeryLazy",
+    -- 别用 VeryLazy：那会让 dashboard / 纯 quickfix 这种根本没打开文件的场景
+    -- 也把 lspconfig + mason + mason-lspconfig + lazydev 全拉起来。
+    -- 下面 config 里依赖的「vim.lsp.enable 对已打开 buffer 触发 LspAttach」
+    -- 在 BufReadPost 同样成立（它一定晚于 buffer 打开）。
+    event = { "BufReadPost", "BufNewFile", "BufWritePre" },
     dependencies = {
       "mason.nvim",
       { "mason-org/mason-lspconfig.nvim", config = function() end },
@@ -54,6 +58,11 @@ return {
           enabled = true,
         },
         folds = {
+          enabled = true,
+        },
+        -- 改开标签时闭标签跟着实时同步（HTML/Vue/JSX）。nvim-ts-autotag 只在
+        -- InsertLeave 时补，这个是边打边同步、且由 server 权威判定而非 treesitter 猜。
+        linked_editing = {
           enabled = true,
         },
         format = {
@@ -205,122 +214,140 @@ return {
     config = vim.schedule_wrap(function(_, opts)
       local Util = require("utils")
 
-      -- setup autoformat
-      Util.format.register(Util.lsp.formatter())
+      -- schedule 出去后就跳出了 lazy 的 Util.try（它只包住「安排调度」那一步），
+      -- 这里面抛错不会归到 nvim-lspconfig、也不走通知，只以裸
+      -- "vim.schedule callback: lsp.lua:xxx" 出现。所以自己兜一层。
+      local ok, err = pcall(function()
+        -- setup autoformat
+        Util.format.register(Util.lsp.formatter())
 
-      -- setup keymaps
-      for server, server_opts in pairs(opts.servers) do
-        if type(server_opts) == "table" and server_opts.keys then
-          Util.lsp.keymaps.set({ name = server ~= "*" and server or nil }, server_opts.keys)
-        end
-      end
-
-      -- inlay hints：通过 LspAttach 统一触发；lspconfig 现在 VeryLazy 加载，
-      -- vim.lsp.enable 会对已打开 buffer 触发 LspAttach，无需再遍历 get_clients。
-      if opts.inlay_hints.enabled then
-        vim.api.nvim_create_autocmd("LspAttach", {
-          callback = function(event)
-            local client = vim.lsp.get_client_by_id(event.data.client_id)
-            local buffer = event.buf
-            if
-              vim.api.nvim_buf_is_valid(buffer)
-              and vim.bo[buffer].buftype == ""
-              and not vim.tbl_contains(opts.inlay_hints.exclude, vim.bo[buffer].filetype)
-              and client
-              and client:supports_method("textDocument/inlayHint")
-            then
-              vim.lsp.inlay_hint.enable(true, { bufnr = buffer })
-            end
-          end,
-        })
-      end
-
-      -- folds
-      if opts.folds.enabled then
-        Snacks.util.lsp.on({ method = "textDocument/foldingRange" }, function()
-          if Util.set_default("foldmethod", "expr") then
-            Util.set_default("foldexpr", "v:lua.vim.lsp.foldexpr()")
+        -- setup keymaps
+        for server, server_opts in pairs(opts.servers) do
+          if type(server_opts) == "table" and server_opts.keys then
+            Util.lsp.keymaps.set({ name = server ~= "*" and server or nil }, server_opts.keys)
           end
-        end)
-      end
+        end
 
-      -- code lens
-      if opts.codelens.enabled and vim.lsp.codelens then
-        Snacks.util.lsp.on({ method = "textDocument/codeLens" }, function(buffer)
-          vim.lsp.codelens.enable(true, { bufnr = buffer })
-          vim.api.nvim_create_autocmd({ "BufEnter", "CursorHold", "InsertLeave" }, {
-            buffer = buffer,
-            callback = function()
-              vim.lsp.codelens.enable(true, { bufnr = buffer })
+        -- inlay hints：通过 LspAttach 统一触发；lspconfig 在 BufReadPost 加载，
+        -- vim.lsp.enable 会对已打开 buffer 触发 LspAttach，无需再遍历 get_clients。
+        if opts.inlay_hints.enabled then
+          vim.api.nvim_create_autocmd("LspAttach", {
+            callback = function(event)
+              local client = vim.lsp.get_client_by_id(event.data.client_id)
+              local buffer = event.buf
+              if
+                vim.api.nvim_buf_is_valid(buffer)
+                and vim.bo[buffer].buftype == ""
+                and not vim.tbl_contains(opts.inlay_hints.exclude, vim.bo[buffer].filetype)
+                and client
+                and client:supports_method("textDocument/inlayHint")
+              then
+                vim.lsp.inlay_hint.enable(true, { bufnr = buffer })
+              end
             end,
           })
-        end)
-      end
+        end
 
-      -- diagnostics
-      if type(opts.diagnostics.virtual_text) == "table" and opts.diagnostics.virtual_text.prefix == "icons" then
-        opts.diagnostics.virtual_text.prefix = function(diagnostic)
-          local icons = Util.config.icons.diagnostics
-          for d, icon in pairs(icons) do
-            if diagnostic.severity == vim.diagnostic.severity[d:upper()] then
-              return icon
+        -- folds
+        if opts.folds.enabled then
+          Snacks.util.lsp.on({ method = "textDocument/foldingRange" }, function()
+            if Util.set_default("foldmethod", "expr") then
+              Util.set_default("foldexpr", "v:lua.vim.lsp.foldexpr()")
+            end
+          end)
+        end
+
+        -- linked editing（0.12 内置，默认关闭，见 :h lsp-linked_editing_range）
+        -- 注意 enable 的 filter 只吃 client_id，没有 bufnr——它是按 client 全局开的。
+        if opts.linked_editing.enabled then
+          Snacks.util.lsp.on({ method = "textDocument/linkedEditingRange" }, function(_, client)
+            vim.lsp.linked_editing_range.enable(true, { client_id = client.id })
+          end)
+        end
+
+        -- code lens
+        if opts.codelens.enabled and vim.lsp.codelens then
+          Snacks.util.lsp.on({ method = "textDocument/codeLens" }, function(buffer)
+            vim.lsp.codelens.enable(true, { bufnr = buffer })
+            vim.api.nvim_create_autocmd({ "BufEnter", "CursorHold", "InsertLeave" }, {
+              buffer = buffer,
+              callback = function()
+                vim.lsp.codelens.enable(true, { bufnr = buffer })
+              end,
+            })
+          end)
+        end
+
+        -- diagnostics
+        if type(opts.diagnostics.virtual_text) == "table" and opts.diagnostics.virtual_text.prefix == "icons" then
+          opts.diagnostics.virtual_text.prefix = function(diagnostic)
+            -- 是 Util.icons 不是 Util.config.icons：utils 下没有 config 子模块，
+            -- 惰性加载的 __index 会静默返回 nil，写错只会在真正走到这个分支时才炸。
+            local icons = Util.icons.diagnostics
+            for d, icon in pairs(icons) do
+              if diagnostic.severity == vim.diagnostic.severity[d:upper()] then
+                return icon
+              end
+            end
+            return "●"
+          end
+        end
+        vim.diagnostic.config(vim.deepcopy(opts.diagnostics))
+
+        if opts.capabilities then
+          local base = opts.servers["*"]
+          opts.servers["*"] = vim.tbl_deep_extend("force", type(base) == "table" and base or {}, {
+            capabilities = opts.capabilities,
+          })
+        end
+
+        if opts.servers["*"] then
+          vim.lsp.config("*", opts.servers["*"])
+        end
+
+        -- get all the servers that are available through mason-lspconfig
+        local have_mason = Util.has("mason-lspconfig.nvim")
+        local mason_all = have_mason
+            and vim.tbl_keys(require("mason-lspconfig.mappings").get_mason_map().lspconfig_to_package)
+          or {} --[[ @as string[] ]]
+        local mason_exclude = {} ---@type string[]
+
+        ---@return boolean? exclude automatic setup
+        local function configure(server)
+          if server == "*" then
+            return false
+          end
+          local sopts = opts.servers[server]
+          sopts = sopts == true and {} or (not sopts) and { enabled = false } or sopts --[[@as LspServerConfig]]
+
+          if sopts.enabled == false then
+            mason_exclude[#mason_exclude + 1] = server
+            return
+          end
+
+          local use_mason = sopts.mason ~= false and vim.tbl_contains(mason_all, server)
+          local setup = opts.setup[server] or opts.setup["*"]
+          if setup and setup(server, sopts) then
+            mason_exclude[#mason_exclude + 1] = server
+          else
+            vim.lsp.config(server, sopts)
+            if not use_mason then
+              vim.lsp.enable(server)
             end
           end
-          return "●"
-        end
-      end
-      vim.diagnostic.config(vim.deepcopy(opts.diagnostics))
-
-      if opts.capabilities then
-        local base = opts.servers["*"]
-        opts.servers["*"] = vim.tbl_deep_extend("force", type(base) == "table" and base or {}, {
-          capabilities = opts.capabilities,
-        })
-      end
-
-      if opts.servers["*"] then
-        vim.lsp.config("*", opts.servers["*"])
-      end
-
-      -- get all the servers that are available through mason-lspconfig
-      local have_mason = Util.has("mason-lspconfig.nvim")
-      local mason_all = have_mason
-          and vim.tbl_keys(require("mason-lspconfig.mappings").get_mason_map().lspconfig_to_package)
-        or {} --[[ @as string[] ]]
-      local mason_exclude = {} ---@type string[]
-
-      ---@return boolean? exclude automatic setup
-      local function configure(server)
-        if server == "*" then
-          return false
-        end
-        local sopts = opts.servers[server]
-        sopts = sopts == true and {} or (not sopts) and { enabled = false } or sopts --[[@as LspServerConfig]]
-
-        if sopts.enabled == false then
-          mason_exclude[#mason_exclude + 1] = server
-          return
+          return use_mason
         end
 
-        local use_mason = sopts.mason ~= false and vim.tbl_contains(mason_all, server)
-        local setup = opts.setup[server] or opts.setup["*"]
-        if setup and setup(server, sopts) then
-          mason_exclude[#mason_exclude + 1] = server
-        else
-          vim.lsp.config(server, sopts)
-          if not use_mason then
-            vim.lsp.enable(server)
-          end
+        local install = vim.tbl_filter(configure, vim.tbl_keys(opts.servers))
+        if have_mason then
+          require("mason-lspconfig").setup({
+            ensure_installed = vim.list_extend(install, Util.opts("mason-lspconfig.nvim").ensure_installed or {}),
+            automatic_enable = { exclude = mason_exclude },
+          })
         end
-        return use_mason
-      end
-
-      local install = vim.tbl_filter(configure, vim.tbl_keys(opts.servers))
-      if have_mason then
-        require("mason-lspconfig").setup({
-          ensure_installed = vim.list_extend(install, Util.opts("mason-lspconfig.nvim").ensure_installed or {}),
-          automatic_enable = { exclude = mason_exclude },
-        })
+      end)
+      if not ok then
+        Util.error("nvim-lspconfig 配置失败：\n" .. tostring(err))
       end
     end),
   },

@@ -3,7 +3,8 @@
 -- S treesitter支持的光标跳转,同时visual选定
 return {
   "folke/flash.nvim",
-  event = "VeryLazy",
+  -- 不要 event：下面 modes.search.enabled 和 modes.char.enabled 都是 false，
+  -- 没有任何需要常驻的 autocmd hook；event 只会让 keys 变成摆设。
   ---@type Flash.Config
   opts = {
     -- 可用的跳转标签字符列表

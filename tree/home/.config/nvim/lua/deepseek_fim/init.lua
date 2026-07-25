@@ -47,6 +47,45 @@ function M.log(...)
   end
 end
 
+-- 错误上报状态。原先所有错误只进 M.log，而 log 在 debug=false（默认）时直接 return，
+-- 于是 key 失效 / 余额不足 / 模型下线 / 网络不通全部零反馈——这是花钱的 API，不能哑。
+local err_state = { msg = nil, at = 0, streak = 0 }
+local ERR_NOTIFY_INTERVAL_MS = 60 * 1000
+local ERR_DISABLE_STREAK = 5
+
+--- 上报一次请求失败：同一条错误 60s 内只提示一次；连续失败到阈值就自动停用，
+--- 避免带着坏配置一直烧 token。恢复方式是 :DeepseekToggle。
+--- @param err string|nil
+function M.report_error(err)
+  local msg = tostring(err or "unknown error")
+  err_state.streak = err_state.streak + 1
+
+  if err_state.streak >= ERR_DISABLE_STREAK and M.config.enabled then
+    M.config.enabled = false
+    err_state.msg, err_state.at = nil, 0
+    vim.notify(
+      ("DeepSeek FIM 连续 %d 次失败，已自动停用：%s\n修好后 :DeepseekToggle 重新开启"):format(
+        ERR_DISABLE_STREAK,
+        msg
+      ),
+      vim.log.levels.ERROR
+    )
+    return
+  end
+
+  local now = vim.uv.now()
+  if err_state.msg == msg and (now - err_state.at) < ERR_NOTIFY_INTERVAL_MS then
+    return
+  end
+  err_state.msg, err_state.at = msg, now
+  vim.notify("DeepSeek FIM: " .. msg, vim.log.levels.WARN)
+end
+
+--- 一次成功即清空连续失败计数。
+function M.report_ok()
+  err_state.streak = 0
+end
+
 --- @param opts deepseek_fim.Config|nil
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
@@ -82,10 +121,7 @@ function M.setup(opts)
   local key = vim.env[M.config.api_key_env]
   if not key or key == "" then
     vim.schedule(function()
-      vim.notify(
-        "DeepSeek FIM 已禁用：环境变量 " .. M.config.api_key_env .. " 未设置",
-        vim.log.levels.WARN
-      )
+      vim.notify("DeepSeek FIM 已禁用：环境变量 " .. M.config.api_key_env .. " 未设置", vim.log.levels.WARN)
     end)
   end
 end

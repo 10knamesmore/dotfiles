@@ -46,7 +46,9 @@ return {
   {
     "bluz71/vim-moonfly-colors",
     name = "moonfly",
-    lazy = false,
+    -- 备用配色，不需要 lazy=false：真正应用的是上面 tokyonight 的
+    -- config 里那句 colorscheme("tokyonight-moon")，moonfly 早加载纯属陪跑。
+    lazy = true,
     priority = 1000,
   },
   {

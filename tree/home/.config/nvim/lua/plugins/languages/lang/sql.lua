@@ -99,6 +99,11 @@ return {
     "mfussenegger/nvim-lint",
     optional = true,
     opts = function(_, opts)
+      -- 不给 --dialect 时 sqlfluff 直接 usage error 退出：错误只走 stderr，
+      -- 退出码又被内置 linter 的 ignore_exitcode 吞掉，stdout 空 => 一条诊断都产不出、且毫无提示。
+      -- 与下面 conform 的 --dialect=ansi 保持对称。
+      opts.linters = opts.linters or {}
+      opts.linters.sqlfluff = { prepend_args = { "--dialect=ansi" } }
       for _, ft in ipairs(sql_ft) do
         opts.linters_by_ft[ft] = opts.linters_by_ft[ft] or {}
         table.insert(opts.linters_by_ft[ft], "sqlfluff")
@@ -111,6 +116,10 @@ return {
     opts = function(_, opts)
       opts.formatters.sqlfluff = {
         args = { "format", "--dialect=ansi", "-" },
+        -- 内置定义是 require_cwd = true + cwd = root_file{.sqlfluff, pyproject.toml, …}，
+        -- 而 override 默认 inherit=true 会把它继承下来：项目没有那几个文件时
+        -- formatter 被判不可用并静默跳过。既然这里已显式给了 dialect，就别再依赖项目配置。
+        require_cwd = false,
       }
       for _, ft in ipairs(sql_ft) do
         opts.formatters_by_ft[ft] = opts.formatters_by_ft[ft] or {}

@@ -41,10 +41,23 @@ function M.save()
   if not data then
     return
   end
-  local f = io.open(path(), "w")
-  if f then
+  -- 先写临时文件再 rename：io.open(p, "w") 会立刻截断原文件，写一半崩掉就留下
+  -- 损坏的 JSON，而 M.load 对 decode 失败是静默归零——用量统计会无声清空。
+  -- rename 在同一文件系统内是原子的，多个 nvim 实例并发也只会整份互相覆盖，不会写坏。
+  local target = path()
+  local tmp = target .. ".tmp"
+  local f = io.open(tmp, "w")
+  if not f then
+    return
+  end
+  local ok = pcall(function()
     f:write(vim.json.encode(data))
-    f:close()
+  end)
+  f:close()
+  if ok then
+    os.rename(tmp, target)
+  else
+    os.remove(tmp)
   end
 end
 
