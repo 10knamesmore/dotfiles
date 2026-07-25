@@ -67,11 +67,11 @@ BarModule {
     // 状态底色
     tintColor: {
         if (charging || full)
-            return Qt.rgba(0.545, 0.835, 0.792, 0.08); // teal 8%
+            return Colors.withAlpha(Colors.teal, 0.08);
         if (pct <= 10)
-            return Qt.rgba(0.929, 0.529, 0.588, 0.18); // red 18%
+            return Colors.withAlpha(Colors.red, 0.18);
         if (pct <= 30)
-            return Qt.rgba(0.933, 0.831, 0.624, 0.12); // yellow 12%
+            return Colors.withAlpha(Colors.yellow, 0.12);
         return "transparent";
     }
     // 根据电量/状态动态调整颜色

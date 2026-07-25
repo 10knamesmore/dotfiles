@@ -13,7 +13,6 @@ BarModule {
 
     accentColor: Colors.flamingo
     implicitWidth: label.implicitWidth + 32
-    Component.onCompleted: stateReader.running = true
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);
@@ -22,30 +21,20 @@ BarModule {
         PanelState.toggleScreenEffects();
     }
 
-    // 定期检查效果状态
-    Process {
-        id: stateReader
-
-        command: ["cat", Quickshell.env("HOME") + "/.cache/hypr/screen-effects.json"]
-
-        stdout: SplitParser {
-            onRead: data => {
-                try {
-                    let obj = JSON.parse(data);
-                    root.effectsActive = (obj.warmth > 0 || obj.grain > 0);
-                } catch (e) {}
-            }
+    // 状态文件仅在 screen_effects.sh / 设置面板写入时才变 —— inotify 监听即可，
+    // 取代旧的每 5s fork cat 轮询（per-screen ×2，读同一份全局状态，纯浪费）。
+    FileView {
+        id: stateFile
+        path: Quickshell.env("HOME") + "/.cache/hypr/screen-effects.json"
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            try {
+                let obj = JSON.parse(text());
+                root.effectsActive = (obj.warmth > 0 || obj.grain > 0);
+            } catch (e) {}
         }
-    }
-
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: {
-            stateReader.running = false;
-            stateReader.running = true;
-        }
+        onFileChanged: reload()
     }
 
     Text {

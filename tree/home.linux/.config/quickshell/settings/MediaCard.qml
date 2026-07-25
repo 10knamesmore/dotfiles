@@ -15,11 +15,11 @@ Rectangle {
     implicitHeight: mainCol.implicitHeight + 20
     radius: Tokens.radiusM
     color: cardArea.containsMouse
-        ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha)
-        : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
+        ? Colors.withAlpha(Colors.surface1, Tokens.cardAlpha)
+        : Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
     border.color: cardArea.containsMouse
-        ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, Tokens.borderHoverAlpha)
-        : Qt.rgba(1, 1, 1, 0.06)
+        ? Colors.withAlpha(Colors.mauve, Tokens.borderHoverAlpha)
+        : Colors.overlay(0.06)
     border.width: 1
     clip: true
 
@@ -137,7 +137,7 @@ Rectangle {
                     height: 36
                     radius: Tokens.radiusFull
                     color: mediaBtnArea.containsMouse
-                        ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.15)
+                        ? Colors.withAlpha(Colors.mauve, 0.15)
                         : "transparent"
 
                     Text {

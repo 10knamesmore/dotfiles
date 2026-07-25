@@ -54,8 +54,8 @@ PanelWindow {
             anchors.fill: parent
             visible: BarLayout.current.barBackground
             radius: BarLayout.current.squareCorners ? 0 : Tokens.radiusL
-            color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, BarLayout.current.barAlpha)
-            border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
+            color: Colors.withAlpha(Colors.base, BarLayout.current.barAlpha)
+            border.color: Colors.overlay(Tokens.borderAlpha)
             border.width: BarLayout.current.barBackground ? Tokens.borderWidth : 0
 
             SoftShadow {

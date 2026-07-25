@@ -14,9 +14,9 @@ Rectangle {
     readonly property int _snapThreshold: 60   // 逻辑像素
 
     radius: Tokens.radiusM
-    color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.5)
+    color: Colors.withAlpha(Colors.base, 0.5)
     border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.06)
+    border.color: Colors.overlay(0.06)
     clip: true
 
     function _logW(m) { return Math.round(m.width / m.scale); }
@@ -115,7 +115,7 @@ Rectangle {
             radius: Tokens.radiusS
             visible: modelData.enabled
             opacity: modelData.enabled ? 1 : 0.4
-            color: isSelected ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.22) : Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5)
+            color: isSelected ? Colors.withAlpha(Colors.blue, 0.22) : Colors.withAlpha(Colors.surface1, 0.5)
             border.width: 2
             border.color: isSelected ? Colors.green : Colors.blue
             z: isSelected ? 2 : 1

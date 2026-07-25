@@ -92,14 +92,13 @@ BarModule {
         }
     }
 
-    Timer {
-        interval: 2000
-        running: root.player !== null
-        repeat: true
-        onTriggered: {
-            pidReader.running = false;
+    // PID 在 player 生命周期内不变，且只有 hover/右键复制才用 —— 改为 player 变化时取一次，
+    // 消除旧的每 2s pgrep -fi fork（per-screen ×2，扫全 /proc）。
+    onPlayerChanged: {
+        if (root.player)
             pidReader.running = true;
-        }
+        else
+            root.playerPid = 0;
     }
 
     Component.onCompleted: {
@@ -178,7 +177,7 @@ BarModule {
             id: identityTag
 
             visible: root.player !== null
-            color: Qt.rgba(Colors.pink.r, Colors.pink.g, Colors.pink.b, 0.2)
+            color: Colors.withAlpha(Colors.pink, 0.2)
             radius: 4
             width: identityText.implicitWidth + 10
             height: identityText.implicitHeight + 4

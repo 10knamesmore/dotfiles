@@ -361,7 +361,7 @@ PanelOverlay {
                 width: clearDoneText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: clearDoneArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                color: clearDoneArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                 Text {
                     id: clearDoneText
@@ -389,7 +389,7 @@ PanelOverlay {
                 width: addNoteText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: addNoteArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
+                color: addNoteArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.15) : "transparent"
 
                 Text {
                     id: addNoteText
@@ -417,7 +417,7 @@ PanelOverlay {
                 width: addTodoText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: addTodoArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
+                color: addTodoArea.containsMouse ? Colors.withAlpha(Colors.green, 0.15) : "transparent"
 
                 Text {
                     id: addTodoText
@@ -504,7 +504,7 @@ PanelOverlay {
                 width: tabLabel.implicitWidth + 16
                 height: 24
                 radius: Tokens.radiusFull
-                color: active ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2) : tabArea.containsMouse ? Colors.surface1 : "transparent"
+                color: active ? Colors.withAlpha(Colors.mauve, 0.2) : tabArea.containsMouse ? Colors.surface1 : "transparent"
 
                 Text {
                     id: tabLabel
@@ -705,7 +705,7 @@ PanelOverlay {
                             }
 
                             Text {
-                                text: (parent.parent.parent.parent.text || "空便签").split("\n")[0]
+                                text: (delegateRect.text || "空便签").split("\n")[0]
                                 color: done ? Colors.overlay0 : Colors.text
                                 font.family: Fonts.family
                                 font.pixelSize: Fonts.body
@@ -730,7 +730,7 @@ PanelOverlay {
                         Layout.preferredWidth: 28
                         Layout.preferredHeight: 28
                         radius: Tokens.radiusFull
-                        color: pinArea.containsMouse ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.15) : "transparent"
+                        color: pinArea.containsMouse ? Colors.withAlpha(Colors.yellow, 0.15) : "transparent"
 
                         Text {
                             anchors.centerIn: parent
@@ -757,7 +757,7 @@ PanelOverlay {
                         Layout.preferredWidth: 28
                         Layout.preferredHeight: 28
                         radius: Tokens.radiusFull
-                        color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                        color: delArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                         Text {
                             anchors.centerIn: parent
@@ -800,8 +800,8 @@ PanelOverlay {
                             height: 22
                             radius: Tokens.radiusFull
                             color: isTodo
-                                ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.2)
-                                : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2)
+                                ? Colors.withAlpha(Colors.green, 0.2)
+                                : Colors.withAlpha(Colors.blue, 0.2)
 
                             Text {
                                 id: typeLabel
@@ -827,8 +827,8 @@ PanelOverlay {
                             height: 22
                             radius: Tokens.radiusFull
                             color: done
-                                ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15)
-                                : Qt.rgba(1, 1, 1, 0.06)
+                                ? Colors.withAlpha(Colors.green, 0.15)
+                                : Colors.overlay(0.06)
 
                             Text {
                                 id: doneLabel
@@ -883,7 +883,7 @@ PanelOverlay {
                         // 置顶
                         Rectangle {
                             width: 22; height: 22; radius: Tokens.radiusFull
-                            color: pinned ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.2) : editPinArea.containsMouse ? Colors.surface2 : "transparent"
+                            color: pinned ? Colors.withAlpha(Colors.yellow, 0.2) : editPinArea.containsMouse ? Colors.surface2 : "transparent"
 
                             Text {
                                 anchors.centerIn: parent
@@ -958,7 +958,7 @@ PanelOverlay {
                             font.pixelSize: Fonts.body
                             wrapMode: TextEdit.WordWrap
                             selectByMouse: true
-                            text: parent.parent.parent.text
+                            text: delegateRect.text
                             onTextChanged: {
                                 if (isEditing)
                                     root.updateNoteText(index, editArea.text);

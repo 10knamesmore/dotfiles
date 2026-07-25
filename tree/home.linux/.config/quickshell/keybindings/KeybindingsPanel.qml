@@ -300,7 +300,7 @@ PanelOverlay {
                         implicitHeight: cardCol.implicitHeight + 20
                         radius: Tokens.radiusMS
                         color: sectionHover.containsMouse ? Colors.surface1 : Colors.surface0
-                        border.color: sectionHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
+                        border.color: sectionHover.containsMouse ? Colors.withAlpha(Colors.blue, Tokens.borderHoverAlpha) : Colors.overlay(0.04)
                         border.width: 1
                         Behavior on color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
                         Behavior on border.color { ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard } }
@@ -352,7 +352,7 @@ PanelOverlay {
                                                 height: 22
                                                 radius: Tokens.radiusXS
                                                 color: Colors.surface1
-                                                border.color: Qt.rgba(1, 1, 1, 0.08)
+                                                border.color: Colors.overlay(0.08)
                                                 border.width: 1
 
                                                 Text {

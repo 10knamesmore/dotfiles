@@ -96,7 +96,6 @@ format_keybindings() {
             *workspace_save*)     desc="保存工作区布局" ;;
             *workspace_restore*)  desc="恢复工作区布局" ;;
             *keybindings_cheatsheet*) desc="快捷键速查 (本窗口)" ;;
-            *killall*waybar*)     desc="切换 Waybar 显示" ;;
             *launch_yazi*)        desc="打开文件管理器 (Yazi)" ;;
             *hyprshot*region*)    desc="截图 (选区)" ;;
             *hyprshot*window*)    desc="截图 (窗口)" ;;

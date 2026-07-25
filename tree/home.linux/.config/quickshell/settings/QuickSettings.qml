@@ -31,6 +31,7 @@ PanelOverlay {
 
     function refreshStatus() {
         wifiProc.running = true;
+        wifiNameProc.running = true; // 否则 wifiName 永远空，WiFi 开关显示不出 SSID
         btPowerProc.running = true;
         btDeviceProc.running = true;
         brightnessProc.running = true;
@@ -243,13 +244,8 @@ PanelOverlay {
             }
 
             // ── 滑块区 ──
-            Text {
+            SectionLabel {
                 text: "调节"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             SettingsSlider {
@@ -279,13 +275,8 @@ PanelOverlay {
             }
 
             // ── 开关区 ──
-            Text {
+            SectionLabel {
                 text: "快捷开关"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             GridLayout {
@@ -377,26 +368,16 @@ PanelOverlay {
             }
 
             // ── 主题切换 ──
-            Text {
+            SectionLabel {
                 text: "主题"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             ThemePicker {
                 Layout.fillWidth: true
             }
 
-            Text {
+            SectionLabel {
                 text: "栏样式"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             BarStylePicker {
@@ -428,13 +409,8 @@ PanelOverlay {
             }
 
             // ── 截图 ──
-            Text {
+            SectionLabel {
                 text: "工具"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             RowLayout {
@@ -475,8 +451,8 @@ PanelOverlay {
                 Layout.fillWidth: true
                 implicitHeight: sysInfoCol.implicitHeight + 20
                 radius: Tokens.radiusM
-                color: sysHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
-                border.color: sysHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
+                color: sysHover.containsMouse ? Colors.withAlpha(Colors.surface1, Tokens.cardAlpha) : Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
+                border.color: sysHover.containsMouse ? Colors.withAlpha(Colors.blue, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
                 border.width: 1
                 clip: true
 
@@ -628,13 +604,8 @@ PanelOverlay {
             }
 
             // ── 电源操作 ──
-            Text {
+            SectionLabel {
                 text: "电源"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.xs
-                font.letterSpacing: 2
-                font.weight: Font.Medium
             }
 
             RowLayout {

@@ -20,8 +20,8 @@ Rectangle {
     Layout.fillHeight: true
     implicitHeight: toggleCol.implicitHeight + 16
     radius: Tokens.radiusM
-    color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.25 : 0.15) : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: toggled ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, toggleHover.containsMouse ? 0.5 : Tokens.borderHoverAlpha) : toggleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+    color: toggled ? Colors.withAlpha(Colors.blue, toggleHover.containsMouse ? 0.25 : 0.15) : toggleHover.containsMouse ? Colors.surface1 : Colors.surface0
+    border.color: toggled ? Colors.withAlpha(Colors.blue, toggleHover.containsMouse ? 0.5 : Tokens.borderHoverAlpha) : toggleHover.containsMouse ? Colors.overlay(0.08) : "transparent"
     border.width: 1
     scale: toggleHover.containsMouse ? 1.03 : 1
 

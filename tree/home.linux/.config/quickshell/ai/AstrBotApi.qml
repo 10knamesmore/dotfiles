@@ -17,10 +17,6 @@ Item {
     signal chatStats(var stats)    // {token_usage, start_time, end_time, time_to_first_token}
     signal chatError(string message)
     signal configsLoaded(var configs)
-    signal sessionsLoaded(var sessions)
-    signal botsLoaded(var botIds)
-    signal fileUploaded(string attachmentId, string filename)
-    signal imMessageSent(bool success)
 
     // ── Chat SSE 流式 ──
     function sendChat(message, sessionId, configId, username) {
@@ -39,7 +35,7 @@ Item {
         chatProc._fullContent = "";
         chatProc._gotData = false;
         let cmd = [
-            "curl", "-N", "-s", "--no-buffer", "--max-time", "120",
+            "curl", "-N", "-s", "--noproxy", "*", "--no-buffer", "--max-time", "120",
             "-X", "POST",
             "-H", "Content-Type: application/json",
             "-H", "X-API-Key: " + api.apiKey,
@@ -60,87 +56,11 @@ Item {
             return;
         configsProc._buf = "";
         configsProc.command = [
-            "curl", "-s", "--max-time", "10",
+            "curl", "-s", "--noproxy", "*", "--max-time", "10",
             "-H", "X-API-Key: " + api.apiKey,
             api.server + "/api/v1/configs"
         ];
         configsProc.running = true;
-    }
-
-    // ── Sessions ──
-    function fetchSessions(username, page, pageSize) {
-        if (sessionsProc.running)
-            return;
-        sessionsProc._buf = "";
-        let url = api.server + "/api/v1/chat/sessions?username=" + encodeURIComponent(username || "qml-user");
-        if (page)
-            url += "&page=" + page;
-        if (pageSize)
-            url += "&page_size=" + pageSize;
-        sessionsProc.command = [
-            "curl", "-s", "--max-time", "10",
-            "-H", "X-API-Key: " + api.apiKey,
-            url
-        ];
-        sessionsProc.running = true;
-    }
-
-    // ── Bots ──
-    function fetchBots() {
-        if (botsProc.running)
-            return;
-        botsProc._buf = "";
-        botsProc.command = [
-            "curl", "-s", "--max-time", "10",
-            "-H", "X-API-Key: " + api.apiKey,
-            api.server + "/api/v1/im/bots"
-        ];
-        botsProc.running = true;
-    }
-
-    // ── File Upload ──
-    function uploadFile(filePath) {
-        if (uploadProc.running)
-            return;
-        uploadProc._buf = "";
-        uploadProc.command = [
-            "curl", "-s", "--max-time", "30",
-            "-X", "POST",
-            "-H", "X-API-Key: " + api.apiKey,
-            "-F", "file=@" + filePath,
-            api.server + "/api/v1/file"
-        ];
-        uploadProc.running = true;
-    }
-
-    // ── File Download ──
-    function downloadFile(attachmentId, destPath) {
-        if (downloadProc.running)
-            return;
-        downloadProc.command = [
-            "curl", "-s", "--max-time", "30",
-            "-H", "X-API-Key: " + api.apiKey,
-            "-o", destPath,
-            api.server + "/api/v1/file?attachment_id=" + encodeURIComponent(attachmentId)
-        ];
-        downloadProc.running = true;
-    }
-
-    // ── IM Message ──
-    function sendImMessage(umo, message) {
-        if (imProc.running)
-            return;
-        imProc._buf = "";
-        let body = { umo: umo, message: message };
-        imProc.command = [
-            "curl", "-s", "--max-time", "10",
-            "-X", "POST",
-            "-H", "Content-Type: application/json",
-            "-H", "X-API-Key: " + api.apiKey,
-            "-d", JSON.stringify(body),
-            api.server + "/api/v1/im/message"
-        ];
-        imProc.running = true;
     }
 
     // ── Process: Chat SSE ──
@@ -254,89 +174,4 @@ Item {
         }
     }
 
-    // ── Process: Sessions ──
-    Process {
-        id: sessionsProc
-
-        property string _buf: ""
-
-        stdout: SplitParser {
-            onRead: data => sessionsProc._buf += data
-        }
-
-        onExited: {
-            try {
-                let obj = JSON.parse(_buf);
-                if (obj.status === "ok" && obj.data && obj.data.sessions)
-                    api.sessionsLoaded(obj.data.sessions);
-            } catch (e) {}
-            _buf = "";
-        }
-    }
-
-    // ── Process: Bots ──
-    Process {
-        id: botsProc
-
-        property string _buf: ""
-
-        stdout: SplitParser {
-            onRead: data => botsProc._buf += data
-        }
-
-        onExited: {
-            try {
-                let obj = JSON.parse(_buf);
-                if (obj.status === "ok" && obj.data && obj.data.bot_ids)
-                    api.botsLoaded(obj.data.bot_ids);
-            } catch (e) {}
-            _buf = "";
-        }
-    }
-
-    // ── Process: File Upload ──
-    Process {
-        id: uploadProc
-
-        property string _buf: ""
-
-        stdout: SplitParser {
-            onRead: data => uploadProc._buf += data
-        }
-
-        onExited: {
-            try {
-                let obj = JSON.parse(_buf);
-                if (obj.status === "ok" && obj.data)
-                    api.fileUploaded(obj.data.attachment_id, obj.data.filename);
-            } catch (e) {}
-            _buf = "";
-        }
-    }
-
-    // ── Process: File Download ──
-    Process {
-        id: downloadProc
-    }
-
-    // ── Process: IM Message ──
-    Process {
-        id: imProc
-
-        property string _buf: ""
-
-        stdout: SplitParser {
-            onRead: data => imProc._buf += data
-        }
-
-        onExited: {
-            try {
-                let obj = JSON.parse(_buf);
-                api.imMessageSent(obj.status === "ok");
-            } catch (e) {
-                api.imMessageSent(false);
-            }
-            _buf = "";
-        }
-    }
 }

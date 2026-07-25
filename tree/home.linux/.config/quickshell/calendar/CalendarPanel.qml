@@ -218,13 +218,13 @@ PanelOverlay {
                             text: modelData.lunar || ""
                             color: {
                                 if (modelData.isToday)
-                                    return Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.8);
+                                    return Colors.withAlpha(Colors.base, 0.8);
 
                                 if (modelData.isFestival)
                                     return Colors.peach;
 
                                 if (!modelData.inMonth)
-                                    return Qt.rgba(Colors.overlay0.r, Colors.overlay0.g, Colors.overlay0.b, 0.6);
+                                    return Colors.withAlpha(Colors.overlay0, 0.6);
 
                                 return Colors.overlay0;
                             }

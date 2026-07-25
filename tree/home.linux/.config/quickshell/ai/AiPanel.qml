@@ -357,9 +357,6 @@ PanelOverlay {
                 }
             }
         }
-        function onSessionsLoaded(sessions) {
-            // AstrBot 的会话列表仅供参考，不覆盖本地索引
-        }
     }
 
     // ── 持久化 Process ──
@@ -480,7 +477,7 @@ PanelOverlay {
                 width: configLabel.implicitWidth + 16
                 height: 24
                 radius: Tokens.radiusFull
-                color: configArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : Qt.rgba(1, 1, 1, 0.05)
+                color: configArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.15) : Colors.overlay(0.05)
 
                 Text {
                     id: configLabel
@@ -514,7 +511,7 @@ PanelOverlay {
                 width: toolRow.implicitWidth + 12
                 height: 24
                 radius: Tokens.radiusFull
-                color: Qt.rgba(1, 1, 1, 0.05)
+                color: Colors.overlay(0.05)
 
                 RowLayout {
                     id: toolRow
@@ -543,7 +540,7 @@ PanelOverlay {
                 width: 28
                 height: 28
                 radius: Tokens.radiusFull
-                color: historyArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent"
+                color: historyArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.15) : "transparent"
 
                 Text {
                     anchors.centerIn: parent
@@ -575,7 +572,7 @@ PanelOverlay {
                 width: 28
                 height: 28
                 radius: Tokens.radiusFull
-                color: newChatArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : "transparent"
+                color: newChatArea.containsMouse ? Colors.withAlpha(Colors.green, 0.15) : "transparent"
 
                 Text {
                     anchors.centerIn: parent
@@ -607,7 +604,7 @@ PanelOverlay {
                 width: clearText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                color: clearArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                 Text {
                     id: clearText
@@ -640,7 +637,7 @@ PanelOverlay {
                 width: 28
                 height: 28
                 radius: Tokens.radiusFull
-                color: settingsArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                color: settingsArea.containsMouse ? Colors.overlay(0.08) : "transparent"
 
                 Text {
                     anchors.centerIn: parent
@@ -724,26 +721,26 @@ PanelOverlay {
 
                     color: {
                         if (isUser)
-                            return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2);
+                            return Colors.withAlpha(Colors.mauve, 0.2);
                         if (isError)
-                            return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.1);
+                            return Colors.withAlpha(Colors.red, 0.1);
                         if (isToolResult)
-                            return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.08);
+                            return Colors.withAlpha(Colors.green, 0.08);
                         if (isTool)
-                            return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.08);
+                            return Colors.withAlpha(Colors.peach, 0.08);
                         return Colors.surface0;
                     }
 
                     border.color: {
                         if (isUser)
-                            return Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.15);
+                            return Colors.withAlpha(Colors.mauve, 0.15);
                         if (isError)
-                            return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15);
+                            return Colors.withAlpha(Colors.red, 0.15);
                         if (isToolResult)
-                            return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.12);
+                            return Colors.withAlpha(Colors.green, 0.12);
                         if (isTool)
-                            return Qt.rgba(Colors.peach.r, Colors.peach.g, Colors.peach.b, 0.12);
-                        return Qt.rgba(1, 1, 1, 0.04);
+                            return Colors.withAlpha(Colors.peach, 0.12);
+                        return Colors.overlay(0.04);
                     }
                     border.width: 1
 
@@ -785,7 +782,7 @@ PanelOverlay {
                     // user: 贴气泡左侧外边；assistant/tool: 贴气泡右侧外边
                     x: bubble.isUser ? (bubble.x - width - 4) : (bubble.x + bubble.width + 4)
                     visible: bubbleHover.hovered || copyArea.containsMouse || copied
-                    color: copyArea.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
+                    color: copyArea.containsMouse ? Colors.overlay(0.12) : "transparent"
 
                     Text {
                         anchors.centerIn: parent
@@ -914,8 +911,8 @@ PanelOverlay {
                     radius: Tokens.radiusFull
                     color: {
                         if (root.generating)
-                            return sendArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent";
-                        return sendArea.containsMouse && root.apiReachable ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : "transparent";
+                            return sendArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent";
+                        return sendArea.containsMouse && root.apiReachable ? Colors.withAlpha(Colors.blue, 0.15) : "transparent";
                     }
 
                     Text {
@@ -1006,7 +1003,7 @@ PanelOverlay {
         visible: root.showSettings
         anchors.fill: parent
         radius: Tokens.radiusL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.98)
+        color: Colors.withAlpha(Colors.base, 0.98)
         z: 20
 
         MouseArea {
@@ -1036,7 +1033,7 @@ PanelOverlay {
                     width: 28
                     height: 28
                     radius: Tokens.radiusFull
-                    color: settingsCloseArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                    color: settingsCloseArea.containsMouse ? Colors.overlay(0.08) : "transparent"
 
                     Text {
                         anchors.centerIn: parent
@@ -1178,8 +1175,8 @@ PanelOverlay {
                 height: 40
                 radius: Tokens.radiusMS
                 color: saveSettingsArea.containsMouse
-                    ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25)
-                    : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                    ? Colors.withAlpha(Colors.blue, 0.25)
+                    : Colors.withAlpha(Colors.blue, 0.15)
 
                 Text {
                     anchors.centerIn: parent

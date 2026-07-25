@@ -130,7 +130,7 @@ Flickable {
                         width: 40
                         height: 22
                         radius: 11
-                        color: editView.panel.editAutoConnect ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3) : Colors.surface2
+                        color: editView.panel.editAutoConnect ? Colors.withAlpha(Colors.green, 0.3) : Colors.surface2
 
                         Rectangle {
                             width: 16
@@ -223,8 +223,8 @@ Flickable {
                         Layout.fillWidth: true
                         height: 32
                         radius: 8
-                        color: editView.panel.editIpMethod === modelData.value ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15) : (ipMethodHover.containsMouse ? Colors.surface1 : Colors.surface0)
-                        border.color: editView.panel.editIpMethod === modelData.value ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.3) : "transparent"
+                        color: editView.panel.editIpMethod === modelData.value ? Colors.withAlpha(Colors.blue, 0.15) : (ipMethodHover.containsMouse ? Colors.surface1 : Colors.surface0)
+                        border.color: editView.panel.editIpMethod === modelData.value ? Colors.withAlpha(Colors.blue, 0.3) : "transparent"
                         border.width: 1
 
                         Text {
@@ -534,7 +534,7 @@ Flickable {
                     Layout.fillWidth: true
                     height: 36
                     radius: 10
-                    color: saveBtnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                    color: saveBtnArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15)
 
                     Text {
                         anchors.centerIn: parent
@@ -567,7 +567,7 @@ Flickable {
                     Layout.fillWidth: true
                     height: 36
                     radius: 10
-                    color: forgetBtnArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.2) : Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.1)
+                    color: forgetBtnArea.containsMouse ? Colors.withAlpha(Colors.red, 0.2) : Colors.withAlpha(Colors.red, 0.1)
 
                     Text {
                         anchors.centerIn: parent

@@ -2,8 +2,6 @@ import QtQuick
 pragma Singleton
 
 QtObject {
-    // 专辑封面占位
-
     readonly property string family: "Hack Nerd Font"
     // ── 排版尺度 ──
     readonly property int xs: 10
@@ -37,11 +35,4 @@ QtObject {
     readonly property int display1: 48
     // ── 字重 ──
     readonly property int weightLight: Font.Light
-    readonly property int weightNormal: Font.Normal
-    readonly property int weightMedium: Font.Medium
-    readonly property int weightBold: Font.Bold
-    // ── 字间距 ──
-    readonly property real trackingNormal: 0
-    readonly property real trackingWide: 1.5
-    readonly property real trackingXWide: 2.5
 }

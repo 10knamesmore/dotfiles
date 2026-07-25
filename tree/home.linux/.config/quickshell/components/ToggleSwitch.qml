@@ -13,8 +13,8 @@ Rectangle {
     height: small ? 16 : 20
     radius: height / 2
     color: checked
-        ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3)
-        : Qt.rgba(1, 1, 1, 0.08)
+        ? Colors.withAlpha(Colors.green, 0.3)
+        : Colors.overlay(0.08)
 
     Rectangle {
         width: root.small ? 12 : 16

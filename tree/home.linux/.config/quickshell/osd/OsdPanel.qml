@@ -118,8 +118,8 @@ PanelWindow {
         width: 240
         height: 80
         radius: Tokens.radiusXL
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.toastAlpha)
-        border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
+        color: Colors.withAlpha(Colors.base, Tokens.toastAlpha)
+        border.color: Colors.overlay(Tokens.borderAlpha)
         border.width: 1
         opacity: 0
 

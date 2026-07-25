@@ -515,7 +515,7 @@ PanelOverlay {
     function topProcs(byMem) {
         let arr = root.procs.slice();
         arr.sort((a, b) => byMem ? (b.mem - a.mem) : (b.cpu - a.cpu));
-        return arr;
+        return arr.slice(0, 16); // 只喂前 16：两个 tab 的 Repeater 非虚拟化且常驻，别重建全 ~80 行
     }
 
     // ── 进程行组件 ──
@@ -578,7 +578,7 @@ PanelOverlay {
             Layout.preferredWidth: 24
             Layout.preferredHeight: 24
             radius: Tokens.radiusS
-            color: kArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.25) : "transparent"
+            color: kArea.containsMouse ? Colors.withAlpha(Colors.red, 0.25) : "transparent"
             Text {
                 anchors.centerIn: parent
                 text: "✕"
@@ -894,7 +894,8 @@ PanelOverlay {
                     }
                     ProcHeader {}
                     Repeater {
-                        model: root.topProcs(false)
+                        // 仅当前 tab 填充：隐藏 tab 的进程列表不再每 1.5s 重建 16 个 ProcRow
+                        model: root.currentTab === "cpu" ? root.topProcs(false) : []
                         delegate: ProcRow {
                             required property var modelData
                             proc: modelData
@@ -1142,7 +1143,8 @@ PanelOverlay {
                     }
                     ProcHeader {}
                     Repeater {
-                        model: root.topProcs(true)
+                        // 仅当前 tab 填充：隐藏 tab 的进程列表不再每 1.5s 重建 16 个 ProcRow
+                        model: root.currentTab === "memory" ? root.topProcs(true) : []
                         delegate: ProcRow {
                             required property var modelData
                             proc: modelData

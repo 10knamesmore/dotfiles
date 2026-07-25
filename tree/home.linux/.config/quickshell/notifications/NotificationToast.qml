@@ -81,18 +81,13 @@ PanelWindow {
                 width: 340
                 height: toastContent.implicitHeight + 16
                 radius: Tokens.radiusM
-                color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.toastAlpha)
-                border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
+                color: Colors.withAlpha(Colors.base, Tokens.toastAlpha)
+                border.color: Colors.overlay(Tokens.borderAlpha)
                 border.width: 1
                 opacity: 0
                 x: 50
                 scale: 0.92
                 clip: true
-
-                SoftShadow {
-                    anchors.fill: parent
-                    radius: parent.radius
-                }
 
                 Component.onCompleted: {
                     opacity = 1;
@@ -175,7 +170,7 @@ PanelWindow {
                     height: 2
                     width: 340
                     radius: 1
-                    color: Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.5)
+                    color: Colors.withAlpha(Colors.blue, 0.5)
 
                     NumberAnimation on width {
                         id: progressAnim

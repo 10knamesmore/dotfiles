@@ -11,9 +11,9 @@ Rectangle {
     visible: MonitorState.revertSecs > 0
     implicitHeight: visible ? row.implicitHeight + Tokens.spaceM * 2 : 0
     radius: Tokens.radiusM
-    color: Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.14)
+    color: Colors.withAlpha(Colors.red, 0.14)
     border.width: 1
-    border.color: Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.5)
+    border.color: Colors.withAlpha(Colors.red, 0.5)
 
     RowLayout {
         id: row

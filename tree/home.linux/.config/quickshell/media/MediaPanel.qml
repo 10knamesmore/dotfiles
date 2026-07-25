@@ -259,6 +259,7 @@ PanelOverlay {
 
                 Connections {
                     target: LyricsState
+                    enabled: root.showing // 面板关闭时不响应歌词行变化，省掉隐藏态的 scroll 重算
                     function onCurrentLyricIndexChanged() {
                         if (lyricsView.autoFollow)
                             lyricsView.scrollToCurrent(true);

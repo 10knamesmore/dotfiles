@@ -37,7 +37,7 @@ Rectangle {
     implicitHeight: contentCol.implicitHeight + 24
     radius: Tokens.radiusMS
     color: cardHover.containsMouse ? Colors.surface1 : Colors.surface0
-    border.color: cardHover.containsMouse ? Qt.rgba(root.cond.r, root.cond.g, root.cond.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.04)
+    border.color: cardHover.containsMouse ? Qt.rgba(root.cond.r, root.cond.g, root.cond.b, Tokens.borderHoverAlpha) : Colors.overlay(0.04)
     border.width: 1
     clip: true
 
@@ -276,7 +276,7 @@ Rectangle {
                         ctx.beginPath();
                         ctx.moveTo(8, baseY);
                         ctx.lineTo(w - 8, baseY);
-                        ctx.strokeStyle = Qt.rgba(Colors.surface2.r, Colors.surface2.g, Colors.surface2.b, 0.6).toString();
+                        ctx.strokeStyle = Colors.withAlpha(Colors.surface2, 0.6).toString();
                         ctx.lineWidth = 1;
                         ctx.stroke();
 

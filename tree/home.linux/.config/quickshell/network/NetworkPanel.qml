@@ -568,7 +568,7 @@ PanelOverlay {
                 width: wifiToggleText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: root.wifiEnabled ? (wifiToggleArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)) : (wifiToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
+                color: root.wifiEnabled ? (wifiToggleArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15)) : (wifiToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
 
                 Text {
                     id: wifiToggleText
@@ -731,8 +731,8 @@ PanelOverlay {
                 width: ListView.view.width
                 height: netRow.implicitHeight + 12
                 radius: Tokens.radiusMS
-                color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, netHover.containsMouse ? 0.2 : 0.1) : (netHover.containsMouse ? Colors.surface1 : "transparent")
-                border.color: inUse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, Tokens.borderHoverAlpha) : "transparent"
+                color: inUse ? Colors.withAlpha(Colors.green, netHover.containsMouse ? 0.2 : 0.1) : (netHover.containsMouse ? Colors.surface1 : "transparent")
+                border.color: inUse ? Colors.withAlpha(Colors.green, Tokens.borderHoverAlpha) : "transparent"
                 border.width: inUse ? 1 : 0
 
                 MouseArea {
@@ -930,7 +930,7 @@ PanelOverlay {
                         width: connectBtnText.implicitWidth + 20
                         height: 32
                         radius: Tokens.radiusS
-                        color: connectBtnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                        color: connectBtnArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15)
 
                         Text {
                             id: connectBtnText
@@ -970,7 +970,7 @@ PanelOverlay {
                         width: 32
                         height: 32
                         radius: Tokens.radiusS
-                        color: cancelArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                        color: cancelArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                         Text {
                             anchors.centerIn: parent

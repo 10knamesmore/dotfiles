@@ -166,7 +166,7 @@ PanelOverlay {
                 width: clearText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                color: clearArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                 Text {
                     id: clearText
@@ -326,7 +326,7 @@ PanelOverlay {
                         Layout.preferredWidth: 28
                         Layout.preferredHeight: 28
                         radius: Tokens.radiusFull
-                        color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                        color: delArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                         Text {
                             anchors.centerIn: parent

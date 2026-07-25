@@ -3,7 +3,6 @@ import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 
 // 电源菜单 — 全屏遮罩 + 居中操作按钮
@@ -117,10 +116,6 @@ PanelWindow {
 
     }
 
-    Process {
-        id: powerProc
-    }
-
     component PowerButton: Rectangle {
         property string icon: ""
         property string label: ""
@@ -129,7 +124,7 @@ PanelWindow {
         width: 100
         height: 110
         radius: Tokens.radiusL
-        color: btnArea.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.7) : Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, Tokens.panelAlpha)
+        color: btnArea.containsMouse ? Colors.withAlpha(Colors.surface1, 0.7) : Colors.withAlpha(Colors.base, Tokens.panelAlpha)
         border.color: btnArea.containsMouse ? Colors.blue : Colors.surface1
         border.width: 1
 
@@ -168,8 +163,9 @@ PanelWindow {
             cursorShape: Qt.PointingHandCursor
             onClicked: {
                 PanelState.powerMenuOpen = false;
-                powerProc.command = ["sh", "-c", command];
-                powerProc.running = true;
+                // 必须 execDetached，别退回复用一个 Process：lock 起的 hyprlock 是长命进程，
+                // 会永久占住那个 Process 对象，之后 suspend/reboot/poweroff 全部被静默丢弃。
+                Quickshell.execDetached(["sh", "-c", command]);
             }
         }
 

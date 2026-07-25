@@ -72,7 +72,10 @@ BarModule {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
-            winDebounce.restart();
+            // class/pid 只在焦点窗口切换时才变（title 已由 Hyprland.activeToplevel 响应式绑定）。
+            // 只认 activewindow[v2]，挡掉 windowtitle[v2] 等高频事件的无谓 hyprctl fork。
+            if (event.name === "activewindow" || event.name === "activewindowv2")
+                winDebounce.restart();
         }
     }
 
@@ -117,7 +120,7 @@ BarModule {
             id: classTag
 
             visible: root.windowClass !== ""
-            color: Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2)
+            color: Colors.withAlpha(Colors.mauve, 0.2)
             radius: 4
             width: classText.implicitWidth + 10
             height: classText.implicitHeight + 4

@@ -31,7 +31,7 @@ Loader {
 
         Rectangle {
             radius: Tokens.radiusL
-            color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.6)
+            color: Colors.withAlpha(Colors.base, 0.6)
             implicitWidth: groupRow.implicitWidth + 12
             implicitHeight: 36
 

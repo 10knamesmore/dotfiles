@@ -24,8 +24,8 @@ Rectangle {
 
     clip: true
     radius: Tokens.radiusL
-    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, root.hovered ? 0.85 : 0.5) : (hovered ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha))
-    border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
+    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5) : (hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha))
+    border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: root.flat ? 0 : Tokens.borderWidth
     implicitHeight: 36
     scale: hovered ? 1.03 : 1.0

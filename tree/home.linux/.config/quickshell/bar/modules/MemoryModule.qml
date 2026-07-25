@@ -58,10 +58,10 @@ BarModule {
 
         }
 
-        // hover 展开显示详细内存
+        // hover 展开显示详细内存（RAM + Swap，memTooltipText 折成一行）
         Text {
-            visible: root.hovered && SystemStats.memDetailText !== ""
-            text: SystemStats.memDetailText
+            visible: root.hovered && SystemStats.memTooltipText !== ""
+            text: SystemStats.memTooltipText.replace("\n", "  ·  ")
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.caption

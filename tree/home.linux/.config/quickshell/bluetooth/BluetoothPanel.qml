@@ -397,7 +397,7 @@ PanelOverlay {
                 radius: Tokens.radiusFull
                 visible: root.btPowered
                 color: root.scanning
-                    ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15)
+                    ? Colors.withAlpha(Colors.blue, 0.15)
                     : (scanBtnArea.containsMouse ? Colors.surface2 : "transparent")
 
                 Text {
@@ -461,7 +461,7 @@ PanelOverlay {
                 height: 26
                 radius: Tokens.radiusFull
                 color: root.btPowered
-                    ? (powerToggleArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.25) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15))
+                    ? (powerToggleArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15))
                     : (powerToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
 
                 Text {
@@ -602,10 +602,10 @@ PanelOverlay {
                 height: devRow.implicitHeight + 12
                 radius: Tokens.radiusMS
                 color: connected
-                    ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, devHover.containsMouse ? 0.2 : 0.1)
+                    ? Colors.withAlpha(Colors.green, devHover.containsMouse ? 0.2 : 0.1)
                     : (devHover.containsMouse ? Colors.surface1 : "transparent")
                 border.color: connected
-                    ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, Tokens.borderHoverAlpha)
+                    ? Colors.withAlpha(Colors.green, Tokens.borderHoverAlpha)
                     : "transparent"
                 border.width: connected ? 1 : 0
 
@@ -739,7 +739,7 @@ PanelOverlay {
                             width: actConnText.implicitWidth + 16
                             height: 26
                             radius: Tokens.radiusS
-                            color: actConnArea.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.2) : Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.1)
+                            color: actConnArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.2) : Colors.withAlpha(Colors.blue, 0.1)
 
                             Text { id: actConnText; anchors.centerIn: parent; text: "连接"; color: Colors.blue; font.family: Fonts.family; font.pixelSize: Fonts.caption }
                             MouseArea { id: actConnArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.connectDevice(mac) }
@@ -751,7 +751,7 @@ PanelOverlay {
                             width: actDiscText.implicitWidth + 16
                             height: 26
                             radius: Tokens.radiusS
-                            color: actDiscArea.containsMouse ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.2) : Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.1)
+                            color: actDiscArea.containsMouse ? Colors.withAlpha(Colors.yellow, 0.2) : Colors.withAlpha(Colors.yellow, 0.1)
 
                             Text { id: actDiscText; anchors.centerIn: parent; text: "断开"; color: Colors.yellow; font.family: Fonts.family; font.pixelSize: Fonts.caption }
                             MouseArea { id: actDiscArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.disconnectDevice(mac) }
@@ -763,7 +763,7 @@ PanelOverlay {
                             width: actTrustText.implicitWidth + 16
                             height: 26
                             radius: Tokens.radiusS
-                            color: actTrustArea.containsMouse ? Qt.rgba(Colors.teal.r, Colors.teal.g, Colors.teal.b, 0.2) : Qt.rgba(Colors.teal.r, Colors.teal.g, Colors.teal.b, 0.1)
+                            color: actTrustArea.containsMouse ? Colors.withAlpha(Colors.teal, 0.2) : Colors.withAlpha(Colors.teal, 0.1)
 
                             Text { id: actTrustText; anchors.centerIn: parent; text: "信任"; color: Colors.teal; font.family: Fonts.family; font.pixelSize: Fonts.caption }
                             MouseArea { id: actTrustArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.trustDevice(mac) }
@@ -775,7 +775,7 @@ PanelOverlay {
                             width: actRemoveText.implicitWidth + 16
                             height: 26
                             radius: Tokens.radiusS
-                            color: actRemoveArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.2) : Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.1)
+                            color: actRemoveArea.containsMouse ? Colors.withAlpha(Colors.red, 0.2) : Colors.withAlpha(Colors.red, 0.1)
 
                             Text { id: actRemoveText; anchors.centerIn: parent; text: "忘记"; color: Colors.red; font.family: Fonts.family; font.pixelSize: Fonts.caption }
                             MouseArea { id: actRemoveArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.removeDevice(mac) }

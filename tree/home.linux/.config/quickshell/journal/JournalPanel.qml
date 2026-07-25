@@ -173,7 +173,7 @@ PanelOverlay {
                 width: pauseText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: pauseArea.containsMouse ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.15) : "transparent"
+                color: pauseArea.containsMouse ? Colors.withAlpha(Colors.yellow, 0.15) : "transparent"
 
                 Text {
                     id: pauseText
@@ -210,7 +210,7 @@ PanelOverlay {
                 width: clearText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: clearArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                color: clearArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
 
                 Text {
                     id: clearText
@@ -275,8 +275,8 @@ PanelOverlay {
                     width: filterLabel.implicitWidth + 14
                     height: 24
                     radius: Tokens.radiusFull
-                    color: root.filterPriority === modelData.value ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.2) : (filterBtnArea.containsMouse ? Colors.surface1 : "transparent")
-                    border.color: root.filterPriority === modelData.value ? Qt.rgba(Colors.mauve.r, Colors.mauve.g, Colors.mauve.b, 0.4) : "transparent"
+                    color: root.filterPriority === modelData.value ? Colors.withAlpha(Colors.mauve, 0.2) : (filterBtnArea.containsMouse ? Colors.surface1 : "transparent")
+                    border.color: root.filterPriority === modelData.value ? Colors.withAlpha(Colors.mauve, 0.4) : "transparent"
                     border.width: 1
 
                     Text {

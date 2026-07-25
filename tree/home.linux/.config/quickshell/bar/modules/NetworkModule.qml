@@ -1,58 +1,26 @@
 import "../../theme"
 import "../../state"
+import "../../services"
 import "../components"
 import QtQuick
-import Quickshell
-import Quickshell.Io
 
 BarModule {
     id: root
 
-    property string iconText: "󰤮"
-    property string valueText: "…"
-    property string tooltipText: ""
-    property bool disconnected: false
+    // 网络状态收口到 NetworkService 单例（全局一次 fork），本模块只渲染
+    readonly property string iconText: NetworkService.iconText
+    readonly property string valueText: NetworkService.valueText
+    readonly property string tooltipText: NetworkService.tooltipText
+    readonly property bool disconnected: NetworkService.disconnected
 
     accentColor: Colors.sky
     implicitWidth: label.implicitWidth + 32
-    Component.onCompleted: reader.running = true
     onClicked: mouse => {
         PanelState.closeAll();
         let pos = root.mapToItem(null, mouse.x, mouse.y);
         MorphState.morphSourceX = pos.x + 2;
         MorphState.morphSourceY = pos.y + 6;
         PanelState.toggleNetwork();
-    }
-
-    Process {
-        id: reader
-
-        command: [Quickshell.env("DOTS_SCRIPTS") + "/network_status.sh"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                try {
-                    let obj = JSON.parse(data);
-                    root.iconText = obj.icon ?? "󰤮";
-                    root.valueText = obj.value ?? "";
-                    root.tooltipText = obj.tooltip ?? "";
-                    root.disconnected = obj.class === "disconnected";
-                } catch (e) {
-                    root.valueText = data;
-                }
-            }
-        }
-
-    }
-
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: {
-            reader.running = false;
-            reader.running = true;
-        }
     }
 
     Row {

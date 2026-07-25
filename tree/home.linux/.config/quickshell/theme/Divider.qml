@@ -14,17 +14,17 @@ Rectangle {
 
         GradientStop {
             position: 0.15
-            color: Qt.rgba(Colors.surface2.r, Colors.surface2.g, Colors.surface2.b, 0.4)
+            color: Colors.withAlpha(Colors.surface2, 0.4)
         }
 
         GradientStop {
             position: 0.5
-            color: Qt.rgba(Colors.surface2.r, Colors.surface2.g, Colors.surface2.b, 0.5)
+            color: Colors.withAlpha(Colors.surface2, 0.5)
         }
 
         GradientStop {
             position: 0.85
-            color: Qt.rgba(Colors.surface2.r, Colors.surface2.g, Colors.surface2.b, 0.4)
+            color: Colors.withAlpha(Colors.surface2, 0.4)
         }
 
         GradientStop {

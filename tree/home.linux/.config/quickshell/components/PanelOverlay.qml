@@ -13,7 +13,8 @@ import Quickshell.Wayland
 //
 // 性能权衡：morph 路径会触发子元素 relayout（这是「展开」感的根源，不可避免），
 // 但只发生在 ~500ms 动画期内；静态后无消耗。
-// SoftShadow / panel container 都开了 layer 缓存，让 hover 等微动画走 GPU 合成。
+// SoftShadow 内部开了 layer 缓存走 GPU 合成；panel 容器本身含动态内容（ListView 等），
+// 不给它开 layer——否则每帧都要重画整块 FBO，反而更贵。
 PanelWindow {
     id: root
 
@@ -173,17 +174,13 @@ PanelWindow {
         width: root._atTarget ? root.panelWidth : srcW
         height: root._atTarget ? root.panelHeight : srcH
         radius: root._atTarget ? root.panelRadius : srcR
-        color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b,
+        color: Colors.withAlpha(Colors.base,
             root._atTarget ? Tokens.panelAlpha : (root.hasMorphSource ? Tokens.panelAlpha * 0.5 : Tokens.panelAlpha))
-        border.color: Qt.rgba(1, 1, 1, root._atTarget ? Tokens.borderAlpha : 0)
+        border.color: Colors.overlay(root._atTarget ? Tokens.borderAlpha : 0)
         border.width: 1
         opacity: root.hasMorphSource ? _closeFade.fadeValue : (root._atTarget ? 1 : 0)
         clip: true
 
-        SoftShadow {
-            anchors.fill: parent
-            radius: parent.radius
-        }
 
         MouseArea {
             anchors.fill: parent

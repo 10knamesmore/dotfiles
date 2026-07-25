@@ -13,8 +13,8 @@ Rectangle {
 
     height: Math.min(configCol.implicitHeight + 2 * Tokens.spaceM, 300)
     radius: Tokens.radiusMS
-    color: Qt.rgba(Colors.mantle.r, Colors.mantle.g, Colors.mantle.b, 0.95)
-    border.color: Qt.rgba(1, 1, 1, Tokens.borderAlpha)
+    color: Colors.withAlpha(Colors.mantle, 0.95)
+    border.color: Colors.overlay(Tokens.borderAlpha)
     border.width: 1
     z: 10
 
@@ -56,8 +56,8 @@ Rectangle {
                     radius: Tokens.radiusMS
                     color: {
                         if (modelData.id === picker.currentConfigId)
-                            return Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15);
-                        return cfgArea.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent";
+                            return Colors.withAlpha(Colors.blue, 0.15);
+                        return cfgArea.containsMouse ? Colors.overlay(0.06) : "transparent";
                     }
 
                     RowLayout {

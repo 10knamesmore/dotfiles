@@ -10,14 +10,14 @@ local HOME = os.getenv("HOME")
 -- dots：仓库根优先环境变量 DOTFILES_DIR，兜底读 ~/.config/dots/root（裸 TTY 启动也不断）
 local DOTFILES = os.getenv("DOTFILES_DIR")
 if not DOTFILES or DOTFILES == "" then
-    local f = io.open(HOME .. "/.config/dots/root", "r")
-    if f then
-        DOTFILES = (f:read("l") or ""):gsub("%s+$", "")
-        f:close()
-    end
+  local f = io.open(HOME .. "/.config/dots/root", "r")
+  if f then
+    DOTFILES = (f:read("l") or ""):gsub("%s+$", "")
+    f:close()
+  end
 end
 if not DOTFILES or DOTFILES == "" then
-    DOTFILES = HOME .. "/dotfiles"
+  DOTFILES = HOME .. "/dotfiles"
 end
 local SCRIPTS = DOTFILES .. "/.gen/scripts" -- 原 $scripts_dir
 local N = SCRIPTS -- 原 $n（原 conf 中未定义，按 SCRIPTS 同义处理）
@@ -36,7 +36,7 @@ local mlocal = HOME .. "/.local/state/hypr/monitors.local.lua"
 local chunk = loadfile(mlocal)
 local ok = chunk and pcall(chunk)
 if not ok then
-    hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })
+  hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })
 end
 
 -- ============================================================
@@ -58,111 +58,111 @@ hl.env("WEBKIT_DISABLE_DMABUF_RENDERER", "1") -- NVIDIA 上 WebKit 渲染
 -- ============================================================
 
 hl.config({
-    -- ---------- 输入 ----------
-    input = {
-        kb_layout = "us",
-        follow_mouse = 1,
-        sensitivity = 0,
-        repeat_rate = 70,
-        repeat_delay = 200,
-        scroll_factor = 2.5,
-        touchpad = {
-            disable_while_typing = true,
-            natural_scroll = true,
-        },
-        touchdevice = {
-            enabled = false,
-        },
+  -- ---------- 输入 ----------
+  input = {
+    kb_layout = "us",
+    follow_mouse = 1,
+    sensitivity = 0,
+    repeat_rate = 70,
+    repeat_delay = 200,
+    scroll_factor = 2.5,
+    touchpad = {
+      disable_while_typing = true,
+      natural_scroll = true,
     },
-
-    xwayland = { force_zero_scaling = true },
-
-    cursor = {
-        no_hardware_cursors = 1,
-        min_refresh_rate = 24,
-        hide_on_key_press = true,
-        inactive_timeout = 30,
-        persistent_warps = true,
-        enable_hyprcursor = false,
+    touchdevice = {
+      enabled = false,
     },
+  },
 
-    render = {
-        direct_scanout = 1,
-        -- 0.55 起 cm_fs_passthrough 已移除，由 cm_auto_hdr 自动处理
+  xwayland = { force_zero_scaling = true },
+
+  cursor = {
+    -- no_hardware_cursors = 1,
+    min_refresh_rate = 24,
+    hide_on_key_press = true,
+    inactive_timeout = 30,
+    persistent_warps = true,
+    enable_hyprcursor = false,
+  },
+
+  render = {
+    direct_scanout = 1,
+    -- 0.55 起 cm_fs_passthrough 已移除，由 cm_auto_hdr 自动处理
+  },
+
+  ecosystem = { no_donation_nag = true },
+
+  -- ---------- 外观 ----------
+  general = {
+    gaps_in = 3,
+    gaps_out = {
+      top = 5,
+      left = 10,
+      right = 10,
+      bottom = 10,
     },
-
-    ecosystem = { no_donation_nag = true },
-
-    -- ---------- 外观 ----------
-    general = {
-        gaps_in = 3,
-        gaps_out = {
-            top = 5,
-            left = 10,
-            right = 10,
-            bottom = 10,
-        },
-        border_size = 2,
-        col = {
-            active_border = { colors = { "rgba(89b4faee)", "rgba(cba6f7ee)" }, angle = 45 },
-            inactive_border = "rgba(45475a40)",
-        },
-        resize_on_border = true,
-        hover_icon_on_border = true,
-        allow_tearing = false,
-        layout = "scrolling",
-        snap = { enabled = true },
+    border_size = 2,
+    col = {
+      active_border = { colors = { "rgba(89b4faee)", "rgba(cba6f7ee)" }, angle = 45 },
+      inactive_border = "rgba(45475a40)",
     },
+    resize_on_border = true,
+    hover_icon_on_border = true,
+    allow_tearing = false,
+    layout = "scrolling",
+    snap = { enabled = true },
+  },
 
-    decoration = {
-        rounding = 12,
-        rounding_power = 2.0,
-        active_opacity = 0.98,
-        inactive_opacity = 0.85,
-        fullscreen_opacity = 1,
-        dim_inactive = true,
-        dim_strength = 0.15,
-        dim_special = 0.5,
-        blur = {
-            enabled = true,
-            size = 8,
-            passes = 2,
-            vibrancy = 0.1696,
-            special = true,
-            input_methods = true,
-        },
-        shadow = {
-            enabled = true,
-            range = 15,
-            render_power = 2,
-            color = "rgba(11111bee)",
-        },
+  decoration = {
+    rounding = 12,
+    rounding_power = 2.0,
+    active_opacity = 0.98,
+    inactive_opacity = 0.85,
+    fullscreen_opacity = 1,
+    dim_inactive = true,
+    dim_strength = 0.15,
+    dim_special = 0.5,
+    blur = {
+      enabled = true,
+      size = 8,
+      passes = 2,
+      vibrancy = 0.1696,
+      special = true,
+      input_methods = true,
     },
-
-    animations = {
-        enabled = true,
-        workspace_wraparound = true,
+    shadow = {
+      enabled = true,
+      range = 15,
+      render_power = 2,
+      color = "rgba(11111bee)",
     },
+  },
 
-    -- ---------- 布局 ----------
-    dwindle = { preserve_split = true },
-    master = { new_status = "master" },
-    scrolling = { column_width = 0.51 },
+  animations = {
+    enabled = true,
+    workspace_wraparound = true,
+  },
 
-    -- ---------- misc / debug ----------
-    misc = {
-        force_default_wallpaper = -1,
-        disable_hyprland_logo = true,
-        animate_manual_resizes = true,
-        enable_swallow = false,
-        swallow_regex = "^(kitty)$",
-        swallow_exception_regex = "^(pnpm tauri dev)$",
-        allow_session_lock_restore = true,
-    },
+  -- ---------- 布局 ----------
+  dwindle = { preserve_split = true },
+  master = { new_status = "master" },
+  scrolling = { column_width = 0.51 },
 
-    debug = {
-        vfr = true, -- 0.55 起 vfr 从 misc 搬到 debug
-    },
+  -- ---------- misc / debug ----------
+  misc = {
+    force_default_wallpaper = -1,
+    disable_hyprland_logo = true,
+    animate_manual_resizes = true,
+    enable_swallow = false,
+    swallow_regex = "^(kitty)$",
+    swallow_exception_regex = "^(pnpm tauri dev)$",
+    allow_session_lock_restore = true,
+  },
+
+  debug = {
+    vfr = true, -- 0.55 起 vfr 从 misc 搬到 debug
+  },
 })
 
 -- ============================================================
@@ -178,17 +178,19 @@ hl.curve("shellDecelerate", { type = "bezier", points = { { 0.2, 0.9 }, { 0.3, 1
 hl.curve("shellStandard", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
 
 -- 0.55 spring 物理动画——比 bezier 在打断时更自然
--- easy：稳重，过阻尼无弹，给工作区切换用
-hl.curve("easy", { type = "spring", mass = 1, stiffness = 71.2633, dampening = 18.0 })
--- snappy：高刚度=固有频率高=到位快；dampening 取临界(2√90≈19)保证不过冲。给窗口移动用
-hl.curve("snappy", { type = "spring", mass = 1, stiffness = 90, dampening = 19 })
+-- 无回弹 ⟺ dampening ≥ 临界阻尼 2√(stiffness·mass)（源码 Spring.cpp: GAMMA<OMEGA0 才振荡）
+-- 改 stiffness 必须同步改 dampening，否则重新变欠阻尼、又开始过冲
+-- easy：稳重无弹，给工作区切换用；临界 2√150≈24.5
+hl.curve("easy", { type = "spring", mass = 1, stiffness = 150, dampening = 24.5 })
+-- snappy：高刚度=固有频率高=到位快，给窗口移动用；临界 2√200≈28.3
+hl.curve("snappy", { type = "spring", mass = 1, stiffness = 200, dampening = 28.3 })
 
 hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
 hl.animation({ leaf = "border", enabled = true, speed = 5.39, bezier = "easeOutQuint" })
 
 -- windows / windowsMove 用高刚度 snappy（快速到位，打断仍平滑）
-hl.animation({ leaf = "windows",     enabled = true, speed = 8,    spring = "snappy" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 8,    spring = "snappy" })
+hl.animation({ leaf = "windows", enabled = true, speed = 8, spring = "snappy" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 1, spring = "snappy" })
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 4.1, bezier = "easeOutQuint", style = "popin 87%" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 1.49, bezier = "linear", style = "popin 87%" })
 
@@ -203,8 +205,8 @@ hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "al
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
 
 -- scrolling 布局：工作区水平滑动 + 淡入 + spring，跟手感强且过渡更柔
-hl.animation({ leaf = "workspaces",    enabled = true, speed = 7, spring = "easy", style = "slidefade" })
-hl.animation({ leaf = "workspacesIn",  enabled = true, speed = 7, spring = "easy", style = "slidefade" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
+hl.animation({ leaf = "workspacesIn", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
 hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
 
 -- ============================================================
@@ -218,64 +220,64 @@ hl.device({ name = "msft0001:00-04f3:317c-touchpad", enabled = false })
 -- ============================================================
 
 hl.window_rule({
-    name = "suppress-maximize-events",
-    match = { class = ".*" },
-    suppress_event = "maximize",
+  name = "suppress-maximize-events",
+  match = { class = ".*" },
+  suppress_event = "maximize",
 })
 
 hl.window_rule({
-    name = "xwayland-dragging-nofocus",
-    match = {
-        class = "^$",
-        title = "^$",
-        xwayland = true,
-        float = true,
-        fullscreen = false,
-        pin = false,
-    },
-    no_focus = true,
+  name = "xwayland-dragging-nofocus",
+  match = {
+    class = "^$",
+    title = "^$",
+    xwayland = true,
+    float = true,
+    fullscreen = false,
+    pin = false,
+  },
+  no_focus = true,
 })
 
 -- JetBrains: tooltip 不抢焦点（标题为 win.<id>）
 hl.window_rule({
-    name = "jetbrains-tooltip-noinitialfocus",
-    match = { class = "^(.*jetbrains.*)$", title = "^(win.*)$" },
-    no_initial_focus = true,
+  name = "jetbrains-tooltip-noinitialfocus",
+  match = { class = "^(.*jetbrains.*)$", title = "^(win.*)$" },
+  no_initial_focus = true,
 })
 hl.window_rule({
-    name = "jetbrains-tooltip-nofocus",
-    match = { class = "^(.*jetbrains.*)$", title = "^(win.*)$" },
-    no_focus = true,
+  name = "jetbrains-tooltip-nofocus",
+  match = { class = "^(.*jetbrains.*)$", title = "^(win.*)$" },
+  no_focus = true,
 })
 
 -- JetBrains: 拖动 tab（标题为单个空格）
 hl.window_rule({
-    name = "jetbrains-tabdrag-noinitialfocus",
-    match = { class = "^(.*jetbrains.*)$", title = "^\\s$" },
-    no_initial_focus = true,
+  name = "jetbrains-tabdrag-noinitialfocus",
+  match = { class = "^(.*jetbrains.*)$", title = "^\\s$" },
+  no_initial_focus = true,
 })
 hl.window_rule({
-    name = "jetbrains-tabdrag-nofocus",
-    match = { class = "^(.*jetbrains.*)$", title = "^\\s$" },
-    no_focus = true,
-})
-
-hl.window_rule({
-    name = "keybindings-cheatsheet",
-    match = { class = "^(keybindings-cheatsheet)$" },
-    float = true,
-    size = "45% 70%",
-    center = true,
-    animation = "popin",
+  name = "jetbrains-tabdrag-nofocus",
+  match = { class = "^(.*jetbrains.*)$", title = "^\\s$" },
+  no_focus = true,
 })
 
 hl.window_rule({
-    name = "quick-note-float",
-    match = { class = "^(quick-note)$" },
-    float = true,
-    size = "50% 60%",
-    center = true,
-    animation = "popin",
+  name = "keybindings-cheatsheet",
+  match = { class = "^(keybindings-cheatsheet)$" },
+  float = true,
+  size = "45% 70%",
+  center = true,
+  animation = "popin",
+})
+
+hl.window_rule({
+  name = "quick-note-float",
+  match = { class = "^(quick-note)$" },
+  float = true,
+  size = "50% 60%",
+  center = true,
+  animation = "popin",
 })
 
 -- ============================================================
@@ -283,10 +285,10 @@ hl.window_rule({
 -- ============================================================
 
 hl.layer_rule({
-    name = "quickshell_blur",
-    match = { namespace = "quickshell" },
-    blur = true,
-    ignore_alpha = 0.1,
+  name = "quickshell_blur",
+  match = { namespace = "quickshell" },
+  blur = true,
+  ignore_alpha = 0.1,
 })
 
 -- ============================================================
@@ -322,32 +324,32 @@ hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_disp
 
 -- 调整尺寸（binde 等价：repeating = true）
 hl.bind(
-    mainMod .. " + CONTROL + H",
-    hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl h"),
-    { repeating = true }
+  mainMod .. " + CONTROL + H",
+  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl h"),
+  { repeating = true }
 )
 hl.bind(
-    mainMod .. " + CONTROL + J",
-    hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl j"),
-    { repeating = true }
+  mainMod .. " + CONTROL + J",
+  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl j"),
+  { repeating = true }
 )
 hl.bind(
-    mainMod .. " + CONTROL + K",
-    hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl k"),
-    { repeating = true }
+  mainMod .. " + CONTROL + K",
+  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl k"),
+  { repeating = true }
 )
 hl.bind(
-    mainMod .. " + CONTROL + L",
-    hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl l"),
-    { repeating = true }
+  mainMod .. " + CONTROL + L",
+  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl l"),
+  { repeating = true }
 )
 
 -- 工作区切换 / 移动窗口 / silent 移动
 for i = 1, 10 do
-    local key = i % 10 -- 10 → 键 "0"
-    hl.bind(mainMod .. " + " .. key,           hl.dsp.focus({ workspace = i }))
-    hl.bind(mainMod .. " + SHIFT + " .. key,   hl.dsp.window.move({ workspace = tostring(i) }))
-    hl.bind(mainMod .. " + CONTROL + " .. key, hl.dsp.window.move({ workspace = tostring(i), silent = true }))
+  local key = i % 10 -- 10 → 键 "0"
+  hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
+  hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = tostring(i) }))
+  hl.bind(mainMod .. " + CONTROL + " .. key, hl.dsp.window.move({ workspace = tostring(i), silent = true }))
 end
 
 -- 特殊工作区
@@ -355,14 +357,14 @@ hl.bind(mainMod .. " + M", hl.dsp.workspace.toggle_special("special"))
 hl.bind(mainMod .. " + SHIFT + M", hl.dsp.window.move({ workspace = "special" }))
 
 -- 窗口分组
-hl.bind(mainMod .. " + G",           hl.dsp.group.toggle())
-hl.bind(mainMod .. " + TAB",         hl.dsp.group.next())
+hl.bind(mainMod .. " + G", hl.dsp.group.toggle())
+hl.bind(mainMod .. " + TAB", hl.dsp.group.next())
 hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.group.next({ reverse = true }))
 
 -- QuickShell 全局触发
-hl.bind(mainMod .. " + slash",              hl.dsp.global("quickshell:keybindings"))
-hl.bind(mainMod .. " + SHIFT + A",          hl.dsp.global("quickshell:ai"))
-hl.bind(mainMod .. " + N",                  hl.dsp.global("quickshell:notes"))
+hl.bind(mainMod .. " + slash", hl.dsp.global("quickshell:keybindings"))
+hl.bind(mainMod .. " + SHIFT + A", hl.dsp.global("quickshell:ai"))
+hl.bind(mainMod .. " + N", hl.dsp.global("quickshell:notes"))
 hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.global("quickshell:journal"))
 
 -- 自定义脚本
@@ -378,32 +380,34 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- 0.55 起 `hyprctl dispatch global xxx` 旧语法失效，改用 lua function：
 -- 先 exec_cmd 跑 shell 命令，再 dispatch global dispatcher。
 hl.bind("XF86AudioRaiseVolume", function()
-    hl.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+")
-    hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
+  hl.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+")
+  hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
 hl.bind("XF86AudioLowerVolume", function()
-    hl.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-")
-    hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
+  hl.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-")
+  hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
 hl.bind("XF86AudioMute", function()
-    hl.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-    hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
+  hl.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
+  hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
-hl.bind("XF86AudioMicMute",
-    hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
-    { locked = true, repeating = true })
+hl.bind(
+  "XF86AudioMicMute",
+  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
+  { locked = true, repeating = true }
+)
 
 hl.bind("XF86MonBrightnessUp", function()
-    hl.exec_cmd("brightnessctl s 10%+")
-    hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
+  hl.exec_cmd("brightnessctl s 10%+")
+  hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
 end, { locked = true, repeating = true })
 
 hl.bind("XF86MonBrightnessDown", function()
-    hl.exec_cmd("brightnessctl s 10%-")
-    hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
+  hl.exec_cmd("brightnessctl s 10%-")
+  hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
 end, { locked = true, repeating = true })
 
 -- 播放控制（bindl 等价：locked，锁屏时仍可用）
@@ -416,16 +420,21 @@ hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true 
 -- Autostart（exec-once 等价）
 -- ============================================================
 
+-- 幂等守卫：同名进程已在跑就跳过。hyprland.start 每次 compositor 启动都触发——
+-- 对「无单实例锁」的守护（swaybg/hypridle/wl-paste），若不守卫，Hyprland 每崩溃/
+-- 重启一次就再拉起一份，堆叠出孤儿进程（曾实见 3 个 hypridle 同时在跑）。
+-- 依赖 exec 经 /bin/sh（`||` 短路，已实测生效）；guard 缺省取命令首 token 作进程名。
+local function exec_once(cmd, guard)
+  hl.exec_cmd("pidof -q " .. (guard or cmd:match("^%S+")) .. " || " .. cmd)
+end
+
 hl.on("hyprland.start", function()
-    hl.exec_cmd("swaybg -i " .. HOME .. "/Pictures/wallpapers/disco_elysium_wallpaper.png")
-    hl.exec_cmd("fcitx5 -d")
-    hl.exec_cmd("hypridle")
-    hl.exec_cmd("wl-paste --watch cliphist store")
-    -- macOS 式 Super+C/V/X/A/Z（按窗口分流，终端走 Ctrl+Shift+C）
-    -- --device 显式指定键盘（KM 一体接收器不被 xremap 自动识别为键盘）；换键盘需改设备名
-    hl.exec_cmd("xremap --device 'Wireless Link-KM' " .. HOME .. "/.config/xremap/config.yml")
-    hl.exec_cmd("quickshell")
-    hl.exec_cmd(N .. "/hypr/screen_effects.sh apply")
-    hl.exec_cmd("clash-verge")
-    hl.exec_cmd("google-chrome-stable")
+  exec_once("swaybg -i " .. HOME .. "/Pictures/wallpapers/disco_elysium_wallpaper.png", "swaybg")
+  hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
+  exec_once("hypridle")
+  exec_once("wl-paste --watch cliphist store", "wl-paste")
+  exec_once("quickshell")
+  hl.exec_cmd(N .. "/hypr/screen_effects.sh apply") -- 一次性脚本，跑完即退
+  hl.exec_cmd("clash-verge") -- tauri 单实例
+  hl.exec_cmd("google-chrome-stable") -- 自带单实例锁
 end)

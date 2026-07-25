@@ -15,7 +15,7 @@ Rectangle {
     implicitWidth: Math.max(trayRow.implicitWidth + 24, 36)
     implicitHeight: 36
     radius: 16
-    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : Colors.surface0
+    color: root.flat ? Colors.withAlpha(Colors.surface1, 0.5) : Colors.surface0
     visible: trayRepeater.count > 0
     clip: false
 

@@ -134,9 +134,9 @@ PanelOverlay {
                 Layout.preferredWidth: 280
                 Layout.fillHeight: true
                 radius: Tokens.radiusM
-                color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
+                color: Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
                 border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.06)
+                border.color: Colors.overlay(0.06)
 
                 Flickable {
                     anchors.fill: parent

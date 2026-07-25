@@ -4,7 +4,6 @@ import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 
 // App Launcher — 全屏居中，fuzzy search 启动应用
 PanelOverlay {
@@ -136,8 +135,11 @@ PanelOverlay {
         if (!item || !item.entry || !item.entry.command || item.entry.command.length === 0)
             return;
 
-        launchProc.command = item.entry.command;
-        launchProc.running = true;
+        // 必须 execute()（内部走 execDetached），别退回复用一个 Process：Process 是有状态的，
+        // 子进程未退出时 startProcessIfReady() 直接 return，赋新 command 会被静默丢弃——
+        // 启动过任何一个长命 GUI 应用后，launcher 就再也启动不了第二个。
+        // execute() 顺带带上 .desktop 的 Path= 工作目录，且应用不再是 quickshell 的子进程。
+        item.entry.execute();
         PanelState.launcherOpen = false;
     }
 
@@ -171,10 +173,6 @@ PanelOverlay {
             root.invalidateApps();
         }
         target: DesktopEntries.applications
-    }
-
-    Process {
-        id: launchProc
     }
 
     ColumnLayout {
@@ -278,7 +276,7 @@ PanelOverlay {
                         when: !item.isSelected && item.isHovered
                         PropertyChanges {
                             target: item
-                            color: Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5)
+                            color: Colors.withAlpha(Colors.surface1, 0.5)
                         }
                     }
                 ]

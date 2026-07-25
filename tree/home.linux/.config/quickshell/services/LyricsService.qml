@@ -32,6 +32,7 @@ Scope {
     }
 
     function _resetLyrics() {
+        _lastRaw = ""; // 双缓冲比较只在单曲内有效——切歌必须重置，否则回放旧曲会命中残留 raw 而永不重填
         LyricsState.lyricsLines = [];
         LyricsState.currentLyricIndex = -1;
         LyricsState.currentLyric = "";
@@ -171,7 +172,8 @@ Scope {
     // 逐字高亮要够细，故比行级歌词更快。
     Timer {
         interval: 100
-        running: root._lyricsPlayer !== null && LyricsState.lyricsLines.length > 0
+        // 暂停时 position 不动，无需 10Hz 重算（暂停瞬间的最后一 tick 已定住 currentLyric）
+        running: root._lyricsPlayer !== null && root._lyricsPlayer.isPlaying && LyricsState.lyricsLines.length > 0
         repeat: true
         onTriggered: {
             if (root._lyricsPlayer)

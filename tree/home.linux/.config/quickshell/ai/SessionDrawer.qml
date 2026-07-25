@@ -14,7 +14,7 @@ Rectangle {
     signal sessionDeleted(string sessionId)
     signal closeRequested()
 
-    color: Qt.rgba(Colors.base.r, Colors.base.g, Colors.base.b, 0.95)
+    color: Colors.withAlpha(Colors.base, 0.95)
     radius: Tokens.radiusL
 
     ColumnLayout {
@@ -40,7 +40,7 @@ Rectangle {
                 width: 28
                 height: 28
                 radius: Tokens.radiusFull
-                color: closeArea.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                color: closeArea.containsMouse ? Colors.overlay(0.08) : "transparent"
 
                 Text {
                     anchors.centerIn: parent
@@ -94,8 +94,8 @@ Rectangle {
                 radius: Tokens.radiusMS
                 color: {
                     if (modelData.session_id === drawer.currentSessionId)
-                        return Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.15);
-                    return rowHover.hovered ? Qt.rgba(1, 1, 1, 0.06) : "transparent";
+                        return Colors.withAlpha(Colors.blue, 0.15);
+                    return rowHover.hovered ? Colors.overlay(0.06) : "transparent";
                 }
 
                 HoverHandler {
@@ -139,7 +139,7 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    color: delArea.containsMouse ? Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.15) : "transparent"
+                    color: delArea.containsMouse ? Colors.withAlpha(Colors.red, 0.15) : "transparent"
                     visible: rowHover.hovered
 
                     Text {
@@ -178,7 +178,7 @@ Rectangle {
             Layout.fillWidth: true
             height: 40
             radius: Tokens.radiusMS
-            color: newArea.containsMouse ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.15) : Qt.rgba(1, 1, 1, 0.04)
+            color: newArea.containsMouse ? Colors.withAlpha(Colors.green, 0.15) : Colors.overlay(0.04)
 
             Text {
                 anchors.centerIn: parent

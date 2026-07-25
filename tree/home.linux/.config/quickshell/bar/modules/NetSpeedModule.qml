@@ -70,7 +70,7 @@ BarModule {
         // 接口名标签
         Rectangle {
             visible: root.ifaceName !== ""
-            color: Qt.rgba(Colors.teal.r, Colors.teal.g, Colors.teal.b, 0.2)
+            color: Colors.withAlpha(Colors.teal, 0.2)
             radius: 4
             width: ifaceText.implicitWidth + 10
             height: ifaceText.implicitHeight + 4

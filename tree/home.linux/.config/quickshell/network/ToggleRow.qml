@@ -41,7 +41,7 @@ Rectangle {
             width: 40
             height: 22
             radius: Tokens.radiusFull
-            color: root.toggled ? Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.3) : Colors.surface2
+            color: root.toggled ? Colors.withAlpha(Colors.green, 0.3) : Colors.surface2
 
             Rectangle {
                 width: 16

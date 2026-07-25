@@ -96,7 +96,6 @@ Scope {
     // ── 对账：开机 / 热插拔时按签名恢复已存布局 ──
     function _reconcile(arr, sig) {
         var profile = MM.getProfile(root._store, sig);
-        console.log("[MonitorService] reconcile sig=", sig, "profileFound=", !!profile, "suspend=", root._suspendReconcile); // [诊断] 临时
         if (!profile) {
             _notifyNewCombo(sig);
             return;
@@ -192,9 +191,6 @@ Scope {
         target: Hyprland
 
         function onRawEvent(event) {
-            // [诊断] 临时：打印所有含 mon 的事件名，确认 rawEvent 是否触发
-            if (event.name.toLowerCase().indexOf("mon") >= 0)
-                console.log("[MonitorService] rawEvent:", event.name);
             // 只关心显示器增删等（monitoradded/monitorremoved[v2]）；focusedmon 太频繁，忽略
             if (event.name.indexOf("monitor") === 0 && event.name.indexOf("monitorfocus") !== 0)
                 debounce.restart();
@@ -204,10 +200,7 @@ Scope {
     Timer {
         id: debounce
         interval: 300
-        onTriggered: {
-            console.log("[MonitorService] debounce → query+reconcile"); // [诊断] 临时
-            root.queryMonitors(true);
-        }
+        onTriggered: root.queryMonitors(true)
     }
 
     // ── 回滚倒计时 ──

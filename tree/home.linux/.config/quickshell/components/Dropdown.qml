@@ -21,7 +21,7 @@ Item {
         color: root.enabled ? (fieldArea.containsMouse ? Colors.surface1 : Colors.surface0) : Colors.surface0
         opacity: root.enabled ? 1 : 0.5
         border.width: 1
-        border.color: popup.visible ? Colors.blue : Qt.rgba(1, 1, 1, 0.08)
+        border.color: popup.visible ? Colors.blue : Colors.overlay(0.08)
 
         Text {
             anchors.left: parent.left
@@ -75,7 +75,7 @@ Item {
             radius: Tokens.radiusS
             color: Colors.surface0
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.1)
+            border.color: Colors.overlay(0.1)
         }
 
         contentItem: ListView {

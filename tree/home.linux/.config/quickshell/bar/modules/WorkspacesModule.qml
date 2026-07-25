@@ -12,7 +12,7 @@ Rectangle {
     property bool flat: false
 
     radius: Tokens.radiusL
-    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, 0.5) : Colors.base
+    color: root.flat ? Colors.withAlpha(Colors.surface1, 0.5) : Colors.base
     implicitHeight: 36
     implicitWidth: row.implicitWidth + 8
 

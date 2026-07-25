@@ -209,6 +209,11 @@ BarModule {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
+            // 只对影响窗口布局的事件 refetch；windowtitle[v2] 是最高频事件（浏览器切标签 /
+            // 终端跑构建 / mpv 进度都在刷），且不改布局，必须挡掉，否则每次都 fork 3 个 hyprctl。
+            let n = event.name;
+            if (n === "windowtitle" || n === "windowtitlev2" || n === "activelayout" || n === "submap")
+                return;
             fetchDebounce.restart();
         }
     }
@@ -299,7 +304,7 @@ BarModule {
                             height: Math.max(4, Math.floor(24 / colDelegate.winCount) - 1)
                             radius: 2
                             scale: hoverHit ? 1.25 : 1
-                            color: modelData.active ? Colors.yellow : hoverHit ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, 0.85) : colDelegate.colFocused ? Qt.rgba(Colors.yellow.r, Colors.yellow.g, Colors.yellow.b, root.hovered ? 0.6 : 0.4) : (root.hovered ? Colors.surface1 : Colors.surface2)
+                            color: modelData.active ? Colors.yellow : hoverHit ? Colors.withAlpha(Colors.yellow, 0.85) : colDelegate.colFocused ? Colors.withAlpha(Colors.yellow, root.hovered ? 0.6 : 0.4) : (root.hovered ? Colors.surface1 : Colors.surface2)
 
                             Behavior on color {
                                 ColorAnimation {

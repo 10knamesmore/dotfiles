@@ -16,8 +16,8 @@ Rectangle {
     }
     implicitHeight: contentItem ? contentItem.implicitHeight + 20 : 20
     radius: Tokens.radiusM
-    color: cardHover.containsMouse ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, Tokens.cardAlpha) : Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, Tokens.cardAlpha)
-    border.color: cardHover.containsMouse ? Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, Tokens.borderHoverAlpha) : Qt.rgba(1, 1, 1, 0.06)
+    color: cardHover.containsMouse ? Colors.withAlpha(Colors.surface1, Tokens.cardAlpha) : Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
+    border.color: cardHover.containsMouse ? Colors.withAlpha(Colors.blue, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: 1
     scale: cardHover.containsMouse ? 1.01 : 1
 

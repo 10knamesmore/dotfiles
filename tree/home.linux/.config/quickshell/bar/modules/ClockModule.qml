@@ -131,7 +131,7 @@ Rectangle {
     }
 
     // 默认渐变 blue → sapphire → sky（flat 模式回退淡背景）
-    color: root.flat ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, root.hovered ? 0.85 : 0.5) : "transparent"
+    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5) : "transparent"
     gradient: root.flat ? null : clockGrad
 
     property Gradient clockGrad: Gradient {
