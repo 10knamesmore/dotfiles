@@ -2,6 +2,9 @@ return {
   "akinsho/git-conflict.nvim",
   version = "*",
   event = "BufReadPre",
+  ---@module "git-conflict"
+  ---@type GitConflictUserConfig
+  ---@diagnostic disable-next-line: missing-fields
   opts = {
     default_mappings = false,
     disable_diagnostics = true,

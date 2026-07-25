@@ -5,5 +5,7 @@ return {
   event = { "BufReadPost", "BufNewFile" },
   main = "rainbow-delimiters.setup",
   submodules = false,
+  ---@module "rainbow-delimiters"
+  ---@type rainbow_delimiters.config
   opts = {},
 }

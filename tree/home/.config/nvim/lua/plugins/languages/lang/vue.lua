@@ -1,6 +1,8 @@
 return {
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "vue", "css" } },
   },
 

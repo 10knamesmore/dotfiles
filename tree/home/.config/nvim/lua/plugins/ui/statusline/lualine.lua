@@ -151,17 +151,42 @@ return {
               info = " ",
             },
           },
+          {
+            function()
+              local parts = {}
+              local names = {}
+              for _, c in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+                names[#names + 1] = c.name
+              end
+              if #names > 0 then
+                parts[#parts + 1] = " " .. table.concat(names, ",")
+              end
+              local ok, conform = pcall(require, "conform")
+              if ok then
+                local fs = {}
+                for _, f in ipairs(conform.list_formatters_to_run(0)) do
+                  fs[#fs + 1] = f.name
+                end
+                if #fs > 0 then
+                  parts[#parts + 1] = " " .. table.concat(fs, ",")
+                end
+              end
+              local ok2, lint = pcall(require, "lint")
+              if ok2 then
+                local ls = lint.linters_by_ft[vim.bo.filetype]
+                if ls and #ls > 0 then
+                  parts[#parts + 1] = "󱉶 " .. table.concat(ls, ",")
+                end
+              end
+              return table.concat(parts, "  ")
+            end,
+            color = function()
+              return { fg = Snacks.util.color("Comment") }
+            end,
+          },
         },
 
         lualine_x = {
-          -- Copilot 状态
-          utils.lualine.status(utils.icons.kinds.Copilot, function()
-            local clients = package.loaded["copilot"] and vim.lsp.get_clients({ name = "copilot", bufnr = 0 }) or {}
-            if #clients > 0 then
-              local status = require("copilot.status").data.status
-              return (status == "InProgress" and "pending") or (status == "Warning" and "error") or "ok"
-            end
-          end),
 
           { "searchcount", color = { fg = colors.cyan } },
           -- 当前命令提示
@@ -189,16 +214,6 @@ return {
               return { fg = Snacks.util.color("Debug") }
             end,
           },
-
-          -- Lazy 插件：有插件可更新时显示更新数量
-          -- {
-          --     require("lazy.status").updates,
-          --     cond = require("lazy.status").has_updates,
-          --     color = function()
-          --         return { fg = Snacks.util.color("Special") }
-          --     end,
-          -- },
-          --
 
           {
             "diff",
@@ -254,7 +269,7 @@ return {
           },
         },
       },
-      extensions = { "overseer", "trouble", "toggleterm", "mason", "lazy", "fzf" },
+      extensions = { "trouble", "mason", "lazy", "fzf" },
     }
 
     return opts

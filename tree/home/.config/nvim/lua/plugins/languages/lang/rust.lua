@@ -3,6 +3,8 @@ return {
   {
     "Saecki/crates.nvim",
     event = { "BufRead Cargo.toml" },
+    ---@module "crates"
+    ---@type crates.UserConfig
     opts = {
       completion = {
         crates = {
@@ -21,6 +23,8 @@ return {
   -- Add Rust & related to treesitter
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "rust", "ron" } },
   },
 
@@ -47,6 +51,7 @@ return {
         ft = "rust",
       },
     },
+    ---@module "rustaceanvim"
     --- @type rustaceanvim.Opts
     opts = {
       server = {

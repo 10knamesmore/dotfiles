@@ -1,6 +1,8 @@
 return {
   "lewis6991/gitsigns.nvim",
   event = { "BufReadPost", "BufNewFile", "BufWritePre" },
+  ---@type Gitsigns.Config
+  ---@diagnostic disable-next-line: missing-fields
   opts = {
     signs_staged_enable = true,
     signcolumn = false, -- Toggle with `:Gitsigns toggle_signs`

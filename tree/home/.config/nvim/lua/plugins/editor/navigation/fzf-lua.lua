@@ -41,6 +41,7 @@ return {
     cmd = "FzfLua",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = function()
+      ---@type fzf-lua.Config
       return {
         "telescope",
         -- fzf-lua 默认开 --highlight-line（fzf 0.73 的「整行满宽高亮当前行」）。它在滚动长列表 +

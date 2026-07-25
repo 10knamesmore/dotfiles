@@ -5,6 +5,7 @@ return {
   {
     "smjonas/inc-rename.nvim",
     cmd = "IncRename",
+    ---@type inc_rename.UserConfig
     opts = {},
   },
 

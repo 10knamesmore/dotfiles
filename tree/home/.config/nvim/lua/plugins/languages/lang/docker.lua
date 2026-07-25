@@ -1,10 +1,14 @@
 return {
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "dockerfile" } },
   },
   {
     "mason.nvim",
+    ---@module "mason"
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = { ensure_installed = { "hadolint" } },
   },
   {

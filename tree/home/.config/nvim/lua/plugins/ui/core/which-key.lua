@@ -3,6 +3,7 @@ return {
   event = "VeryLazy",
   opts_extend = { "spec" },
   opts = function()
+    ---@type wk.Opts
     return {
       preset = "helix",
       defaults = {},

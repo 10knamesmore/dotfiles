@@ -3,6 +3,8 @@ return {
   -- BufReadPost 而非 VeryLazy：它对每个 buffer 起独立 git 子进程，
   -- dashboard / 空 buffer 场景没有 blame 可算，没必要跟着启动一起拉起来。
   event = "BufReadPost",
+  ---@module "gitblame"
+  ---@type SetupOptions
   opts = {
     -- your configuration comes here
     -- for example

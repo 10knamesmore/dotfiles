@@ -10,6 +10,8 @@ return {
   {
     "nvim-treesitter/nvim-treesitter",
     -- 不写死在这里的话，qmljs.so 就只能靠手动 :TSInstall，换机即失。
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "qmljs", "qmldir" } },
   },
 
@@ -35,6 +37,8 @@ return {
   {
     "stevearc/conform.nvim",
     optional = true,
+    ---@module "conform"
+    ---@type conform.setupOpts
     opts = {
       formatters_by_ft = {
         qml = { "qmlformat" },

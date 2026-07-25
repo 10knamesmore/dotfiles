@@ -1,6 +1,7 @@
 -- Search and replace using ripgrep
 return {
   "chrisgrieser/nvim-rip-substitute",
+  ---@type RipSubstitute.Config
   opts = {
     popupWin = {
       title = " search & replace",

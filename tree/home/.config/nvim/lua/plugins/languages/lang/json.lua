@@ -2,6 +2,8 @@ return {
   -- add json to treesitter
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "json5" } },
   },
 

@@ -2,7 +2,11 @@
 return {
   "kevinhwang91/nvim-bqf",
   ft = "qf",
+  ---@module "bqf"
+  ---@type BqfConfig
+  ---@diagnostic disable-next-line: missing-fields
   opts = {
+    ---@diagnostic disable-next-line: missing-fields
     preview = {
       winblend = 0,
     },

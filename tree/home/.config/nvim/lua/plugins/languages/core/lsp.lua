@@ -15,6 +15,8 @@ return {
         "folke/lazydev.nvim",
         ft = "lua",
         cmd = "LazyDev",
+        ---@module "lazydev"
+        ---@type lazydev.Config
         opts = {
           library = {
             { path = "${3rd}/luv/library", words = { "vim%.uv" } },
@@ -358,6 +360,7 @@ return {
     cmd = "Mason",
     build = ":MasonUpdate",
     opts_extend = { "ensure_installed" },
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = {
       ensure_installed = {
         "stylua",

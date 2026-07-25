@@ -4,6 +4,7 @@ return {
   dependencies = {
     "nvim-tree/nvim-web-devicons",
   },
+  ---@type dropbar_configs_t
   opts = {
     bar = {
       enable = function(buf, win, _)

@@ -1,6 +1,8 @@
 return {
   {
     "mason-org/mason.nvim",
+    ---@module "mason"
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = {
       ensure_installed = {
         "tinymist",
@@ -9,6 +11,8 @@ return {
   },
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = {
       ensure_installed = { "typst" },
     },
@@ -51,6 +55,8 @@ return {
   {
     "stevearc/conform.nvim",
     optional = true,
+    ---@module "conform"
+    ---@type conform.setupOpts
     opts = {
       formatters_by_ft = {
         typst = { "typstyle", lsp_format = "prefer" },
@@ -102,6 +108,8 @@ return {
 
   {
     "folke/ts-comments.nvim",
+    ---@module "ts-comments"
+    ---@type TSCommentsOptions
     opts = {
       lang = {
         typst = { "// %s", "/* %s */" },

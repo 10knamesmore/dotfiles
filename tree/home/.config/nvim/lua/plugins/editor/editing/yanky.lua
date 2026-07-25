@@ -31,6 +31,8 @@ return {
   },
   {
     "folke/which-key.nvim",
+    ---@module "which-key"
+    ---@type wk.Opts
     opts = {
       spec = {
         {
@@ -42,6 +44,8 @@ return {
   {
     "10knamesmore/yank-more.nvim",
     event = "VeryLazy",
+    ---@module "yank-more"
+    ---@type BetterYankOptions
     opts = {
       highlight = {
         timer = 150,

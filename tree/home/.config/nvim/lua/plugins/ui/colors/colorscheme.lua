@@ -5,6 +5,7 @@ return {
     priority = 1000, -- 最高优先级，确保最先加载
     opts = function()
       vim.api.nvim_set_hl(0, "@keyword.import.rust", { link = "@Keyword" })
+      ---@type tokyonight.Config
       return {
         transparent = false,
         style = "moon",
@@ -41,6 +42,8 @@ return {
   },
   {
     "rebelot/kanagawa.nvim",
+    ---@module "kanagawa"
+    ---@type KanagawaConfig
     opts = {},
   },
   {
@@ -55,6 +58,8 @@ return {
     "catppuccin/nvim",
     lazy = true,
     name = "catppuccin",
+    ---@module "catppuccin"
+    ---@type CatppuccinOptions
     opts = {
       flavour = "mocha",
       styles = {

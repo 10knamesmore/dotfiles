@@ -8,6 +8,7 @@ return {
   -- 栈拽到 BufReadPost，抵消掉 telescope 自身的懒加载。:TodoTelescope 内部
   -- require("telescope") 时，lazy 的 require hook 会按需把它拉起来。
   dependencies = { "nvim-lua/plenary.nvim" },
+  ---@type TodoOptions
   opts = {
     signs = true, -- show icons in the signs column
     sign_priority = 8, -- sign priority

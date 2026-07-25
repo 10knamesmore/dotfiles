@@ -206,6 +206,8 @@ return {
   {
     "windwp/nvim-ts-autotag",
     event = { "BufReadPost", "BufNewFile", "BufWritePre" },
+    ---@module "nvim-ts-autotag"
+    ---@type nvim-ts-autotag.PluginSetup
     opts = {},
   },
 }

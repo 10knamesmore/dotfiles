@@ -46,6 +46,8 @@ return {
   {
     "nvim-treesitter/nvim-treesitter",
     optional = true,
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "sql" } },
   },
 
@@ -77,6 +79,8 @@ return {
   {
     "saghen/blink.cmp",
     optional = true,
+    ---@module "blink.cmp"
+    ---@type blink.cmp.Config
     opts = {
       sources = {
         default = { "dadbod" },
@@ -93,6 +97,8 @@ return {
   -- Linters & formatters
   {
     "mason-org/mason.nvim",
+    ---@module "mason"
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = { ensure_installed = { "sqlfluff" } },
   },
   {

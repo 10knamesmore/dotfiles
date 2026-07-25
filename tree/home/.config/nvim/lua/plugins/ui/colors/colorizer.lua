@@ -4,6 +4,7 @@ return {
   event = "BufReadPre",
   cmd = { "ColorizerToggle" },
   opts = function()
+    ---@module "colorizer"
     ---@type colorizer.SetupOptions
     return {
       filetypes = { "*" }, -- 针对哪些文件类型启用高亮，"*" 表示所有文件类型

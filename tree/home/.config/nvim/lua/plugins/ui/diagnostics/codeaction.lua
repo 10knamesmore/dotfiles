@@ -4,6 +4,8 @@ return {
   {
     "kosayoda/nvim-lightbulb",
     event = "LspAttach",
+    ---@module "nvim-lightbulb"
+    ---@type nvim-lightbulb.Config
     opts = {
       --- sign/virtual_text/float/number/line 等 handler 的默认优先级
       --- 数值越大越靠前显示

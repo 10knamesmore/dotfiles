@@ -111,6 +111,8 @@ return {
   {
     "stevearc/conform.nvim",
     optional = true,
+    ---@module "conform"
+    ---@type conform.setupOpts
     opts = {
       formatters = {
         ["markdown-toc"] = {
@@ -120,6 +122,9 @@ return {
                 return true
               end
             end
+            -- 上游把 condition 标成 fun(...):boolean（不是 boolean?），
+            -- 落到函数末尾隐式返回 nil 会触发 missing-return。行为等价。
+            return false
           end,
         },
         ["markdownlint-cli2"] = {
@@ -141,6 +146,8 @@ return {
     "mason-org/mason.nvim",
     -- prettier 是上面 formatters_by_ft 里 markdown 链的第一环，必须一起装：
     -- conform 对不可用的 formatter 是静默跳过、其余照跑，换机后只会「排版无声消失」。
+    ---@module "mason"
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = { ensure_installed = { "prettier", "markdownlint-cli2", "markdown-toc" } },
   },
   -- markdown 不lint
@@ -222,6 +229,8 @@ return {
   },
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = {
       ensure_installed = { "latex" },
     },

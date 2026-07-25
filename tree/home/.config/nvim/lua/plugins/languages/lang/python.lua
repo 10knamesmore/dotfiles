@@ -110,6 +110,8 @@ end
 return {
   {
     "nvim-treesitter/nvim-treesitter",
+    ---@module "nvim-treesitter"
+    ---@type TSConfig | {ensure_installed: string[]}
     opts = { ensure_installed = { "ninja", "rst" } },
   },
 
@@ -162,6 +164,8 @@ return {
   {
     "mason-org/mason.nvim",
     optional = true,
+    ---@module "mason"
+    ---@param opts MasonSettings | {ensure_installed: string[]}
     opts = function(_, opts)
       opts.ensure_installed = opts.ensure_installed or {}
       if not vim.tbl_contains(opts.ensure_installed, "debugpy") then
@@ -173,6 +177,8 @@ return {
   {
     "stevearc/conform.nvim",
     optional = true,
+    ---@module "conform"
+    ---@type conform.setupOpts
     opts = {
       formatters_by_ft = {
         python = { "ruff_organize_imports", "ruff_format" },

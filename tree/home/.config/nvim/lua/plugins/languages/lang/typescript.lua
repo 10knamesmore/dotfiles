@@ -314,6 +314,8 @@ return {
   {
     "stevearc/conform.nvim",
     optional = true,
+    ---@module "conform"
+    ---@type conform.setupOpts
     opts = {
       formatters_by_ft = {
         javascript = { "biome", "prettierd", "prettier", stop_after_first = true },
@@ -330,6 +332,8 @@ return {
   },
   {
     "mason-org/mason.nvim",
+    ---@module "mason"
+    ---@type MasonSettings | {ensure_installed: string[]}
     opts = { ensure_installed = { "prettier", "prettierd", "biome" } },
   },
 

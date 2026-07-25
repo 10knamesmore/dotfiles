@@ -8,6 +8,7 @@ return {
       "rcarriga/nvim-notify",
     },
     -- enabled = false,
+    ---@type NoiceConfig
     opts = {
       messages = {
         enabled = true,
@@ -99,6 +100,12 @@ return {
   },
   {
     "rcarriga/nvim-notify",
+    ---@module "notify"
+    -- notify.Config 的 merge_duplicates 是必填字段，而这里是交给 lazy 深合并的
+    -- 部分配置，缺字段属于设计如此。注意 disable-next-line 必须紧贴 opts 那行
+    -- （诊断报在表上，不是报在 ---@type 上）——摆法同 bqf.lua:5-8。
+    ---@type notify.Config
+    ---@diagnostic disable-next-line: missing-fields
     opts = {
       fps = 60,
       stages = "slide",
