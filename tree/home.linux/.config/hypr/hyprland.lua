@@ -131,11 +131,22 @@ hl.config({
       special = true,
       input_methods = true,
     },
+    -- 0.56 起 shadow.color 从纯色升成 gradient 类型，单字符串仍合法（被当成单 stop）。
+    -- 角度动画由 shadowangle leaf 驱动。
+    -- 同期的 decoration.glow 试过不留：那是「内发光」（CHyprInnerGlowDecoration 画在窗口
+    -- 内部、DECORATION_LAYER_OVER），淡了被 border 盖死看不见，浓了直接给贴边文字染色。
     shadow = {
       enabled = true,
       range = 15,
       render_power = 2,
-      color = "rgba(11111bee)",
+      color = { colors = { "rgba(11111bee)", "rgba(1e1b3cee)" }, angle = 45 },
+      color_inactive = "rgba(11111b99)",
+    },
+
+    -- 0.56 新增：窗口位移时的运动模糊。samples 默认 7，掉帧就往下调
+    motion_blur = {
+      enabled = true,
+      samples = 15,
     },
   },
 
@@ -187,6 +198,12 @@ hl.curve("snappy", { type = "spring", mass = 1, stiffness = 200, dampening = 28.
 
 hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
 hl.animation({ leaf = "border", enabled = true, speed = 5.39, bezier = "easeOutQuint" })
+
+-- 0.56 新增 leaf：shadow 渐变的角度动画与淡入淡出
+-- style 只接受 "loop" | "once"（AnimationManager.cpp::styleValidInConfigVar）。
+-- 别改成 loop：角度会永久旋转 ⟹ 每帧重绘 ⟹ debug.vfr 白设，闲置也满负载
+hl.animation({ leaf = "shadowangle", enabled = true, speed = 5, bezier = "easeOutQuint", style = "once" })
+hl.animation({ leaf = "fadeShadow", enabled = true, speed = 3, bezier = "almostLinear" })
 
 -- windows / windowsMove 用高刚度 snappy（快速到位，打断仍平滑）
 hl.animation({ leaf = "windows", enabled = true, speed = 8, spring = "snappy" })
