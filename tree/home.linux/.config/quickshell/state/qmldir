@@ -4,5 +4,6 @@ singleton MonitorState 1.0 MonitorState.qml
 singleton MorphState 1.0 MorphState.qml
 singleton OsdState 1.0 OsdState.qml
 singleton PanelState 1.0 PanelState.qml
+singleton ScreenEffectsState 1.0 ScreenEffectsState.qml
 singleton SystemState 1.0 SystemState.qml
 singleton SystemStats 1.0 SystemStats.qml

@@ -457,8 +457,7 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
   exec_once("hypridle")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
-  exec_once("quickshell")
-  hl.exec_cmd(N .. "/hypr/screen_effects.sh apply") -- 一次性脚本，跑完即退
+  exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
   hl.exec_cmd("clash-verge") -- tauri 单实例
   hl.exec_cmd("google-chrome-stable") -- 自带单实例锁
 end)

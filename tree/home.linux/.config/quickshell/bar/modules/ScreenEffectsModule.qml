@@ -3,13 +3,15 @@ import "../../state"
 import "../components"
 import QtQuick
 import Quickshell
-import Quickshell.Io
 
 // 屏幕效果按钮 — 显示当前效果状态，点击切换面板
 BarModule {
     id: root
 
-    property bool effectsActive: false
+    // 直接绑 State 单例。过去是 inotify 监听 ~/.cache/hypr/screen-effects.json，
+    // 但写入方（ScreenEffectsService）和本模块在同一个 quickshell 进程里，
+    // 等于「自己写文件 → 内核通知自己 → 自己读回来」，纯绕路。
+    readonly property bool effectsActive: ScreenEffectsState.effectsActive
 
     accentColor: Colors.flamingo
     implicitWidth: label.implicitWidth + 32
@@ -19,22 +21,6 @@ BarModule {
         MorphState.morphSourceX = pos.x + 2;
         MorphState.morphSourceY = pos.y + 6;
         PanelState.toggleScreenEffects();
-    }
-
-    // 状态文件仅在 screen_effects.sh / 设置面板写入时才变 —— inotify 监听即可，
-    // 取代旧的每 5s fork cat 轮询（per-screen ×2，读同一份全局状态，纯浪费）。
-    FileView {
-        id: stateFile
-        path: Quickshell.env("HOME") + "/.cache/hypr/screen-effects.json"
-        watchChanges: true
-        printErrors: false
-        onLoaded: {
-            try {
-                let obj = JSON.parse(text());
-                root.effectsActive = (obj.warmth > 0 || obj.grain > 0);
-            } catch (e) {}
-        }
-        onFileChanged: reload()
     }
 
     Text {
