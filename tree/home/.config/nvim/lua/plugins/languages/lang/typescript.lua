@@ -191,6 +191,46 @@ return {
               end)
             end
           end)
+
+          -- tsserver 的关键字补全不带尾随空格（rust-analyzer 那种 "pub $0" 是服务端 snippet，
+          -- tsserver 只回纯文本），所以 accept 后光标紧贴关键字。这里在 accept 之后补一个空格。
+          -- 别改成 blink 的 transform_items 去改 textEdit.newText：blink accept 前必发
+          -- completionItem/resolve，vtsls 会重建 item 把改过的文本原样打回，改了等于没改。
+          local keyword_space = {}
+          for kw in
+            ([[const let var function class interface type enum namespace declare abstract
+            readonly static public private protected export import new extends implements in of as
+            satisfies keyof typeof instanceof async await yield return throw case delete void
+            if else do while for switch catch try finally]]):gmatch("%S+")
+          do
+            keyword_space[kw] = true
+          end
+          vim.api.nvim_create_autocmd("User", {
+            pattern = "BlinkCmpAccept",
+            callback = function(ev)
+              local item = ev.data and ev.data.item
+              if
+                not item
+                or item.kind ~= vim.lsp.protocol.CompletionItemKind.Keyword
+                or not keyword_space[item.label]
+                or not vim.tbl_contains(opts.filetypes, vim.bo.filetype)
+              then
+                return
+              end
+              -- 事件可能被 schedule；若用户已 Esc 回 normal mode，col 会被钳位导致空格插错字节
+              if not vim.api.nvim_get_mode().mode:find("^i") then
+                return
+              end
+              local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+              -- 光标后已有空格（比如在行中间替换补全）就不重复加
+              if vim.api.nvim_get_current_line():sub(col + 1, col + 1) == " " then
+                return
+              end
+              vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { " " })
+              vim.api.nvim_win_set_cursor(0, { row, col + 1 })
+            end,
+          })
+
           -- copy typescript settings to javascript
           opts.settings.javascript =
             vim.tbl_deep_extend("force", {}, opts.settings.typescript, opts.settings.javascript or {})
