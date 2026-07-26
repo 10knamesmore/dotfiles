@@ -26,11 +26,12 @@ Scope {
     property bool _suspendReconcile: false  // 自己应用导致的事件不触发再对账
     property bool _reconcileAfterQuery: false
     property var _notifiedSigs: ({})    // 已就「新组合」通知过的签名集
+    property var _hdrProbe: []          // 刚应用、待回读验证 HDR 是否真生效的布局
 
     // ── 当前显示器（state 形态）→ 布局列表 ──
     function _monitorsToLayouts(mons) {
         return mons.map(function (m) {
-            return { name: m.name, enabled: m.enabled, mode: m.mode, x: m.x, y: m.y, scale: m.scale, transform: m.transform || 0, mirror: m.mirror || null };
+            return { name: m.name, enabled: m.enabled, mode: m.mode, x: m.x, y: m.y, scale: m.scale, transform: m.transform || 0, mirror: m.mirror || null, color: MM.colorOf(m) };
         });
     }
 
@@ -83,14 +84,45 @@ Scope {
                 "availableModes": ipc.availableModes || [],
                 "focused": ipc.focused || false,
                 "mirror": null,
-                "primary": ipc.name === primaryName
+                "primary": ipc.name === primaryName,
+                "color": MM.colorFromIpc(ipc)
             };
         });
         MonitorState.signature = sig;
         MonitorState.primaryName = primaryName;
 
+        _checkHdrAccepted(arr);
+
         if (root._reconcileAfterQuery && !root._suspendReconcile)
             _reconcile(arr, sig);
+    }
+
+    // 刚应用过的布局里，凡是请求了 HDR 却回读不到的，标记该屏不支持。
+    // 只在 apply 后的那次查询里做——热插拔等常规查询不该改这个判定。
+    function _checkHdrAccepted(arr) {
+        var want = root._hdrProbe;
+        if (!want || want.length === 0)
+            return;
+        root._hdrProbe = [];
+        var byName = {};
+        arr.forEach(function (ipc) { byName[ipc.name] = ipc; });
+        var rejected = [];
+        var next = {};
+        Object.keys(MonitorState.hdrUnsupported).forEach(function (k) { next[k] = MonitorState.hdrUnsupported[k]; });
+        want.forEach(function (l) {
+            var ipc = byName[l.name];
+            if (!ipc)
+                return;
+            if (MM.hdrRejected(l, ipc)) {
+                next[l.name] = true;
+                rejected.push(l.name);
+            } else if (MM.isHdr(l)) {
+                delete next[l.name];
+            }
+        });
+        MonitorState.hdrUnsupported = next;
+        if (rejected.length > 0)
+            MonitorState.errorMsg = rejected.join("、") + "：显示器不支持 HDR，已保持 SDR";
     }
 
     // ── 对账：开机 / 热插拔时按签名恢复已存布局 ──
@@ -236,6 +268,8 @@ Scope {
                 MonitorState.applying = false;
                 if (text.indexOf("error") < 0 && text.indexOf("Error") < 0) {
                     MonitorState.errorMsg = "";
+                    // 请求了 HDR 的屏留待下一次查询回读验证（hyprctl eval 对不支持的屏不报错）
+                    root._hdrProbe = (applyProc._layouts || []).filter(function (l) { return MM.isHdr(l); });
                     root.queryMonitors(false); // 刷新显示，不再对账
                     if (applyProc._withRevert) {
                         MonitorState.revertSecs = root._revertSeconds;

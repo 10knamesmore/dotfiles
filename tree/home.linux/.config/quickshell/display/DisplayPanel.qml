@@ -1,6 +1,7 @@
 import "../components"
 import "../theme"
 import "../state"
+import "lib/monitorModel.js" as MM
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -22,32 +23,60 @@ PanelOverlay {
                 "name": m.name, "description": m.description, "enabled": m.enabled,
                 "mode": m.mode, "x": m.x, "y": m.y, "scale": m.scale, "transform": m.transform,
                 "width": m.width, "height": m.height, "refreshRate": m.refreshRate,
-                "availableModes": m.availableModes, "primary": m.primary
+                "availableModes": m.availableModes, "primary": m.primary,
+                // 深拷贝 color 子对象：draft 是编辑态，直接引用会让滑块实时改到 live 状态
+                "color": MM.colorOf(m)
             };
         });
         if (root.selectedIndex >= root.draft.length)
             root.selectedIndex = 0;
     }
 
-    function _setField(i, key, val) {
+    function _clone(d) {
+        var e = {};
+        Object.keys(d).forEach(function (k) { e[k] = d[k]; });
+        return e;
+    }
+
+    // draft 条目必须整个换成新对象，不能原地改字段再 slice()。
+    // selected 的绑定是 draft[selectedIndex]，原地改后它重算拿到的仍是同一个引用，
+    // 而 QML 对 property var 是引用比较——判定「值没变」就不发 selectedChanged，
+    // 下游 checked/value 绑定全都不重算，表现为「切到别的显示器再切回来才生效」。
+    function _patch(i, patch) {
         if (i < 0 || i >= draft.length)
             return;
-        draft[i][key] = val;
-        root.draft = draft.slice();
+        var next = draft.slice();
+        var e = _clone(next[i]);
+        Object.keys(patch).forEach(function (k) { e[k] = patch[k]; });
+        next[i] = e;
+        root.draft = next;
+    }
+
+    function _setField(i, key, val) {
+        var p = {};
+        p[key] = val;
+        _patch(i, p);
     }
 
     function _setPos(i, x, y) {
+        _patch(i, { "x": x, "y": y });
+    }
+
+    // color 是子对象，_setField 那套「整键替换」会丢掉同级字段，故单独走一个 setter。
+    function _setColor(i, key, val) {
         if (i < 0 || i >= draft.length)
             return;
-        draft[i].x = x;
-        draft[i].y = y;
-        root.draft = draft.slice();
+        var c = MM.colorOf(draft[i]);
+        c[key] = val;
+        _patch(i, { "color": c });
     }
 
     function _setPrimary(i) {
-        for (var k = 0; k < draft.length; k++)
-            draft[k].primary = (k === i);
-        root.draft = draft.slice();
+        root.draft = draft.map(function (d, k) {
+            var e = _clone(d);
+            e.primary = (k === i);
+            return e;
+        });
     }
 
     function _apply() {
@@ -55,7 +84,7 @@ PanelOverlay {
         var layouts = draft.map(function (d) {
             if (d.primary)
                 primary = d.name;
-            return { "name": d.name, "enabled": d.enabled, "mode": d.mode, "x": d.x, "y": d.y, "scale": d.scale, "transform": d.transform, "mirror": null };
+            return { "name": d.name, "enabled": d.enabled, "mode": d.mode, "x": d.x, "y": d.y, "scale": d.scale, "transform": d.transform, "mirror": null, "color": MM.colorOf(d) };
         });
         MonitorState.requestApply(layouts, primary);
     }
@@ -153,6 +182,11 @@ PanelOverlay {
                         onTransformEdited: (transform) => root._setField(root.selectedIndex, "transform", transform)
                         onPrimaryToggled: root._setPrimary(root.selectedIndex)
                         onEnabledToggled: root._setField(root.selectedIndex, "enabled", !root.selected.enabled)
+                        hdrUnsupported: root.selected ? (MonitorState.hdrUnsupported[root.selected.name] === true) : false
+                        onHdrToggled: root._setColor(root.selectedIndex, "cm", MM.isHdr(root.selected) ? "srgb" : "hdr")
+                        onSdrMaxLuminanceEdited: (v) => root._setColor(root.selectedIndex, "sdrMaxLuminance", Math.round(v))
+                        onSdrBrightnessEdited: (v) => root._setColor(root.selectedIndex, "sdrBrightness", v)
+                        onSdrSaturationEdited: (v) => root._setColor(root.selectedIndex, "sdrSaturation", v)
                     }
                 }
             }

@@ -117,7 +117,7 @@ hl.config({
   decoration = {
     rounding = 12,
     rounding_power = 2.0,
-    active_opacity = 0.98,
+    active_opacity = 0.99,
     inactive_opacity = 0.85,
     fullscreen_opacity = 1,
     dim_inactive = true,
@@ -278,6 +278,30 @@ hl.window_rule({
   size = "50% 60%",
   center = true,
   animation = "popin",
+})
+
+-- HDR 屏上 Chrome 整窗发暗的解药。
+-- Chrome 会给自己的 surface 声明 BT2020+PQ 且 set_luminances(0, 1000, 203)——不管显示器
+-- 实际峰值多少都报 1000 nits。DP-3 峰值只有 417，于是 Hyprland 判定需要色调映射
+-- （needsTonemap = srcMax >= dstMax*1.01），把 1000 压进 417，连参考白 203 的 SDR 界面
+-- 一起压暗。Firefox 从不调 set_image_description，走普通 SDR 路径，所以不受影响——
+-- 「Chrome 比 Firefox 暗」就是这么来的，不是显示器或 Hyprland 配错了。
+-- tonemap: 0=关 1=默认 2=clamp 3=limited。关掉的代价是 >417 nits 的高光被硬裁剪。
+hl.window_rule({
+  name = "chrome-no-tonemap",
+  match = { class = "^(google-chrome)$" },
+  tonemap = 0,
+})
+
+hl.window_rule({
+  name = "game-fullscreen-passthrough",
+  match = { class = "^(steam_app_\\d+|gamescope)" },
+  no_blur = true,
+  no_anim = true,
+  no_shadow = true,
+  no_dim = true,
+  opaque = true, -- 必须：active_opacity 0.98 会直接掐死 direct scanout
+  immediate = true, -- 撕裂换低延迟，不想要就删这行
 })
 
 -- ============================================================

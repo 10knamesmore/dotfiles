@@ -108,6 +108,8 @@ Rectangle {
         delegate: Rectangle {
             id: tile
             property bool dragging: false
+            property real pressX: 0
+            property real pressY: 0
             property bool isSelected: index === canvas.selectedIndex
 
             width: Math.max(28, canvas._logW(modelData) * canvas._sf)
@@ -120,8 +122,11 @@ Rectangle {
             border.color: isSelected ? Colors.green : Colors.blue
             z: isSelected ? 2 : 1
 
-            Binding on x { value: canvas._toPxX(modelData.x); when: !tile.dragging; restoreMode: Binding.RestoreBindingOrValue }
-            Binding on y { value: canvas._toPxY(modelData.y); when: !tile.dragging; restoreMode: Binding.RestoreBindingOrValue }
+            // restoreMode 必须是 RestoreNone：另两种模式在 when 转 false（按下开始拖）时会把
+            // x/y 恢复成「绑定生效前的原始值」，而这里从没显式赋过 x/y，原始值就是 0
+            // ——结果一按下矩形就瞬移到画布左上角，松手还会把这个假坐标写回 draft。
+            Binding on x { value: canvas._toPxX(modelData.x); when: !tile.dragging; restoreMode: Binding.RestoreNone }
+            Binding on y { value: canvas._toPxY(modelData.y); when: !tile.dragging; restoreMode: Binding.RestoreNone }
 
             Column {
                 anchors.centerIn: parent
@@ -167,13 +172,22 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onPressed: {
                     canvas.monitorSelected(index);
+                    tile.pressX = tile.x;
+                    tile.pressY = tile.y;
                     tile.dragging = true;
                 }
                 onReleased: {
+                    // 纯点击（只为选中）不该改坐标：否则 _snap 会把它吸到邻屏边上，
+                    // 且 draft 被标脏。阈值放 1px 容忍拖拽起手的抖动。
+                    var moved = Math.abs(tile.x - tile.pressX) > 1 || Math.abs(tile.y - tile.pressY) > 1;
+                    // 先读 tile.x 再放开 dragging——dragging 转 false 会立刻重新激活上面的
+                    // Binding，把 x 拉回 modelData 的旧值。
                     var lx = canvas._toLogX(tile.x);
                     var ly = canvas._toLogY(tile.y);
-                    var s = canvas._snap(index, lx, ly);
                     tile.dragging = false;
+                    if (!moved)
+                        return;
+                    var s = canvas._snap(index, lx, ly);
                     canvas.monitorMoved(index, s.x, s.y);
                 }
             }
