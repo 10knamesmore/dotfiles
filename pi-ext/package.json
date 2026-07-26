@@ -1,0 +1,13 @@
+{
+  "name": "pi-extensions-dev",
+  "private": true,
+  "type": "module",
+  "comment": "pi extension 的开发工作区，只为编辑期 LSP 取 .d.ts。pi 运行时由自己的 loader 内建提供 @earendil-works/pi-* 与 typebox（VIRTUAL_MODULES / getAliases），不读这里的 node_modules——所以本目录整个不需要落到 $HOME，只有 src/ 下的 extension 经 dots.lua 的 distribute 链到 ~/.pi/agent/extensions/。",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-tui": "0.82.1",
+    "@types/node": "^22",
+    "typebox": "1.1.38",
+    "typescript": "^7.0.2"
+  }
+}

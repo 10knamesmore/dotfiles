@@ -1,13 +1,13 @@
 # AI 工具链配置
 
-本仓库管理的 AI 编码工具（Claude Code / Codex / opencode）配置全貌：资产怎么落位、
+本仓库管理的 AI 编码工具（Claude Code / Codex / opencode / pi）配置全貌：资产怎么落位、
 `cc-hook` 守卫引擎怎么工作、改了东西怎么生效。
 
 ## 资产地图
 
 ```text
 tree/home/.claude/                          →  ~/.claude/
-├── CLAUDE.md                                  全局指令（所有项目生效）
+├── CLAUDE.md                                  仅一行 `@~/.agents/AGENTS.md` import + Claude 专属补充
 ├── settings.json                              permissions / hooks 注册 / plugins
 ├── statusline-command.sh                      状态栏脚本
 └── hooks/                                     granularity "children"：目录保持真实
@@ -15,18 +15,28 @@ tree/home/.claude/                          →  ~/.claude/
     └── (cc-hook)                              二进制不入库，post_sync 编译后复制进来
 
 tree/home/.agents/                          →  ~/.agents/（整层镜像）
+├── AGENTS.md                                  ★ 全局指令唯一真相源（跨 harness）
+│                      ── distribute ──→       ~/.pi/agent/AGENTS.md
 ├── skills/            ── distribute ──→       ~/.claude/skills/ + ~/.codex/skills/（逐 skill 链）
 └── claude/                                    Claude 专属格式，按工具命名空间隔离
     ├── agents/        ── distribute ──→       ~/.claude/agents/
     └── commands/      ── distribute ──→       ~/.claude/commands/
 
+tree/home/.pi/agent/                        →  ~/.pi/agent/（granularity "children"：目录保持真实）
+└── settings.json                              pi 主配置；auth.json/sessions/bin/ 等运行期物留本机
+
 cli/crates/cc-hooks/                           cc-hook 引擎源码（Rust）
 scripts/common/cc-hook-test                 →  .gen/scripts/（进 PATH 的黑盒回归命令）
 ```
 
-设计原则：**skills 是公开标准、不专属某个工具**，所以源住中立目录 `.agents/`，
+设计原则：**skills 和全局指令是公开标准、不专属某个工具**，所以源住中立目录 `.agents/`，
 Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实目录，机器本地
 （不入库）的 skill 可与受管链接共存。接入新工具 = `dots.lua` 的 `to` 列表加一行 + `dots sync`。
+
+全局指令的两种接法按工具能力选：Claude Code 只认 `~/.claude/CLAUDE.md`，但支持
+`@path` import，所以那份退化成一行 import；pi 只认自己 agent 目录下的 `AGENTS.md`，
+够不着 `~/.agents/`，走 `distribute` 链过去。工具特定的硬约束（如 cc-hook 拦截）
+写在各自的文件里，别污染中立源。
 
 ## settings.json 要点
 

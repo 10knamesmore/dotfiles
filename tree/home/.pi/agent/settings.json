@@ -1,0 +1,13 @@
+{
+  "npmCommand": [
+    "pnpm"
+  ],
+  "theme": "dark",
+  "lastChangelogVersion": "0.82.1",
+  "editorPaddingX": 0,
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "defaultProvider": "deepseek",
+  "defaultModel": "deepseek-v4-flash"
+}

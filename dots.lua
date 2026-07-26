@@ -19,6 +19,13 @@ granularity("home/.config/opencode", {
 -- cc-hook bin 落在真实目录、不污染仓库。
 granularity("home/.claude/hooks", { mode = "children" })
 
+-- pi agent：同上，目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
+-- sessions/、models-store.json、npm/ 等机器本地物，整目录链会把它们卷进仓库。
+-- 注意 pi 用 writeFileSync 原地写 settings.json（跟随软链、不 temp+rename），
+-- 所以链进来的 settings.json 在 /settings 改动后会直接回流仓库——这是要的行为，
+-- 代价是 pi 自写的 lastChangelogVersion 会跟着进 diff。
+granularity("home/.pi/agent", { mode = "children" })
+
 distribute("skills", {
     src = "tree/home/.agents/skills",
     to = { "~/.claude/skills", "~/.codex/skills", "~/.kimi/skills" },
@@ -33,6 +40,38 @@ distribute("commands", {
     src = "tree/home/.agents/claude/commands",
     to = { "~/.claude/commands" },
     mode = "children",
+})
+
+-- pi extension：源住 pi-ext/（仓库内独立 TS 工程，含 package.json/tsconfig/
+-- node_modules，全为编辑期 LSP 服务），只把 src/ 下的成品链进去。pi 运行时由
+-- 自己的 loader 内建提供 @earendil-works/pi-* 与 typebox，不读 node_modules，
+-- 故工程文件整个不必落 $HOME。tree/ 因此保持纯 $HOME 镜像、不掺开发工作区。
+-- 注意 pi 只认 extensions 下的 `*.ts` 与 `*/index.ts` 两种形态。
+-- post：extension 若 import 外部依赖（非 pi 内建提供的那几个），jiti **不 resolve
+-- symlink**，只从软链所在的 ~/.pi/agent/extensions/ 逐级向上找 node_modules，
+-- 够不着仓库侧的 pi-ext/node_modules → Cannot find module。补一条 $HOME 侧 →
+-- 仓库侧的桥。注意与上面 opencode 那条方向相反：Bun 按 realpath 找、jiti 按软链
+-- 路径找，所以两个工具要往相反方向搭桥。
+-- 未跑 pnpm install 时 node_modules 不存在，静默跳过（纯编辑期产物，不该报警）。
+distribute("pi-extensions", {
+    src = "pi-ext/src",
+    to = { "~/.pi/agent/extensions" },
+    mode = "children",
+    post = function()
+        local nm = dots.repo .. "/pi-ext/node_modules"
+        dots.run("test -d '" .. nm .. "' && ln -sfn '" .. nm .. "' '"
+            .. dots.home .. "/.pi/agent/node_modules' || true")
+    end,
+})
+
+-- 全局 agent 指令的唯一真相源。Claude Code 只认 ~/.claude/CLAUDE.md，
+-- 那份改成 `@~/.agents/AGENTS.md` 一行 import（官方推荐的 AGENTS.md 接法）；
+-- pi 只认 ~/.pi/agent/ 下的 AGENTS.md，够不着 ~/.agents/，只能链过去。
+-- 接新工具 = to 加一行。
+distribute("agents-md", {
+    src = "tree/home/.agents/AGENTS.md",
+    to = { "~/.pi/agent/AGENTS.md" },
+    mode = "file",
 })
 
 -- 每次 sync 保持 cc-hook（Claude Code hooks 入口）新鲜并复制到 ~/.claude/hooks/。
