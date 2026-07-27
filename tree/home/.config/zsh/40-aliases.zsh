@@ -52,6 +52,19 @@ neo() {
   neovide --frame none </dev/null >/dev/null 2>&1 & disown
 }
 
+# fzf 选一个预定义 kitty session（*.kitty-session，见 sessions/ 目录），
+# 新开一个独立 OS window 跑它。每次都是全新窗口，互不干扰。
+ks() {
+  local sessions_dir=~/.config/kitty/sessions
+  local -a names=($sessions_dir/*.kitty-session(N:t:r))
+  names=(${names:#example})
+  (( ${#names} )) || { print -u2 "ksession: $sessions_dir 下没有 *.kitty-session"; return 1 }
+  local name
+  name=$(print -l -- $names | fzf --preview "bat --color=always --style=numbers $sessions_dir/{}.kitty-session")
+  [[ -n $name ]] || return
+  kitty --session "$sessions_dir/$name.kitty-session" </dev/null >/dev/null 2>&1 & disown
+}
+
 # ================================
 # 📁 文件/目录显示增强（使用 eza）
 # ================================

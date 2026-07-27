@@ -19,6 +19,7 @@ return {
       spec = {
         {
           mode = { "n", "x" },
+          { "<leader>a", group = "ai" },
           { "<leader>c", group = "code" },
           { "<leader>d", group = "debug" },
           { "<leader>dp", group = "profiler" },

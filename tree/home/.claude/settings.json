@@ -36,6 +36,7 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "opus[1m]",
   "enableAllProjectMcpServers": false,
   "hooks": {
     "PreToolUse": [
@@ -70,7 +71,8 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "figma@claude-plugins-official": true
   },
   "language": "中文",
   "alwaysThinkingEnabled": true,

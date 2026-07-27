@@ -48,5 +48,8 @@ cli/target/
 # mpv 运行时续播状态（~/.config/mpv 软链进仓库，mpv 会往里写；机器本地，不入库）
 tree/home/.config/mpv/watch_later/
 
+# kitty session 定义（ksession 用）：常带本机专属路径，机器本地，不入库
+tree/home/.config/kitty/sessions/
+
 # uosc 缩略图助手 ziggy（多平台二进制，uosc 运行时按需自取；不入库）
 tree/home/.config/mpv/scripts/uosc/bin/
