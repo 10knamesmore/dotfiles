@@ -70,7 +70,7 @@ distribute("pi-extensions", {
 -- 接新工具 = to 加一行。
 distribute("agents-md", {
     src = "tree/home/.agents/AGENTS.md",
-    to = { "~/.pi/agent/AGENTS.md" },
+    to = { "~/.pi/agent/AGENTS.md", "~/.codex/AGENTS.md" },
     mode = "file",
 })
 
