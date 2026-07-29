@@ -33,7 +33,9 @@ pub fn maybe_onboard(repo_root: &Path, home: &Path) -> Result<()> {
         return Ok(());
     }
 
-    crate::render::warn(&format!("未识别这台机器（探测名：{hostname}）。做一次 host 引导："));
+    crate::render::warn(&format!(
+        "未识别这台机器（探测名：{hostname}）。做一次 host 引导："
+    ));
     let alias = prompt_line("  别名（写进 dots.lua，建议不暴露身份，如 mini/cloud；回车跳过）：")?;
     let alias = alias.trim();
     if alias.is_empty() {
@@ -185,7 +187,10 @@ mod tests {
     #[test]
     fn render_all_omits_toolchains_call() {
         let out = render_host_block("mini", &ToolchainChoice::All);
-        assert!(out.contains(r#"["mini"] = function()"#), "应含别名 key：{out}");
+        assert!(
+            out.contains(r#"["mini"] = function()"#),
+            "应含别名 key：{out}"
+        );
         assert!(out.contains("end,"), "应是带逗号的表项：{out}");
         assert!(
             !out.contains("toolchains({ only"),
@@ -262,7 +267,10 @@ mod tests {
 
         // dots.lua 被编辑：含别名块 + only 过滤
         let lua = fs::read_to_string(repo.path().join("dots.lua"))?;
-        assert!(lua.contains(r#"["mini"] = function()"#), "应插入别名块：\n{lua}");
+        assert!(
+            lua.contains(r#"["mini"] = function()"#),
+            "应插入别名块：\n{lua}"
+        );
         assert!(
             lua.contains(r#"toolchains({ only = { "core" } })"#),
             "应含 only 过滤：\n{lua}"
