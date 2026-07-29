@@ -75,7 +75,7 @@ distribute("agents-md", {
 })
 
 -- Codex hooks 与共享规则各自住真实目录；hook 定义留在中立的 .agents/ 命名空间，
--- 规则暂由 Claude 现有 pretool.toml 单源提供，避免两个 harness 漂移。
+-- 规则暂由 Claude 现有 pretool.toml 单源提供，避免各 harness 漂移。
 distribute("codex-hooks", {
     src = "tree/home/.agents/codex/hooks.json",
     to = { "~/.codex/hooks.json" },
@@ -83,7 +83,7 @@ distribute("codex-hooks", {
 })
 distribute("agent-hook-rules", {
     src = "tree/home/.claude/hooks/pretool.toml",
-    to = { "~/.codex/pretool.toml" },
+    to = { "~/.codex/pretool.toml", "~/.kimi-code/pretool.toml" },
     mode = "file",
 })
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Wayfinder"
+  short_description: "用 Spec 与 Subspec 规划并推进跨 session 的大型工作"
+  default_prompt: "Use $wayfinder to organize this effort into a repo-local Spec and actionable Subspecs."
+policy:
+  allow_implicit_invocation: true

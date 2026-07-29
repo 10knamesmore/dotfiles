@@ -1,0 +1,6 @@
+interface:
+  display_name: "实现"
+  short_description: "按 Spec 中的一个 Subspec 完成并验证实现"
+  default_prompt: "Use $implement to complete and verify the next implementation Subspec in this Spec."
+policy:
+  allow_implicit_invocation: true

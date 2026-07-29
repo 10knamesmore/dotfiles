@@ -1,6 +1,6 @@
 # AI 工具链配置
 
-本仓库管理的 AI 编码工具（Claude Code / Codex / opencode / pi）配置全貌：资产怎么落位、
+本仓库管理的 AI 编码工具（Claude Code / Codex / Kimi Code / opencode / pi）配置全貌：资产怎么落位、
 共享守卫引擎与 `cc-usage` 用量统计怎么工作、改了东西怎么生效。
 
 ## 资产地图
@@ -16,8 +16,15 @@ tree/home/.claude/                          →  ~/.claude/
                                                （住 hooks/ 是因为 settings.json 按此路径注册）
 
 ~/.local/bin/cc-usage                          用量统计二进制，同样不入库、post_sync 装进来
-~/.local/bin/agent-hook                       Codex hook adapter，同样由 post_sync 安装
+~/.local/bin/agent-hook                       Codex / Kimi Code hook adapter，同样由 post_sync 安装
 ~/.codex/pretool.toml                          ← Claude pretool.toml 的受管链接（共享规则）
+~/.kimi-code/pretool.toml                      ← 同上，agent-hook kimi-pretool 的缺省规则路径
+
+tree/home/.kimi-code/                       →  ~/.kimi-code/（逐文件链；sessions/oauth/credentials
+├── config.toml                              主配置：permission 硬禁区 / hooks 注册（kimi-pretool）
+│                                            / providers/models——/login 会原地回写 oauth 节
+│                                            回流仓库（同 pi 的 settings.json）；运行期物留本机）
+└── tui.toml                                 终端偏好（theme/editor/通知）
 
 tree/home/.agents/                          →  ~/.agents/（整层镜像）
 ├── AGENTS.md                                  ★ 全局指令唯一真相源（跨 harness）
@@ -32,7 +39,7 @@ tree/home/.agents/                          →  ~/.agents/（整层镜像）
 tree/home/.pi/agent/                        →  ~/.pi/agent/（granularity "children"：目录保持真实）
 └── settings.json                              pi 主配置；auth.json/sessions/bin/ 等运行期物留本机
 
-cli/crates/cc-hooks/                           共享引擎 + Claude/Codex adapter（Rust）
+cli/crates/cc-hooks/                           共享引擎 + Claude/Codex/Kimi adapter（Rust）
 cli/crates/cc-usage/                           cc-usage 用量统计源码（Rust）
 scripts/common/cc-hook-test                 →  .gen/scripts/（进 PATH 的黑盒回归命令）
 ```
@@ -40,11 +47,33 @@ scripts/common/cc-hook-test                 →  .gen/scripts/（进 PATH 的黑
 设计原则：**skills 和全局指令是公开标准、不专属某个工具**，所以源住中立目录 `.agents/`，
 Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实目录，机器本地
 （不入库）的 skill 可与受管链接共存。接入新工具 = `dots.lua` 的 `to` 列表加一行 + `dots sync`。
+例外是 Kimi Code：它原生读 `~/.agents/AGENTS.md` 与 `~/.agents/skills/`，连订阅都不用加。
+同一 domain 的可选细则收在一个 skill 内：顶层 `SKILL.md` 只做路由，按场景 reference
+`subskills/*.md` 与 `references/`；subskill 本身是普通 Markdown，不再放嵌套 `SKILL.md`。
 
 全局指令的两种接法按工具能力选：Claude Code 只认 `~/.claude/CLAUDE.md`，但支持
 `@path` import，所以那份退化成一行 import；pi 只认自己 agent 目录下的 `AGENTS.md`，
 够不着 `~/.agents/`，走 `distribute` 链过去。工具特定的协议 adapter
 写在各自的文件里，别污染中立源。
+
+## Spec-first engineering workflow
+
+`tree/home/.agents/skills/` 中的工程 workflow 以 repo-local Markdown 为 source of truth，并允许 implicit invocation：
+
+```text
+wayfinder                         大型工作 → Spec + 依赖明确的 Subspec
+to-spec                           当前对话 → Spec + 初始 Subspec
+grill-with-docs                   逐问解决 decision Subspec，并同步 domain docs
+implement                         一次实现并验证一个 implementation Subspec
+improve-codebase-architecture     架构候选 → decision Subspec → implementation Subspec
+```
+
+默认目录是 `specs/<spec-slug>/SPEC.md` 和同目录下的 `subspecs/*.md`；repo 已有约定时优先
+沿用。Spec 是整个 effort 的 contract，Subspec 是单 session 工作单元，dependency 写在
+Subspec frontmatter 的 `depends_on`。`blocked` 是 dependency 推导状态，不落盘。
+
+这些 skills 不依赖 issue tracker，也不创建 label、assignee 或 resolution comment。用户明确
+要求同步 tracker 时，tracker 只能作为 mirror，repo 内 Spec 与 Subspec 仍是 canonical artifact。
 
 ## settings.json 要点
 
@@ -60,6 +89,22 @@ permissions 与 cc-hook 的分工：permissions 是 Claude Code 内建的粗粒�
 cc-hook 负责需要**词法理解**的判定（旗标簇、链式命令、字段匹配）和**软引导**
 （deny 的 reason 喂回模型让它自己改方案）。
 
+## Kimi config.toml 要点
+
+源：`tree/home/.kimi-code/config.toml`（字段全集见官方文档，这里只记人手维护的部分）。
+
+- **`[[permission.rules]]` deny**：与 Claude `permissions.deny` 对齐的硬禁区，另补 Kimi 自身
+  凭据（`~/.kimi-code/credentials`、`~/.kimi-code/oauth/**`）。pattern 形如 `Read(path)` /
+  `Bash(cmd *)`，首条命中生效。
+- **`[[hooks]]` PreToolUse**：省略 matcher = 全量工具（对齐 Claude 的 `matcher *`），进
+  `~/.local/bin/agent-hook kimi-pretool`。
+- **`telemetry = false`**、**`default_permission_mode = "auto"`**。
+- providers/models/services 节由 `/login` 与模型目录刷新维护（oauth 节回写会经软链回流仓库，
+  这是要的行为），别手改。
+
+全局指令与 skills 不用配：Kimi 原生读 `~/.agents/AGENTS.md` 与 `~/.agents/skills/`。
+
+
 ## 共享守卫引擎
 
 源码 `cli/crates/cc-hooks/`，保留两个入口：
@@ -67,11 +112,13 @@ cc-hook 负责需要**词法理解**的判定（旗标簇、链式命令、字�
 - `cc-hook pretool`：Claude Code adapter，支持规则的 `deny` / `ask`。
 - `agent-hook codex-pretool`：Codex adapter，复用同一判定结果；Codex PreToolUse
   暂不支持 `ask`，故将其降级成带原始理由的 hard deny，避免 hook failure 后意外放行。
+- `agent-hook kimi-pretool`：Kimi Code adapter，语义同 Codex（ask 同样降级为 hard deny）；
+  评估前把 Kimi 的 `FetchURL` 工具名改写为共享表使用的 `WebFetch`。
 
 ```text
 src/
 ├── main.rs            cc-hook：Claude Code adapter
-├── bin/agent-hook.rs  agent-hook：Codex adapter
+├── bin/agent-hook.rs  agent-hook：Codex / Kimi Code adapter
 ├── common/            跨 hook 事件共用
 │   ├── outcome.rs       HookRun 统一返回值（业务函数不做 IO）
 │   └── wire.rs          stdout / stderr / 审计日志统一落地
@@ -81,6 +128,7 @@ src/
     ├── evaluation.rs    harness 无关的规则判定与审计语义
     ├── envelope.rs      Claude Code 输出信封
     ├── codex.rs         Codex 输出信封与 ask → deny 降级
+    ├── kimi.rs          Kimi Code 输出信封、ask → deny 降级、FetchURL → WebFetch 改写
     └── rules.rs         规则表 TOML schema
 ```
 
@@ -113,7 +161,7 @@ Codex 全局 hook 源是 `tree/home/.agents/codex/hooks.json`，只匹配 `^Bash
 否则守卫静默失效无人知。
 
 - 路径：`CC_HOOK_AUDIT_LOG` 环境变量优先（指向 `/dev/null` 即关闭），缺省 `~/.claude/cc-hook.log`。
-- Codex adapter：`AGENT_HOOK_AUDIT_LOG` 优先，缺省
+- Codex / Kimi Code adapter：`AGENT_HOOK_AUDIT_LOG` 优先，缺省
   `~/.local/state/agent-hook/audit.log`；降级行额外记录 `source_decision=ask`。
 - 只记决策与留痕，**不记静默放行**（信噪比：放行是绝大多数，记了等于刷屏）。
 - 行格式：`<epoch秒> decision=<deny|ask> tool=<Bash|工具名> rule=<规则名> cmd=<命令摘要≤200字>`。
@@ -265,9 +313,10 @@ ledger/<YYYY-MM-DD>/<哈希>.json  它那天贡献的条目（按 message.id / u
 
 | 改什么                      | 怎么生效                                                        |
 | --------------------------- | --------------------------------------------------------------- |
-| `pretool.toml` 规则         | Claude 保存即生效；Codex 侧首次接入需 `dots sync` 建立共享链接 |
+| `pretool.toml` 规则         | Claude 保存即生效；Codex/Kimi 侧首次接入需 `dots sync` 建立共享链接 |
 | 引擎代码（`cli/crates/cc-hooks/`） | `dots sync` → post_sync 编译；`cc-hook` 进 `~/.claude/hooks/`，`agent-hook` 进 `~/.local/bin/` |
 | Codex `hooks.json`          | `dots sync` 后在 Codex `/hooks` 审核并信任；定义变更会要求重新审核 |
+| Kimi `config.toml`/`tui.toml` | 受管软链，保存即生效；hooks 注册需 **Kimi 新会话**（官方口径：启动时读一次） |
 | 用量统计（`cli/crates/cc-usage/`） | 同上，产物落 `~/.local/bin/cc-usage`                              |
 | `statusline-command.sh`      | 受管软链，保存即生效                                            |
 | `settings.json` 的 hooks 注册 | 需要**新会话**（Claude Code 启动时读一次）                      |
@@ -292,6 +341,8 @@ cargo test 内部又分两类规则来源，**已无手工同步负担**：
   不再靠手抄 fixture，「改生产表忘了同步测试」这类漂移由它机械兜住。
 - `tests/e2e_codex_pretool.rs` 起真实 `agent-hook`，同时覆盖合成规则与生产规则，
   固化 deny 同形、ask → deny 降级、未命中静默三条 Codex 契约。
+- `tests/e2e_kimi_pretool.rs` 同形覆盖 Kimi Code adapter，额外断言
+  `FetchURL` 命中共享表的 `WebFetch` 规则（含生产表 `gh-not-webfetch-github`）。
 
 `cc-hook-test`（源 `scripts/common/cc-hook-test`）按四区断言 deny/ask/silent 与
 exit 0 契约：规则表预期 / 误伤回归 / 已知绕过 / fail-open。全绿 exit 0，有挂 exit 1。

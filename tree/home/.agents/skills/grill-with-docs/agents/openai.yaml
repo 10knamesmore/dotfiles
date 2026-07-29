@@ -1,0 +1,6 @@
+interface:
+  display_name: "带文档的追问"
+  short_description: "追问设计并维护 Spec、Subspec 与 domain docs"
+  default_prompt: "Use $grill-with-docs to resolve the active decision Subspec one question at a time."
+policy:
+  allow_implicit_invocation: true

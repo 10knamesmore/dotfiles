@@ -1,0 +1,6 @@
+interface:
+  display_name: "整理为 Spec"
+  short_description: "将对话整理为 repo-local Spec 与 Subspec"
+  default_prompt: "Use $to-spec to turn the current conversation into a repo-local Spec and initial Subspecs."
+policy:
+  allow_implicit_invocation: true
