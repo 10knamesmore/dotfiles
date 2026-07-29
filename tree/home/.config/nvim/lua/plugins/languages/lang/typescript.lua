@@ -357,6 +357,13 @@ return {
     ---@module "conform"
     ---@type conform.setupOpts
     opts = {
+      formatters = {
+        -- conform 内置的 biome 只设了 cwd 没设 require_cwd（默认 false），于是**没有
+        -- biome.json 的项目也会跑 biome**，用它自带的默认风格（双引号 + trailingCommas
+        -- all）盖掉项目的 .prettierrc —— 排在 stop_after_first 第一位更是让 prettier
+        -- 永远轮不到。加这个开关，让 biome 只在真有 biome 配置的项目里接管。
+        biome = { require_cwd = true },
+      },
       formatters_by_ft = {
         javascript = { "biome", "prettierd", "prettier", stop_after_first = true },
         javascriptreact = { "biome", "prettierd", "prettier", stop_after_first = true },
