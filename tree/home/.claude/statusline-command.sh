@@ -308,6 +308,21 @@ if [ -n "$lines_added" ] || [ -n "$lines_removed" ]; then
     lines_part="${GREEN}+${la}${RESET}${OVERLAY2}/${RESET}${RED}-${lr}${RESET}"
 fi
 
+# ---------- Daily cross-session aggregate ----------
+# 跨 session 的当日用量由 cc-usage 增量扫 transcript 得出（源码 cli/crates/cc-usage/）。
+# 别改回「拿本脚本收到的 current_usage 自己累加」：statusline 按 300ms 防抖刷新，
+# 窗口内的中间状态是丢帧而非延迟，累加出来的 token 实测少 5%~13%。
+today_part=""
+cc_usage="$HOME/.local/bin/cc-usage"
+if [ -x "$cc_usage" ] && today_json=$("$cc_usage" today 2>/dev/null) && [ -n "$today_json" ]; then
+    today_vals=$(echo "$today_json" | jq -r '[.cost_usd, .tokens_total, .edits.added, .edits.removed] | @tsv')
+    IFS=$'\t' read -r today_cost today_tokens today_added today_removed <<<"$today_vals"
+    if [ -n "$today_cost" ] && [ "${today_tokens:-0}" -gt 0 ]; then
+        today_cost_fmt=$(printf '%.4f' "$today_cost")
+        today_part="${MAUVE}📅today${RESET} ${OVERLAY2}\$${today_cost_fmt}${RESET} ${SKY}$(fmt_tokens "$today_tokens")tok${RESET} ${GREEN}+${today_added}${RESET}${OVERLAY2}/${RESET}${RED}-${today_removed}${RESET}"
+    fi
+fi
+
 sep() { printf '%s' " ${OVERLAY2}|${RESET} "; }
 
 # ---------- Line 1: identity（user@host + 目录 + 分支）----------
@@ -366,6 +381,12 @@ fi
 if [ -n "$lines_part" ]; then
     [ -n "$line2" ] && printf ' '
     printf '%s' "$lines_part"
+    line2="1"
+fi
+
+if [ -n "$today_part" ]; then
+    [ -n "$line2" ] && sep
+    printf '%s' "$today_part"
     line2="1"
 fi
 

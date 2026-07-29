@@ -1,5 +1,5 @@
 [workspace]
-members  = ["crates/dots-core", "crates/dots", "crates/cc-hooks"]
+members  = ["crates/dots-core", "crates/dots", "crates/cc-hooks", "crates/cc-usage"]
 resolver = "2"
 
 [workspace.package]
@@ -28,6 +28,7 @@ shlex       = "1"
 toml        = "0.8"
 regex-lite  = "0.1"
 globset     = "0.4"
+jiff        = { version = "0.2", features = ["serde"] }
 dots-core   = { path = "crates/dots-core" }
 
 # dev

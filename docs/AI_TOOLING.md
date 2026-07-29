@@ -1,7 +1,7 @@
 # AI 工具链配置
 
 本仓库管理的 AI 编码工具（Claude Code / Codex / opencode / pi）配置全貌：资产怎么落位、
-`cc-hook` 守卫引擎怎么工作、改了东西怎么生效。
+`cc-hook` 守卫引擎与 `cc-usage` 用量统计怎么工作、改了东西怎么生效。
 
 ## 资产地图
 
@@ -9,10 +9,13 @@
 tree/home/.claude/                          →  ~/.claude/
 ├── CLAUDE.md                                  仅一行 `@~/.agents/AGENTS.md` import + Claude 专属补充
 ├── settings.json                              permissions / hooks 注册 / plugins
-├── statusline-command.sh                      状态栏脚本
+├── statusline-command.sh                      状态栏脚本（当日用量段调 cc-usage）
 └── hooks/                                     granularity "children"：目录保持真实
     ├── pretool.toml                        →  ~/.claude/hooks/pretool.toml（守卫规则表）
     └── (cc-hook)                              二进制不入库，post_sync 编译后复制进来
+                                               （住 hooks/ 是因为 settings.json 按此路径注册）
+
+~/.local/bin/cc-usage                          用量统计二进制，同样不入库、post_sync 装进来
 
 tree/home/.agents/                          →  ~/.agents/（整层镜像）
 ├── AGENTS.md                                  ★ 全局指令唯一真相源（跨 harness）
@@ -26,6 +29,7 @@ tree/home/.pi/agent/                        →  ~/.pi/agent/（granularity "chi
 └── settings.json                              pi 主配置；auth.json/sessions/bin/ 等运行期物留本机
 
 cli/crates/cc-hooks/                           cc-hook 引擎源码（Rust）
+cli/crates/cc-usage/                           cc-usage 用量统计源码（Rust）
 scripts/common/cc-hook-test                 →  .gen/scripts/（进 PATH 的黑盒回归命令）
 ```
 
@@ -166,12 +170,86 @@ false negative（漏拦）代价高，因为还有 permissions 和人工确认�
 链式命令**会**拦：`a && b && git push` 按 `&& || ; | &` 与换行切段，每段独立过规则，
 `git push` 那段照样命中（`cd /tmp && rm -fr build` → deny 即此机制，测试已固化）。
 
+## cc-usage 用量统计
+
+源码 `cli/crates/cc-usage/`，二进制 `cc-usage`，落 `~/.local/bin/`。状态栏那段
+`📅today $x.xxxx N.NMtok +a/-r` 就是它算的：**跨 session 的当日** token / 成本 / 改动行。
+
+```text
+src/
+├── main.rs            bin：clap 分发 + 一行 JSON 到 stdout
+├── clock.rs           UTC 时间戳 → 本地日期（按天分桶的键）
+├── metrics/
+│   ├── mod.rs           Metrics：token / 改动行 / 工具次数 / 按模型拆分
+│   ├── ledger.rs        ★ 去重账本：按稳定键攒条目，最后才折成 Metrics
+│   ├── tokens.rs        四类 token（单价不同，必须分开存）
+│   └── price.rs         model → 计价档 → USD
+├── transcript/
+│   ├── discover.rs      递归找 ~/.claude/projects/**/*.jsonl（含 subagents/）
+│   ├── entry.rs         JSONL 单行 → 闭合事件（Message / Patch）
+│   └── scan.rs          增量扫描：字节进度 → 按天账本
+└── store.rs           状态落盘：扫描进度 + 按天账本目录
+```
+
+```bash
+cc-usage today                     # 扫当天动过的 transcript 后打印今日汇总
+cc-usage report --date 2026-07-01  # 只读已有状态打印某天（不扫描）
+cc-usage backfill --days 30        # 回扫补历史，首次几十秒
+```
+
+statusline 里写死 `$HOME/.local/bin/cc-usage` 而不是靠 PATH——状态栏脚本跑在非交互
+shell 里，别假设 rc 文件被 source 过。
+
+### 为什么必须读 transcript
+
+Claude Code 喂给 statusline 的 `context_window.current_usage` **不能当累加源**：状态栏
+按 300ms 防抖刷新，窗口内的中间状态是**丢帧而非延迟**，官方没有补偿机制。实测把它
+逐轮累加，token 比 transcript 真值少 5%~13%。transcript 是唯一的完整账本。
+
+`cost.total_cost_usd` 倒是精确，但它只覆盖当前 session；要「今日跨 session」就还得
+自己计价，于是干脆全部从 transcript 算，单一真相源。
+
+### transcript 的四个坑（改这块前先读）
+
+- **一条 API 响应按 content block 拆成多行**，各行共享 `message.id`、`usage` 重复。
+  所以 usage 必须按 id 去重取末条（个别行是流式中途值，实测出现过 `output_tokens`
+  先 1 后 309），而 `tool_use` 反过来要**逐行**数——每行只带一个块，按 id 去重会漏掉
+  工具调用。
+- **`/compact`、fork 出 background job 会把上游会话的行原样复制进新 transcript**：
+  `uuid` 与 `message.id` 保持不变，只有 `sessionId` 被改写成新会话 id。实测一天里
+  100 条消息同时存在于两个文件，**按文件各自累加指标再相加会多算 37%**。所以指标
+  必须先进 `ledger.rs` 的去重账本（用量按 `message.id`、活动按行 `uuid`），跨文件
+  合并完才折成 Metrics——指标只会加不会减，先折就没法再去重了。
+  `sessionId` 不能当去重键，它在复制时会变。
+- **subagent 的 transcript 在 `<session-id>/subagents/` 子目录**，token 常比主线还多，
+  只扫一级目录会少算一大截 → discover 必须递归。
+- **计价系数对齐 Claude Code**：cache write 记 `1.25 ×` input、cache read 记 `0.1 ×`
+  input。按 1h TTL 的真实 `2 ×` 算会让「今日总额」比状态栏上同一 session 的成本还高，
+  看着像坏了。`price.rs` 有一条拿真实会话数据对账的回归测试守着。
+
+### 状态与并发
+
+状态在 `$XDG_CACHE_HOME`/`~/.cache` 下 `cc-usage/`，两块：
+
+```text
+progress/<路径哈希>.json       每个 transcript 扫到第几字节
+ledger/<YYYY-MM-DD>/<哈希>.json  它那天贡献的条目（按 message.id / uuid 索引）
+```
+
+汇总某天只读那天的目录，过期清理就是删整个日期目录，保留 30 天。账本存的是「从文件
+开头累计」的**绝对值**而非增量——多个 session 的状态栏并发刷新同一个 transcript，最坏
+是某次写回偏旧、下次自愈，**不会重复计数**，所以不需要加锁。
+
+删掉状态目录只会损失历史（当天数据下次刷新即重建），`cc-usage backfill` 可补回。
+
 ## 双速部署链
 
 | 改什么                      | 怎么生效                                                        |
 | --------------------------- | --------------------------------------------------------------- |
 | `pretool.toml` 规则         | 保存即生效（hook 每次调用现读 TOML）                            |
 | 引擎代码（`cli/crates/cc-hooks/`） | `dots sync` → post_sync 钩子 `cargo build` + 复制进 `~/.claude/hooks/`（见 `dots.lua`） |
+| 用量统计（`cli/crates/cc-usage/`） | 同上，产物落 `~/.local/bin/cc-usage`                              |
+| `statusline-command.sh`      | 受管软链，保存即生效                                            |
 | `settings.json` 的 hooks 注册 | 需要**新会话**（Claude Code 启动时读一次）                      |
 
 ## 测试
@@ -179,6 +257,7 @@ false negative（漏拦）代价高，因为还有 permissions 和人工确认�
 三层，分工明确：
 
 ```bash
+cargo nextest run -p cc-usage  # 单测：解析 / 增量扫描 / 计价 / 状态落盘
 cargo test -p cc-hooks      # 单测 + e2e：cargo 产物 × 规则（语义正确性 + 生产表正确性）
 cc-hook-test                # 黑盒：~/.claude/hooks/ 部署二进制 × 生产 pretool.toml（部署最后一公里）
 cc-hook-test <bin路径>      # 测任意二进制（如刚编译的 cli/target/release/cc-hook）

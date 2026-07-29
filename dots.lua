@@ -74,12 +74,18 @@ distribute("agents-md", {
     mode = "file",
 })
 
--- 每次 sync 保持 cc-hook（Claude Code hooks 入口）新鲜并复制到 ~/.claude/hooks/。
+-- 每次 sync 保持派生二进制新鲜：cc-hook（hooks 入口）、cc-usage（statusline 用量统计）。
 on({
     post_sync = function()
-        local bin = dots.cargo.build(dots.repo .. "/cli", "cc-hook")
-        if bin then
-            dots.file.install(bin, dots.home .. "/.claude/hooks/cc-hook")
+        local bins = {
+            ["cc-hook"] = dots.home .. "/.claude/hooks/cc-hook",
+            ["cc-usage"] = dots.home .. "/.local/bin/cc-usage",
+        }
+        for name, dest in pairs(bins) do
+            local bin = dots.cargo.build(dots.repo .. "/cli", name)
+            if bin then
+                dots.file.install(bin, dest)
+            end
         end
     end,
 })
