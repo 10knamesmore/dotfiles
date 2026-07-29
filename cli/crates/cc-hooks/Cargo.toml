@@ -1,6 +1,6 @@
 [package]
 name         = "cc-hooks"
-description  = "Claude Code hooks 统一入口（bin: cc-hook），子命令 = 各 hook 用途"
+description  = "Claude Code 与 Codex 共用的本地 hook 规则引擎"
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true
@@ -13,6 +13,10 @@ workspace = true
 [[bin]]
 name = "cc-hook"
 path = "src/main.rs"
+
+[[bin]]
+name = "agent-hook"
+path = "src/bin/agent-hook.rs"
 
 [dependencies]
 clap.workspace       = true

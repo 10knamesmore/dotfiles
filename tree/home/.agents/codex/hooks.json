@@ -1,0 +1,18 @@
+{
+  "description": "Global Codex guardrails backed by the shared agent-hook engine.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/agent-hook codex-pretool",
+            "timeout": 5,
+            "statusMessage": "Checking command policy"
+          }
+        ]
+      }
+    ]
+  }
+}

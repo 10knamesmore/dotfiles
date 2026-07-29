@@ -1,6 +1,8 @@
-//! PreToolUse 事件专属逻辑：规则 schema、命令词法、匹配引擎、JSON 信封。
+//! PreToolUse 共享规则判定与 Claude Code/Codex 协议 adapter。
 
 pub mod argv;
+pub mod codex;
 pub mod engine;
 pub mod envelope;
+pub mod evaluation;
 pub mod rules;

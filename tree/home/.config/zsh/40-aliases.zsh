@@ -124,4 +124,4 @@ alias zja="zellij attach"
 # ================================
 # AI
 # ================================
-alias cc="claude"
+alias cc="codex"

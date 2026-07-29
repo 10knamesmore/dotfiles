@@ -1,7 +1,7 @@
 # AI 工具链配置
 
 本仓库管理的 AI 编码工具（Claude Code / Codex / opencode / pi）配置全貌：资产怎么落位、
-`cc-hook` 守卫引擎与 `cc-usage` 用量统计怎么工作、改了东西怎么生效。
+共享守卫引擎与 `cc-usage` 用量统计怎么工作、改了东西怎么生效。
 
 ## 资产地图
 
@@ -16,11 +16,15 @@ tree/home/.claude/                          →  ~/.claude/
                                                （住 hooks/ 是因为 settings.json 按此路径注册）
 
 ~/.local/bin/cc-usage                          用量统计二进制，同样不入库、post_sync 装进来
+~/.local/bin/agent-hook                       Codex hook adapter，同样由 post_sync 安装
+~/.codex/pretool.toml                          ← Claude pretool.toml 的受管链接（共享规则）
 
 tree/home/.agents/                          →  ~/.agents/（整层镜像）
 ├── AGENTS.md                                  ★ 全局指令唯一真相源（跨 harness）
 │                      ── distribute ──→       ~/.pi/agent/AGENTS.md
 ├── skills/            ── distribute ──→       ~/.claude/skills/ + ~/.codex/skills/（逐 skill 链）
+├── codex/
+│   └── hooks.json      ── distribute ──→       ~/.codex/hooks.json
 └── claude/                                    Claude 专属格式，按工具命名空间隔离
     ├── agents/        ── distribute ──→       ~/.claude/agents/
     └── commands/      ── distribute ──→       ~/.claude/commands/
@@ -28,7 +32,7 @@ tree/home/.agents/                          →  ~/.agents/（整层镜像）
 tree/home/.pi/agent/                        →  ~/.pi/agent/（granularity "children"：目录保持真实）
 └── settings.json                              pi 主配置；auth.json/sessions/bin/ 等运行期物留本机
 
-cli/crates/cc-hooks/                           cc-hook 引擎源码（Rust）
+cli/crates/cc-hooks/                           共享引擎 + Claude/Codex adapter（Rust）
 cli/crates/cc-usage/                           cc-usage 用量统计源码（Rust）
 scripts/common/cc-hook-test                 →  .gen/scripts/（进 PATH 的黑盒回归命令）
 ```
@@ -39,7 +43,7 @@ Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实�
 
 全局指令的两种接法按工具能力选：Claude Code 只认 `~/.claude/CLAUDE.md`，但支持
 `@path` import，所以那份退化成一行 import；pi 只认自己 agent 目录下的 `AGENTS.md`，
-够不着 `~/.agents/`，走 `distribute` 链过去。工具特定的硬约束（如 cc-hook 拦截）
+够不着 `~/.agents/`，走 `distribute` 链过去。工具特定的协议 adapter
 写在各自的文件里，别污染中立源。
 
 ## settings.json 要点
@@ -56,20 +60,27 @@ permissions 与 cc-hook 的分工：permissions 是 Claude Code 内建的粗粒�
 cc-hook 负责需要**词法理解**的判定（旗标簇、链式命令、字段匹配）和**软引导**
 （deny 的 reason 喂回模型让它自己改方案）。
 
-## cc-hook 守卫引擎
+## 共享守卫引擎
 
-源码 `cli/crates/cc-hooks/`，二进制 `cc-hook`。**子命令 = hook 事件**
-（`pretool` → PreToolUse；将来 posttool/stop 同理），事件内的工具差异全部下沉到规则 TOML。
+源码 `cli/crates/cc-hooks/`，保留两个入口：
+
+- `cc-hook pretool`：Claude Code adapter，支持规则的 `deny` / `ask`。
+- `agent-hook codex-pretool`：Codex adapter，复用同一判定结果；Codex PreToolUse
+  暂不支持 `ask`，故将其降级成带原始理由的 hard deny，避免 hook failure 后意外放行。
 
 ```text
 src/
-├── main.rs            bin：clap 分发 + wire 落地（stdout/stderr/exit code）
+├── main.rs            cc-hook：Claude Code adapter
+├── bin/agent-hook.rs  agent-hook：Codex adapter
 ├── common/            跨 hook 事件共用
-│   └── outcome.rs       HookRun 统一返回值（业务函数不做 IO）
+│   ├── outcome.rs       HookRun 统一返回值（业务函数不做 IO）
+│   └── wire.rs          stdout / stderr / 审计日志统一落地
 └── pretool/           PreToolUse 专属
     ├── argv.rs          命令词法：引号感知切段 / heredoc 剥除 / 短旗标簇
     ├── engine.rs        规则匹配：首条命中
-    ├── envelope.rs      stdin JSON 解析 + hookSpecificOutput 输出信封
+    ├── evaluation.rs    harness 无关的规则判定与审计语义
+    ├── envelope.rs      Claude Code 输出信封
+    ├── codex.rs         Codex 输出信封与 ask → deny 降级
     └── rules.rs         规则表 TOML schema
 ```
 
@@ -84,11 +95,16 @@ PreToolUse JSON (stdin)
   → tool_name == "Bash" ?
       是 → tool_input.command 过 [[bash]] 规则（argv 引擎），命中即返回
   → 所有工具过 [[tool]] 规则（字段匹配器）
-  → 全不中 → 静默放行（走 Claude Code 正常权限流程）
+  → 全不中 → 静默放行（走 harness 正常权限流程）
 
-命中输出：{"hookSpecificOutput": {"permissionDecision": "deny"|"ask", "permissionDecisionReason": "…"}}
-  deny = 直接拦，reason 喂回模型让它换方案；ask = 弹确认框给用户
+Claude：deny = 直接拦；ask = 弹确认框给用户
+Codex： deny = 直接拦；ask = hard deny + 解释当前 PreToolUse 不支持 ask
 ```
+
+Codex 全局 hook 源是 `tree/home/.agents/codex/hooks.json`，只匹配 `^Bash$`。当前
+`[[tool]]` 规则仍按 Claude 的 canonical tool name 编写，且 Codex hosted tools
+不经过本地 PreToolUse，因此首期只复用可验证等价的 Bash 规则。新增或修改
+`~/.codex/hooks.json` 后，需要在 Codex `/hooks` 中审核并信任当前定义。
 
 ### 审计日志（可观测性）
 
@@ -97,6 +113,8 @@ PreToolUse JSON (stdin)
 否则守卫静默失效无人知。
 
 - 路径：`CC_HOOK_AUDIT_LOG` 环境变量优先（指向 `/dev/null` 即关闭），缺省 `~/.claude/cc-hook.log`。
+- Codex adapter：`AGENT_HOOK_AUDIT_LOG` 优先，缺省
+  `~/.local/state/agent-hook/audit.log`；降级行额外记录 `source_decision=ask`。
 - 只记决策与留痕，**不记静默放行**（信噪比：放行是绝大多数，记了等于刷屏）。
 - 行格式：`<epoch秒> decision=<deny|ask> tool=<Bash|工具名> rule=<规则名> cmd=<命令摘要≤200字>`。
 - 落盘是 best-effort——任何 IO 失败都静默吞掉，**绝不违反 fail-open**（写不了日志也不阻断命令）。
@@ -107,7 +125,8 @@ PreToolUse JSON (stdin)
 
 ### 规则表（pretool.toml）
 
-源：`tree/home/.claude/hooks/pretool.toml`，**改完即生效**（每次 hook 调用现读）。
+源：`tree/home/.claude/hooks/pretool.toml`。Claude 直接读取该路径；`dots sync` 将同一源
+分发到 `~/.codex/pretool.toml` 供 Codex 读取，避免复制两份规则。
 同类规则自上而下首条命中。
 
 **`[[bash]]`** —— 作用于 `tool_input.command` 的 argv 分词结果，条件 AND：
@@ -246,8 +265,9 @@ ledger/<YYYY-MM-DD>/<哈希>.json  它那天贡献的条目（按 message.id / u
 
 | 改什么                      | 怎么生效                                                        |
 | --------------------------- | --------------------------------------------------------------- |
-| `pretool.toml` 规则         | 保存即生效（hook 每次调用现读 TOML）                            |
-| 引擎代码（`cli/crates/cc-hooks/`） | `dots sync` → post_sync 钩子 `cargo build` + 复制进 `~/.claude/hooks/`（见 `dots.lua`） |
+| `pretool.toml` 规则         | Claude 保存即生效；Codex 侧首次接入需 `dots sync` 建立共享链接 |
+| 引擎代码（`cli/crates/cc-hooks/`） | `dots sync` → post_sync 编译；`cc-hook` 进 `~/.claude/hooks/`，`agent-hook` 进 `~/.local/bin/` |
+| Codex `hooks.json`          | `dots sync` 后在 Codex `/hooks` 审核并信任；定义变更会要求重新审核 |
 | 用量统计（`cli/crates/cc-usage/`） | 同上，产物落 `~/.local/bin/cc-usage`                              |
 | `statusline-command.sh`      | 受管软链，保存即生效                                            |
 | `settings.json` 的 hooks 注册 | 需要**新会话**（Claude Code 启动时读一次）                      |
@@ -258,7 +278,7 @@ ledger/<YYYY-MM-DD>/<哈希>.json  它那天贡献的条目（按 message.id / u
 
 ```bash
 cargo nextest run -p cc-usage  # 单测：解析 / 增量扫描 / 计价 / 状态落盘
-cargo test -p cc-hooks      # 单测 + e2e：cargo 产物 × 规则（语义正确性 + 生产表正确性）
+cargo nextest run -p cc-hooks # 共享引擎 + Claude/Codex adapter e2e
 cc-hook-test                # 黑盒：~/.claude/hooks/ 部署二进制 × 生产 pretool.toml（部署最后一公里）
 cc-hook-test <bin路径>      # 测任意二进制（如刚编译的 cli/target/release/cc-hook）
 ```
@@ -270,6 +290,8 @@ cargo test 内部又分两类规则来源，**已无手工同步负担**：
 - `tests/e2e_production_rules.rs` 用 `include_str!` 直接内联**真实** `tree/home/.claude/hooks/pretool.toml`
   （改 toml 即触发本测试重编译），断言生产规则的决策——生产表正确性由它单源覆盖，
   不再靠手抄 fixture，「改生产表忘了同步测试」这类漂移由它机械兜住。
+- `tests/e2e_codex_pretool.rs` 起真实 `agent-hook`，同时覆盖合成规则与生产规则，
+  固化 deny 同形、ask → deny 降级、未命中静默三条 Codex 契约。
 
 `cc-hook-test`（源 `scripts/common/cc-hook-test`）按四区断言 deny/ask/silent 与
 exit 0 契约：规则表预期 / 误伤回归 / 已知绕过 / fail-open。全绿 exit 0，有挂 exit 1。

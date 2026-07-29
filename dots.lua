@@ -74,11 +74,25 @@ distribute("agents-md", {
     mode = "file",
 })
 
--- 每次 sync 保持派生二进制新鲜：cc-hook（hooks 入口）、cc-usage（statusline 用量统计）。
+-- Codex hooks 与共享规则各自住真实目录；hook 定义留在中立的 .agents/ 命名空间，
+-- 规则暂由 Claude 现有 pretool.toml 单源提供，避免两个 harness 漂移。
+distribute("codex-hooks", {
+    src = "tree/home/.agents/codex/hooks.json",
+    to = { "~/.codex/hooks.json" },
+    mode = "file",
+})
+distribute("agent-hook-rules", {
+    src = "tree/home/.claude/hooks/pretool.toml",
+    to = { "~/.codex/pretool.toml" },
+    mode = "file",
+})
+
+-- 每次 sync 保持派生二进制新鲜：Claude cc-hook、Codex agent-hook、Claude statusline 的 cc-usage。
 on({
     post_sync = function()
         local bins = {
             ["cc-hook"] = dots.home .. "/.claude/hooks/cc-hook",
+            ["agent-hook"] = dots.home .. "/.local/bin/agent-hook",
             ["cc-usage"] = dots.home .. "/.local/bin/cc-usage",
         }
         for name, dest in pairs(bins) do
