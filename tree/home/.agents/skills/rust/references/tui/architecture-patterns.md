@@ -247,7 +247,7 @@ fn draw(&mut self, frame: &mut Frame, area: Rect) {
 
 **实证锚点**：spotify-player `ui/page.rs` 渲染时算 `is_active && focus == This`；joshuto 渲染时把 `focused` 当参数传给目录列表；tui-textarea 焦点状态全外置、库自身不存。反面：bubbletea / gitui / tui-realm 都存 `is_focused`，且都伴随手动双写同步的负担。
 
-> 路由组件返回意图、顶层执行副作用、`Consumed/Pass/Do` 的完整设计与「优先级单一真相源」铁律，见 `references/page-focus-routing.md`。
+> 路由组件返回意图、顶层执行副作用、`Consumed/Pass/Do` 的完整设计与「优先级单一真相源」铁律，见 `references/tui/page-focus-routing.md`。
 
 ### 组件内列表导航的两个防回归点
 
@@ -375,7 +375,7 @@ async fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
 ├─ 少量互斥页（不叠加）    → 派生 active_layer()（单函数按优先级算当前层）
 ├─ 同屏多面板互切焦点      → 该页私有一个 focus 枚举 + 相邻对成环 next/previous
 └─ 事件路由               → 有序层逆序冒泡，第一个 Consumed 短路（切忌广播）
-                           详见 references/page-focus-routing.md
+                           详见 references/tui/page-focus-routing.md
 ```
 
 > 「多页面 + 焦点」不是上面四种顶层架构的第五种，而是叠加在任意一种之上的**正交维度**。

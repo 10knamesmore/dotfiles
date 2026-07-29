@@ -1,4 +1,4 @@
-# 事件处理机制
+# TUI 事件处理机制
 
 ## 目录
 - [同步 Poll 模式](#同步-poll-模式)
@@ -186,7 +186,7 @@ fn handle_key(&mut self, key: KeyEvent) -> Result<Option<Action>> {
 }
 ```
 
-> **警示：别让单个 `mode` enum 兼任「页面 + 焦点 + 输入路由」三职。** 这里的 `mode` 只该表达「同一组键如何被解释」（输入模式）。一旦它还兼当「现在是哪个全屏页」「哪个面板有焦点」，`match self.mode` 就会在多个文件里平行散落（television 有 8 处），加一个态要全量补 arm、漏一处静默退化。把全屏页、面板焦点、输入模式拆成正交概念，详见 `references/page-focus-routing.md`。
+> **警示：别让单个 `mode` enum 兼任「页面 + 焦点 + 输入路由」三职。** 这里的 `mode` 只该表达「同一组键如何被解释」（输入模式）。一旦它还兼当「现在是哪个全屏页」「哪个面板有焦点」，`match self.mode` 就会在多个文件里平行散落（television 有 8 处），加一个态要全量补 arm、漏一处静默退化。把全屏页、面板焦点、输入模式拆成正交概念，详见 `references/tui/page-focus-routing.md`。
 
 ```rust
 fn handle_insert_key(&mut self, key: KeyEvent) -> Result<Option<Action>> {

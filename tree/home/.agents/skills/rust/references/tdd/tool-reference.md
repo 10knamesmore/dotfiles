@@ -1,6 +1,6 @@
 # Rust 测试工具参考
 
-主流程与选型见 `SKILL.md`。本文件是各工具可直接抄用的模板，去项目化、换成通用占位类型
+主流程与选型见 `subskills/tdd.md`。本文件是各工具可直接抄用的模板，去项目化、换成通用占位类型
 （`Config` / `Request` / `myapp` 等），需要哪段抄哪段。
 
 ## cargo 别名（`.cargo/config.toml`）

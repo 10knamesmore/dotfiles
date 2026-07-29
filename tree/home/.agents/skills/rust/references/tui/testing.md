@@ -81,7 +81,7 @@ fn list_with_long_title_snapshot() -> Result<()> {
 ```rust
 #[test]
 fn selection_wraps_at_end() {
-    assert_eq!(next_index(/*cur*/ 4, /*len*/ 5), 0);
+    assert_eq!(next_index(4, 5), 0);
 }
 ```
 
