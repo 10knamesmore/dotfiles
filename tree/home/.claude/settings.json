@@ -36,7 +36,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
   "enableAllProjectMcpServers": false,
   "hooks": {
     "PreToolUse": [
@@ -81,6 +80,5 @@
   "theme": "dark",
   "preferredNotifChannel": "kitty",
   "agentPushNotifEnabled": false,
-  "skipAutoPermissionPrompt": true,
-  "model": "claude-fable-5[1m]"
+  "skipAutoPermissionPrompt": true
 }
