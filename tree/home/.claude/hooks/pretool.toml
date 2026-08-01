@@ -137,3 +137,26 @@ tool     = "Write"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
+
+# ════ ~/.zshrc 不受 dotfiles 接管，且可能含 API key ════
+
+[[tool]]
+name     = "no-zshrc-read"
+tool     = "Read"
+where    = { file_path = { glob = ["**/.zshrc"] } }
+decision = "deny"
+reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接读。需要 shell 配置内容时读 ~/dotfiles/tree/home/.zshrc_dotfiles（受管源）。"
+
+[[tool]]
+name     = "no-zshrc-edit"
+tool     = "Edit"
+where    = { file_path = { glob = ["**/.zshrc"] } }
+decision = "deny"
+reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
+
+[[tool]]
+name     = "no-zshrc-write"
+tool     = "Write"
+where    = { file_path = { glob = ["**/.zshrc"] } }
+decision = "deny"
+reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
