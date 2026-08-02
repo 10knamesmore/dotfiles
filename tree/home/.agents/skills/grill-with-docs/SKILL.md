@@ -16,4 +16,4 @@ description: 通过持续追问打磨 Spec 或 design，并同步维护当前 Su
 5. 同步维护 domain glossary。只有满足难以逆转、缺少上下文会令人意外、存在真实 trade-off 三项条件时才创建 ADR。
 6. decision 与 evidence 完整后把 Subspec 标记为 `resolved`，再更新 Spec status。
 
-如果没有活动 Spec，仍执行 grilling 与 domain-modeling；只有工作规模确实需要跨 session 推进时才创建 Spec。
+如果没有活动 Spec，仍执行 grilling 与 domain-modeling 打磨 design，但不创建 Spec——确认的事实留在对话与 domain docs 中。发现工作规模确实需要跨 session 推进时，交回 wayfinder 创建 Spec。

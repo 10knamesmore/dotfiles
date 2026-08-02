@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: 将无法由一个 agent session 容纳的大块工作组织为 repo-local Spec 与依赖明确的 Subspec，并逐个推进，直到通往 destination 的路径清晰或工作完成。
+description: 管理 repo-local Spec 的完整生命周期——将大而模糊的目标或已聊清楚的当前对话固化为 Spec 与 Subspec，并沿 frontier 逐个推进，直到 destination 达成。推进 feature 开发、优化、重构等工作时使用，也用于创建 spec、整理对话为 spec、继续推进已有 spec。
 ---
 
 # Wayfinder
@@ -8,6 +8,21 @@ description: 将无法由一个 agent session 容纳的大块工作组织为 rep
 一个模糊想法可能大到无法由一个 agent session 完成，而且从当前位置到 **destination** 的路径还不可见。Wayfinder 先把这段工作组织成一个 **Spec**，再把当前已经看清的问题和执行切片写成 **Subspec**，逐个推进并持续清除 fog。
 
 默认使用 repo 内的 Markdown 文件作为唯一 source of truth。不要创建或维护 issue、label、assignee、blocking relation、resolution comment，也不要通过 close issue 表示完成。只有用户明确要求同步到 issue tracker 时，才把 tracker 当作 mirror；文件中的 Spec 与 Subspec 仍是 canonical artifact。
+
+## 路由
+
+先判断本次调用属于哪种模式，然后**先读对应的 reference 文件，再开始行动**。不要仅凭本文件直接执行模式流程。
+
+| 场景 | 必读文件 |
+|---|---|
+| 用户带着大而模糊的目标，需要 grill 收敛后创建 Spec | [references/create.md](references/create.md) |
+| 当前对话已确认方向与决策，直接固化为 Spec，不重新访谈 | [references/distill.md](references/distill.md) |
+| 用户提供已有 Spec 或 Subspec，要求继续推进 | [references/advance.md](references/advance.md) |
+
+创建或修改任何 spec 文件前，另需读取格式约定：
+
+- [Spec format](references/SPEC-FORMAT.md)
+- [Subspec format](references/SUBSPEC-FORMAT.md)
 
 ## Domain model
 
@@ -25,17 +40,16 @@ description: 将无法由一个 agent session 容纳的大块工作组织为 rep
 
 ```text
 specs/
-└── <spec-slug>/
-    ├── SPEC.md
-    └── subspecs/
-        ├── <id>-<slug>.md
-        └── ...
+├── <yy-mm-dd>-<spec-slug>.md              ← 单文件 Spec（默认、优先）
+└── <yy-mm-dd>-<spec-slug>/                ← 仅当单文件装不下时才拆分
+    ├── 1-<subspec-slug>.md
+    ├── 2-<subspec-slug>.md
+    └── ...
 ```
 
-创建或修改文件前，读取：
+创建前必须评估 Spec 大小：只有内容确实太大、单文件无法容纳时才拆出 Subspec 目录；能单文件装下的一律只创建 Spec 文件，不预留空的 Subspec 结构。
 
-- [Spec format](references/SPEC-FORMAT.md)
-- [Subspec format](references/SUBSPEC-FORMAT.md)
+写入任何 spec 文件前，先确认 repo 的 ignore 配置已排除 spec 目录（如 `specs/`）；没有就先加入。Spec 与 Subspec 是本地工作 artifact，不提交入库。
 
 路径和 `id` 用于机器定位；面向人类的 narration、decision index 和交接说明始终使用 title，并把链接包在 title 上。
 
@@ -63,7 +77,7 @@ Subspec status：
 
 ## Subspec kinds
 
-- **decision**（HITL）：需要用户参与的产品、domain 或架构决策。使用 grilling 与 domain-modeling，一次只解决一个问题。
+- **decision**（HITL）：需要用户参与的产品、domain 或架构决策。使用 grill-with-docs 与 domain-modeling，一次只解决一个问题。
 - **research**（AFK）：通过源码、documentation、API 或其他可验证资料补齐决策所需事实。
 - **prototype**（HITL）：制作低成本 artifact，让用户基于具体结果反馈。
 - **task**（HITL 或 AFK）：解除后续决策阻塞所需的前置操作，本身不交付 destination。
@@ -81,34 +95,3 @@ Spec 故意允许不完整。判断内容应该成为 Subspec 还是留在 `Not 
 `Not yet specified` 不包含已作出的 decision、已有 Subspec 或 out-of-scope 内容。
 
 destination 决定 scope。确认不属于 destination 的内容写入 Spec 的 `Out of scope`；如果已经存在对应 Subspec，将其改为 `cancelled` 并记录原因。只有重新定义 destination 时，才重新考虑这些内容。
-
-## Invocation
-
-有两种模式。除并行 research 外，每个 session 最多推进一个 Subspec。
-
-### 创建 Spec
-
-用户带着一个大而模糊的目标调用。
-
-1. 读取 repo instructions、现有 glossary、相关 ADR，以及已有 spec 约定。
-2. 使用 grilling 和 domain-modeling 命名 destination。destination 决定整个 Spec 的 scope。
-3. breadth-first 扫描整个问题空间，找出当前可明确表达的 decision、research、prototype 和 task。如果工作已经清晰且一个 session 可以完成，不创建 Spec，直接说明无需拆分。implementation Subspec 只在 contract 与 acceptance criteria 稳定后创建。
-4. 创建 `SPEC.md`，写入 destination、共享约束、acceptance criteria、fog 和 out-of-scope。
-5. 为当前可以精确表达的工作创建 Subspec；全部文件创建后，再在 second pass 写 `depends_on`，避免引用不存在的 `id`。
-6. 在 Spec 的 Subspec index 中只写 title 与相对链接，不复制 status、dependency 或详细内容。
-7. 可以并行启动互不依赖的 research subagents；每个 subagent 只修改自己的 Subspec。
-8. 停止。创建 Spec 的 session 不继续解决 decision 或 implementation Subspec。
-
-### 推进 Spec
-
-用户提供 Spec 或 Subspec path；如果只提供 Spec，由你选择 frontier，不让用户手动挑选。
-
-1. 读取完整 Spec，再只读取 Subspec index 中各文件的 frontmatter，计算 frontier。
-2. 如果用户指定 Subspec，验证它位于 frontier；否则按 Spec index 顺序选择第一个 frontier。
-3. claim 选中的 Subspec，再读取它的完整内容和 dependency resolution。不要一次加载所有 Subspec body。
-4. 按 kind 推进：decision 使用 grilling 与 domain-modeling；research 查证事实；prototype 产出并链接 artifact；task 完成前置操作；implementation 交给 `implement`。
-5. 将结论写入该 Subspec 的 `Resolution`，把验证结果写入 `Evidence`，实际验证后再改为 `resolved`。
-6. 更新 Spec 的 decision summary、Subspec index、fog、out-of-scope 和整体 status。新浮现的问题能精确表达时创建新 Subspec，否则留在 fog。
-7. 如果没有 frontier，但仍有未 resolved Subspec，报告 dependency cycle、`draft` Subspec 或 stale claim；不要猜测下一步。
-
-并发 session 应只长期编辑各自 claim 的 Subspec。对 `SPEC.md` 的更新保持短小，并在写入前重新读取，降低 merge conflict。

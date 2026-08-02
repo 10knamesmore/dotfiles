@@ -1,0 +1,13 @@
+# 创建 Spec（从模糊目标）
+
+用户带着一个大而模糊的目标调用。先创建 Spec 骨架，再 grill 清楚 destination——grilling 的纪律是确认即写盘，必须始终有 Spec 文件作为落点，不允许 grill 完凭回忆批量补写。
+
+1. 读取 repo instructions、现有 glossary、相关 ADR，以及已有 spec 约定。
+2. 如果工作已经清晰且一个 session 可以完成，不创建 Spec，直接说明无需拆分。
+3. 创建 Spec 骨架：destination 先写当前理解的 draft，acceptance criteria、fog 和 out-of-scope 能写多少写多少，status 为 `draft`。
+4. 使用 grill-with-docs 和 domain-modeling 打磨 destination。destination 决定整个 Spec 的 scope。用户每确认一项事实，立即更新 Spec 的对应 section。
+5. destination 收敛后，breadth-first 扫描整个问题空间，找出当前可明确表达的 decision、research、prototype 和 task。implementation Subspec 只在 contract 与 acceptance criteria 稳定后创建。
+6. 为当前可以精确表达的工作创建 Subspec；全部文件创建后，再在 second pass 写 `depends_on`，避免引用不存在的 `id`。
+7. 在 Spec 的 Subspec index 中只写 title 与相对链接，不复制 status、dependency 或详细内容。
+8. 可以并行启动互不依赖的 research subagents；每个 subagent 只修改自己的 Subspec。
+9. 停止。创建 Spec 的 session 不继续解决 decision 或 implementation Subspec。

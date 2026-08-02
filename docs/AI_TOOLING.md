@@ -61,15 +61,16 @@ Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实�
 `tree/home/.agents/skills/` 中的工程 workflow 以 repo-local Markdown 为 source of truth，并允许 implicit invocation：
 
 ```text
-wayfinder                         大型工作 → Spec + 依赖明确的 Subspec
-to-spec                           当前对话 → Spec + 初始 Subspec
+wayfinder                         Spec 生命周期唯一入口：从模糊目标创建 / 固化当前对话 / 沿 frontier 推进
 grill-with-docs                   逐问解决 decision Subspec，并同步 domain docs
 implement                         一次实现并验证一个 implementation Subspec
-improve-codebase-architecture     架构候选 → decision Subspec → implementation Subspec
+domain-modeling                   维护 CONTEXT.md glossary 与 docs/adr/
 ```
 
-默认目录是 `specs/<spec-slug>/SPEC.md` 和同目录下的 `subspecs/*.md`；repo 已有约定时优先
-沿用。Spec 是整个 effort 的 contract，Subspec 是单 session 工作单元，dependency 写在
+默认路径是 `specs/<yy-mm-dd>-<spec-slug>.md` 单文件 Spec；只有内容确实太大、单文件装不下时
+才拆分到同名目录 `specs/<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md`。repo 已有约定时优先
+沿用。spec 目录必须先被 ignore 排除（没有就先加入），Spec 与 Subspec 不提交入库。
+Spec 是整个 effort 的 contract，Subspec 是单 session 工作单元，dependency 写在
 Subspec frontmatter 的 `depends_on`。`blocked` 是 dependency 推导状态，不落盘。
 
 这些 skills 不依赖 issue tracker，也不创建 label、assignee 或 resolution comment。用户明确
