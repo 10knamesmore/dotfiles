@@ -1,6 +1,6 @@
 ---
 name: rust
-description: Rust 代码编写、修改、审查、调试与测试规范，并覆盖 Rust TDD 工具选型和 ratatui TUI 架构。处理 .rs 文件、Cargo crate、Rust 测试、Rust feature/bugfix 或 Rust TUI 时使用。
+description: Rust 代码编写、修改、审查、调试与测试规范，并覆盖 compile-aware 验证、Rust 测试工具选型和 ratatui TUI 架构。处理 .rs 文件、Cargo crate、Rust 测试、Rust feature/bugfix 或 Rust TUI 时使用。
 ---
 
 # Rust
@@ -13,7 +13,7 @@ description: Rust 代码编写、修改、审查、调试与测试规范，并�
 
 按任务加载 subskill，不要一次读完全部资料：
 
-1. 编写或修改测试、以 test-first 方式实现 feature/bugfix 时，完整读取 `subskills/tdd.md`。
+1. 编写或修改测试、验证 Rust feature/bugfix 时，完整读取 `subskills/testing.md`。
 2. 处理 ratatui、terminal UI、事件系统、widget、layout、state 或 TUI 性能时，完整读取 `subskills/tui.md`。
-3. 同时涉及 TUI 测试时，同时读取 `subskills/tdd.md` 和 `subskills/tui.md`。
+3. 同时涉及 TUI 测试时，同时读取 `subskills/testing.md` 和 `subskills/tui.md`。
 4. subskill 指向的 `references/` 只在对应场景需要时读取。

@@ -1,6 +1,6 @@
 # Rust 测试工具参考
 
-主流程与选型见 `subskills/tdd.md`。本文件是各工具可直接抄用的模板，去项目化、换成通用占位类型
+主流程与选型见 `subskills/testing.md`。本文件是各工具可直接抄用的模板，去项目化、换成通用占位类型
 （`Config` / `Request` / `myapp` 等），需要哪段抄哪段。
 
 ## cargo 别名（`.cargo/config.toml`）
@@ -8,8 +8,8 @@
 ```toml
 [alias]
 # 需 `cargo install cargo-nextest cargo-insta`
-t    = "nextest run --workspace"      # 全仓测试
-td   = "test --workspace --doc"       # doctest（nextest 不覆盖，单独兜）
+t    = "nextest run"                  # 调用时显式传 -p / test filter，不默认扩大到全 workspace
+td   = "test --doc"                   # doctest（nextest 不覆盖，按相关 package 运行）
 snap = "insta test --test-runner nextest --review"  # 改了快照后人工审阅；绝不 accept-all
 ```
 

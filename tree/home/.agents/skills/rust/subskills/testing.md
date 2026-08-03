@@ -1,12 +1,20 @@
-# Rust TDD：工具选型与落地
+# Rust 测试：compile-aware 验证与工具选型
 
 ## Overview
 
-遵守 RED-GREEN-REFACTOR：先写测试并确认它因目标行为缺失而失败，再写最小实现，最后在测试保持通过时重构。
+把 test target 的编译视为编译验证。不要为了制造 RED 而运行一个已知无法编译的中间状态，也不要在测试前机械地再跑一次 `cargo check`, 。
 
-本 subskill 只回答 Rust 落地问题：每一步用哪个工具、断言怎么写不踩坑、fixture 怎么跨 crate 共享。先确定要验证的行为，再用下面的选型矩阵选工具。
+`编译10分钟证明了某个业务函数还不存在` 这种死板RED 在rust中， 不管是编译时间还是磁盘占用都是**无法接受**, 禁止用tmp目录存放target
 
-重型用法（各工具完整 API、e2e harness 模板、配置文件模板）见 `references/tdd/tool-reference.md`，需要时再读。
+先确认 compiler 已经证明了什么，再只测试 compiler 无法证明的行为。一次编辑完成最小实现和必要测试，然后选择覆盖目标行为的最窄命令，尽量只触发一次编译。
+
+重型用法（各工具完整 API、e2e harness 模板、配置文件模板）见 `references/testing/tool-reference.md`，需要时再读。
+
+## compiler 与测试的边界
+
+- 类型正确性、ownership、lifetime、trait bound、enum exhaustiveness 等 compiler 已覆盖的性质，不写重复测试。
+- 业务规则、算法结果、边界值、状态转换、解析与 serialization 语义、错误路径、并发和 process lifecycle 等 runtime behavior，用测试验证。
+- regression 已有可复现输入时保留最小 regression test；不要为了形式上的 test-first，先写一个引用不存在 API 的测试并运行它。
 
 ## 选型矩阵（先看这张表）
 
@@ -22,27 +30,27 @@
 一句话决策：单值/等价 → assert；形状 → insta；任意输入 → proptest；跨进程 → e2e。
 不确定时默认 `assert_eq!`，它最能表意。
 
-## 运行器：cargo-nextest
+## 运行器与最少编译
 
-默认运行器选 **cargo-nextest**（`cargo install cargo-nextest cargo-insta`）：并行快、可配 retries
-吸收偶发 flaky、可用 test-groups 把抢资源的 e2e 串行隔离。唯一坑：nextest 不跑 doctest，
-doctest 必须单独 `cargo test --doc`。
+项目已配置 **cargo-nextest** 时优先使用：它并行快、可配 retries 吸收偶发 flaky、可用
+test-groups 把抢资源的 e2e 串行隔离。nextest 不跑 doctest，相关 doctest 必须单独
+`cargo test --doc`。
 
-推荐在 `.cargo/config.toml` 里固化别名（模板见 `references/tdd/tool-reference.md`）：
+需要固化项目别名时参考 `references/testing/tool-reference.md`：
 
 ```bash
-cargo t      # = nextest run --workspace   全仓测试
-cargo td     # = test --workspace --doc    doctest（nextest 不覆盖，单独兜）
+cargo t      # = nextest run；调用时显式传 -p / test filter
+cargo td     # = test --doc；doctest（nextest 不覆盖，按相关 package 运行）
 cargo snap   # = insta test --review       改了快照后人工审阅
 ```
 
-## RED-GREEN-REFACTOR 在 Rust 的落地
+命令按能提供的证据选择，不机械串行执行：
 
-- **RED**：先写测试。编译不过也算红（被测函数还不存在时，编译错误是合法的红）。用 `cargo t`
-  跑出红，确认它确实因为行为缺失而失败，而不是测试本身写错。
-- **GREEN**：写最小实现让 `cargo t` 转绿。
-- **REFACTOR**：保持绿。proptest 跑出的失败反例会落进 `proptest-regressions/<test>.txt`，
-  提交进 git——它是永久回归用例，下次自动重跑防退化。
+- 改动包含相关测试时，直接运行最窄的 test target 或 test filter；测试命令已编译 library 和 test target，不先跑 `cargo check`。
+- 改动完全由 compiler 约束且没有必要的 behavior test 时，运行最窄的 `cargo check -p <crate>`。
+- doctest、clippy、全 workspace 测试只在改动触及对应风险时追加；它们提供不同证据，但不作为每次修改后的固定流水线。
+- 命令失败后根据诊断修改，再运行同一最窄命令。失败是诊断结果，不是必须刻意制造的流程阶段。
+- proptest 跑出的失败反例会落进 `proptest-regressions/<test>.txt`，提交进 git 作为永久 regression case。
 
 ## 测试也是代码：断言与错误处理
 
@@ -86,7 +94,7 @@ fn round_trips() -> color_eyre::Result<()> {
 
 ## insta 快照纪律
 
-1. **每张快照带描述**，`cargo insta review` 时逐张可辨。封一个强制描述的宏（模板见 `references/tdd/tool-reference.md`）：
+1. **每张快照带描述**，`cargo insta review` 时逐张可辨。封一个强制描述的宏（模板见 `references/testing/tool-reference.md`）：
    ```rust
    insta::with_settings!({ description => "状态栏:快捷键提示行" }, {
        insta::assert_snapshot!(rendered);
@@ -107,6 +115,7 @@ fn round_trips() -> color_eyre::Result<()> {
 | e2e 不隔离环境/共享 socket | flaky、互相干扰 | 每用例独立临时目录（PID+纳秒后缀），抢资源的用 test-group 串行 |
 | 只跑 `cargo nextest`，漏 doctest | 文档示例腐烂没人发现 | 单独 `cargo test --doc`（`cargo td`） |
 | 盲接受快照 / `INSTA_UPDATE=always` | 把 bug 一起接受成新基线 | `cargo insta review` 逐张人工确认 |
+| 先 `cargo check` 再跑同一 target 的测试 | 重复编译，反馈变慢 | 直接跑最窄测试命令，把 test compilation 作为编译验证 |
 
 ## 红旗——停下重来
 
@@ -114,4 +123,6 @@ fn round_trips() -> color_eyre::Result<()> {
 - 单值等价判断用快照
 - 认为 nextest 会运行 doctest
 - 为了让 CI 通过而直接接受快照
-- 先写实现再补测试
+- 为制造 RED 而运行引用不存在 API 的测试
+- compiler 已覆盖的性质又写一层无行为价值的测试
+- 局部改动无依据地跑全 workspace，或机械串行运行 `check`、`build`、`clippy`、test
