@@ -20,6 +20,66 @@ local filter_dotfiles = function(fs_entry)
   return show_dotfiles or not vim.startswith(fs_entry.name, ".")
 end
 
+--- 按文件名中的连续数字段比较 natural order，不把数字转成 Lua number。
+--- 数值相同时，位数更少的数字段优先，例如 `2` 排在 `02` 前面。
+---@param a string
+---@param b string
+---@return boolean is_less `a` 是否应排在 `b` 前面
+local natural_name_less = function(a, b)
+  local a_lower, b_lower = a:lower(), b:lower()
+  local a_index, b_index = 1, 1
+
+  while a_index <= #a_lower and b_index <= #b_lower do
+    local a_char, b_char = a_lower:sub(a_index, a_index), b_lower:sub(b_index, b_index)
+    local a_is_digit, b_is_digit = a_char:match("%d") ~= nil, b_char:match("%d") ~= nil
+
+    if a_is_digit and b_is_digit then
+      local a_digits, b_digits = a_lower:match("%d+", a_index), b_lower:match("%d+", b_index)
+      local a_value, b_value = a_digits:match("^0*(%d+)$"), b_digits:match("^0*(%d+)$")
+
+      if #a_value ~= #b_value then
+        return #a_value < #b_value
+      end
+      if a_value ~= b_value then
+        return a_value < b_value
+      end
+      if #a_digits ~= #b_digits then
+        return #a_digits < #b_digits
+      end
+
+      a_index, b_index = a_index + #a_digits, b_index + #b_digits
+    else
+      if a_char ~= b_char then
+        return a_char < b_char
+      end
+
+      a_index, b_index = a_index + 1, b_index + 1
+    end
+  end
+
+  if #a_lower ~= #b_lower then
+    return #a_lower < #b_lower
+  end
+
+  return a < b
+end
+
+--- 保持目录优先，并在目录组和文件组内按文件名的 natural order 排序。
+---@param fs_entries { fs_type: string, name: string, path: string }[]
+---@return { fs_type: string, name: string, path: string }[] fs_entries 排序后的原数组
+local sort_naturally = function(fs_entries)
+  table.sort(fs_entries, function(a, b)
+    local a_is_dir, b_is_dir = a.fs_type == "directory", b.fs_type == "directory"
+    if a_is_dir ~= b_is_dir then
+      return a_is_dir
+    end
+
+    return natural_name_less(a.name, b.name)
+  end)
+
+  return fs_entries
+end
+
 local root_augroup = vim.api.nvim_create_augroup("MiniFilesTabRoot", { clear = false })
 local transient_mini_files_tabs = {}
 
@@ -219,6 +279,7 @@ return {
     content = {
       filter = filter_dotfiles,
       prefix = prefix_with_symlink_icon,
+      sort = sort_naturally,
     },
     mappings = {
       trim_left = "H",
