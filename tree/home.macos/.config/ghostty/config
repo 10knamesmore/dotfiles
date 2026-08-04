@@ -6,36 +6,56 @@
 #
 # 需要 ghostty >= 1.2.0（cursor shader uniforms 在 1.2.0 才有）。
 # 校验：ghostty +validate-config --config-file=$HOME/.config/ghostty/config
+# Ghostty 不支持行尾注释；# 注释必须独占一行，否则会成为配置值的一部分。
 
 # ── 主题 / 配色（与 kitty 的 Catppuccin Mocha 同源）──
-theme = catppuccin-mocha
+theme = Catppuccin Mocha
 # 若提示无此主题：ghostty +list-themes | grep -i mocha 查准确名字
 
-# ── 字体（ghostty 自动选 italic/bold 变体，无需像 kitty 那样点名）──
+# ── 字体（与 kitty 的 victor_font_macos.conf 对齐：ExtraLight 常规 + Medium 粗斜体）──
+# 重复 font-family 构成 fallback 链：Victor Mono 缺的 CJK 落到行楷。
+# bold/italic/bold-italic 未显式设 font-family，自动克隆上面的链（Config.zig 的
+# "font-family 设了就继承到其余 style" 行为），所以中文粗斜体仍回退到行楷。
 font-family = Victor Mono
+font-family = Xingkai SC
+# named style：按字体自报的 style 字符串匹配（见 ghostty +list-fonts）。
+font-style = ExtraLight
+font-style-bold = Medium Oblique
+font-style-italic = ExtraLight Italic
+font-style-bold-italic = Medium Italic
 font-size = 14
 
 # ── 窗口 ──
 background-opacity = 0.85
-background-blur = 20                      # kitty 用 30；ghostty 标度不同（true=20），过高会有渲染/性能问题，想更浓再往上调
+# kitty 用 30；ghostty 标度不同（true=20），过高会有渲染/性能问题，想更浓再往上调。
+background-blur = 20
 window-padding-x = 4
 window-padding-y = 4
-macos-titlebar-style = hidden             # ≈ kitty hide_window_decorations titlebar-only
-confirm-close-surface = false             # ≈ kitty confirm_os_window_close 0
-window-inherit-working-directory = true   # 新 tab/split 继承 cwd（≈ kitty 的 *_with_cwd）
+# ≈ kitty hide_window_decorations titlebar-only
+# macos-titlebar-style = hidden
+# ≈ kitty confirm_os_window_close 0
+confirm-close-surface = false
+# 新 tab/split 继承 cwd（≈ kitty 的 *_with_cwd）
+window-inherit-working-directory = true
 
 # ── 光标 ──
-cursor-style = block                      # cursor shader 仅对 block 光标生效，别改
+# cursor shader 仅对 block 光标生效，别改。
+# cursor-color = cell-foreground
+cursor-style = block
 cursor-style-blink = false
 # 拖尾由下方 custom-shader 实现（≈ kitty cursor_trail）
 
 # ── 滚动 ──
-scrollback-limit = 10000000               # 单位是字节（非行）；这是 ghostty 默认值，≈ kitty scrollback_lines 10000 的量级
+# 单位是字节（非行）；这是 ghostty 默认值，≈ kitty scrollback_lines 10000 的量级。
+scrollback-limit = 10000000
 
 # ── split（注意：ghostty 没有 kitty 的自动平铺 Tall/Grid，只有手动 split）──
-split-divider-color = #FF8700             # ≈ kitty active_border_color
-unfocused-split-opacity = 0.9             # ≈ kitty inactive_text_alpha
-unfocused-split-fill = #1E1E2E            # 钉死成主题背景，规避 split-divider-color 渗色 bug
+# ≈ kitty active_border_color
+split-divider-color = #FF8700
+# ≈ kitty inactive_text_alpha
+unfocused-split-opacity = 0.9
+# 钉死成主题背景，规避 split-divider-color 渗色 bug。
+unfocused-split-fill = #1E1E2E
 
 # ── shell 集成（OSC 7 cwd 继承 / OSC 133 命令标记）──
 shell-integration = zsh
@@ -45,14 +65,19 @@ clipboard-read = allow
 clipboard-write = allow
 
 # ── macOS ──
-macos-option-as-alt = true                # ≈ macos_option_as_alt
-quit-after-last-window-closed = true      # ≈ macos_quit_when_last_window_closed
+# ≈ macos_option_as_alt
+macos-option-as-alt = true
+# ≈ macos_quit_when_last_window_closed
+quit-after-last-window-closed = true
 
 # ── 键位（沿用 kitty 的 ctrl+shift 肌肉记忆）──
-keybind = ctrl+shift+enter=new_split:auto # kitty 的 new_window ≈ ghostty 的 split
+# kitty 的 new_window ≈ ghostty 的 split
+keybind = ctrl+shift+enter=new_split:auto
 keybind = ctrl+shift+t=new_tab
-keybind = ctrl+shift+n=new_window         # kitty 的 os_window ≈ ghostty 的 window
-keybind = alt+backspace=text:\x1b[3~      # 模拟 Delete（≈ kitty send_text \x1b[3~）
+# kitty 的 os_window ≈ ghostty 的 window
+keybind = ctrl+shift+n=new_window
+# 模拟 Delete（≈ kitty send_text \x1b[3~）
+keybind = alt+backspace=text:\x1b[3~
 
 # scrollback → 外部编辑器：ghostty 没有 kitty 的 @screen_scrollback 管道。
 # write_screen_file:open 把当前屏幕(含scrollback)写临时文件，用系统默认程序打开。
@@ -68,6 +93,9 @@ keybind = ctrl+shift+h=write_screen_file:open
 # 顺序 = 应用顺序：先画光标拖尾，再对整画面做辉光（拖尾也会跟着发光）。
 # 性能：一旦启用 custom-shader，ghostty 每帧重绘(vsync)，笔记本更耗电。
 # 路径相对本配置文件目录解析（整个 ~/.config/ghostty 由 dots 整目录软链，相对路径安全）。
-custom-shader = shaders/cursor_smear.glsl  # 光标拖尾（≈ cursor_trail）
-custom-shader = shaders/bloom.glsl         # 辉光：亮像素向外晕染，调强弱见该文件顶部注释
-custom-shader-animation = true             # 仅 active 窗口跑动画；要所有窗口都动画改 always（更耗电）
+# 光标拖尾（≈ cursor_trail）
+custom-shader = shaders/cursor_smear.glsl
+# 辉光：亮像素向外晕染，调强弱见该文件顶部注释。
+# custom-shader = shaders/bloom.glsl
+# 仅 active 窗口跑动画；要所有窗口都动画改 always（更耗电）。
+custom-shader-animation = true
