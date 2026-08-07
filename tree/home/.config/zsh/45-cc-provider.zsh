@@ -49,6 +49,18 @@ _anthropic_normalize_provider() {
     esac
 }
 
+# 上下文窗口按 provider 设置；apply 层切换前统一 unset 清掉残留
+_set_ctx_window_256k() {
+    export CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144
+    export CLAUDE_CODE_MAX_CONTEXT_TOKENS=262144
+}
+
+# deepseek/opencode/ftai：1M 上下文 / 600k 压缩阈值
+_set_ctx_window_1m() {
+    export CLAUDE_CODE_AUTO_COMPACT_WINDOW=614400
+    export CLAUDE_CODE_MAX_CONTEXT_TOKENS=1048576
+}
+
 _anthropic_use_opencode() {
     export ANTHROPIC_PROVIDER="opencode"
 
@@ -63,6 +75,7 @@ _anthropic_use_opencode() {
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
 
     export CLAUDE_CODE_SUBAGENT_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
+    _set_ctx_window_1m
 }
 
 _anthropic_use_kimi() {
@@ -79,6 +92,7 @@ _anthropic_use_kimi() {
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="$KIMI_K2_7_HIGHSPEED_MODEL"
 
     export CLAUDE_CODE_SUBAGENT_MODEL="$KIMI_K3_256K_MODEL"
+    _set_ctx_window_256k
 }
 
 _anthropic_use_deepseek() {
@@ -95,6 +109,7 @@ _anthropic_use_deepseek() {
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
 
     export CLAUDE_CODE_SUBAGENT_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
+    _set_ctx_window_1m
 }
 
 _anthropic_use_ftai() {
@@ -111,6 +126,7 @@ _anthropic_use_ftai() {
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="${FTAI_GLM_MODEL}[1m]"
 
     export CLAUDE_CODE_SUBAGENT_MODEL="${FTAI_GLM_MODEL}[1m]"
+    _set_ctx_window_1m
 }
 
 _anthropic_apply_provider() {
@@ -119,6 +135,9 @@ _anthropic_apply_provider() {
         echo "未知 provider：$1" >&2
         return 1
     }
+
+    # 上下文窗口是 provider 级配置：切换前统一清掉上一 provider 残留，再由各 provider 设置
+    unset CLAUDE_CODE_AUTO_COMPACT_WINDOW CLAUDE_CODE_MAX_CONTEXT_TOKENS
 
     case "$provider" in
     kimi) _anthropic_use_kimi ;;
