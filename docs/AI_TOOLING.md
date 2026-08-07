@@ -64,7 +64,7 @@ Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实�
 wayfinder                         Spec 生命周期唯一入口：从模糊目标创建 / 固化当前对话 / 沿 frontier 推进
 grill-with-docs                   逐问解决 decision Subspec，并同步 domain docs
 implement                         一次实现并验证一个 implementation Subspec
-handoff                           当前 Agent 基于 live state 生成可执行、用后即删的一次性交接文档
+handoff                           A 将 Spec 任务编译为 B 可独立执行并回传 review 的一次性文档
 domain-modeling                   维护 CONTEXT.md glossary 与 docs/adr/
 ```
 
@@ -77,9 +77,11 @@ Subspec frontmatter 的 `depends_on`。`blocked` 是 dependency 推导状态，�
 这些 skills 不依赖 issue tracker，也不创建 label、assignee 或 resolution comment。用户明确
 要求同步 tracker 时，tracker 只能作为 mirror，repo 内 Spec 与 Subspec 仍是 canonical artifact。
 
-`handoff` 由当前 Agent 亲自采集 Spec、源码、git 与验证 evidence 后编写，不能把生成交接文档
-再次委托出去。handoff 只是一次性 transport：接手 Agent 完整读取并把工作写入自己的 plan 后
-立即删除；它不得成为 Spec、源码或长期项目文档之外的第二份 authority。
+`handoff` 是 A 侧的文档生成 Skill。A 在 task transport 中放入 Parent Spec、目标 Subspec 与直接
+dependencies 的精确指针，并内联 claim、实现、验证和 review 回传协议；B 只需读取生成的 handoff，
+不需要 `handoff` Skill。B 一般可使用 `wayfinder` / `implement`，没有时按 handoff 内的显式 fallback
+执行。B 完成后删除 inbound task transport 并写 review transport 交回 A；Spec、Subspec、源码与
+Evidence 始终是 canonical authority。
 
 ## settings.json 要点
 

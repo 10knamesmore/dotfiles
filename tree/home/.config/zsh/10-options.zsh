@@ -33,7 +33,11 @@ setopt numeric_glob_sort    # glob 结果数字按数值排序（1 2 10 而非 1
 # --- 补全：compinit + 匹配规则 + 菜单高亮（须在 uv 等工具注册补全之前跑）---
 autoload -Uz compinit
 mkdir -p "$HOME/.cache/zsh"
-compinit -d "$HOME/.cache/zsh/zcompdump" # 初始化补全系统，dump 缓存挪出 $HOME 根目录
+compinit -C -d "$HOME/.cache/zsh/zcompdump" # 初始化补全系统，-C 跳过安全审计；dump 缓存挪出 $HOME 根目录
+# dump 变更后重编译 .zwc（zsh 加载时自动优先用编译版，纯文本解析只在首次发生）
+if [[ -f "$HOME/.cache/zsh/zcompdump" && ( ! -f "$HOME/.cache/zsh/zcompdump.zwc" || "$HOME/.cache/zsh/zcompdump" -nt "$HOME/.cache/zsh/zcompdump.zwc" ) ]]; then
+    zcompile "$HOME/.cache/zsh/zcompdump"
+fi
 zmodload zsh/complist                    # 菜单选择（menuselect keymap）所需模块
 # matcher-list 多档递进：前一档无匹配才落到下一档（档内规则空格分隔、同时生效）
 #   m:{a-zA-Z}={A-Za-z}  大小写不敏感（双向）

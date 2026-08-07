@@ -70,7 +70,6 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
     "figma@claude-plugins-official": true
   },
   "language": "中文",

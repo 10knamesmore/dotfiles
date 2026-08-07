@@ -21,6 +21,7 @@ source "$HOME/.config/zsh/20-functions.zsh"
 source "$HOME/.config/zsh/25-fzf-tab.zsh"
 source "$HOME/.config/zsh/30-autosuggestions.zsh"
 source "$HOME/.config/zsh/40-aliases.zsh"
+source "$HOME/.config/zsh/45-cc-provider.zsh"
 
 # 平台差异
 if [[ -f "$HOME/.zshrc_linux" ]]; then
@@ -30,7 +31,12 @@ elif [[ -f "$HOME/.zshrc_macos" ]]; then
 fi
 
 # 工具初始化（均加 command -v 守卫，缺失不报错——便于换机）
-command -v uv >/dev/null && eval "$(uv generate-shell-completion zsh)"
+# uv 补全：生成一次落盘缓存，避免每次启动 fork uv 进程（~80ms）
+command -v uv >/dev/null && {
+    local _uvcomp="$HOME/.cache/zsh/uv-completion.zsh"
+    [[ -s "$_uvcomp" ]] || uv generate-shell-completion zsh > "$_uvcomp" 2>/dev/null
+    [[ -s "$_uvcomp" ]] && source "$_uvcomp"
+}
 proxy
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 替代旧 OMZ z 插件
 # 补全覆盖：`z 词<Tab>` 直接进 fzf（默认要「空格+Tab」才进，词贴着光标时只补本地子目录）。

@@ -20,7 +20,7 @@ name     = "rm-recursive"
 cmd      = "rm"
 all      = [["-r", "-R", "--recursive"]]
 path_outside = ["/tmp"]
-decision = "deny"
+decision = "ask"
 reason   = "守卫拦截：rm 递归删除（-r/-R/--recursive），仅 /tmp 下放行。删 /tmp 请写绝对路径（相对路径按当前目录判），或让用户手动执行。"
 
 [[bash]]
