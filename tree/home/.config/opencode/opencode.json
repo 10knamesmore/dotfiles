@@ -1,7 +1,7 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
-    "edit": "ask",
+    "edit": "allow",
     "bash": "ask",
     "webfetch": "allow",
     "websearch": "allow",
@@ -10,24 +10,5 @@
     "list": "allow",
     "lsp": "allow",
     "skill": "allow"
-  },
-  "model": "ftai/gpt-5.6-sol",
-  "provider": {
-    "ftai": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "FTAI Proxy",
-      "options": {
-        "apiKey": "{env:FTAI_API_KEY}",
-        "baseURL": "https://llm-proxy.ftai.chat/v1"
-      },
-      "models": {
-        "gpt-5.6-sol": { "name": "GPT-5.6-sol" },
-        "gpt-5.6-terra": { "name": "GPT-5.6-terra" },
-        "deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
-        "deepseek-v4-flash": { "name": "DeepSeek V4 Flash" },
-        "kimi-k2.7-code": { "name": "Kimi K2.7 Code" },
-        "glm-5.2-auto": { "name": "GLM-5.2 (auto)" }
-      }
-    }
   }
 }
