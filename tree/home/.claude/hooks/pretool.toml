@@ -5,6 +5,8 @@
 #   [[bash]] —— Bash 命令的 argv 引擎：条件 AND；any/all 内层 OR；
 #               词形 `-x`（单杠单字母）= 短旗标，可命中合写簇（-rf 含 r、f）。
 #               切段引号感知（引号内 ; | & 不切）；heredoc 正文与 `--` 后的操作数不参与匹配。
+#               path_outside = ["/tmp"]：位置参数存在不落在任何白名单路径（绝对路径前缀）下
+#               的才命中——白名单豁免守卫（展开 ~/$HOME，相对路径按 hook 进程 cwd 判）。
 #   [[tool]] —— 任意工具：tool 精确匹配 tool_name，where 各字段匹配器 AND。
 #               匹配器词汇：equals/contains/prefix/suffix/glob/domain/re（数组内 OR）；
 #               not = { … } 反向（内层命中则整体不中，如 glob 命中但排除 .example）。
@@ -14,11 +16,12 @@
 # ════ 高危命令 ════
 
 [[bash]]
-name     = "rm-recursive-force"
+name     = "rm-recursive"
 cmd      = "rm"
-all      = [["-r", "--recursive"], ["-f", "--force"]]
+all      = [["-r", "-R", "--recursive"]]
+path_outside = ["/tmp"]
 decision = "deny"
-reason   = "守卫拦截：rm 递归+强制。改用更窄的具体路径并去掉 -f，或说明理由让用户手动执行。"
+reason   = "守卫拦截：rm 递归删除（-r/-R/--recursive），仅 /tmp 下放行。删 /tmp 请写绝对路径（相对路径按当前目录判），或让用户手动执行。"
 
 [[bash]]
 name     = "git-push"
@@ -140,23 +143,23 @@ reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户
 
 # ════ ~/.zshrc 不受 dotfiles 接管，且可能含 API key ════
 
-[[tool]]
-name     = "no-zshrc-read"
-tool     = "Read"
-where    = { file_path = { glob = ["**/.zshrc"] } }
-decision = "deny"
-reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接读。需要 shell 配置内容时读 ~/dotfiles/tree/home/.zshrc_dotfiles（受管源）。"
-
-[[tool]]
-name     = "no-zshrc-edit"
-tool     = "Edit"
-where    = { file_path = { glob = ["**/.zshrc"] } }
-decision = "deny"
-reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
-
-[[tool]]
-name     = "no-zshrc-write"
-tool     = "Write"
-where    = { file_path = { glob = ["**/.zshrc"] } }
-decision = "deny"
-reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
+# [[tool]]
+# name     = "no-zshrc-read"
+# tool     = "Read"
+# where    = { file_path = { glob = ["**/.zshrc"] } }
+# decision = "deny"
+# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接读。需要 shell 配置内容时读 ~/dotfiles/tree/home/.zshrc_dotfiles（受管源）。"
+#
+# [[tool]]
+# name     = "no-zshrc-edit"
+# tool     = "Edit"
+# where    = { file_path = { glob = ["**/.zshrc"] } }
+# decision = "deny"
+# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
+#
+# [[tool]]
+# name     = "no-zshrc-write"
+# tool     = "Write"
+# where    = { file_path = { glob = ["**/.zshrc"] } }
+# decision = "deny"
+# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"

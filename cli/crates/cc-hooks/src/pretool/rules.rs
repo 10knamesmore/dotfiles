@@ -54,6 +54,10 @@ pub struct BashRule {
     /// 位置参数正则（作用于 cmd/subcmd 之后的 argv）：任一命中即满足
     #[serde(default)]
     pub args_re: Vec<String>,
+    /// 位置参数中存在一个不落在任何白名单路径（绝对路径前缀，任一前缀内算「在内」）
+    /// 之下的路径即满足——白名单豁免守卫（如 `rm -rf` 仅 `/tmp` 下放行，其余全拦）。
+    #[serde(default)]
+    pub path_outside: Vec<String>,
     /// 命中后的决策
     pub decision: Decision,
     /// 喂回模型/展示给用户的理由
@@ -159,11 +163,11 @@ mod tests {
 
     const FIXTURE: &str = r#"
 [[bash]]
-name     = "rm-recursive-force"
+name     = "rm-recursive"
 cmd      = "rm"
-all      = [["-r", "--recursive"], ["-f", "--force"]]
+all      = [["-r", "-R", "--recursive"]]
 decision = "deny"
-reason   = "rm 递归+强制"
+reason   = "rm 递归删除"
 
 [[tool]]
 name     = "gh-not-webfetch-github"

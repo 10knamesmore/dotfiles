@@ -15,11 +15,12 @@ use tempfile::NamedTempFile;
 /// 生产规则正确性见 e2e_production_rules.rs（include_str! 读真 pretool.toml）。
 const RULES: &str = r#"
 [[bash]]
-name     = "rm-recursive-force"
+name     = "rm-recursive"
 cmd      = "rm"
-all      = [["-r", "--recursive"], ["-f", "--force"]]
+all      = [["-r", "-R", "--recursive"]]
+path_outside = ["/tmp"]
 decision = "deny"
-reason   = "rm 递归+强制"
+reason   = "rm 递归删除，仅 /tmp 下放行"
 
 [[bash]]
 name     = "git-push"
@@ -112,9 +113,12 @@ fn assert_verdict(rules: &NamedTempFile, stdin_json: &str, expected: Option<&str
 #[test]
 fn bash_verdict_table_end_to_end() {
     let cases: &[(&str, Option<&str>)] = &[
-        ("rm -rf /tmp/foo", Some("deny")),
-        ("cd /tmp && rm -fr build", Some("deny")),
-        ("command rm -rf x", Some("deny")),
+        ("rm -rf ~/foo", Some("deny")),
+        ("rm -rf /usr", Some("deny")),
+        ("cd /tmp && rm -fr ~/build", Some("deny")),
+        ("command rm -rf ~/x", Some("deny")),
+        ("rm -rf /", Some("deny")),
+        ("rm -rf /tmp/foo", None), // 白名单 /tmp 内放行
         ("git push origin dev", Some("ask")),
         ("git reset --hard HEAD~1", Some("ask")),
         ("git add -A", None),
@@ -264,10 +268,10 @@ fn audit_log_records_decisions_only() {
     };
 
     // deny 命中 → 审计记一行（决策 + 规则名 + 命令摘要）
-    run_with_audit(&bash_envelope("rm -rf /tmp/x"));
+    run_with_audit(&bash_envelope("rm -rf ~/x"));
     let after_deny = std::fs::read_to_string(log.path()).unwrap();
     assert!(
-        after_deny.contains("decision=deny") && after_deny.contains("rule=rm-recursive-force"),
+        after_deny.contains("decision=deny") && after_deny.contains("rule=rm-recursive"),
         "审计应记录 deny 决策与规则名: {after_deny}"
     );
     assert!(

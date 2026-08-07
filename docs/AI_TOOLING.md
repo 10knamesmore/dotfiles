@@ -64,6 +64,7 @@ Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实�
 wayfinder                         Spec 生命周期唯一入口：从模糊目标创建 / 固化当前对话 / 沿 frontier 推进
 grill-with-docs                   逐问解决 decision Subspec，并同步 domain docs
 implement                         一次实现并验证一个 implementation Subspec
+handoff                           当前 Agent 基于 live state 生成可执行、用后即删的一次性交接文档
 domain-modeling                   维护 CONTEXT.md glossary 与 docs/adr/
 ```
 
@@ -75,6 +76,10 @@ Subspec frontmatter 的 `depends_on`。`blocked` 是 dependency 推导状态，�
 
 这些 skills 不依赖 issue tracker，也不创建 label、assignee 或 resolution comment。用户明确
 要求同步 tracker 时，tracker 只能作为 mirror，repo 内 Spec 与 Subspec 仍是 canonical artifact。
+
+`handoff` 由当前 Agent 亲自采集 Spec、源码、git 与验证 evidence 后编写，不能把生成交接文档
+再次委托出去。handoff 只是一次性 transport：接手 Agent 完整读取并把工作写入自己的 plan 后
+立即删除；它不得成为 Spec、源码或长期项目文档之外的第二份 authority。
 
 ## settings.json 要点
 
@@ -180,13 +185,14 @@ Codex 全局 hook 源是 `tree/home/.agents/codex/hooks.json`，只匹配 `^Bash
 
 **`[[bash]]`** —— 作用于 `tool_input.command` 的 argv 分词结果，条件 AND：
 
-| 字段      | 语义                                                         |
-| --------- | ------------------------------------------------------------ |
-| `cmd`     | argv[0] 全等（`command` 前缀自动剥除）                        |
-| `subcmd`  | argv[1] 全等（如 git 子命令）                                 |
-| `any`     | 词形列表，任一命中                                            |
-| `all`     | AND-of-OR 词组：每组至少命中一个词形                          |
-| `args_re` | 位置参数正则（cmd/subcmd 之后），任一命中                     |
+| 字段            | 语义                                                         |
+| --------------- | ------------------------------------------------------------ |
+| `cmd`           | argv[0] 全等（`command` 前缀自动剥除）                        |
+| `subcmd`        | argv[1] 全等（如 git 子命令）                                 |
+| `any`           | 词形列表，任一命中                                            |
+| `all`           | AND-of-OR 词组：每组至少命中一个词形                          |
+| `args_re`       | 位置参数正则（cmd/subcmd 之后），任一命中                     |
+| `path_outside`  | 位置参数存在不落在任何白名单路径（绝对路径前缀）下的才命中——白名单豁免守卫（仅 `/tmp` 下放行，其余全拦） |
 
 词形约定：`-x`（单杠单字母）查短旗标簇（`-rf` 含 `r`、`f`）；其余按字面词查 argv。
 
@@ -236,7 +242,13 @@ false negative（漏拦）代价高，因为还有 permissions 和人工确认�
 误伤面大，故不拦）。这些边界由 `cc-hook-test` 的「已知绕过」分区固化，哪天行为变了测试会报。
 
 链式命令**会**拦：`a && b && git push` 按 `&& || ; | &` 与换行切段，每段独立过规则，
-`git push` 那段照样命中（`cd /tmp && rm -fr build` → deny 即此机制，测试已固化）。
+`git push` 那段照样命中（测试已固化）。
+
+rm 守卫是白名单豁免：`path_outside = ["/tmp"]` 只放行落在 `/tmp` 下的 `rm` **递归删除**
+（`-r`/`-R`/`--recursive`，不要求 `-f`——非交互 shell 递归删本就不需要它），其余（`$HOME`、
+`/usr`、`/` 等）全拦。`cd` 不跨段跟踪，相对路径按 hook 进程 cwd 判（不在白名单就拦）——删
+`/tmp` 下相对路径请写绝对路径。路径先做词法规范化（剥 `.`、回退 `..`），`/tmp/../etc` 不会
+被词法前缀误放行。
 
 ## cc-usage 用量统计
 

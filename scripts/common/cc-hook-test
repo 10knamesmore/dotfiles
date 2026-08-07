@@ -46,10 +46,15 @@ toolc() {
 }
 
 echo "═══ A. 规则表预期行为 ═══"
-bashc "rm -rf"                       deny   'rm -rf /tmp/foo'
-bashc "rm 长旗标"                    deny   'rm --recursive --force x'
-bashc "链式 rm -fr"                  deny   'cd /tmp && rm -fr build'
-bashc "rm -r 无 -f"                  silent 'rm -r /tmp/foo'
+bashc "rm -rf ~ 下"                  deny   'rm -rf ~/foo'
+bashc "rm 长旗标"                    deny   'rm --recursive --force ~/foo'
+bashc "链式 rm -fr"                  deny   'cd /tmp && rm -fr ~/build'
+bashc "rm -rf /tmp 放行"             silent 'rm -rf /tmp/foo'
+bashc "rm -r /tmp 放行"              silent 'rm -r /tmp/foo'
+bashc "rm -r /var/tmp 拦"            deny   'rm -r /var/tmp/x'
+bashc "rm -Rf /var/tmp 拦"           deny   'rm -Rf /var/tmp/x'
+bashc "rm -rf /usr 拦"               deny   'rm -rf /usr'
+bashc "rm -rf / 保底"                deny   'rm -rf /'
 bashc "rm 单文件"                    silent 'rm foo.txt'
 bashc "git push"                     ask    'git push origin main'
 bashc "git reset --hard"             ask    'git reset --hard HEAD~1'
@@ -97,7 +102,7 @@ EOF'
 bashc "heredoc后真命令仍拦"          deny   'cat <<EOF
 text
 EOF
-rm -rf /tmp/x'
+rm -rf ~/x'
 bashc "herestring 不误伤"            silent 'cat <<< "rm -rf x"'
 bashc "rm -- -rf 不误伤"             silent 'rm -- -rf'
 toolc "Read .env.example 放行"       silent Read '{"file_path":"/home/u/proj/.env.example"}'
@@ -110,7 +115,7 @@ echo "═══ C. 已知绕过（守卫定位=引导模型，不拦蓄意）═
 bashc "绝对路径 /bin/rm"             silent '/bin/rm -rf /tmp/x'
 bashc "env 前缀"                     silent 'env rm -rf /tmp/x'
 bashc "exec 前缀"                    silent 'exec rm -rf /tmp/x'
-bashc "command 前缀(已剥)"           deny   'command rm -rf x'
+bashc "command 前缀(已剥)"           deny   'command rm -rf ~/x'
 bashc "xargs rm"                     silent 'echo /tmp/x | xargs rm -rf'
 bashc "命令替换内 grep"              silent 'echo $(grep foo bar)'
 

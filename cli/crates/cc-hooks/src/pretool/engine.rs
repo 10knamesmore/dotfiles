@@ -4,6 +4,7 @@
 //! - [`check_tool`]：`tool_name` + `tool_input` 字段过 `[[tool]]` 规则
 
 use std::collections::BTreeSet;
+use std::path::{Component, Path, PathBuf};
 
 use regex_lite::Regex;
 
@@ -135,7 +136,71 @@ fn bash_hit(rule: &BashRule, segment: &[String]) -> bool {
             Regex::new(pattern).is_ok_and(|matcher| tail.iter().any(|arg| matcher.is_match(arg)))
         })
     };
-    any_ok && all_ok && args_re_ok
+    // 白名单豁免：位置参数存在不落在任何白名单路径下的 → 命中。
+    // HOME 缺失无法展开 `~`/`$HOME` → 条件不中（fail-open 朝放行倾斜）
+    let outside_ok = rule.path_outside.is_empty() || {
+        let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+            return false;
+        };
+        // cwd 不可得时退回 home 作基准（相对路径保守判在 home 下）
+        let cwd = std::env::current_dir().unwrap_or_else(|_| home.clone());
+        let tail = words.get(positional_start..).unwrap_or(&[]);
+        // 只判操作数：`--` 前以 `-` 开头的词是旗标（-rf/--force），当相对路径会误判；
+        // 字面 `--` 之后一律是操作数（POSIX 约定，同 argv::short_flags）。
+        let mut operands = false;
+        tail.iter().any(|arg| {
+            if arg == "--" {
+                operands = true;
+                false
+            } else if !operands && arg.starts_with('-') {
+                false
+            } else {
+                // 白名单前缀写绝对路径（不做 `~` 展开）；前缀匹配失败视为「在外」
+                rule.path_outside
+                    .iter()
+                    .all(|prefix| !under_path(arg, Path::new(prefix), &home, &cwd))
+            }
+        })
+    };
+    any_ok && all_ok && args_re_ok && outside_ok
+}
+
+/// 位置参数展开并规范化后是否落在 `prefix` 下（rm 守卫白名单）。
+///
+/// 展开字面 `~` / `$HOME`（经 home）；相对路径按 hook 进程 cwd 解析（`cd` 不跨段
+/// 跟踪，故 `cd /tmp && rm -rf build` 里的 `build` 仍按当前 cwd 判，不在白名单就拦）。
+/// 必须做词法规范化（剥 `.`、回退 `..`）：白名单是放行方向，`/tmp/../etc` 不
+/// normalize 会被词法前缀误判「在 /tmp 内」而放跑。`~user` 不解析成别的用户 home，
+/// 落相对路径分支。误拦比漏删安全：拿不准就拦。
+fn under_path(arg: &str, prefix: &Path, home: &Path, cwd: &Path) -> bool {
+    let raw = if arg == "~" || arg == "$HOME" {
+        home.to_path_buf()
+    } else if let Some(rest) = arg
+        .strip_prefix("~/")
+        .or_else(|| arg.strip_prefix("$HOME/"))
+    {
+        home.join(rest)
+    } else if arg.starts_with('/') {
+        PathBuf::from(arg)
+    } else {
+        cwd.join(arg)
+    };
+    normalize(&raw).starts_with(prefix)
+}
+
+/// 词法规范化：剥 `.`，`..` 回退父级（越界超出根时忽略）。
+fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 /// 词形命中：`-x`（单杠+单字母）查短旗标簇，其余按字面词查 argv。
@@ -167,11 +232,12 @@ mod tests {
     /// 生产规则的正确性由 tests/e2e_production_rules.rs 读真 pretool.toml 覆盖。
     const RULES: &str = r#"
 [[bash]]
-name     = "rm-recursive-force"
+name     = "rm-recursive"
 cmd      = "rm"
-all      = [["-r", "--recursive"], ["-f", "--force"]]
+all      = [["-r", "-R", "--recursive"]]
+path_outside = ["/tmp"]
 decision = "deny"
-reason   = "rm 递归+强制"
+reason   = "rm 递归删除，仅 /tmp 下放行"
 
 [[bash]]
 name     = "git-push"
@@ -206,30 +272,31 @@ reason   = "GitHub 一律 gh"
 
     /// (输入命令, 期望命中：None=静默放行)
     const BASH_CASES: &[(&str, Option<(&str, Decision)>)] = &[
-        // ── deny ──
+        // ── deny（rm 递归删除且位置参数不落在白名单 /tmp 下）──
+        ("rm -rf ~/.cache", Some(("rm-recursive", Decision::Deny))),
+        ("rm -rf $HOME/foo", Some(("rm-recursive", Decision::Deny))),
+        ("rm -rf ~", Some(("rm-recursive", Decision::Deny))),
+        ("rm -rf /usr", Some(("rm-recursive", Decision::Deny))),
+        ("rm -rf /", Some(("rm-recursive", Decision::Deny))),
+        ("rm -rf /*", Some(("rm-recursive", Decision::Deny))),
+        ("rm -r /var/tmp/x", Some(("rm-recursive", Decision::Deny))),
+        ("rm -Rf /var/tmp/x", Some(("rm-recursive", Decision::Deny))),
         (
-            "rm -rf /tmp/foo",
-            Some(("rm-recursive-force", Decision::Deny)),
+            "cd /tmp && rm -fr ~/build",
+            Some(("rm-recursive", Decision::Deny)),
         ),
         (
-            "cd /tmp && rm -fr build",
-            Some(("rm-recursive-force", Decision::Deny)),
+            "cd /tmp\nrm -rf ~/build",
+            Some(("rm-recursive", Decision::Deny)),
         ),
         (
-            "cd /tmp\nrm -rf build",
-            Some(("rm-recursive-force", Decision::Deny)),
+            "cat list | rm -rf ~/x",
+            Some(("rm-recursive", Decision::Deny)),
         ),
+        ("command rm -rf ~/x", Some(("rm-recursive", Decision::Deny))),
         (
-            "cat list | rm -rf x",
-            Some(("rm-recursive-force", Decision::Deny)),
-        ),
-        (
-            "command rm -rf x",
-            Some(("rm-recursive-force", Decision::Deny)),
-        ),
-        (
-            "rm --recursive --force x",
-            Some(("rm-recursive-force", Decision::Deny)),
+            "rm --recursive --force ~/x",
+            Some(("rm-recursive", Decision::Deny)),
         ),
         // ── ask ──
         ("git push origin dev", Some(("git-push", Decision::Ask))),
@@ -242,7 +309,9 @@ reason   = "GitHub 一律 gh"
         // ── 静默放行 ──
         ("git add -A", None),
         ("ls -la && cargo build", None),
-        ("rm -r /tmp/foo", None),
+        ("rm -rf /tmp/foo", None),
+        ("rm -rf /tmp", None),
+        ("rm -r /tmp/foo", None), // /tmp 内递归也放行
         ("rm my-perf-report.txt", None),
         (r#"echo "rm -rf /""#, None),
         ("rm -1 weird", None),
@@ -261,6 +330,27 @@ reason   = "GitHub 一律 gh"
             assert_eq!(verdict, *expected, "command: {command}");
         }
         Ok(())
+    }
+
+    #[test]
+    fn under_path_pins_path_shapes() {
+        let home = Path::new("/home/w");
+        let cwd = Path::new("/home/w/proj");
+        let tmp = Path::new("/tmp");
+        // 白名单内（含边界本身）
+        assert!(under_path("/tmp", tmp, home, cwd));
+        assert!(under_path("/tmp/x", tmp, home, cwd));
+        assert!(under_path("/tmp/../tmp/x", tmp, home, cwd)); // normalize 后仍在 /tmp 内
+        // 白名单外
+        assert!(!under_path("/tmpabc/x", tmp, home, cwd)); // 兄弟前缀
+        assert!(!under_path("/usr", tmp, home, cwd));
+        assert!(!under_path("/", tmp, home, cwd));
+        assert!(!under_path("/tmp/../etc", tmp, home, cwd)); // normalize 跳出白名单 → 拦
+        assert!(!under_path("~/x", tmp, home, cwd)); // ~ 展开到 home，不在 /tmp
+        assert!(!under_path("x", tmp, home, cwd)); // 相对 → cwd，不在 /tmp
+        assert!(!under_path(".", tmp, home, cwd));
+        // `~user` 不解析别的用户 home：落相对路径分支（保守拦）
+        assert!(!under_path("~root/x", tmp, home, cwd));
     }
 
     #[test]

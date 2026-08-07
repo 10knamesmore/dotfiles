@@ -9,11 +9,11 @@ use tempfile::NamedTempFile;
 /// 覆盖 Codex 可直接表达的 deny、无法表达的 ask，以及静默放行。
 const RULES: &str = r#"
 [[bash]]
-name     = "rm-recursive-force"
+name     = "rm-recursive"
 cmd      = "rm"
-all      = [["-r", "--recursive"], ["-f", "--force"]]
+all      = [["-r", "-R", "--recursive"]]
 decision = "deny"
-reason   = "rm 递归+强制"
+reason   = "rm 递归删除"
 
 [[bash]]
 name     = "git-push"
@@ -81,10 +81,10 @@ fn decision(stdout: &str) -> Result<Option<(String, String)>, serde_json::Error>
 #[test]
 fn deny_keeps_codex_supported_shape() -> Result<(), Box<dyn std::error::Error>> {
     let rules = rules_file(RULES)?;
-    let stdout = run(rules.path(), &bash_envelope("rm -rf /tmp/build"))?;
+    let stdout = run(rules.path(), &bash_envelope("rm -rf ~/build"))?;
     assert_eq!(
         decision(&stdout)?,
-        Some(("deny".to_owned(), "rm 递归+强制".to_owned())),
+        Some(("deny".to_owned(), "rm 递归删除".to_owned())),
         "Codex 支持的 deny 应保持原规则理由"
     );
     Ok(())

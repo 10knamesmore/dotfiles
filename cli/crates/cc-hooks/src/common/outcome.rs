@@ -80,10 +80,10 @@ mod tests {
     #[test]
     fn with_audit_attaches_semantic_line() {
         let run = HookRun::decision(serde_json::json!({"k": "v"}))
-            .with_audit("decision=deny rule=rm-recursive-force".into());
+            .with_audit("decision=deny rule=rm-recursive".into());
         assert_eq!(
             run.audit.as_deref(),
-            Some("decision=deny rule=rm-recursive-force")
+            Some("decision=deny rule=rm-recursive")
         );
         assert_eq!(run.code, 0, "审计落盘不改 fail-open 退出码");
     }
