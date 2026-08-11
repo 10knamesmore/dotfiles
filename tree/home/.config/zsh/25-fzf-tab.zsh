@@ -75,6 +75,41 @@ zstyle ':fzf-tab:*' prefix ''                      # 去掉候选左侧的 · �
 zstyle ':fzf-tab:*' fzf-pad 6
 zstyle ':fzf-tab:*' fzf-min-height 15   # 高度下限：首次钉死也至少 15 行，不会被小菜单拖矮
 
+# 覆盖 zsh 补全系统的 _path_commands：外部命令候选的描述列注入 which 路径——
+# fzf-tab 候选行显示的就是描述列（无描述才显示命令名），inline 在此注入。
+# $commands 是 zsh 内置的 name→path 哈希（即 which 的外部分支），零 stat。
+# builtin/alias/function 不走这里（_command_names 直接 compadd），靠组标题分辨。
+# 覆盖了原版的 whatis extra-verbose 分支（本就没启用），path_dirs 分支保留。
+_path_commands() {
+    local ret=1 name p
+    local -a expl names ps descs path_dirs
+    local -i axis=0 pad i
+    # 路径右端对齐，轴 = 最长「名字+路径」+2 间隙。不贴 fzf 窗口右缘：补全在 fzf
+    # 启动前完成，窗口宽度（--popup/边框/滚动条）无法可靠预知，按窗口算一旦偏窄，
+    # 路径整列被 fzf 截尾成 ..
+    for name in ${(k)commands}; do
+        p=${(D)commands[$name]}
+        names+=$name; ps+=$p
+        (( ${#name} + ${#p} > axis )) && axis=$(( ${#name} + ${#p} ))
+    done
+    for i in {1..$#names}; do
+        pad=$(( axis - ${#names[i]} + 2 ))
+        descs+="${names[i]}${(l:$pad:)ps[i]}"
+    done
+    _wanted commands expl 'external command' compadd "$@" -ld descs -a names && ret=0
+    if [[ -o path_dirs ]]; then
+        if [[ $PREFIX$SUFFIX = */* ]]; then
+            path_dirs=( ${path:#.} )
+            _wanted commands expl 'external command' _path_files -W path_dirs -g '*(-*)' && ret=0
+        else
+            path_dirs=( ${^path}/*(/N:t) )
+            (( ${#path_dirs} )) &&
+                _wanted path-dirs expl 'directory in path' compadd "$@" -S / -a path_dirs && ret=0
+        fi
+    fi
+    return ret
+}
+
 # --- 自写 widget：Ctrl-F 找文件 / Ctrl-S live-grep，选中直接进 nvim ---
 # 把 nvim 里的 <space><space> / <space>/ 搬到提示符下；选中后回填 `nvim +行 文件`
 # 再 accept-line——顺带进 shell 历史，Ctrl-R 能翻到「上次打开的文件」。

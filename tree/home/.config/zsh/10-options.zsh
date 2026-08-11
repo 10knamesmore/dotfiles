@@ -60,6 +60,10 @@ LISTMAX=1000            # 候选超过此数才问「是否显示全部」；默
 # --- 键绑定 ---
 # 显式 emacs 模式：zsh 见 $EDITOR 含 "vi"（nvim）会自动切 viins，曾导致 Ctrl-A/E 等全部失效
 bindkey -e
+# Ctrl-G 用 $EDITOR 编辑当前 buffer；Esc Ctrl-G 保留默认 send-break 作为取消键
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^G' edit-command-line
 # 释放 tty 流控遗产：默认 Ctrl-S 冻结终端输出（误按假死元凶）、Ctrl-Q 解冻；关掉后按键到达 zle
 setopt no_flow_control
 # 释放四键（原流控 S/Q、删词 W、删整行 U）：S 在 25-fzf-tab 启用为 live-grep、

@@ -20,6 +20,9 @@ tree/home/.claude/                          →  ~/.claude/
 ~/.codex/pretool.toml                          ← Claude pretool.toml 的受管链接（共享规则）
 ~/.kimi-code/pretool.toml                      ← 同上，agent-hook kimi-pretool 的缺省规则路径
 
+tree/home/.config/cc-switch/registry.json   →  ~/.config/cc-switch/（provider/model 注册表，
+│                                            详见「provider 切换」节）
+
 tree/home/.kimi-code/                       →  ~/.kimi-code/（逐文件链；sessions/oauth/credentials
 ├── config.toml                              主配置：permission 硬禁区 / hooks 注册（kimi-pretool）
 │                                            / providers/models——/login 会原地回写 oauth 节
@@ -96,6 +99,31 @@ Evidence 始终是 canonical authority。
 permissions 与 cc-hook 的分工：permissions 是 Claude Code 内建的粗粒度白/黑名单；
 cc-hook 负责需要**词法理解**的判定（旗标簇、链式命令、字段匹配）和**软引导**
 （deny 的 reason 喂回模型让它自己改方案）。
+
+## provider 切换（cc-switch）
+
+provider/model 全部是数据，不再往 shell 环境 export：
+
+```text
+tree/home/.config/cc-switch/registry.json  →  ~/.config/cc-switch/registry.json
+                                             注册表（无 secret，${VAR} 引用 key）
+~/.local/state/cc-switch/local.json          machine-local overlay（同 schema 深合并，
+                                             local 优先；可 inline 明文 key，不入库）
+~/.local/state/cc-switch/active.json         渲染产物（含展开的 key，chmod 600）
+~/.local/state/cc-switch/profile             当前 profile 名
+```
+
+`cc_switch`（无参走 fzf，唯一参数是 `status`）由 `tree/home/.config/zsh/45-cc-provider.zsh`
+渲染 active.json；`claude`/`cc` 被同名 function 包住，注入 `--settings active.json`
+（优先级高于 user settings，settings 的 `env` 又覆盖 shell export——shell 里残留的
+`ANTHROPIC_*` 不影响 CC 进程）。渲染时对「注册表全集 − 当前 profile」的变量补 `""`
+（CC 视 `""` 为 unset），`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_API_KEY` 交叉残留由此根除。
+
+- **加 provider/model** = registry.json 加一个块（`models` 节可选，做 env 增量覆盖）；本机私有 provider
+  写 local.json，结构与合并规则同上。key 一律由 ~/.zshrc export，registry 只写 `${VAR}`。
+- **切换**只重写 active.json（先写临时文件再 mv），已运行的 claude 会话重启生效。
+- key 轮换后重跑一次 `cc_switch` 选当前 profile 即可重渲染（active.json 内联了展开值）。
+- statusline 全部读 stdin JSON，不依赖 shell 环境变量，不受此机制影响。
 
 ## Kimi config.toml 要点
 

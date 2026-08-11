@@ -45,30 +45,23 @@
 - `# Examples` 中使用 ` ```rust ` 代码块，示例需与真实签名、类型名和调用方式一致。
 - `# Notes` 用于补充约束、性能特征、副作用、调用时机等非主体信息；无额外信息时可省略。
 
-## 类型注释结构
+### 无参数函数示例
 
-- 结构体、trait、枚举或其他类型的第一行先写摘要。
-- 当类型存在需要解释的字段或关联数据时，使用 `# Fields` 段。
-- `# Fields` 下的条目使用 ``- `field_name`: 描述`` 形式，描述字段职责、单位、约束或含义。
-- 类型级文档可追加 `# Examples`，展示典型构造或使用方式。
-- 没有值得说明的字段时，不强行生成 `# Fields`，保留摘要与必要示例即可。
+````rust
+/// 返回当前构建目标使用的默认 API 地址。
+///
+/// # Return:
+///   客户端在未配置覆盖值时使用的接口地址。
+///
+/// # Examples:
+/// ```rust
+/// assert!(default_endpoint().starts_with("https://"));
+/// ```
+pub fn default_endpoint() -> &'static str {
+    "https://api.example.com"
+}
 
-## 文件与模块级注释
-
-- 文件顶部的模块说明使用 `//!`。
-- 文件级注释至少包含一行摘要；当模块职责不明显时，可追加 `# 模块说明` 段解释用途、边界与主要内容。
-- 文件级注释应概括该模块提供的能力，而不是重复列出内部每个私有实现细节。
-
-## 风格与边界
-
-- 避免仅复述函数名或类型名。
-- 公共 API 必须有文档注释；私有项按需要补充。
-- 若 workspace lint 开启 `missing_docs` / `clippy::missing_docs_in_private_items`（deny），则**所有**项（含私有）都必须有文档注释，不再按需省略。
-- 示例应与实际签名一致，避免过度复杂。
-- 在同一仓库内统一使用同一组标题命名，不混用 `# Arguments`/`# Params`、`# Errors`/`# Error`。
-- 当项目模板要求固定段落顺序时，补全文档时保持该顺序，不随意重排。
-
-## Rust 代码块示例
+````
 
 ### 函数注释示例
 
@@ -98,31 +91,16 @@ pub fn parse_user_id(raw: &str) -> Result<u64, ParseUserIdError> {
 }
 ````
 
-### 无参数函数示例
+## 类型注释结构
 
-````rust
-/// 返回当前构建目标使用的默认 API 地址。
-///
-/// # Return:
-///   客户端在未配置覆盖值时使用的接口地址。
-///
-/// # Examples:
-/// ```rust
-/// assert!(default_endpoint().starts_with("https://"));
-/// ```
-pub fn default_endpoint() -> &'static str {
-    "https://api.example.com"
-}
-````
+- 结构体、trait、枚举或其他类型的第一行先写摘要。
+- 类型级文档可追加 `# Examples`，展示典型构造或使用方式。
+- 每个字段都要添加文档注释， 并且每个字段之间要空一行
 
 ### 类型注释示例
 
 ````rust
 /// 保存工作进程运行时所需的配置。
-///
-/// # Fields:
-///   - `name`: 用于日志和指标上报的工作进程名称。
-///   - `retry_limit`: 任务失败后的最大重试次数。
 ///
 /// # Examples:
 /// ```rust
@@ -133,10 +111,19 @@ pub fn default_endpoint() -> &'static str {
 /// assert_eq!(config.retry_limit, 3);
 /// ```
 pub struct WorkerConfig {
+    /// 用于日志和指标上报的工作进程名称
     pub name: String,
+
+    /// 任务失败后的最大重试次数
     pub retry_limit: u8,
 }
 ````
+
+## 文件与模块级注释
+
+- 文件顶部的模块说明使用 `//!`。
+- 文件级注释至少包含一行摘要；当模块职责不明显时，可追加 `# 模块说明` 段解释用途、边界与主要内容。
+- 文件级注释应概括该模块提供的能力，而不是重复列出内部每个私有实现细节。
 
 ### 文件级注释示例
 
@@ -147,3 +134,12 @@ pub struct WorkerConfig {
 //!   该模块集中处理配置解析、环境变量覆盖，以及启动流程中使用的
 //!   配置校验逻辑。
 ```
+
+## 风格与边界
+
+- 禁止仅复述函数名或类型名。
+- 公共 API 必须有文档注释；私有项按需要补充。
+- 若 workspace lint 开启 `missing_docs` / `clippy::missing_docs_in_private_items`（deny），则**所有**项（含私有）都必须有文档注释，不再按需省略。
+- 示例应与实际签名一致，避免过度复杂。
+- 在同一仓库内统一使用同一组标题命名，不混用 `# Arguments`/`# Params`、`# Errors`/`# Error`。
+- 当项目模板要求固定段落顺序时，补全文档时保持该顺序，不随意重排。

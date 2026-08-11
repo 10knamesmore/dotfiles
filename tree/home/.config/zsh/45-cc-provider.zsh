@@ -1,245 +1,174 @@
 # ============================================================
 # Claude Code provider 切换
-# API key 一律由 ~/.zshrc export（本仓库不含任何 secret）；
-# 这里只放 URL/模型名配置 + 切换/恢复逻辑。
-# 用法：cc_switch [kimi|ds|ftai|opencode|status]，无参走 fzf 选择
+#
+# provider/model 全部是数据：registry.json（仓库，无 secret）
+# + local.json（machine-local overlay，jq 深合并，local 优先）。
+# 切换 = 渲染 active.json（${VAR} 在此展开，key 由 ~/.zshrc export），
+# claude/cc 经 --settings 注入；环境变量只活在 CC 进程内，shell 零污染。
+#
+# 渲染时对「注册表全集 − 当前 profile」的变量补 ""（CC 视 "" 为 unset），
+# 上一 provider 独有的变量（如 AUTH_TOKEN/API_KEY 交叉）不会残留。
+#
+# 用法：cc_switch [status]，无参走 fzf 选择
 # ============================================================
 
-# ---- provider 非 secret 配置（key 由 ~/.zshrc 提供）----
-export OPENCODE_BASE_URL=https://opencode.ai/zen/go
-export KIMI_ANTHROPIC_URL=https://api.kimi.com/coding/
-export DEEPSEEK_ANTHROPIC_URL=https://api.deepseek.com/anthropic
-export FTAI_ANTHROPIC_URL=https://llm-proxy.ftai.chat
+_ccs_registry="$HOME/.config/cc-switch/registry.json"
+_ccs_dir="${XDG_STATE_HOME:-$HOME/.local/state}/cc-switch"
+_ccs_local="$_ccs_dir/local.json"
+_ccs_active="$_ccs_dir/active.json"
+_ccs_profile="$_ccs_dir/profile"
 
-export DEEPSEEK_V4_FLASH_MODEL="deepseek-v4-flash"
-export KIMI_K3_1M_MODEL="k3"
-export KIMI_K3_256K_MODEL="k3-256k"
-export KIMI_K2_7_HIGHSPEED_MODEL="kimi-for-coding-highspeed"
-export FTAI_GLM_MODEL="glm-5.2-auto"
-
-# 保存上次选择的 provider
-export ANTHROPIC_PROVIDER_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/anthropic/provider"
-
-_anthropic_init_state_file() {
-    local state_dir
-
-    state_dir="$(dirname -- "$ANTHROPIC_PROVIDER_FILE")" || return 1
-
-    command mkdir -p -- "$state_dir" || {
-        echo "无法创建状态目录：$state_dir" >&2
-        return 1
-    }
-
-    if [[ ! -e "$ANTHROPIC_PROVIDER_FILE" ]]; then
-        : >|"$ANTHROPIC_PROVIDER_FILE" || {
-            echo "无法创建状态文件：$ANTHROPIC_PROVIDER_FILE" >&2
-            return 1
-        }
+# 合并后的注册表（registry + local overlay，深合并）
+_ccs_merged() {
+    if [[ -f "$_ccs_local" ]]; then
+        jq -s '.[0] * .[1]' "$_ccs_registry" "$_ccs_local"
+    else
+        jq '.' "$_ccs_registry"
     fi
 }
 
-# alias → canonical（kimi/ds/ftai），未知返回 1
-_anthropic_normalize_provider() {
-    case "$1" in
-    kimi | k) echo kimi ;;
-    ds | deepseek | d) echo ds ;;
-    ftai | proxy | f) echo ftai ;;
-    opencode | oc) echo opencode ;;
-    *) return 1 ;;
-    esac
+# 全部可选 combo：provider 一行，provider/model 各一行
+_ccs_combos() {
+    _ccs_merged | jq -r '
+        .providers | to_entries[] | .key as $n
+        | $n, ($n + "/" + ((.value.models // {}) | to_entries[] | .key))
+    '
 }
 
-# 上下文窗口按 provider 设置；apply 层切换前统一 unset 清掉残留
-_set_ctx_window_256k() {
-    export CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144
-    export CLAUDE_CODE_MAX_CONTEXT_TOKENS=262144
+# combo 引用的 key 变量里为空的列表（${VAR} 展开后为空即缺 key）
+_ccs_missing_keys() {
+    local combo="$1" provider model env_tsv line k v
+    provider="${combo%%/*}"
+    [[ "$combo" == */* ]] && model="${combo#*/}" || model=""
+    env_tsv="$(_ccs_merged | jq -r --arg p "$provider" --arg m "$model" '
+        .providers[$p] as $p
+        | (($p.env // {}) * (($p.models // {})[$m].env // {}))
+        | to_entries[] | .key + "\t" + .value')" || return 1
+    while IFS=$'\t' read -r k v; do
+        [[ "$v" == *'${'* ]] || continue
+        v="${(e)v}"
+        [[ -z "$v" ]] && echo "$k"
+    done <<<"$env_tsv"
 }
 
-# deepseek/opencode/ftai：1M 上下文 / 600k 压缩阈值
-_set_ctx_window_1m() {
-    export CLAUDE_CODE_AUTO_COMPACT_WINDOW=614400
-    export CLAUDE_CODE_MAX_CONTEXT_TOKENS=1048576
-}
+# 渲染 active.json：<combo-id>；成功返回 0
+_ccs_render() {
+    local combo="$1" provider model
+    provider="${combo%%/*}"
+    [[ "$combo" == */* ]] && model="${combo#*/}" || model=""
 
-_anthropic_use_opencode() {
-    export ANTHROPIC_PROVIDER="opencode"
+    local merged
+    merged="$(_ccs_merged)" || return 1
 
-    export ANTHROPIC_BASE_URL="$OPENCODE_BASE_URL"
-    export ANTHROPIC_API_KEY="$OPENCODE_API_KEY"
-
-    export ANTHROPIC_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-
-    export ANTHROPIC_DEFAULT_FABLE_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-
-    export CLAUDE_CODE_SUBAGENT_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    _set_ctx_window_1m
-}
-
-_anthropic_use_kimi() {
-    export ANTHROPIC_PROVIDER="kimi"
-
-    export ANTHROPIC_BASE_URL="$KIMI_ANTHROPIC_URL"
-    export ANTHROPIC_AUTH_TOKEN="$KIMI_CODE_API_KEY"
-
-    export ANTHROPIC_MODEL="$KIMI_K3_256K_MODEL"
-
-    export ANTHROPIC_DEFAULT_FABLE_MODEL="${KIMI_K3_1M_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="$KIMI_K3_256K_MODEL"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="$KIMI_K3_256K_MODEL"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="$KIMI_K2_7_HIGHSPEED_MODEL"
-
-    export CLAUDE_CODE_SUBAGENT_MODEL="$KIMI_K3_256K_MODEL"
-    _set_ctx_window_256k
-}
-
-_anthropic_use_deepseek() {
-    export ANTHROPIC_PROVIDER="ds"
-
-    export ANTHROPIC_BASE_URL="$DEEPSEEK_ANTHROPIC_URL"
-    export ANTHROPIC_AUTH_TOKEN="$DEEPSEEK_API_KEY"
-
-    export ANTHROPIC_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-
-    export ANTHROPIC_DEFAULT_FABLE_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-
-    export CLAUDE_CODE_SUBAGENT_MODEL="${DEEPSEEK_V4_FLASH_MODEL}[1m]"
-    _set_ctx_window_1m
-}
-
-_anthropic_use_ftai() {
-    export ANTHROPIC_PROVIDER="ftai"
-
-    export ANTHROPIC_BASE_URL="$FTAI_ANTHROPIC_URL"
-    export ANTHROPIC_AUTH_TOKEN="$FTAI_API_KEY"
-
-    export ANTHROPIC_MODEL="${FTAI_GLM_MODEL}[1m]"
-
-    export ANTHROPIC_DEFAULT_FABLE_MODEL="${FTAI_GLM_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="${FTAI_GLM_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="${FTAI_GLM_MODEL}[1m]"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="${FTAI_GLM_MODEL}[1m]"
-
-    export CLAUDE_CODE_SUBAGENT_MODEL="${FTAI_GLM_MODEL}[1m]"
-    _set_ctx_window_1m
-}
-
-_anthropic_apply_provider() {
-    local provider
-    provider="$(_anthropic_normalize_provider "$1")" || {
-        echo "未知 provider：$1" >&2
+    jq -e --arg p "$provider" --arg m "$model" '
+        .providers[$p] as $p
+        | $p and (if $m == "" then true else $p.models[$m] end)' \
+        <<<"$merged" >/dev/null || {
+        echo "未知 provider/model：$combo" >&2
         return 1
     }
 
-    # 上下文窗口是 provider 级配置：切换前统一清掉上一 provider 残留，再由各 provider 设置
-    unset CLAUDE_CODE_AUTO_COMPACT_WINDOW CLAUDE_CODE_MAX_CONTEXT_TOKENS
+    local missing
+    missing="$(_ccs_missing_keys "$provider${model:+/$model}")"
+    if [[ -n "$missing" ]]; then
+        echo "缺少 API key（在 ~/.zshrc export 对应变量）：" >&2
+        echo "$missing" | sed 's/^/  /' >&2
+        return 1
+    fi
 
-    case "$provider" in
-    kimi) _anthropic_use_kimi ;;
-    ds) _anthropic_use_deepseek ;;
-    ftai) _anthropic_use_ftai ;;
-    opencode) _anthropic_use_opencode ;;
-    esac
+    # 当前 profile 的 env（展开 ${VAR}）
+    local -A wanted
+    local k v
+    while IFS=$'\t' read -r k v; do
+        wanted[$k]="${(e)v}"
+    done < <(jq -r --arg p "$provider" --arg m "$model" '
+        .providers[$p] as $p
+        | (($p.env // {}) * (($p.models // {})[$m].env // {}))
+        | to_entries[] | .key + "\t" + .value' <<<"$merged")
+
+    # 注册表全集中、当前 profile 没有的变量补 ""，清掉上一 provider 残留
+    local union_key
+    while read -r union_key; do
+        [[ -n "${wanted[$union_key]+x}" ]] || wanted[$union_key]=""
+    done < <(jq -r '
+        [ .providers[] as $p
+          | (($p.env // {}), (($p.models // {}) | to_entries[] | .value.env // {}))
+          | keys[] ] | unique[]' <<<"$merged")
+
+    # 展开完毕的 model 同时写顶层 model 键，压住 user settings 的 model（--settings 优先级更高）
+    local -a jqargs
+    for k v in "${(@kv)wanted}"; do
+        jqargs+=(--arg "$k" "$v")
+    done
+
+    command mkdir -p -- "$_ccs_dir" || return 1
+    local tmp="$_ccs_active.tmp.$$"
+    jq -n "${jqargs[@]}" --arg model "${wanted[ANTHROPIC_MODEL]:-}" \
+        '{env: $ARGS.named} + (if $model == "" then {} else {model: $model} end)' \
+        >|"$tmp" || {
+        rm -f -- "$tmp"
+        return 1
+    }
+    chmod 600 "$tmp"
+    command mv -f -- "$tmp" "$_ccs_active" || return 1
+
+    printf '%s\n' "$provider${model:+/$model}" >|"$_ccs_profile" || return 1
 }
 
-# cc_switch          使用 fzf 选择
 cc_switch() {
-    local provider="${1:-}"
-
-    if [[ "$provider" == "status" ]]; then
-        echo "provider : ${ANTHROPIC_PROVIDER:-unknown}"
-        echo "base_url : ${ANTHROPIC_BASE_URL:-unset}"
-        echo "model    : ${ANTHROPIC_MODEL:-unset}"
-        echo "fable    : ${ANTHROPIC_DEFAULT_FABLE_MODEL:-unset}"
-        echo "opus     : ${ANTHROPIC_DEFAULT_OPUS_MODEL:-unset}"
-        echo "sonnet   : ${ANTHROPIC_DEFAULT_SONNET_MODEL:-unset}"
-        echo "haiku    : ${ANTHROPIC_DEFAULT_HAIKU_MODEL:-unset}"
-        echo "subagent : ${CLAUDE_CODE_SUBAGENT_MODEL:-unset}"
-        echo "state    : ${ANTHROPIC_PROVIDER_FILE:-unset}"
+    if [[ "${1:-}" == "status" ]]; then
+        echo "profile  : $(<"$_ccs_profile" 2>/dev/null || echo none)"
+        echo "active   : $_ccs_active"
+        echo "overlay  : $([[ -f "$_ccs_local" ]] && echo "$_ccs_local" || echo none)"
+        if [[ -f "$_ccs_active" ]]; then
+            jq -r '.model as $m | "model    : \($m // "unset")",
+                   (.env | to_entries[] | "\(.key) = \(.value)")' "$_ccs_active"
+        else
+            echo "（尚未渲染，任意 cc_switch 选择后生成）"
+        fi
         return 0
     fi
 
-    if [[ -z "$provider" ]]; then
-        if ! command -v fzf >/dev/null 2>&1; then
-            echo "未找到 fzf，请先安装：brew install fzf" >&2
-            return 1
-        fi
-
-        # 只列出已配置 API key 的 provider（key 由 ~/.zshrc 提供）
-        local providers=()
-        [[ -n "$KIMI_CODE_API_KEY" ]] && providers+=("kimi")
-        [[ -n "$DEEPSEEK_API_KEY" ]] && providers+=("ds")
-        [[ -n "$FTAI_API_KEY" ]] && providers+=("ftai")
-        [[ -n "$OPENCODE_API_KEY" ]] && providers+=("opencode")
-
-        if (( ${#providers[@]} == 0 )); then
-            echo "未配置任何 provider 的 API key（请在 ~/.zshrc 中 export 对应 key）" >&2
-            return 1
-        fi
-
-        provider="$(
-            printf '%s\n' "${providers[@]}" |
-                fzf \
-                    --prompt="Claude Code provider > " \
-                    --height="40%" \
-                    --layout="reverse" \
-                    --border
-        )" || return 1
-
-        [[ -n "$provider" ]] || return 1
-    fi
-
-    provider="$(_anthropic_normalize_provider "$provider")" || {
-        echo "用法：cc_switch [kimi|ds|ftai|opencode|status]" >&2
-        return 1
-    }
-
-    case "$provider" in
-    kimi) _provider_key="${KIMI_CODE_API_KEY:-}" ;;
-    ds) _provider_key="${DEEPSEEK_API_KEY:-}" ;;
-    ftai) _provider_key="${FTAI_API_KEY:-}" ;;
-    opencode) _provider_key="${OPENCODE_API_KEY:-}" ;;
-    esac
-    if [[ -z "$_provider_key" ]]; then
-        echo "未配置 $provider 的 API key（请在 ~/.zshrc 中 export 对应 key）" >&2
+    if [[ $# -gt 0 ]]; then
+        echo "用法：cc_switch [status]（切换走无参 fzf）" >&2
         return 1
     fi
-    unset _provider_key
 
-    _anthropic_apply_provider "$provider" || return 1
-    _anthropic_init_state_file || return 1
-
-    printf '%s\n' "$provider" >|"$ANTHROPIC_PROVIDER_FILE" || {
-        echo "无法写入状态文件：$ANTHROPIC_PROVIDER_FILE" >&2
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "未找到 fzf" >&2
         return 1
-    }
+    fi
+    # 只列出 key 齐全的 combo
+    local -a combos
+    local c
+    while read -r c; do
+        [[ -z "$(_ccs_missing_keys "$c")" ]] && combos+=("$c")
+    done < <(_ccs_combos)
+    if (( ${#combos[@]} == 0 )); then
+        echo "没有任何 key 齐全的 provider（key 在 ~/.zshrc export）" >&2
+        return 1
+    fi
+    local target
+    target="$(
+        printf '%s\n' "${combos[@]}" |
+            fzf --prompt="Claude Code provider > " --height="40%" --layout="reverse" --border
+    )" || return 1
+    [[ -n "$target" ]] || return 1
 
-    echo "已切换到：$ANTHROPIC_PROVIDER"
-    echo "Base URL：$ANTHROPIC_BASE_URL"
-    echo "Model：$ANTHROPIC_MODEL"
+    _ccs_render "$target" || return 1
+    echo "已切换到：$(<"$_ccs_profile")（重启 claude 生效）"
 }
 
-# Shell 启动：恢复上次 provider
-if _anthropic_init_state_file; then
-    if [[ -s "$ANTHROPIC_PROVIDER_FILE" ]]; then
-        _saved_anthropic_provider="$(<"$ANTHROPIC_PROVIDER_FILE")"
-
-        if ! _anthropic_apply_provider "$_saved_anthropic_provider" 2>/dev/null; then
-            _anthropic_use_kimi
-            printf '%s\n' "kimi" >|"$ANTHROPIC_PROVIDER_FILE"
-        fi
-
-        unset _saved_anthropic_provider
+# 强制走 active profile；--settings 优先级高于 user settings
+claude() {
+    if [[ -f "$_ccs_active" ]]; then
+        command claude --settings "$_ccs_active" "$@"
     else
-        _anthropic_use_kimi
-        printf '%s\n' "kimi" >|"$ANTHROPIC_PROVIDER_FILE"
+        command claude "$@"
     fi
-else
-    # 状态文件初始化失败时，至少保证当前终端可用
-    _anthropic_use_kimi
+}
+
+# 首次使用（active.json 不存在）时按默认 provider 渲染一次
+if [[ ! -f "$_ccs_active" && -f "$_ccs_registry" && -n "$KIMI_CODE_API_KEY" ]]; then
+    _ccs_render kimi >/dev/null 2>&1
 fi
