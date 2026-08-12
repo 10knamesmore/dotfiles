@@ -20,7 +20,7 @@
 - transport 不记录累计历史。长期 contract、status、Resolution 和 Evidence 必须写入 Spec/Subspec 或源码。
 - task transport 必须指向 Parent Spec、目标 Subspec 与直接 dependencies；不复制 Spec，也不把查找 canonical contract 留给 B 猜。
 - B 不依赖 `handoff` Skill。可用时由 B 使用 `wayfinder` / `implement`，不可用时执行 task transport 内联的等价步骤。
-- 默认把 transport 放在活动 Spec 的 artifact 目录，文件名遵循 repo 约定；同一路径只能在上一份 transport 删除后复用。
+- 默认把 transport 放在活动 Spec 的 artifact 目录，文件名为 `HANDOFF-$(date +%m-%d_%H-%M).md`；同一路径只能在上一份 transport 删除后复用。
 - 不把 transport 加入 staging、commit、issue tracker 或长期文档索引。
 
 ## 公共文件头

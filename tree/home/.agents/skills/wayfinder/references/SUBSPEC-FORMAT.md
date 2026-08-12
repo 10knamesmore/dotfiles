@@ -21,7 +21,7 @@ depends_on: []
 - `kind`：`decision`、`research`、`prototype`、`task` 或 `implementation`。
 - `status`：`draft`、`ready`、`in-progress`、`resolved` 或 `cancelled`。
 - `depends_on`：同一 Spec 下的 Subspec `id` 列表。空列表表示没有 dependency。
-- `owner`：只在 claim 后添加，用可辨认的 human 或 agent session label 表示当前负责人。
+- `owner`：只在 claim 后添加，用可辨认的 human 或 agent session label 表示当前负责人。 比如`claude code xxx`/`kimi xxx`
 
 `blocked` 不属于 status。只要任一 `depends_on` 尚未 `resolved`，该 Subspec 就是 derived blocked。
 
