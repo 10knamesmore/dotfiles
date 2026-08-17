@@ -519,7 +519,7 @@ cargo-nextest / prek / …   │           end,
 [ai]                       ├─ 跳过    }
 claude                     │
 [js]                       │
-pnpm / nvm!              ──┘
+node / pnpm            ──┘
 ```
 
 执行时序：bootstrap 在装工具链**之前**单独 eval dots.lua 并以 dry-run 激活当前 host 块（只收集声明、不落盘副作用），读到 filter 后过滤清单；收尾的 sync 会再次正常激活 host 块——`vars`/`link` 等真正的副作用属于 sync 阶段。

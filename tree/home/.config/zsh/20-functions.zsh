@@ -40,7 +40,7 @@ proxy() {
         on)
             export http_proxy="$url" https_proxy="$url" all_proxy="$url"
             export HTTP_PROXY="$url" HTTPS_PROXY="$url" ALL_PROXY="$url"
-            export no_proxy="127.0.0.1,localhost,::1,xz07" NO_PROXY="127.0.0.1,localhost,::1,xz07"
+            export no_proxy="127.0.0.1,localhost,::1,xz07,non-convex.tech,.non-convex.tech" NO_PROXY="127.0.0.1,localhost,::1,xz07,non-convex.tech,.non-convex.tech"
             ;;
         off)
             unset http_proxy https_proxy all_proxy ftp_proxy

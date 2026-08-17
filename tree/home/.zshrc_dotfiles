@@ -13,6 +13,8 @@ alias skill="cd $DOTFILES_DIR/tree/home/.agents/skills"
 
 # PATH
 [[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
+# Node 官方 tarball 落点（由 packages/toolchains.toml [js] 组安装，免版本管理器）
+[[ -d "$HOME/.local/share/node/bin" ]] && export PATH="$HOME/.local/share/node/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
 # zsh 模块（历史/目录/补全/键绑定 + 内联函数 + 历史建议）。compinit 在 10-options 跑，须在 uv 补全前。

@@ -52,6 +52,9 @@ cargo-cache          = "cargo install --locked cargo-cache"
 claude               = "curl -fsSL https://claude.ai/install.sh | bash"
 
 [js]
-pnpm                 = "curl -fsSL https://get.pnpm.io/install.sh | sh -"
-# nvm 是 shell 函数，command -v 探测不到 → 总是执行 + 命令内自带存在性守卫
-"nvm!"               = "[ -s ~/.nvm/nvm.sh ] || curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash"
+# Node 走官方 tarball（nodejs.org/dist），固定版本求可复现，升级 = 改版本号。
+# 落点 ~/.local/share/node（用户自有、免 sudo），PATH 由 .zshrc_dotfiles 注入；
+# uname 映射：Darwin/Linux→darwin/linux，aarch64→arm64，x86_64→x64
+node                 = "mkdir -p ~/.local/share/node && curl -fsSL https://nodejs.org/dist/v24.19.0/node-v24.19.0-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x64/').tar.gz | tar -xz --strip-components=1 -C ~/.local/share/node"
+# pnpm 由 Node 自带的 corepack 激活（Node 24 仍捆绑 corepack，25 起官方移除，升级大版本时需换渠道）
+pnpm                 = "~/.local/share/node/bin/corepack enable --install-directory ~/.local/share/node/bin && ~/.local/share/node/bin/corepack prepare pnpm@10 --activate"
