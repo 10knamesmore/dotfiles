@@ -1,6 +1,15 @@
+#!/bin/sh
+# 配置 macOS SketchyBar 的布局、配色、状态 item 及 hover popup。
+# Usage: sketchybar --reload
+# 依赖：sketchybar、yabai，以及 plugins/ 中各 item 声明的命令
+# 读取环境变量：CONFIG_DIR（SketchyBar 注入，指向当前配置目录）
+# 写入环境变量：无
+
+# ── 基础路径与配色 ───────────────────────────────────────────────────────
+
 PLUGIN_DIR="$CONFIG_DIR/plugins"
 
-# Catppuccin Mocha — 与 kitty/bat/fzf 及 Linux quickshell 同色板
+# Catppuccin Mocha，与 kitty、bat、fzf 及 Linux QuickShell 共用同一配色语义。
 BASE=0xff1e1e2e
 MANTLE=0xff181825
 SURFACE0=0xff313244
@@ -17,6 +26,8 @@ YELLOW=0xfff9e2af
 PEACH=0xfffab387
 RED=0xfff38ba8
 TEAL=0xff94e2d5
+
+# ── Bar 外观与 item 默认值 ───────────────────────────────────────────────
 
 sketchybar --bar \
   position=top \
@@ -51,6 +62,8 @@ default=(
 )
 sketchybar --default "${default[@]}"
 
+# ── 左侧：工作区与当前窗口 ───────────────────────────────────────────────
+
 space_common=(
   icon.highlight=off
   label.drawing=off
@@ -75,18 +88,6 @@ do
                                 click_script="yabai -m space --focus $sid"
 done
 
-# layout=(
-#   icon=󰙀
-#   icon.color="$YELLOW"
-#   label.color="$YELLOW"
-#   background.color="$SURFACE0"
-#   update_freq=2
-#   script="$PLUGIN_DIR/layout.sh"
-#   click_script="yabai -m window --toggle split"
-# )
-# sketchybar --add item layout left \
-#            --set layout "${layout[@]}"
-
 window_title=(
   icon=󰘔
   icon.color="$MAUVE"
@@ -100,6 +101,8 @@ window_title=(
 sketchybar --add item window_title left \
            --set window_title "${window_title[@]}" \
            --subscribe window_title front_app_switched window_focus space_change
+
+# ── 中间：实时网速与时钟 ─────────────────────────────────────────────────
 
 net_up=(
   icon=󰕒
@@ -155,6 +158,10 @@ net_down=(
 sketchybar --add item net_down center \
            --set net_down "${net_down[@]}"
 
+# ── 右侧：系统状态、AI 额度与电池（从左到右） ───────────────────────────
+
+# CPU
+
 cpu=(
   icon=
   icon.color="$BLUE"
@@ -164,6 +171,8 @@ cpu=(
 )
 sketchybar --add item cpu right \
            --set cpu "${cpu[@]}"
+
+# 内存及详情 popup
 
 memory=(
   icon=
@@ -212,16 +221,7 @@ sketchybar --add item memory.details.swap popup.memory \
            --set memory.details.swap "${memory_details_common[@]}" \
                                      label.color="$TEXT"
 
-# media=(
-#   icon=󰎈
-#   icon.color="$TEAL"
-#   label.color="$TEAL"
-#   label.max_chars=28
-#   update_freq=2
-#   script="$PLUGIN_DIR/media.sh"
-# )
-# sketchybar --add item media right \
-#            --set media "${media[@]}"
+# 音量
 
 volume=(
   icon.color="$PEACH"
@@ -231,6 +231,8 @@ volume=(
 sketchybar --add item volume right \
            --set volume "${volume[@]}" \
            --subscribe volume volume_change
+
+# 当前网络及详情 popup
 
 network=(
   icon=󰖩
@@ -278,6 +280,72 @@ sketchybar --add item network.details.gateway popup.network \
 sketchybar --add item network.details.dns popup.network \
            --set network.details.dns "${network_details_common[@]}"
 
+# AI 额度固定按 Codex、Kimi、OpenCode 排列，并紧邻 battery 左侧。
+# 主标签只显示 W/5h 的剩余百分比；其他计划窗口保留在各自 popup。
+ai_limit_common=(
+  label="--"
+  label.max_chars=24
+  popup.background.color="$MANTLE"
+  popup.background.corner_radius=12
+  popup.blur_radius=16
+  update_freq=60
+)
+
+sketchybar --add item ai.codex right \
+           --set ai.codex "${ai_limit_common[@]}" \
+                          icon="󰚩" \
+                          icon.color="$GREEN" \
+                          label.color="$GREEN" \
+                          script="$PLUGIN_DIR/ai_limits/run.sh codex" \
+           --subscribe ai.codex mouse.entered mouse.exited mouse.exited.global
+
+sketchybar --add item ai.kimi right \
+           --set ai.kimi "${ai_limit_common[@]}" \
+                         icon="󰽥" \
+                         icon.color="$BLUE" \
+                         label.color="$BLUE" \
+                         script="$PLUGIN_DIR/ai_limits/run.sh kimi" \
+           --subscribe ai.kimi mouse.entered mouse.exited mouse.exited.global
+
+sketchybar --add item ai.opencode right \
+           --set ai.opencode "${ai_limit_common[@]}" \
+                             icon="󰅩" \
+                             icon.color="$PEACH" \
+                             label.color="$PEACH" \
+                             script="$PLUGIN_DIR/ai_limits/run.sh opencode" \
+           --subscribe ai.opencode mouse.entered mouse.exited mouse.exited.global
+
+ai_limit_details_common=(
+  icon.drawing=off
+  label.max_chars=120
+  label.width=440
+  label.align=left
+  label.padding_left=12
+  label.padding_right=12
+  label.color="$TEXT"
+  background.drawing=off
+)
+
+for provider in codex kimi opencode
+do
+  case "$provider" in
+    codex) detail_color="$GREEN" ;;
+    kimi) detail_color="$BLUE" ;;
+    opencode) detail_color="$PEACH" ;;
+  esac
+
+  sketchybar --add item "ai.$provider.details.title" "popup.ai.$provider" \
+             --set "ai.$provider.details.title" "${ai_limit_details_common[@]}" \
+                                                   label.color="$detail_color" \
+                                                   label.font="Hack Nerd Font:Bold:14.0"
+
+  for slot in 1 2 3 4
+  do
+    sketchybar --add item "ai.$provider.details.$slot" "popup.ai.$provider" \
+               --set "ai.$provider.details.$slot" "${ai_limit_details_common[@]}"
+  done
+done
+
 battery=(
   icon.color="$GREEN"
   label.color="$GREEN"
@@ -287,6 +355,34 @@ battery=(
 sketchybar --add item battery right \
            --set battery "${battery[@]}" \
            --subscribe battery system_woke power_source_change
+
+
+# ── 可选模块（当前未启用） ───────────────────────────────────────────────
+
+# layout=(
+#   icon=󰙀
+#   icon.color="$YELLOW"
+#   label.color="$YELLOW"
+#   background.color="$SURFACE0"
+#   update_freq=2
+#   script="$PLUGIN_DIR/layout.sh"
+#   click_script="yabai -m window --toggle split"
+# )
+# sketchybar --add item layout left \
+#            --set layout "${layout[@]}"
+
+# media=(
+#   icon=󰎈
+#   icon.color="$TEAL"
+#   label.color="$TEAL"
+#   label.max_chars=28
+#   update_freq=2
+#   script="$PLUGIN_DIR/media.sh"
+# )
+# sketchybar --add item media right \
+#            --set media "${media[@]}"
+
+# ── 组合项与首次刷新 ─────────────────────────────────────────────────────
 
 sketchybar --add bracket workspaces '/space\..*/' layout \
            --set workspaces background.color="$BASE" \
