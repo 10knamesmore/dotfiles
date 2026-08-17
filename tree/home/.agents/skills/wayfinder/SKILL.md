@@ -85,6 +85,8 @@ Subspec status：
 
 Subspec 的 kind 描述工作性质，不表示 status。不要按 user story 机械拆分 Subspec；按可以独立验收、依赖明确的决策或实现切片拆分。
 
+简化工作先使用 [`find-simplifications`](../find-simplifications/SKILL.md) 证明 consumer、ownership、behavior change 和净删除量。一个需要跨 session 推进的强候选可以形成一个优先为单文件的 Spec；多个互不相关的候选不能只因来自同一次 audit 就共享 umbrella Spec。候选已经属于活动 Spec 的 destination 时，再按未知量写成 `research`、`decision` 或 `implementation` Subspec。
+
 ## Fog of war
 
 Spec 故意允许不完整。判断内容应该成为 Subspec 还是留在 `Not yet specified`，只看问题现在能否被精确表达，而不是现在能否回答。

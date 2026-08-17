@@ -1,0 +1,6 @@
+interface:
+  display_name: "Find Simplifications"
+  short_description: "寻找并证明高价值代码简化候选"
+  default_prompt: "使用 $find-simplifications 审计指定范围，区分 production consumer 与测试/文档证据，并形成少量可独立决定和验收的简化 proposal。"
+policy:
+  allow_implicit_invocation: true

@@ -74,3 +74,4 @@ draft/ready/in-progress -> cancelled
 - claim 失效或主动释放时可以回到 `ready`，并删除 stale `owner`。
 - 只有写完 `Resolution` 与 `Evidence` 并完成实际验证后，才能改为 `resolved`。
 - `cancelled` 必须在 `Resolution` 记录原因，并同步 Spec 的 scope 或路线。
+- decision 或 simplification proposal 存在真实 trade-off 时，可以增加 `Alternatives considered` 与 `Risks and consequences` section；不复制到 Spec，也不编造没有实际评估的 alternative。

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prose Standard"
+  short_description: "编写和审查自包含的持久 prose 与代码注释"
+  default_prompt: "使用 $prose-standard 编写或审查指定范围内的仓库 prose；若涉及代码，检查注释是否准确解释业务语义、约束与异常行为。"
+policy:
+  allow_implicit_invocation: true

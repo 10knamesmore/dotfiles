@@ -4,17 +4,17 @@
 
 本规范面向**纯 JavaScript 文件**（`.js` / `.mjs` / `.cjs`，不含 TypeScript）。
 
-与 `typescript_spec.md` 的根本分工：
+与 [`typescript.md`](./typescript.md) 的根本分工：
 
 * **TS 文件**：类型信息写在签名里（`function f(x: number): string`），编译器即类型真相。JSDoc 只写**行为语义**——做什么、边界、副作用、示例——**不重复类型**，把类型标进注释属于冗余。
 * **纯 JS 文件**：语言本身没有类型语法，类型信息**无处可写**。此时 JSDoc 的类型标签（`@type` / `@param {Type}` / `@returns {Type}` / `@typedef`）就是**唯一的类型真相源**，是注释的核心价值，而不是可有可无的补充。
 
-也就是说：在 TS 里「注释别写类型」，在纯 JS 里「注释必须写类型」。这是两份规范最重要的差异，务必先建立这个心智模型再往下读。
+也就是说：在 TS 里"注释别写类型"，在纯 JS 里"注释必须写类型"。这是两份规范最重要的差异，务必先建立这个心智模型再往下读。
 
 工具链层面，JS 的 JSDoc 类型不只是给人看：
 
 * 文件首行写 `// @ts-check`，或在 `tsconfig.json` / `jsconfig.json` 里开启 `checkJs: true`，TypeScript 语言服务就会**把 JSDoc 类型当真**，在 VS Code 等编辑器里提供补全、跳转、类型错误红线——纯 JS 也能拿到接近 TS 的开发体验，且零构建、零语法改动。
-* 因此为纯 JS 写 JSDoc 类型，等价于「不引入 TS 工具链的前提下获得静态类型检查」。这是补全 JS 文档注释时最该优先保证的收益。
+* 因此为纯 JS 写 JSDoc 类型，等价于"不引入 TS 工具链的前提下获得静态类型检查"。这是补全 JS 文档注释时最该优先保证的收益。
 
 ## 基本形式
 
@@ -177,7 +177,7 @@ function sortInPlace(arr, cmp) {
 }
 ```
 
-* `@callback` 等价于「为函数类型定义一个 `@typedef`」，比内联 `{function(a, b): number}` 可读性高，且能复用。
+* `@callback` 等价于"为函数类型定义一个 `@typedef`"，比内联 `{function(a, b): number}` 可读性高，且能复用。
 
 ### @template：泛型
 
@@ -200,7 +200,7 @@ function indexBy(items, selectKey) {
 
 * `@template T` 声明类型参数，后续 `@param` / `@returns` 即可引用 `T`。
 * 带约束写 `@template {PropertyKey} K`，对应 TS 的 `K extends PropertyKey`。
-* 函数体内需要类型断言时用行内 `/** @type {X} */ (expr)` 的「cast」语法（注意被断言表达式要用圆括号包住）。
+* 函数体内需要类型断言时用行内 `/** @type {X} */ (expr)` 的"cast"语法（注意被断言表达式要用圆括号包住）。
 
 ### 内联类型断言（cast）
 
@@ -213,7 +213,7 @@ el.value = "init";
 
 ## @typedef 提取 vs 内联对象类型的取舍
 
-JSDoc 既能内联写对象类型，也能用 `@typedef` 命名后引用。取舍原则与 `lua_spec.md` 里「内联结构 vs `@class`」是同一套约定：
+JSDoc 既能内联写对象类型，也能用 `@typedef` 命名后引用。取舍原则与 [`lua.md`](./lua.md) 里的"内联结构 vs `@class`"是同一套约定：
 
 * **内联**：结构简单、只用一次、字段少（一两个），直接内联，避免为一次性结构造一个全局名字：
 
@@ -236,7 +236,7 @@ JSDoc 既能内联写对象类型，也能用 `@typedef` 命名后引用。取�
    */
   ```
 
-* 判断口诀：**「用一次且简单 → 内联；用多次或需逐字段解释 → @typedef」**。不要为图省事把会被多处引用的复杂结构反复内联，也不要为只出现一次的 `{a: string}` 强行造 `@typedef`。
+* 判断口诀：**"用一次且简单 → 内联；用多次或需逐字段解释 → @typedef"**。不要为图省事把会被多处引用的复杂结构反复内联，也不要为只出现一次的 `{a: string}` 强行造 `@typedef`。
 
 ## import 类型：跨文件引用类型
 
@@ -278,11 +278,11 @@ function displayName(user) {
 
 ## 行为性标签（与 TS spec 共通，简要带过）
 
-纯 JS 同样使用这些**非类型**标签，语义与 `typescript_spec.md` 完全一致，此处不展开，重点仍在类型承载：
+纯 JS 同样使用这些**非类型**标签，语义与 [`typescript.md`](./typescript.md) 完全一致，此处不展开，重点仍在类型承载：
 
 * `@throws {Error}`：可能抛出的异常类型与触发条件。
 * `@example`：最小可理解的使用示例，代码块用 ```` ```js ````。
-* `@deprecated`：弃用原因、起始版本、替代方案与迁移方式，不要只写「已弃用」。
+* `@deprecated`：弃用原因、起始版本、替代方案与迁移方式，不要只写"已弃用"。
 * `@see`：引用相关函数、模块或替代 API。
 
 推荐标签顺序（与 TS 对齐，注意 JS 用 `@template` 而非 `@typeParam`）：摘要 → `@template` → `@param` → `@returns` → `@throws` → `@example` → `@deprecated`。
@@ -305,7 +305,7 @@ function displayName(user) {
  */
 ```
 
-类型已经在 `{number}` 里声明，描述再写「一个 number 类型」是纯噪声。描述只该补充**类型表达不了的语义**：单位、范围、约束、业务含义。
+类型已经在 `{number}` 里声明，描述再写"一个 number 类型"是纯噪声。描述只该补充**类型表达不了的语义**：单位、范围、约束、业务含义。
 
 ### 反例二：给自明字面量写 @type
 
@@ -336,7 +336,7 @@ const names = [];
 // ✗ 摘要只是复述函数名
 /** parseConfig 函数。 */
 
-// ✓ 摘要回答「做什么」
+// ✓ 摘要回答"做什么"
 /** 解析配置文件文本为运行时配置对象。 */
 ```
 

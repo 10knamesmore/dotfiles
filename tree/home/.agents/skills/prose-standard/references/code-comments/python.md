@@ -192,7 +192,7 @@ class RetryPolicy:
 
 ### 4.9 async 函数
 
-* 结构与同步函数一致（`Args`/`Returns`/`Raises`），不需要在摘要里写「异步地…」。
+* 结构与同步函数一致（`Args`/`Returns`/`Raises`），不需要在摘要里写"异步地…"。
 * 需要说明的是 await 语义之外的行为：是否并发安全、是否持有锁、取消（`asyncio.CancelledError`）时的清理行为。
 
 ```python

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Trim CoT Leakage"
+  short_description: "清除仓库 prose 中泄漏的编写与 review 过程"
+  default_prompt: "使用 $trim-cot-leakage 审计指定范围，保留完整事实并把无法解析的 session、PR、review 和草稿视角改为当前仓库视角。"
+policy:
+  allow_implicit_invocation: true

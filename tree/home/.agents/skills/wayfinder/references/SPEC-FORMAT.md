@@ -80,3 +80,4 @@ status: draft
 - `Subspecs` 是稳定 index；完成后不删除条目。
 - `Decisions so far` 只索引已 resolved 的 decision，不替代原 Subspec。
 - `complete` 必须同时满足 required Subspec resolved 和 acceptance criteria 已验证。
+- 存在真实 trade-off 时，可以增加 `Alternatives considered` 与 `Risks and consequences` section；只记录实际考虑过的 alternative，不为填模板编造陪衬。

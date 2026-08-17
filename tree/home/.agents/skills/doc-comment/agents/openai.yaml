@@ -1,4 +1,0 @@
-interface:
-  display_name: "代码注释"
-  short_description: "编写和审查解释真实业务语义的代码注释"
-  default_prompt: "使用 $doc-comment 编写或审查当前代码的注释，确保业务语义、约束和异常行为准确且自包含。"
