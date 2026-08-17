@@ -17,6 +17,7 @@ RESET=$'\033[0m'
 # ---------- Data from Claude Code ----------
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 model=$(echo "$input" | jq -r '.model.display_name // empty')
+effort=$(echo "$input" | jq -r '.effort.level // empty')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 ctx_size=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
 total_in=$(echo "$input" | jq -r '.context_window.total_input_tokens // empty')
@@ -351,6 +352,9 @@ line2=""
 
 if [ -n "$model" ]; then
     printf '%s' "${SKY}${model}${RESET}"
+    if [ -n "$effort" ]; then
+        printf ' %s' "${MAUVE}(${effort})${RESET}"
+    fi
     line2="1"
 fi
 
