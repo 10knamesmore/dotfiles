@@ -47,14 +47,6 @@ decision = "ask"
 reason   = "该操作会丢弃工作区改动，需要用户确认"
 
 [[bash]]
-name     = "git-commit-no-verify"
-cmd      = "git"
-subcmd   = "commit"
-any      = ["--no-verify", "-n"]
-decision = "ask"
-reason   = "--no-verify/-n 跳过 pre-commit 质量闸门（fmt/clippy/test）。正常应先修好再提交；确需跳过请用户确认。"
-
-[[bash]]
 name     = "chmod-world-writable"
 cmd      = "chmod"
 args_re  = ["^0?777$", "o\\+w"]

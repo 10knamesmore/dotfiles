@@ -3,9 +3,7 @@ name: grill-with-docs
 description: 通过持续追问打磨 Spec 或 design，并同步维护当前 Subspec、domain glossary 与必要的 ADR。
 ---
 
-# Grill with Docs
-
-使用 grilling 与 domain-modeling，一次只问一个能够改变当前 decision 的问题。
+use domain-modeling，在对话从持续反复询问任何还没有确定的问题/决定，一次只问一个能够改变当前 decision 的问题。
 
 如果存在活动 Spec：
 

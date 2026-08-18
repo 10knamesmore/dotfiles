@@ -198,7 +198,7 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 - validation command 和失败边界；
 - security、persistence、compatibility 或 side-effect seam；
 - Subspec Resolution/Evidence/status 与实际结果是否一致；
-- review 通过后应推进的 Spec/frontier，或 review 失败时应创建的精确 follow-up。
+- review 通过后应推进的 Spec/frontier，或 review 发现问题时应就地修复的精确位置；只有新的、规模足够大的 feat 才创建 follow-up task transport。
 
 review transport 不替 A 宣布验收通过。
 

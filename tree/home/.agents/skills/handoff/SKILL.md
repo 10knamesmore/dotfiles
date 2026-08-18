@@ -32,6 +32,7 @@ Agent A：review 真实效果、更新 Spec/frontier
 ## 不变量
 
 - Spec、Subspec、domain docs、源码与项目指令是 canonical authority；transport 只传递本轮任务或 review 请求。
+- 一轮 transport 只服务一次新的大 feat 开发。review 发现的 bug 和小修小补由 A 就地修复，不设计多轮 transport 往返。
 - A 必须亲自核对 live source、worktree、git state 与验证结果并生成 outbound transport，不把写 transport 再委托出去。
 - receiver 不因 transport 的结论而跳过 source-grounded verification。A review 时必须重新检查真实 diff、源码和测试效果。
 - 完成、剩余、失败和未验证必须分开；不得用进度百分比或模糊的完成了代替 evidence。
@@ -90,10 +91,10 @@ task transport 还要说明真正阻塞时的 fallback：B 写 `status: blocked`
 A 完整读取 review transport，然后独立检查真实 diff、源码、运行过的命令、测试覆盖和用户可见效果。transport 的完成声明只是 review index，不是验收证据本身。
 
 - review 通过：按 `wayfinder` 更新适用的 Parent Spec canonical state、frontier、fog 和整体 status；只有 resolved decision 才进入 decision summary。
-- review 发现精确问题：把问题写入新的 Subspec 或明确 follow-up，再生成下一轮 task transport；不要把评论追加进旧 transport。
+- review 发现精确问题：bug 和小修小补由 A 就地修复并验证，不生成新一轮 task transport；只有问题构成新一轮大 feat 开发时，才写入新的 Subspec 并生成新的 task transport。不要把评论追加进旧 transport。
 - review 需要用户决定：写回 decision Subspec 或 fog，并停止，不替用户选择。
 
-A 完成 review 和 canonical state 更新后删除 inbound review transport。需要继续下一轮时，再创建新的 task transport；删除前不得复用同一路径。
+A 完成 review 和 canonical state 更新后删除 inbound review transport。需要推进下一个 frontier feat 时，再创建新的 task transport；删除前不得复用同一路径。
 
 ### 6. 验证 outbound transport
 

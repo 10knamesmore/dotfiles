@@ -65,11 +65,6 @@ fn production_rules_parse_and_decide() {
         ("grep foo file.txt", Some("deny")), // prefer-rg（合成 fixture 里没有）
         ("git push origin main", Some("ask")),
         ("git add -A", None),
-        // ── git commit --no-verify / -n ──
-        ("git commit --no-verify -m wip", Some("ask")),
-        ("git commit -n -m wip", Some("ask")),
-        ("git commit -nm wip", Some("ask")), // -n 在合写簇里也命中
-        (r#"git commit -m "正常提交""#, None), // 普通提交不误伤
         // ── chmod 全局可写 ──
         ("chmod 777 file", Some("ask")),
         ("chmod -R 777 dir", Some("ask")),

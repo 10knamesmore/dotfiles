@@ -275,6 +275,8 @@ export interface SchedulerConfig {
 }
 ```
 
+注意每一个 字段都要有注释， 并且中间应当空一行
+
 ### React 组件示例
 
 ````tsx

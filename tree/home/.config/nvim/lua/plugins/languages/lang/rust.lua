@@ -59,8 +59,13 @@ return {
         default_settings = {
           -- rust-analyzer language server configuration
           ["rust-analyzer"] = {
+            -- 普通 helper 即使位于 #[cfg(test)] 模块中也不会被归为测试引用。
+            references = {
+              excludeTests = true,
+              excludeImports = true,
+            },
             cargo = {
-              allFeatures = true,
+              features = "all",
               loadOutDirsFromCheck = true,
               buildScripts = {
                 enable = true,
@@ -72,9 +77,31 @@ return {
               -- schema 里是复数 warningsAsHint（rust-analyzer --print-config-schema）
               warningsAsHint = { "inactive-code" },
             },
+            lens = {
+              references = {
+                adt = {
+                  enable = true,
+                },
+                method = {
+                  enable = true,
+                },
+                trait = {
+                  enable = true,
+                },
+                enumVariant = {
+                  enable = true,
+                },
+              },
+            },
             inlayHints = {
               closureCaptureHints = {
                 enable = true,
+              },
+              expressionAdjustmentHints = {
+                enable = "reborrow",
+              },
+              lifetimeElisionHints = {
+                enable = "skip_trivial",
               },
               -- genericParameterHints = { type = { enable = true } },
             },

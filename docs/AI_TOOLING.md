@@ -53,6 +53,9 @@ Claude 和 codex 一样只是 `distribute()` 的订阅者；落点保持真实�
 例外是 Kimi Code：它原生读 `~/.agents/AGENTS.md` 与 `~/.agents/skills/`，连订阅都不用加。
 同一 domain 的可选细则收在一个 skill 内：顶层 `SKILL.md` 只做路由，按场景 reference
 `subskills/*.md` 与 `references/`；subskill 本身是普通 Markdown，不再放嵌套 `SKILL.md`。
+语言规范沿用同一结构：`rust` 按任务加载 compile-aware testing 与 TUI 规则；`typescript`
+负责严格类型、模块与异步边界，并只在项目配置或验证场景加载对应 subskill。TypeScript 的
+runtime test 不默认等于 typecheck；真正进入运行路径的 UI component 另叠加 `frontend-a11y`。
 
 全局指令的两种接法按工具能力选：Claude Code 只认 `~/.claude/CLAUDE.md`，但支持
 `@path` import，所以那份退化成一行 import；pi 只认自己 agent 目录下的 `AGENTS.md`，
@@ -84,7 +87,8 @@ Subspec frontmatter 的 `depends_on`。`blocked` 是 dependency 推导状态，�
 dependencies 的精确指针，并内联 claim、实现、验证和 review 回传协议；B 只需读取生成的 handoff，
 不需要 `handoff` Skill。B 一般可使用 `wayfinder` / `implement`，没有时按 handoff 内的显式 fallback
 执行。B 完成后删除 inbound task transport 并写 review transport 交回 A；Spec、Subspec、源码与
-Evidence 始终是 canonical authority。
+Evidence 始终是 canonical authority。一轮 transport 只服务一次新的大 feat 开发，review 发现的
+bug 由 A 就地修复，不设计多轮 transport 往返。
 
 ## settings.json 要点
 
