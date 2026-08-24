@@ -36,15 +36,28 @@
         "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1048576"
       }
     },
-    "ftai": {
+    "ftai(glm)": {
       "env": {
         "ANTHROPIC_BASE_URL": "https://llm-proxy.ftai.chat",
         "ANTHROPIC_AUTH_TOKEN": "${FTAI_API_KEY}",
-        "ANTHROPIC_DEFAULT_FABLE_MODEL": "glm-5.2-auto[1m]",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2-auto[1m]",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2-auto[1m]",
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5.2-auto[1m]",
-        "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5.2-auto[1m]",
+        "ANTHROPIC_DEFAULT_FABLE_MODEL": "glm-5.3-auto[1m]",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.3-auto[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.3-auto[1m]",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5.3-auto[1m]",
+        "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5.3-auto[1m]",
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000",
+        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "500000"
+      }
+    },
+    "ftai(ds)": {
+      "env": {
+        "ANTHROPIC_BASE_URL": "https://llm-proxy.ftai.chat",
+        "ANTHROPIC_AUTH_TOKEN": "${FTAI_API_KEY}",
+        "ANTHROPIC_DEFAULT_FABLE_MODEL": "deepseek-v4-pro[1m]",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-flash[1m]",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash[1m]",
+        "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-flash[1m]",
         "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "614400",
         "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1048576"
       }

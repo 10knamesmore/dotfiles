@@ -1,4 +1,4 @@
 interface:
   display_name: "Handoff"
-  short_description: "把 Wayfinder 任务编译成无需接收方安装 handoff Skill 的可回传文档"
-  default_prompt: "使用 $handoff 把当前 Wayfinder Spec/Subspec 编译成接收 Agent 可直接执行并回传 review 结果的文档。"
+  short_description: "把完整 coding outcome 编译成 Agent 可执行并回传的交接文档"
+  default_prompt: "使用 $handoff 把当前已明确 contract 的完整 coding outcome 编译成接收 Agent 可直接执行并回传 review 结果的文档；需要整体 cut over 时覆盖全部相关 Subspec 和 repo。"

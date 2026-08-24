@@ -18,7 +18,8 @@
 - channel 中已有未完成 transport 时，不得覆盖、append、rename 成回复或创建并行的第二份消息。
 - receiver 完成 transport 请求的动作后删除 inbound，再发布自己的 outbound transport。
 - transport 不记录累计历史。长期 contract、status、Resolution 和 Evidence 必须写入 Spec/Subspec 或源码。
-- task transport 必须指向 Parent Spec、目标 Subspec 与直接 dependencies；不复制 Spec，也不把查找 canonical contract 留给 B 猜。
+- task transport 必须指向 Parent Spec、全部 in-scope Subspec 与它们的外部 dependencies；不复制 Spec，也不把
+  查找 canonical contract 留给 B 猜。
 - B 不依赖 `handoff` Skill。可用时由 B 使用 `wayfinder` / `implement`，不可用时执行 task transport 内联的等价步骤。
 - 默认把 transport 放在活动 Spec 的 artifact 目录，文件名为 `HANDOFF-$(date +%m-%d_%H-%M).md`；同一路径只能在上一份 transport 删除后复用。
 - 不把 transport 加入 staging、commit、issue tracker 或长期文档索引。
@@ -41,19 +42,23 @@ sender/receiver 使用本轮可辨认的 Agent/session label，不写无法定�
 
 ## Task transport
 
-task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
+task transport 由维护 Wayfinder 的 A 写给完成约定 coding outcome 的 B。通常只有一个目标 Subspec；需要
+共同落地才能成立的 cross-layer cutover、跨 repo integration 或用户明确要求的完整 effort 可以覆盖多个
+依赖有序的 Subspec。
 
 ### 任务
 
 定义唯一 outcome，并列出：
 
-- Parent Spec、目标 Subspec 与直接 dependencies 的精确指针；
-- B 必须完成的 acceptance criteria；
+- Parent Spec、全部 in-scope Subspec 与外部 dependencies 的精确指针；
+- transport 的整体 outcome，以及每个 in-scope Subspec 必须完成的 acceptance criteria；
 - scope 与 out-of-scope；
 - 用户已经授予和没有授予的操作权限；
 - B 完成后要返回 A review 的具体效果。
 
-不要写继续处理、看情况收尾或完成剩余工作。目标 Subspec 必须位于 frontier 且尚未被其他 session claim。
+不要写继续处理、看情况收尾或完成剩余工作；必须枚举完整 delivery boundary。首个 in-scope Subspec 必须
+位于 frontier 且尚未被其他 session claim；后续目标可以只被同一 transport 中更早的目标阻塞。不得仅因
+第一个 frontier 较小，就把用户要求的完整 cutover 截断为无法独立运行的中间层。
 
 ### 必读顺序
 
@@ -61,8 +66,8 @@ task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
 
 1. repo/global instructions；
 2. Parent Spec 的 absolute path 或可解析链接；
-3. 目标 Subspec 的 absolute path 或可解析链接；
-4. 直接 dependency Resolution 与 domain glossary 的精确指针；
+3. 全部 in-scope Subspec 的 absolute path 或可解析链接，并标明 dependency order；
+4. 外部 dependency Resolution 与 domain glossary 的精确指针；
 5. 关键源码、配置、lockfile 和测试入口。
 
 要求 B 在修改前重新运行 live-state 检查。行号只是定位提示，不代替重新读取。
@@ -74,7 +79,7 @@ task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
 | 集合 | 内容要求 |
 | --- | --- |
 | 已完成 | 只有已有 artifact 或当前 evidence 的结果 |
-| B 需要完成 | 达到目标 Subspec acceptance criteria 仍缺少的事项 |
+| B 需要完成 | 达到整体 outcome 及各 in-scope Subspec acceptance criteria 仍缺少的事项 |
 | 未验证或失败 | 没有运行、结果过时、运行失败或被 unrelated baseline 阻断的检查 |
 
 不要把设计完成写成实现完成，也不要把编译通过写成行为验证通过。
@@ -108,7 +113,9 @@ task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
 
 给出 dependency-aware numbered steps。每一步写明目标、seam、需要先读取或验证的内容、产生的 canonical artifact 和进入下一步的可观察条件。
 
-要求 B 开始时自行 claim Subspec。B 可用时使用 `wayfinder`，implementation 使用 `implement`；同时写明无 Skill 时等价的 frontmatter transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 owner。
+要求 B 按依赖顺序自行 claim 每个 Subspec：只有当前目标位于 frontier 时才 claim，完成并 resolved 后再 claim
+下一个。B 可用时使用 `wayfinder`，implementation 使用 `implement`；同时写明无 Skill 时等价的 frontmatter
+transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 owner。
 
 ### 验证与完成定义
 
@@ -118,7 +125,8 @@ task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
 - B 仍需运行的 exact command、cwd 和覆盖面；
 - 禁止运行的真实客户端、部署、发消息、下单、删除数据或其他 side-effect command；
 - 可逐条核验的 Definition of Done；
-- B 必须写回 Subspec 的 Resolution、Evidence 和最终 status。
+- B 必须逐个写回各 in-scope Subspec 的 Resolution、Evidence 和最终 status，并在全部 outcome 达成后更新
+  Parent Spec 的状态。
 
 ### 停止条件
 
@@ -128,7 +136,7 @@ task transport 由维护 wayfinder 的 A 写给执行目标 Subspec 的 B。
 
 task transport 必须把以下协议直接写给 B，不能只让 B 读取本 reference：
 
-1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的 Subspec、源码与 Evidence；
+1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence；
 2. 准备 review transport 所需的实际结果、acceptance criteria evidence、changed artifacts、验证、偏差、未验证项和 dirty ownership；
 3. 删除 inbound task transport；
 4. 在 task transport 指定的 exact output path 创建 review transport；
@@ -144,7 +152,7 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 
 声明：
 
-- Parent Spec 与目标 Subspec；
+- Parent Spec 与全部 in-scope Subspec；
 - `status: completed` 或 `status: blocked`；
 - 希望 A 验证的用户可见效果、contract 和高风险 seam；
 - A 完成 review 后应更新的 canonical state。
@@ -157,7 +165,7 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 
 | Acceptance criterion | Result | Evidence |
 | --- | --- | --- |
-| `<criterion>` | `satisfied`、`not satisfied` 或 `not verified` | `path/to/file:line`、test 或 artifact |
+| `<Subspec / criterion>` | `satisfied`、`not satisfied` 或 `not verified` | `path/to/file:line`、test 或 artifact |
 
 不要只写全部完成。`status: completed` 仍可包含明确标注、不会阻止 acceptance 的 known limitation；阻止 acceptance 的问题必须使用 `status: blocked`。
 
@@ -197,7 +205,7 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 - acceptance criteria 与 external behavior；
 - validation command 和失败边界；
 - security、persistence、compatibility 或 side-effect seam；
-- Subspec Resolution/Evidence/status 与实际结果是否一致；
+- 各 Subspec Resolution/Evidence/status、Parent Spec 状态与实际结果是否一致；
 - review 通过后应推进的 Spec/frontier，或 review 发现问题时应就地修复的精确位置；只有新的、规模足够大的 feat 才创建 follow-up task transport。
 
 review transport 不替 A 宣布验收通过。
@@ -214,7 +222,7 @@ review transport 不替 A 宣布验收通过。
 
 1. direction、sender、receiver 和 transport type 是否明确？
 2. channel 是否只有一份未完成 transport，且没有覆盖对方消息？
-3. 一个看不到原对话的 receiver 能否找到 Spec/Subspec 并直接开始？
+3. 一个看不到原对话的 receiver 能否找到全部 in-scope Spec/Subspec、理解依赖顺序并直接开始？
 4. 每个完成声明是否有 current evidence？
 5. dirty ownership 是否足以防止误覆盖、误格式化和误 stage？
 6. review transport 是否要求 A 检查真实效果，而不是直接信任 B？
