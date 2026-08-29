@@ -128,9 +128,9 @@ dots.resource.copied_file {
 dots.resource.cargo_binary {
     source = {
         manifest = "cli/Cargo.toml",
-        binary = "cc-hook",
+        binary = "agent-hook",
     },
-    target = "~/.claude/hooks/cc-hook",
+    target = "~/.local/bin/agent-hook",
 }
 ```
 

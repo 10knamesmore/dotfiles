@@ -212,8 +212,8 @@ pattern = "Bash(dd *)"
 reason = "毁灭性命令"
 
 # ════ 守卫（agent-hook kimi-pretool：共享 pretool.toml 规则，ask 降级 deny）════
-# 规则源 tree/home/.claude/hooks/pretool.toml，dots sync 分发到 ~/.kimi-code/pretool.toml。
-# 省略 matcher = 全量工具（对齐 Claude 的 matcher *）。引擎见 cli/crates/cc-hooks/。
+# 规则源 tree/home/.agents/hooks/pretool.toml，dots sync 分发到 ~/.kimi-code/pretool.toml。
+# 省略 matcher = 全量工具（对齐 Claude 的 matcher *）。引擎见 cli/crates/agent-hooks/。
 
 [[hooks]]
 event = "PreToolUse"

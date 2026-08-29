@@ -123,9 +123,9 @@ Zsh 不使用框架，配置分为两层：
 
 ## AI 工具链（skills / agents / hooks）
 
-`tree/home/.agents/` 是本地 AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，`codex/hooks.json` 分发到 `~/.codex/hooks.json`。接入新工具 = `dots.lua` 的 `to` 列表加一行 + `dots sync`。
+`tree/home/.agents/` 是本地 AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，agent hook 定义与规则再分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
 
-Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/crates/cc-hooks/`）：`cc-hook` 保留 Claude 的 deny/ask 协议，`agent-hook` 适配 Codex；规则表 `pretool.toml` 拦高危命令、做工具偏好重定向。
+Claude Code、Codex 与 Kimi Code 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。三个 adapter 通过同一个 `agent-hook` binary 保留各自协议差异；`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
 
 ## 当前管理的主要配置
 
@@ -134,7 +134,7 @@ Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/cr
 - 终端：Kitty；文件管理器：Yazi；多路复用：Zellij；监控：btop
 - Linux 桌面：Hyprland（主，0.55+ Lua 入口）/ niri（备选）/ QuickShell（状态栏 + 控制中心）/ xremap / systemd user 单元
 - macOS：yabai / skhd / sketchybar / fcitx5
-- AI 工具：Claude / Codex skills、agents 与共享 PreToolUse 守卫，opencode、pi
+- AI 工具：Claude / Codex / Kimi skills、agents 与共享 PreToolUse 守卫，opencode、pi
 
 以上是主要部分，完整清单以 `tree/` 实际内容为准。
 

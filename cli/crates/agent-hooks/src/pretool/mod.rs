@@ -1,6 +1,7 @@
-//! PreToolUse 共享规则判定与 Claude Code/Codex/Kimi Code 协议 adapter。
+//! PreToolUse 共享规则判定与 harness adapter。
 
 pub mod argv;
+pub mod claude;
 pub mod codex;
 pub mod engine;
 pub mod envelope;

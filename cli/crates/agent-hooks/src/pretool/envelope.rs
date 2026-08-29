@@ -1,11 +1,10 @@
-//! hook JSON 边界：stdin 解析与结构化输出类型。
+//! PreToolUse JSON 边界：共享 stdin 解析与结构化输出类型。
 //!
-//! 输出是 named struct（serde 序列化），不在业务函数里手拼/打印 JSON——
-//! 落地（println/eprintln/exit）统一由 bin 的 wire 层完成。
+//! 输出由具名类型序列化，stdout、stderr 与 exit code 统一由 wire 层处理。
 
 use serde::Serialize;
 
-use crate::pretool::rules::Decision;
+use super::rules::Decision;
 
 /// 从 PreToolUse 的 stdin JSON 提取 `(tool_name, tool_input)`。
 ///
@@ -21,7 +20,7 @@ pub fn parse_pretool(stdin_text: &str) -> Option<(String, serde_json::Value)> {
 /// PreToolUse 的结构化输出（整条 stdout JSON）。
 #[derive(Debug, Serialize)]
 pub struct PreToolUseOutput {
-    /// CC hook 协议的决策载荷
+    /// Agent hook 协议的决策载荷。
     #[serde(rename = "hookSpecificOutput")]
     pub hook_specific_output: PreToolUseDecision,
 }
@@ -32,7 +31,7 @@ pub struct PreToolUseDecision {
     /// 恒为 "PreToolUse"
     #[serde(rename = "hookEventName")]
     pub hook_event_name: &'static str,
-    /// "deny" | "ask"
+    /// `deny`、`ask` 或 adapter 支持的其他决策。
     #[serde(rename = "permissionDecision")]
     pub permission_decision: &'static str,
     /// 喂回模型/展示给用户的理由
@@ -41,14 +40,25 @@ pub struct PreToolUseDecision {
 }
 
 impl PreToolUseOutput {
-    /// 由命中规则的决策与理由构造。
+    /// 保留共享规则的原生决策与理由。
     #[must_use]
-    pub fn new(decision: Decision, reason: &str) -> Self {
+    pub fn from_decision(decision: Decision, reason: impl Into<String>) -> Self {
+        Self::new(decision.as_str(), reason)
+    }
+
+    /// 输出 adapter 已确认支持的 `deny` 决策。
+    #[must_use]
+    pub fn deny(reason: impl Into<String>) -> Self {
+        Self::new("deny", reason)
+    }
+
+    /// 构造协议输出，decision 只由 typed adapter 提供。
+    fn new(permission_decision: &'static str, reason: impl Into<String>) -> Self {
         Self {
             hook_specific_output: PreToolUseDecision {
                 hook_event_name: "PreToolUse",
-                permission_decision: decision.as_str(),
-                permission_decision_reason: reason.to_owned(),
+                permission_decision,
+                permission_decision_reason: reason.into(),
             },
         }
     }
@@ -86,7 +96,7 @@ mod tests {
 
     #[test]
     fn output_serializes_to_protocol_shape() -> Result<(), serde_json::Error> {
-        let output = PreToolUseOutput::new(Decision::Deny, "理由");
+        let output = PreToolUseOutput::deny("理由");
         let value: serde_json::Value = serde_json::from_str(&serde_json::to_string(&output)?)?;
         let payload = &value["hookSpecificOutput"];
         assert_eq!(payload["hookEventName"], "PreToolUse");

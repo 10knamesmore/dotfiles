@@ -1,4 +1,4 @@
-//! 端到端：起真实 `cc-hook pretool` 二进制，stdin 喂 hook JSON，断言决策与 fail-open。
+//! 端到端：起真实 `agent-hook claude-pretool`，断言 Claude 决策与 fail-open。
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -11,11 +11,9 @@ use std::io::Write as _;
 use assert_cmd::Command;
 use tempfile::NamedTempFile;
 
-/// 引擎语义 fixture（含生产表没有的 Probe 等探针规则），只测匹配引擎，**无需镜像生产表**。
-/// 生产规则正确性见 e2e_production_rules.rs（include_str! 读真 pretool.toml）。
+/// 只覆盖 matcher 与 Claude 协议的固定语义，不镜像生产规则。
 const RULES: &str = r#"
 [[bash]]
-name     = "rm-recursive"
 cmd      = "rm"
 all      = [["-r", "-R", "--recursive"]]
 path_outside = ["/tmp"]
@@ -23,14 +21,12 @@ decision = "deny"
 reason   = "rm 递归删除，仅 /tmp 下放行"
 
 [[bash]]
-name     = "git-push"
 cmd      = "git"
 subcmd   = "push"
 decision = "ask"
 reason   = "git 推送需要用户确认"
 
 [[bash]]
-name     = "git-reset-hard"
 cmd      = "git"
 subcmd   = "reset"
 any      = ["--hard"]
@@ -38,21 +34,18 @@ decision = "ask"
 reason   = "丢弃改动"
 
 [[tool]]
-name     = "gh-not-webfetch-github"
 tool     = "WebFetch"
 where    = { url = { domain = "github.com" } }
 decision = "deny"
 reason   = "GitHub 一律 gh CLI"
 
 [[tool]]
-name     = "no-dotenv-read"
 tool     = "Read"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥"
 
 [[tool]]
-name     = "matcher-kinds-probe"
 tool     = "Probe"
 where    = { alpha = { prefix = "pre-", suffix = "-end" }, beta = { contains = ["midA", "midB"] } }
 decision = "ask"
@@ -66,13 +59,12 @@ fn rules_file() -> NamedTempFile {
     file
 }
 
-/// 跑一次 pretool：返回 (stdout, exit success)。审计日志导向 /dev/null，隔离真实 ~/.claude。
+/// 跑一次 Claude adapter，返回 stdout 与 exit success。
 fn run(rules_path: &std::path::Path, stdin_json: &str) -> (String, bool) {
-    let output = Command::cargo_bin("cc-hook")
+    let output = Command::cargo_bin("agent-hook")
         .unwrap()
-        .args(["pretool", "--rules"])
+        .args(["claude-pretool", "--rules"])
         .arg(rules_path)
-        .env("CC_HOOK_AUDIT_LOG", "/dev/null")
         .write_stdin(stdin_json)
         .output()
         .unwrap();
@@ -220,11 +212,10 @@ fn missing_rules_file_fails_open() {
 fn broken_rules_file_fails_open_with_stderr_notice() {
     let mut file = NamedTempFile::new().unwrap();
     file.write_all(b"not [ valid toml").unwrap();
-    let output = Command::cargo_bin("cc-hook")
+    let output = Command::cargo_bin("agent-hook")
         .unwrap()
-        .args(["pretool", "--rules"])
+        .args(["claude-pretool", "--rules"])
         .arg(file.path())
-        .env("CC_HOOK_AUDIT_LOG", "/dev/null")
         .write_stdin(bash_envelope("rm -rf /"))
         .output()
         .unwrap();
@@ -250,37 +241,4 @@ fn malformed_stdin_fails_open() {
         assert!(ok, "stdin: {bad}");
         assert!(stdout.is_empty(), "stdin: {bad}");
     }
-}
-
-#[test]
-fn audit_log_records_decisions_only() {
-    let rules = rules_file();
-    let log = NamedTempFile::new().unwrap();
-    let run_with_audit = |stdin: &str| {
-        Command::cargo_bin("cc-hook")
-            .unwrap()
-            .args(["pretool", "--rules"])
-            .arg(rules.path())
-            .env("CC_HOOK_AUDIT_LOG", log.path())
-            .write_stdin(stdin)
-            .assert()
-            .success();
-    };
-
-    // deny 命中 → 审计记一行（决策 + 规则名 + 命令摘要）
-    run_with_audit(&bash_envelope("rm -rf ~/x"));
-    let after_deny = std::fs::read_to_string(log.path()).unwrap();
-    assert!(
-        after_deny.contains("decision=deny") && after_deny.contains("rule=rm-recursive"),
-        "审计应记录 deny 决策与规则名: {after_deny}"
-    );
-    assert!(
-        after_deny.contains("cmd="),
-        "审计应含命令摘要: {after_deny}"
-    );
-
-    // 静默放行 → 不写审计（只记拦了/问了的，不记放行的）
-    run_with_audit(&bash_envelope("git add -A"));
-    let after_silent = std::fs::read_to_string(log.path()).unwrap();
-    assert_eq!(after_deny, after_silent, "静默放行不应追加审计行");
 }

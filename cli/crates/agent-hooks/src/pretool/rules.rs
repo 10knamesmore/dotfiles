@@ -1,6 +1,6 @@
 //! pretool 规则的 TOML schema。
 //!
-//! 规则文件即配置（`~/.claude/hooks/pretool.toml`），改规则无需重编译。
+//! 规则文件即配置；三个 adapter 各自读取由同一中立源分发的副本。
 //! 两种规则形态：`[[bash]]`（argv 引擎：词法/旗标簇/子命令）与 `[[tool]]`
 //! （任意工具：`tool_name` + `tool_input` 字段的具名匹配器）。
 //! 一条规则内给定的条件取 AND；匹配器数组值内层取 OR。
@@ -9,13 +9,13 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-/// 决策档位：deny 直接拦（理由喂回模型），ask 弹确认框给用户。
+/// 共享决策：deny 直接拦；ask 请求用户确认，不支持它的 adapter 可明确降级。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Decision {
     /// 拒绝执行
     Deny,
-    /// 升级给用户确认
+    /// 请求用户确认
     Ask,
 }
 
@@ -38,8 +38,6 @@ impl Decision {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BashRule {
-    /// 规则名（报告/调试用）
-    pub name: String,
     /// argv[0] 必须等于它（`command` 前缀自动剥除）
     pub cmd: String,
     /// 若给定，argv[1] 必须等于它（如 git 子命令）
@@ -68,8 +66,6 @@ pub struct BashRule {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolRule {
-    /// 规则名（报告/调试用）
-    pub name: String,
     /// 目标工具名（精确匹配，如 "WebFetch" / "Read"）
     pub tool: String,
     /// 字段名 → 匹配器；多字段 AND。字段值非字符串视为不命中。
@@ -163,21 +159,18 @@ mod tests {
 
     const FIXTURE: &str = r#"
 [[bash]]
-name     = "rm-recursive"
 cmd      = "rm"
 all      = [["-r", "-R", "--recursive"]]
 decision = "deny"
 reason   = "rm 递归删除"
 
 [[tool]]
-name     = "gh-not-webfetch-github"
 tool     = "WebFetch"
 where    = { url = { domain = "github.com" } }
 decision = "deny"
 reason   = "GitHub 一律 gh"
 
 [[tool]]
-name     = "dotenv"
 tool     = "Read"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"] } }
 decision = "ask"
@@ -208,10 +201,10 @@ reason   = "敏感文件"
 
     #[test]
     fn unknown_field_is_rejected() {
-        let bad_bash = "[[bash]]\nname='x'\ncmd='y'\ndecision='deny'\nreason='r'\nbogus=1";
+        let bad_bash = "[[bash]]\ncmd='y'\ndecision='deny'\nreason='r'\nbogus=1";
         assert!(Config::from_toml(bad_bash).is_err());
         let bad_matcher =
-            "[[tool]]\nname='x'\ntool='Read'\nwhere={f={fuzzy='x'}}\ndecision='deny'\nreason='r'";
+            "[[tool]]\ntool='Read'\nwhere={f={fuzzy='x'}}\ndecision='deny'\nreason='r'";
         assert!(Config::from_toml(bad_matcher).is_err());
     }
 

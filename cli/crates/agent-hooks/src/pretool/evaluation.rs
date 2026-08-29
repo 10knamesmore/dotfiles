@@ -11,36 +11,9 @@ pub struct Match {
     pub decision: Decision,
     /// 提供给 harness 或模型的解释。
     pub reason: String,
-    /// 用于审计和定位配置的规则名。
-    pub rule_name: String,
-    /// hook 输入中的 canonical tool name。
-    pub tool_name: String,
-    /// Bash 命令摘要；非 Bash 工具为 `None`。
-    pub command: Option<String>,
 }
 
-impl Match {
-    /// 按 harness 最终落地的决策生成审计行。
-    #[must_use]
-    pub fn audit(&self, effective_decision: &str) -> String {
-        let source = if effective_decision == self.decision.as_str() {
-            String::new()
-        } else {
-            format!(" source_decision={}", self.decision.as_str())
-        };
-        let command = self
-            .command
-            .as_deref()
-            .map(|value| format!(" cmd={}", snippet(value)))
-            .unwrap_or_default();
-        format!(
-            "decision={effective_decision}{source} tool={} rule={}{}",
-            self.tool_name, self.rule_name, command
-        )
-    }
-}
-
-/// 用共享规则判定一个 Claude/Codex 兼容的 PreToolUse JSON 信封。
+/// 用共享规则判定一个 adapter 兼容的 PreToolUse JSON 信封。
 ///
 /// 坏 JSON、字段缺失和未命中都返回 `None`，由各 harness adapter 保持 fail-open。
 #[must_use]
@@ -56,28 +29,13 @@ pub fn evaluate(config: &Config, stdin_text: &str) -> Option<Match> {
         return Some(Match {
             decision: rule.decision,
             reason: rule.reason.clone(),
-            rule_name: rule.name.clone(),
-            tool_name,
-            command: Some(command.to_owned()),
         });
     }
 
     engine::check_tool(config, &tool_name, &tool_input).map(|rule| Match {
         decision: rule.decision,
         reason: rule.reason.clone(),
-        rule_name: rule.name.clone(),
-        tool_name,
-        command: None,
     })
-}
-
-/// 截断并单行化 Bash 命令，防止审计日志被长命令撑爆。
-fn snippet(command: &str) -> String {
-    command
-        .chars()
-        .take(200)
-        .collect::<String>()
-        .replace('\n', " ")
 }
 
 #[cfg(test)]
@@ -92,7 +50,6 @@ mod tests {
         let config = Config::from_toml(
             r#"
 [[bash]]
-name = "git-push"
 cmd = "git"
 subcmd = "push"
 decision = "ask"
@@ -105,10 +62,7 @@ reason = "需要确认"
             return Err("规则应命中".into());
         };
         assert_eq!(matched.decision, Decision::Ask);
-        assert_eq!(
-            matched.audit("deny"),
-            "decision=deny source_decision=ask tool=Bash rule=git-push cmd=git push"
-        );
+        assert_eq!(matched.reason, "需要确认");
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
-# cc-hook pretool 规则表（PreToolUse，matcher *）。
-# 改这里即生效（hook 注册本身需新会话）；引擎见 cli/crates/cc-hooks/。
+# agent-hook PreToolUse 规则表。改这里后由 dots sync 分发到各 agent。
+# 守卫用于引导模型并启发式阻拦，不替代 sandbox、permission 或系统权限。
 #
 # 两种规则：
 #   [[bash]] —— Bash 命令的 argv 引擎：条件 AND；any/all 内层 OR；
@@ -10,13 +10,12 @@
 #   [[tool]] —— 任意工具：tool 精确匹配 tool_name，where 各字段匹配器 AND。
 #               匹配器词汇：equals/contains/prefix/suffix/glob/domain/re（数组内 OR）；
 #               not = { … } 反向（内层命中则整体不中，如 glob 命中但排除 .example）。
-# 决策：deny = 直接拦（reason 喂回模型让它改方案）；ask = 弹确认框给用户。
+# 决策：deny = 直接拦；ask = 请求用户确认，不支持 ask 的 adapter 明确降级为 deny。
 # 同类规则自上而下首条命中生效；Bash 先过 [[bash]] 再过 [[tool]]。
 
 # ════ 高危命令 ════
 
 [[bash]]
-name     = "rm-recursive"
 cmd      = "rm"
 all      = [["-r", "-R", "--recursive"]]
 path_outside = ["/tmp"]
@@ -24,7 +23,6 @@ decision = "ask"
 reason   = "守卫拦截：rm 递归删除（-r/-R/--recursive），仅 /tmp 下放行。删 /tmp 请写绝对路径（相对路径按当前目录判），或让用户手动执行。"
 
 [[bash]]
-name     = "git-reset-hard"
 cmd      = "git"
 subcmd   = "reset"
 any      = ["--hard"]
@@ -32,7 +30,6 @@ decision = "ask"
 reason   = "该操作会丢弃工作区改动，需要用户确认"
 
 [[bash]]
-name     = "git-clean-force"
 cmd      = "git"
 subcmd   = "clean"
 all      = [["-f", "--force"]]
@@ -40,7 +37,6 @@ decision = "ask"
 reason   = "该操作会丢弃工作区改动，需要用户确认"
 
 [[bash]]
-name     = "chmod-world-writable"
 cmd      = "chmod"
 args_re  = ["^0?777$", "o\\+w"]
 decision = "ask"
@@ -48,50 +44,42 @@ reason   = "chmod 777 / o+w 把文件设为全局可写，风险高。改用更�
 
 # ════ 工具偏好重定向：deny 的 reason 喂回模型，模型自动换工具重试 ════
 [[bash]]
-name     = "prefer-ripgrep"
 cmd      = "grep"
 decision = "deny"
 reason   = "工具偏好：用 rg 替代 grep"
 
 [[bash]]
-name     = "rg-no-replace"
 cmd      = "rg"
 any      = ["-r", "--replace"]
 decision = "deny"
 reason   = "rg 的 -r/--replace 是替换文本不是递归（递归本就是默认）——`-rn` 是「替换成 n」不是「递归+行号」。要行号用 -n。确需 replace 请说明理由让用户手动执行。"
 
 [[bash]]
-name     = "prefer-fd"
 cmd      = "find"
 decision = "deny"
 reason   = "工具偏好：用 fd 替代 find（fd PATTERN PATH；-name 直接写模式；-exec → fd -x）。确需 find 独有特性时说明理由。"
 
 [[bash]]
-name     = "uv-not-pip"
 cmd      = "pip"
 decision = "deny"
 reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
 
 [[bash]]
-name     = "uv-not-pip3"
 cmd      = "pip3"
 decision = "deny"
 reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
 
 [[bash]]
-name     = "uv-not-python"
 cmd      = "python"
 decision = "deny"
 reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
 
 [[bash]]
-name     = "uv-not-python3"
 cmd      = "python3"
 decision = "deny"
 reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
 
 [[bash]]
-name     = "npm-not-pnpm"
 cmd      = "npm"
 decision = "deny"
 reason   = "JS 包管理用 pnpm 替代 npm（pnpm install / pnpm add / pnpm run …）。确需 npm 独有行为说明理由让用户手动执行。"
@@ -99,28 +87,24 @@ reason   = "JS 包管理用 pnpm 替代 npm（pnpm install / pnpm add / pnpm run
 # ════ 通用工具规则 ════
 
 [[tool]]
-name     = "gh-not-webfetch-github"
 tool     = "WebFetch"
 where    = { url = { domain = "github.com" } }
 decision = "deny"
 reason   = "GitHub 操作一律用 gh CLI."
 
 [[tool]]
-name     = "no-dotenv-read"
 tool     = "Read"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥，不直接读。需要时让用户摘录非敏感字段，或读 .env.example。"
 
 [[tool]]
-name     = "no-dotenv-edit"
 tool     = "Edit"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
 
 [[tool]]
-name     = "no-dotenv-write"
 tool     = "Write"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
@@ -129,21 +113,18 @@ reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户
 # ════ ~/.zshrc 不受 dotfiles 接管，且可能含 API key ════
 
 # [[tool]]
-# name     = "no-zshrc-read"
 # tool     = "Read"
 # where    = { file_path = { glob = ["**/.zshrc"] } }
 # decision = "deny"
 # reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接读。需要 shell 配置内容时读 ~/dotfiles/tree/home/.zshrc_dotfiles（受管源）。"
 #
 # [[tool]]
-# name     = "no-zshrc-edit"
 # tool     = "Edit"
 # where    = { file_path = { glob = ["**/.zshrc"] } }
 # decision = "deny"
 # reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
 #
 # [[tool]]
-# name     = "no-zshrc-write"
 # tool     = "Write"
 # where    = { file_path = { glob = ["**/.zshrc"] } }
 # decision = "deny"

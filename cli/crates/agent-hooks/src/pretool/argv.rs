@@ -1,4 +1,4 @@
-//! 命令行词法：链式切段、shlex 分词、短旗标收集。
+//! 为 Bash 规则提供链式切段、shlex 分词与短旗标收集。
 
 use std::collections::BTreeSet;
 use std::iter::Peekable;

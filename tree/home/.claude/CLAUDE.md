@@ -2,7 +2,7 @@
 
 ## Claude Code 侧
 
-- 上面「工具偏好」里标 hook 的条目由 `cc-hook`（本仓库 `cli/crates/cc-hooks/`）在 PreToolUse 阶段真正拦截，用错会被打回让你换；不是建议而是硬失败。
+- 上面「工具偏好」里标 hook 的条目由 `agent-hook`（本仓库 `cli/crates/agent-hooks/`）在 PreToolUse 阶段启发式阻拦并给出替代方案；它用于引导模型，不是不可绕过的安全边界。
 ## 沟通
 
 - 直说结论，不谄媚不奉承；发现我说错了直接指出，别顺着我
@@ -58,7 +58,7 @@ struct A {x,y,Z}
 ## 工具偏好
 
 下文提到的工具都已经安装， 可以直接使用
-部分由 cc-hook 强制（标「hook」），用错会被拦回让你换；其余是建议。
+部分由 agent-hook 启发式阻拦（标「hook」），用错会被打回让你换；其余是建议。
 
 **搜索 / 导航**
 - rg 替代 grep (hook)。易错:`-r` 是 `--replace` 不是 recursive(递归本就是默认),千万别写 `rg -rn`(=`-r n`,把每个匹配替换成字面 `n`、还没行号)——要行号就 `rg -n`;默认跳过 .gitignore/hidden(.git、target 等),搜全用 `-uu`;pattern 是正则,字面量用 `-F`

@@ -1,4 +1,4 @@
-//! 规则匹配：hook 负载 × 规则集 → 首条命中。
+//! 将 hook 负载与规则集匹配为首条命中。
 //!
 //! - [`check_bash`]：原始命令串逐段（链式命令拆开）过 `[[bash]]` 规则
 //! - [`check_tool`]：`tool_name` + `tool_input` 字段过 `[[tool]]` 规则
@@ -228,11 +228,9 @@ mod tests {
     use super::*;
     use crate::pretool::rules::Decision;
 
-    /// 引擎语义 fixture：只为覆盖匹配逻辑（含生产表没有的探针规则），**无需镜像生产表**。
-    /// 生产规则的正确性由 tests/e2e_production_rules.rs 读真 pretool.toml 覆盖。
+    /// 只覆盖匹配逻辑的固定语义，不镜像生产规则。
     const RULES: &str = r#"
 [[bash]]
-name     = "rm-recursive"
 cmd      = "rm"
 all      = [["-r", "-R", "--recursive"]]
 path_outside = ["/tmp"]
@@ -240,14 +238,12 @@ decision = "deny"
 reason   = "rm 递归删除，仅 /tmp 下放行"
 
 [[bash]]
-name     = "git-push"
 cmd      = "git"
 subcmd   = "push"
 decision = "ask"
 reason   = "git 推送"
 
 [[bash]]
-name     = "git-reset-hard"
 cmd      = "git"
 subcmd   = "reset"
 any      = ["--hard"]
@@ -255,7 +251,6 @@ decision = "ask"
 reason   = "丢弃改动"
 
 [[bash]]
-name     = "git-clean-force"
 cmd      = "git"
 subcmd   = "clean"
 all      = [["-f", "--force"]]
@@ -263,7 +258,6 @@ decision = "ask"
 reason   = "丢弃改动"
 
 [[tool]]
-name     = "webfetch-github"
 tool     = "WebFetch"
 where    = { url = { domain = "github.com" } }
 decision = "deny"
@@ -271,41 +265,26 @@ reason   = "GitHub 一律 gh"
 "#;
 
     /// (输入命令, 期望命中：None=静默放行)
-    const BASH_CASES: &[(&str, Option<(&str, Decision)>)] = &[
+    const BASH_CASES: &[(&str, Option<Decision>)] = &[
         // ── deny（rm 递归删除且位置参数不落在白名单 /tmp 下）──
-        ("rm -rf ~/.cache", Some(("rm-recursive", Decision::Deny))),
-        ("rm -rf $HOME/foo", Some(("rm-recursive", Decision::Deny))),
-        ("rm -rf ~", Some(("rm-recursive", Decision::Deny))),
-        ("rm -rf /usr", Some(("rm-recursive", Decision::Deny))),
-        ("rm -rf /", Some(("rm-recursive", Decision::Deny))),
-        ("rm -rf /*", Some(("rm-recursive", Decision::Deny))),
-        ("rm -r /var/tmp/x", Some(("rm-recursive", Decision::Deny))),
-        ("rm -Rf /var/tmp/x", Some(("rm-recursive", Decision::Deny))),
-        (
-            "cd /tmp && rm -fr ~/build",
-            Some(("rm-recursive", Decision::Deny)),
-        ),
-        (
-            "cd /tmp\nrm -rf ~/build",
-            Some(("rm-recursive", Decision::Deny)),
-        ),
-        (
-            "cat list | rm -rf ~/x",
-            Some(("rm-recursive", Decision::Deny)),
-        ),
-        ("command rm -rf ~/x", Some(("rm-recursive", Decision::Deny))),
-        (
-            "rm --recursive --force ~/x",
-            Some(("rm-recursive", Decision::Deny)),
-        ),
+        ("rm -rf ~/.cache", Some(Decision::Deny)),
+        ("rm -rf $HOME/foo", Some(Decision::Deny)),
+        ("rm -rf ~", Some(Decision::Deny)),
+        ("rm -rf /usr", Some(Decision::Deny)),
+        ("rm -rf /", Some(Decision::Deny)),
+        ("rm -rf /*", Some(Decision::Deny)),
+        ("rm -r /var/tmp/x", Some(Decision::Deny)),
+        ("rm -Rf /var/tmp/x", Some(Decision::Deny)),
+        ("cd /tmp && rm -fr ~/build", Some(Decision::Deny)),
+        ("cd /tmp\nrm -rf ~/build", Some(Decision::Deny)),
+        ("cat list | rm -rf ~/x", Some(Decision::Deny)),
+        ("command rm -rf ~/x", Some(Decision::Deny)),
+        ("rm --recursive --force ~/x", Some(Decision::Deny)),
         // ── ask ──
-        ("git push origin dev", Some(("git-push", Decision::Ask))),
-        ("git push -f origin dev", Some(("git-push", Decision::Ask))),
-        (
-            "git reset --hard HEAD~1",
-            Some(("git-reset-hard", Decision::Ask)),
-        ),
-        ("git clean -fd", Some(("git-clean-force", Decision::Ask))),
+        ("git push origin dev", Some(Decision::Ask)),
+        ("git push -f origin dev", Some(Decision::Ask)),
+        ("git reset --hard HEAD~1", Some(Decision::Ask)),
+        ("git clean -fd", Some(Decision::Ask)),
         // ── 静默放行 ──
         ("git add -A", None),
         ("ls -la && cargo build", None),
@@ -325,8 +304,7 @@ reason   = "GitHub 一律 gh"
     fn bash_verdict_table() -> Result<(), toml::de::Error> {
         let config = Config::from_toml(RULES)?;
         for (command, expected) in BASH_CASES {
-            let verdict =
-                check_bash(&config, command).map(|rule| (rule.name.as_str(), rule.decision));
+            let verdict = check_bash(&config, command).map(|rule| rule.decision);
             assert_eq!(verdict, *expected, "command: {command}");
         }
         Ok(())
@@ -424,9 +402,8 @@ reason   = "GitHub 一律 gh"
 
     #[test]
     fn bad_glob_and_regex_fail_open() -> Result<(), toml::de::Error> {
-        let config = Config::from_toml(
-            "[[bash]]\nname='x'\ncmd='git'\nargs_re=['(']\ndecision='ask'\nreason='r'",
-        )?;
+        let config =
+            Config::from_toml("[[bash]]\ncmd='git'\nargs_re=['(']\ndecision='ask'\nreason='r'")?;
         assert!(check_bash(&config, "git anything").is_none());
         let bad_glob: Matcher = toml::from_str(r#"glob = "[""#).unwrap_or_default();
         assert!(!matcher_hit(&bad_glob, "anything"), "坏 glob 视为不中");

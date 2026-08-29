@@ -10,5 +10,5 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export DOTFILES_DIR="$HERE"
-# --bin dots：workspace 里还有 cc-hook 等其他 bin，不指名会歧义报错。
+# --bin dots：workspace 里还有 agent-hook，不指名会歧义报错。
 exec cargo run --release --quiet --bin dots --manifest-path "$HERE/cli/Cargo.toml" -- "$@"

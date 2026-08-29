@@ -15,8 +15,7 @@ dots.resource.symlink {
     target = dots.repo .. "/tree/home/.config/opencode/node_modules",
 }
 
--- Claude hooks：目录保持真实、逐子项链——让 cargo binary 落在机器本地目录，
--- cc-hook bin 落在真实目录、不污染仓库。
+-- Claude hooks：目录保持真实、逐子项链，使运行时本地文件能与受管 hook 共存。
 granularity("home/.claude/hooks", { mode = "children" })
 
 -- pi agent：同上，目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
@@ -75,27 +74,23 @@ distribute("agents-md", {
     mode = "file",
 })
 
--- Codex hooks 与共享规则各自住真实目录；hook 定义留在中立的 .agents/ 命名空间，
--- `pretool.toml` 是所有 harness 的规则真相源。
+-- Hook 定义与规则源都住中立的 .agents/ 命名空间，再分发到各 harness。
 distribute("codex-hooks", {
     src = "tree/home/.agents/codex/hooks.json",
     to = { "~/.codex/hooks.json" },
     mode = "file",
 })
 distribute("agent-hook-rules", {
-    src = "tree/home/.claude/hooks/pretool.toml",
-    to = { "~/.codex/pretool.toml", "~/.kimi-code/pretool.toml" },
+    src = "tree/home/.agents/hooks/pretool.toml",
+    to = {
+        "~/.claude/hooks/pretool.toml",
+        "~/.codex/pretool.toml",
+        "~/.kimi-code/pretool.toml",
+    },
     mode = "file",
 })
 
 -- 每次 plan 先编译，再按 artifact 内容收敛稳定安装位置。
-dots.resource.cargo_binary {
-    source = {
-        manifest = "cli/Cargo.toml",
-        binary = "cc-hook",
-    },
-    target = "~/.claude/hooks/cc-hook",
-}
 dots.resource.cargo_binary {
     source = {
         manifest = "cli/Cargo.toml",
