@@ -5,15 +5,11 @@ local path_utils = require("utils.path")
 
 --- dotfiles 是否可见（`.` 切换）。这是唯一真相源：filter 和右下角 footer 都读它。
 ---
---- 别改回「filter_show / filter_hide 两个静态函数 + 一个影子布尔」的写法：
---- MiniFiles.open 在 files.lua:797 是 `explorer.opts = H.normalize_opts(nil, opts)`,
---- 第一个参数写死 nil —— 即使 use_latest 从 history 取回了旧 explorer，也会丢弃它
---- 累积的 opts、用全局 setup 配置重建。于是 refresh 换上去的 filter_show 只活到本次
---- 关闭为止，而闭包里的布尔值永远不重置：关掉重开、或在新 tab 打开，footer 就会
---- 声称「显示」而实际仍在过滤。
+--- MiniFiles.open 会在 explorer 重建时从全局 setup 重新生成 opts，因此 filter 必须在
+--- 调用时读取此变量；把可见性同时存进 filter 闭包会让 footer 与实际过滤状态分叉。
 local show_dotfiles = false
 
---- 过滤器在**调用时**读 show_dotfiles，所以无论 explorer 被重建多少次都不会脱节。
+--- 在调用时读取 show_dotfiles，使重建后的 explorer 与 footer 使用同一状态。
 ---@param fs_entry { fs_type: string, name: string, path: string }
 ---@return boolean
 local filter_dotfiles = function(fs_entry)

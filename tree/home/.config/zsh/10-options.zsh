@@ -58,7 +58,7 @@ setopt always_to_end    # 补全成功后光标跳到词尾（默认停在插入
 LISTMAX=1000            # 候选超过此数才问「是否显示全部」；默认 100 太小，长列表交给菜单滚动
 
 # --- 键绑定 ---
-# 显式 emacs 模式：zsh 见 $EDITOR 含 "vi"（nvim）会自动切 viins，曾导致 Ctrl-A/E 等全部失效
+# `$EDITOR=nvim` 会让 Zsh 自动选择 viins；显式固定 emacs 模式以保证下列绑定生效。
 bindkey -e
 # Ctrl-G 用 $EDITOR 编辑当前 buffer；Esc Ctrl-G 保留默认 send-break 作为取消键
 autoload -Uz edit-command-line
@@ -66,11 +66,10 @@ zle -N edit-command-line
 bindkey '^G' edit-command-line
 # 释放 tty 流控遗产：默认 Ctrl-S 冻结终端输出（误按假死元凶）、Ctrl-Q 解冻；关掉后按键到达 zle
 setopt no_flow_control
-# 释放四键（原流控 S/Q、删词 W、删整行 U）：S 在 25-fzf-tab 启用为 live-grep、
-# Q 在 20-functions 启用为 scratch（sc），W/U 仍留白待自定义
+# 清空 Ctrl-S/Ctrl-Q/Ctrl-W/Ctrl-U：S 和 Q 由后续模块绑定，W/U 保持未绑定。
 bindkey -r '^S' '^Q' '^W' '^U'
-KEYTIMEOUT=1                      # 多字节键序列等待窗 400ms→10ms，Esc 类组合键不再迟滞
-WORDCHARS=${WORDCHARS//\//}       # 「词」不再含 /：Ctrl-←/→（及将来的删词键）按路径段移动
+KEYTIMEOUT=1                      # 多字节键序列最多等待 10ms，降低 Esc 组合键延迟
+WORDCHARS=${WORDCHARS//\//}       # 排除 /，让 Ctrl-←/→ 按路径段移动
 
 # ↑↓ 前缀历史搜索：敲了 `git ` 再按 ↑ 只翻 git 开头的历史（光标留在行尾）
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
@@ -85,6 +84,6 @@ bindkey '^[[F' end-of-line                   # End
 bindkey '^[[3~' delete-char                  # Delete
 bindkey '^[[1;5C' forward-word               # Ctrl-→ 按词前跳
 bindkey '^[[1;5D' backward-word              # Ctrl-← 按词后跳
-# Shift-Tab 反向补全（OMZ key-bindings 原有，退役对照表漏收）：主 keymap 起步反向，menuselect 内后退
+# Shift-Tab 在主 keymap 启动反向补全，在 menuselect 中后退。
 bindkey '^[[Z' reverse-menu-complete
 bindkey -M menuselect '^[[Z' reverse-menu-complete

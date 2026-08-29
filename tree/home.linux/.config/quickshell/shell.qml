@@ -28,7 +28,7 @@ import Quickshell.Hyprland._GlobalShortcuts
 ShellRoot {
     id: root
 
-    // ── 后台服务（歌词 / OSD / 通知，逻辑已从 root 抽离到 services/）──
+    // ── 后台服务：歌词 / OSD / 通知 ──
     LyricsService {}
 
     OsdService {

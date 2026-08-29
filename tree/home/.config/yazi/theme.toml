@@ -1,4 +1,3 @@
-# 主题走 flavor（vendor 在 flavors/，package.toml 锁 rev+hash），
-# 与 kitty/fzf/bat/delta 统一 Catppuccin Mocha。931 行的旧版默认主题全量拷贝已退役。
+# 主题使用 package.toml 锁定的 Catppuccin Mocha flavor，与 kitty/fzf/bat/delta 保持一致。
 [flavor]
 dark = "catppuccin-mocha"

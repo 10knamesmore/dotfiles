@@ -176,8 +176,8 @@ return {
           systemd_ls = { enabled = false }, -- 用户自定义：禁用 systemd_ls
           lua_ls = {
             -- 覆盖 lspconfig 的优先级 markers（.luarc.json 会在全体祖先搜完才轮到
-            -- stylua.toml）。nvim 0.12 把 bufname 解析成 realpath 后，本配置住在
-            -- dotfiles 仓库内，优先级语义会让 root 越过 nvim 目录落到仓库根的
+            -- stylua.toml）。bufname 解析为 realpath 后，本配置住在 dotfiles 仓库内，
+            -- 优先级语义会让 root 越过 nvim 目录落到仓库根的
             -- .luarc.json（为 dots.lua 配的），lazydev 注入随之失效。单一嵌套组 =
             -- 全部等优先级、最近者胜：nvim 配置停在自己的 stylua.toml，dots.lua 仍归仓库根 luarc。
             root_markers = { { ".luarc.json", ".luarc.jsonc", "stylua.toml", ".stylua.toml", ".git" } },
@@ -259,7 +259,7 @@ return {
           end)
         end
 
-        -- linked editing（0.12 内置，默认关闭，见 :h lsp-linked_editing_range）
+        -- linked editing 默认关闭，见 :h lsp-linked_editing_range。
         -- 注意 enable 的 filter 只吃 client_id，没有 bufnr——它是按 client 全局开的。
         if opts.linked_editing.enabled then
           Snacks.util.lsp.on({ method = "textDocument/linkedEditingRange" }, function(_, client)

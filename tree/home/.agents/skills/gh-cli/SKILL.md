@@ -34,13 +34,13 @@ description: 在需要 GitHub 相关操作、寻找合适的开源项目或解�
 - 用 `gh run ...` 与 `gh workflow ...` 处理 GitHub Actions 的运行记录、日志、重跑和手动触发。
 - 当高级子命令拿不到需要的字段，或需要分页、GraphQL、自定义请求时，用 `gh api ...`。
 
-具体命令模式见 [gh-workflows.md](/home/wanger/dotfiles/general/skills/gh-cli/references/gh-workflows.md)。
+具体命令模式见 [gh-workflows.md](references/gh-workflows.md)。
 需要完整命令说明、全部参数、示例和子命令列表时，直接查看 GitHub CLI 官方 manual 原文：<https://cli.github.com/manual/gh>。
 
 如果任务偏向开源调研或源码阅读，优先进入对应子工作流：
 
-- 寻找开源项目或解决方案：见 [open-source-discovery.md](/home/wanger/dotfiles/general/skills/gh-cli/references/open-source-discovery.md)
-- 阅读某个开源项目源码：见 [open-source-source-reading.md](/home/wanger/dotfiles/general/skills/gh-cli/references/open-source-source-reading.md)
+- 寻找开源项目或解决方案：见 [open-source-discovery.md](references/open-source-discovery.md)
+- 阅读某个开源项目源码：见 [open-source-source-reading.md](references/open-source-source-reading.md)
 
 ## 执行规则
 

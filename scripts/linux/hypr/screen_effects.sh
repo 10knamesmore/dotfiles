@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
+# 同步设置笔记本内屏和 DDC/CI 外接显示器的亮度。
+# Usage: screen_effects.sh brightness <0-100|+N|-N>
+# 依赖：brightnessctl、ddcutil、grep
+# 环境变量：无
+# 未处理的命令失败或未定义变量会立即终止；硬件命令的容错在调用点显式处理。
 set -euo pipefail
 
-# ── 屏幕背光调节 ──
-# 同时调节笔记本内屏（backlight class）和外接显示器（DDC/CI）。
-#
-# 注：色温 / 胶片颗粒的 shader 生成与热加载已整体搬进 QuickShell，见
-#   ~/.config/quickshell/services/ScreenEffectsService.qml     （状态、IPC）
-#   ~/.config/quickshell/screen-effects/lib/shaderGen.js       （黑体色温、源码拼装）
-#   ~/.config/quickshell/screen-effects/screen-effects.frag    （GLSL 主体）
-# 本脚本不再参与，也不再有 apply/toggle/warmth/grain 等子命令 —— 那些当年是给
-# waybar + 快捷键写的，面板化之后就没有调用方了。
-#
-# 背光留在脚本里是因为它跟 shader 无关：走 brightnessctl（内屏）和 ddcutil（外接），
-# 都是需要 spawn 的外部命令，QML 侧包一层没有收益。
+# 色温与颗粒效果由 `ScreenEffectsService.qml` 管理；本脚本只提供 brightness 命令。
 
 cmd="${1:-}"
 arg="${2:-}"

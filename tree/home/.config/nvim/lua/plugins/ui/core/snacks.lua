@@ -67,8 +67,7 @@ return {
       -- extmark；终端跟不上 180Hz，纯白烧（indent 的 scope/chunk 跟光标跑，受影响最大）。
       animate = { enabled = true, fps = 120 },
       -- 大文件降级：关 matchparen/fold/statuscolumn/conceal、停 completion 与 mini.animate，
-      -- 并把 treesitter 换成正则 syntax。别改回交给 LunarVim/bigfile.nvim——那个插件靠
-      -- after/plugin 自举，在 lazy 下没有 event 就永不加载，等于零保护。
+      -- 并把 treesitter 换成正则 syntax。该能力必须由已进入 setup 的 snacks.bigfile 提供。
       bigfile = { enabled = true, size = 5 * 1024 * 1024 },
       dashboard = {
         enabled = true,
@@ -115,7 +114,7 @@ return {
       profiler = { enabled = false },
       -- 必须显式出现在 opts 里才会被 setup：snacks/init.lua 只对 opts 中存在的
       -- key 补 enabled=true，缺席的模块 M.config[snack] 为 nil、UIEnter 时跳过。
-      -- setup 之后其 ui_select 默认为 true，接管 vim.ui.select（替掉 telescope-ui-select）。
+      -- setup 之后其 ui_select 默认为 true，并接管 vim.ui.select。
       picker = { enabled = true },
       indent = {
         indent = {
@@ -155,7 +154,7 @@ return {
       },
       notifier = { enabled = false }, -- 禁用，交给 noice + nvim-notify 处理
       quickfile = { enabled = true }, -- 启用快速文件访问
-      scroll = { enabled = true }, -- 平滑滚动（替代 mini.animate 的 scroll，见 mini-animate.lua）
+      scroll = { enabled = true }, -- 平滑滚动由 snacks 提供
       scratch = {
         enabled = true,
         name = "草稿",

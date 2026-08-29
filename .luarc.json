@@ -6,12 +6,7 @@
     "granularity",
     "distribute",
     "root",
-    "systemd_user",
     "scripts",
-    "on",
-    "hosts",
-    "vars",
-    "link",
     "dots"
   ]
 }

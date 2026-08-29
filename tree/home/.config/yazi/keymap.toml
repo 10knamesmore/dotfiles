@@ -1,5 +1,4 @@
-# 只写自定义键（prepend_keymap 优先于默认、其余全部继承默认——
-# 全量 keymap = [...] 是整层替换，会丢失版本新增键，已退役）。
+# 只写 prepend_keymap 以继承默认键位；全量 keymap 会整层替换并遗漏上游新增键。
 # 对照基线：https://github.com/sxyazi/yazi/blob/main/yazi-config/preset/keymap-default.toml
 # 消歧语义（yazi-fm/src/router.rs）：按列表顺序取首键匹配的第一条，
 # 多键序列 → 进等待菜单，单键 → 立即执行。prepend 在默认之前，故：

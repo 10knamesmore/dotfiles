@@ -1,6 +1,6 @@
 # TUI 多页面 / 焦点 / 分层路由
 
-这是设计多页面 TUI 时四类反复出问题的地方：**怎么建模「当前在哪个全屏页」、怎么建模「同屏哪个面板有焦点」、按键往哪一层路由、文本框 / 列表怎么复用。** 调研 13 个生产应用得出的判据与反面教材都在这里。
+本文约束多页面 TUI 的四个边界：**怎么建模当前全屏页、怎么建模同屏面板焦点、按键往哪一层路由、文本框与列表怎么复用。**
 
 核心心法一句话：**「全屏页」和「面板焦点」是两个正交概念，必须拆开建模；事件路由的优先级只能有一处真相源。**
 
@@ -48,8 +48,6 @@ impl App {
 }
 ```
 
-**实证锚点**：helix `compositor.rs` 的 `layers` 即层栈，EditorView 恒为 `layers[0]`、浮层 push 在其上；spotify-player 的 `history: Vec<PageState>`（闭集 enum 的栈）做页面下钻回退。
-
 ### ② 少量互斥页（不叠加）→ 派生 `active_layer()`
 
 页就那么几个、彼此互斥、不存在「叠在一起」（如「主列表 / 帮助 / 输入框」三选一），不必上栈——写**一个派生函数**，按各组件的 visible / 优先级当场算出当前活跃层。渲染和路由共用这一个函数，天然不会漂移：
@@ -77,17 +75,15 @@ impl App {
 }
 ```
 
-**实证锚点**：yazi `core.rs` 单个派生函数读各组件 visible、按优先级算出活跃层，渲染与输入路由共用。
-
 ### 反面教材：单 enum 兼任「页面 + 焦点 + 输入路由」三职
 
-television 用一个 `Mode` enum 同时表达页面、焦点、输入路由，结果 8 处 `match self.mode` 平行散落各文件。每加一个态要全量补 8 处 arm，**漏补一处就静默退化**（某个分支默默走 `_ =>` 吞掉，不报错、最难查）。
+用一个 `Mode` enum 同时表达页面、焦点和输入路由，会让 `match self.mode` 平行散落到多个文件。每加一个状态都必须同步补齐全部 arm；漏补的分支可能落入 `_ =>` 并静默吞掉输入。
 
 > 必须把「全屏页是哪个」与「面板焦点在哪」拆成两个正交概念（见下一节）。一个 enum 别既当导航又当焦点又当输入模式。
 
 ### Rust 提醒
 
-- **页面身份优先闭集 enum + 手动转发**（spotify-player 的 `PageState`），而不是 `Vec<Box<dyn Page>>` + downcast。后者要靠 `type_name` 字符串反查「现在是不是某页」（helix 就这么干），脆弱、易错、重构即断。闭集 enum 的 `match` 是穷尽的，加一页编译器逼你补全所有分支。
+- **页面身份优先闭集 enum + 手动转发**，而不是 `Vec<Box<dyn Page>>` + downcast。依赖 `type_name` 字符串反查页面身份会在重命名时失效；闭集 enum 的穷尽 `match` 会要求新增页面补全所有分支。
 - **取栈顶别 `expect("non-empty")`**（撞 `unwrap_used` / `expect_used` 禁用 lint）。要么入口页恒驻、`last().unwrap_or(&Idle)` 兜底，要么用「非空栈」类型（`(T, Vec<T>)` 头 + 尾）从类型上保证非空。
 
 ---
@@ -135,13 +131,11 @@ impl Focus {
 }
 ```
 
-**实证锚点**：spotify-player 的 `impl_focusable!` 宏就是按相邻对生成 `next/previous`。
-
 **focus 栈 ≠ 焦点环。** focus 栈只用于「打开浮层时记住来时焦点、关闭后撤销返回上一焦点」这种**撤销语义**；日常 Tab 循环切面板用上面的枚举环。两者别混。
 
 ### 反对「一个全局 focus 字段管所有面板」
 
-tui-realm 用一个全局焦点指针管所有组件，作者自己都得手写一大堆 `Blur` Msg 来回同步——这是反面。焦点字段属于**它所服务的那个页**，跟着页的生命周期走；页一关，它的焦点状态随之消失，不留全局垃圾。
+全局焦点指针要求每次切换时向多个组件同步 focus/blur 状态，容易产生双写漂移。焦点字段属于**它所服务的那个页**，跟着页的生命周期走；页关闭后，其焦点状态一起消失。
 
 ---
 
@@ -151,9 +145,7 @@ tui-realm 用一个全局焦点指针管所有组件，作者自己都得手写�
 
 输入优先级（浮层吃键 > 当前页吃键 > 全局快捷键兜底）**只能写一遍**——要么是「层栈逆序冒泡」（见 architecture-patterns.md），要么是「派生 `active_layer()`」。**严禁在「按键 handler」和「上下文采集」两处各写一遍。**
 
-> 真实事故：某 server-client 音乐 TUI 里，`handle_key`（决定这个键给谁吃）的视图判定顺序，和 `collect_key_context`（决定底栏提示 / 帮助显示什么键）的视图判定顺序，是**两段独立的 if-else**。后者漏掉了一个浮层分支，于是「键能按、但提示不显示该浮层的键位」——两处优先级漂移，且只在那一个浮层下才暴露，极难定位。
->
-> 正解：优先级判定抽成**一个函数**（`active_layer()` 或层栈），吃键和采集上下文都调它，物理上没法漂移。
+> 若 `handle_key` 与 `collect_key_context` 各自维护一份视图优先级，漏掉任一浮层分支就会出现按键有效但提示缺失。两者必须共用 `active_layer()` 或同一层栈。
 
 ### 组件返回意图，不就地做副作用
 
@@ -189,11 +181,9 @@ fn run_intent(&mut self, intent: Intent) -> color_eyre::Result<()> {
 
 两个收益：①「组件 = 纯输入→Response 映射」**可单测**，喂键断言返回的 `Response` 即可，不用起后端；② **server-client 架构下 UI 进程天然不产生副作用**，所有改动都收敛到顶层一条意图通道。
 
-**实证锚点**：helix 的 `EventResult::Consumed(Option<Callback>)`、ncspot 的 `CommandResult`、lazygit 的 `CommandResult`——三者同构，都是「组件返回结果对象 + 顶层执行」。
-
 ### 配套：`on_action`（结构化）优先于 `on_key`（裸键）
 
-组件接口优先收**结构化 Action**（`on_action(Action)`）而非裸 `KeyEvent`（`on_key`）。裸键到 Action 的映射在顶层按 config keymap 做一次，组件只认语义动作。**别在组件里硬编码物理键**——helix 的 Picker 把 Tab / Enter 写死在组件里，用户无法重映射，是反面。
+组件接口优先收**结构化 Action**（`on_action(Action)`）而非裸 `KeyEvent`（`on_key`）。裸键到 Action 的映射在顶层按 config keymap 做一次，组件只认语义动作。组件内硬编码物理键会绕过用户 keymap，使重映射失效。
 
 ```rust
 // ❌ 组件里硬编码物理键：用户改不了，config keymap 形同虚设
@@ -307,15 +297,10 @@ impl<T> ListSelect<T> {
 }
 ```
 
-**实证锚点**：ncspot 的 `ListView<I>`、television 的 `Picker<T>` 都是这种「一份逻辑、泛型复用」的列表原语。Rust 里强类型偏好**泛型**而非 `Box<dyn>` 的 trait object 列表——编译期单态化、无虚调用、`T` 的方法直接可用。
+Rust 列表原语优先用泛型复用选择与滚动逻辑，而不是为固定元素类型引入 `Box<dyn>`；泛型保留具体类型方法并避免虚调用。
 
 ---
 
 ## 参考链接
 
-- helix compositor：https://github.com/helix-editor/helix/blob/master/helix-term/src/compositor.rs
-- spotify-player 页面 / 焦点：https://github.com/aome510/spotify-player
-- yazi 活跃层派生：https://github.com/sxyazi/yazi
-- ncspot ListView：https://github.com/hrkfdn/ncspot
-- tui-input 三段式：https://github.com/sayanarijit/tui-input
 - unicode 分段 / 宽度：https://docs.rs/unicode-segmentation/ ・ https://docs.rs/unicode-width/

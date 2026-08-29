@@ -1,8 +1,7 @@
 //! 端到端：用**真实生产规则表** `tree/home/.claude/hooks/pretool.toml`（`include_str!` 编译期
 //! 内联，改规则即触发本测试重编译）跑真 `cc-hook` 二进制，断言关键命令的决策。
 //!
-//! 让生产规则的正确性进 `cargo test`——不再只靠部署后的 `cc-hook-test` 黑盒兜底，
-//! 也消除「改生产表忘了同步测试 fixture」这类漂移（本测试读的就是那张真表）。
+//! 测试直接读取生产规则表，不维护会与生产规则漂移的副本。
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -63,7 +62,7 @@ fn production_rules_parse_and_decide() {
         ("rm -rf /tmp/x", None),             // 白名单 /tmp 内放行
         ("rm -rf /", Some("ask")),           // 根目录需确认
         ("grep foo file.txt", Some("deny")), // prefer-rg（合成 fixture 里没有）
-        ("git push origin main", None),      // push 守卫已移除，静默放行
+        ("git push origin main", None),      // 未配置 push 守卫，静默放行
         ("git add -A", None),
         // ── chmod 全局可写 ──
         ("chmod 777 file", Some("ask")),

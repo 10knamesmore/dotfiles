@@ -1,7 +1,7 @@
 //! cc-hook：Claude Code hooks 统一入口。
 //!
-//! 子命令 = CC 生命周期事件（pretool → PreToolUse；将来 posttool/stop 同理）；
-//! 事件内的工具差异全部下沉到规则 TOML。业务函数不做 IO，统一返回
+//! `pretool` 对应 PreToolUse 生命周期事件；工具差异全部下沉到规则 TOML。
+//! 业务函数不做 IO，统一返回
 //! [`cc_hooks::outcome::HookRun`]，由 [`wire`] 落地（stdout/stderr/exit code）。
 //! **任何失败都静默放行（exit 0）**——fail-open 铁律。
 

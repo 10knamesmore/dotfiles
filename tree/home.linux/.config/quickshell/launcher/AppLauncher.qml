@@ -138,7 +138,7 @@ PanelOverlay {
         // 必须 execute()（内部走 execDetached），别退回复用一个 Process：Process 是有状态的，
         // 子进程未退出时 startProcessIfReady() 直接 return，赋新 command 会被静默丢弃——
         // 启动过任何一个长命 GUI 应用后，launcher 就再也启动不了第二个。
-        // execute() 顺带带上 .desktop 的 Path= 工作目录，且应用不再是 quickshell 的子进程。
+        // execute() 同时应用 .desktop 的 Path= 工作目录，并以 detached 进程启动应用。
         item.entry.execute();
         PanelState.launcherOpen = false;
     }
@@ -281,8 +281,7 @@ PanelOverlay {
                     }
                 ]
 
-                // 只对 hover 进/出过渡，selected 切换立即吸附 —— 键盘快速上下选择时
-                // 不再触发一连串 ColorAnimation
+                // 只为 hover 进出添加过渡；selected 切换立即生效，避免键盘选择触发连续动画。
                 transitions: [
                     Transition {
                         from: ""; to: "hovered"

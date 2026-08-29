@@ -38,12 +38,12 @@ QtObject {
     // hover/描边叠色的中性基色：暗色主题用白、亮色(latte)用黑，随 flavor 自适应
     readonly property color overlayBase: isLight ? "#000000" : "#ffffff"
 
-    // 把调色板色带上 alpha —— 取代全库 Qt.rgba(Colors.X.r, .g, .b, a) 样板
+    // 为任意调色板颜色附加 alpha。
     function withAlpha(c, a) {
         return Qt.rgba(c.r, c.g, c.b, a);
     }
 
-    // 中性 hover/描边叠色（自适应亮暗）—— 取代散落的 Qt.rgba(1,1,1,a) 魔法值
+    // 生成随亮暗主题切换基色的中性 hover/描边叠色。
     function overlay(a) {
         return Qt.rgba(overlayBase.r, overlayBase.g, overlayBase.b, a);
     }

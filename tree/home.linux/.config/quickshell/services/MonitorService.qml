@@ -270,7 +270,7 @@ Scope {
                     MonitorState.errorMsg = "";
                     // 请求了 HDR 的屏留待下一次查询回读验证（hyprctl eval 对不支持的屏不报错）
                     root._hdrProbe = (applyProc._layouts || []).filter(function (l) { return MM.isHdr(l); });
-                    root.queryMonitors(false); // 刷新显示，不再对账
+                    root.queryMonitors(false); // 只刷新显示，跳过 reconciliation
                     if (applyProc._withRevert) {
                         MonitorState.revertSecs = root._revertSeconds;
                         countdown.start();

@@ -57,8 +57,7 @@ function isHdr(layout) {
 }
 
 // ipc(hyprctl monitors -j 单条) → color 子对象的唯一入口。
-// 别在调用方手写这个映射：曾经 MonitorService 和 layoutFromIpc 各拼了一份，
-// 新增 sdrMaxLuminance 时漏改其中一处，面板读到的白点就永远停在默认 80。
+// 调用方必须复用此函数；分散映射会遗漏色彩字段，并使 UI 回落到错误的默认值。
 function colorFromIpc(ipc) {
     return colorOf({
         color: {
@@ -204,7 +203,7 @@ function putProfile(store, sig, profile) {
 }
 
 // 存档(按稳定 id) → 可应用的布局列表(用当前 name)。
-// 同一物理屏即便换了接口名，也能凭稳定 id 还原到现在的 name。
+// 同一物理屏更换接口名后，仍按稳定 id 映射到当前 name。
 function layoutFromProfile(profile, currentIpcList) {
     var out = [];
     currentIpcList.forEach(function (ipc) {

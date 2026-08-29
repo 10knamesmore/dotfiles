@@ -55,8 +55,7 @@ function M.format(component, text, hl_group)
   return component:format_hl(lualine_hl_group) .. text .. component:get_default_hl()
 end
 
---- 规范化文件路径，展开 `~` 并统一路径分隔符。
---- 实现在 utils/init.lua，这里只转发——两份拷贝曾经分叉过（那边缺 home 为 nil 的守卫）。
+--- 通过 `utils.norm` 规范化路径，避免维护第二份实现。
 ---@param path string
 ---@return string
 function M.norm(path)

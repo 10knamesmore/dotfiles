@@ -1,108 +1,89 @@
 ---@meta
---- dots.lua 的类型标注（LuaLS）。
---- 让 nvim/LuaLS 对 dots.lua 提供字段补全、签名提示、类型检查。
---- 此文件不被执行，仅供编辑期类型推导（由 .luarc.json 的 workspace.library 引入）。
+--- dots.lua 的 LuaLS 声明。所有 sync 持续结果必须通过 Resource 或 mapping declaration 表达。
 
 ---@class GranularitySpec
----@field mode? "dir"|"children"|"file"   # 链接粒度，缺省 "dir"
----@field ignore? string[]                # 下钻/逐文件时跳过的子项名
----@field pre? fun(): boolean?            # 条目链接前执行；返回 false 则整条目跳过
----@field post? fun()                     # 条目链接后执行（被 pre 阻止则不执行）
+---@field mode? "dir"|"children"|"file" 链接粒度，缺省为 "dir"
+---@field ignore? string[] 下钻或逐文件时跳过的子项名
 
---- 覆盖某 tree 内路径的链接粒度。
----@param path string                      # 相对 tree 的路径，如 "home/.config/opencode"
----@param spec GranularitySpec
+--- 覆盖 tree 内某路径的链接粒度。
+---@param path string 相对 tree 的路径，如 "home/.config/opencode"
+---@param spec GranularitySpec 粒度设置
 function granularity(path, spec) end
 
 ---@class DistributeSpec
----@field src string                       # 唯一真相源（仓库内），如 "tree/home/.agent/skills"
----@field to string[]                      # 落点列表（$HOME 侧，可用 ~）
----@field mode? "dir"|"children"|"file"    # 落点粒度，缺省 "dir"
----@field pre? fun(): boolean?             # 分发前执行；返回 false 则整个分发跳过
----@field post? fun()                      # 分发完成后执行（被 pre 阻止则不执行）
+---@field src string 仓库内唯一真相源
+---@field to string[] 目标列表，可使用 `~`
+---@field mode? "dir"|"children"|"file" 目标粒度，缺省为 "dir"
 
---- 一源多落点分发（接入新工具 = to 加一行 + dots sync）。
----@param name string                       # 分发组标识，仅用于人类可读输出（pre 跳过时的提示），不参与链接判定
----@param spec DistributeSpec
+--- 把一份仓库 source 映射到多个工具目录。
+---@param name string 用于诊断的分发组名
+---@param spec DistributeSpec 分发设置
 function distribute(name, spec) end
 
 ---@class RootSpec
----@field path string                      # 目标根（$HOME 外的绝对/~ 路径）
----@field os? "linux"|"macos"              # 仅该平台生效；nil 为全平台
+---@field path string 额外 tree layer 的绝对目标根或 `~` 路径
+---@field os? "linux"|"macos" 仅在指定平台启用
 
---- 声明非 $HOME 镜像的额外层（罕见，如 macOS App Support）。
----@param name string                      # 对应 tree/<name>
----@param spec RootSpec
+--- 声明非 `$HOME` 的额外 tree layer target root。
+---@param name string 对应 `tree/<name>` 的 layer 名
+---@param spec RootSpec target root 设置
 function root(name, spec) end
 
---- 声明 systemd user 单元（sync 时 systemctl --user enable，幂等）。
----@param units string[]
-function systemd_user(units) end
-
 ---@class ScriptsSpec
----@field ignore_tree? string[]            # 聚合时递归拍平其文件的子目录名（子目录默认整目录链保树形）
+---@field ignore_tree? string[] 递归拍平的 scripts 子目录；其他子目录保持树形
 
---- scripts 聚合选项。
----@param spec ScriptsSpec
+--- 配置 scripts 聚合行为。
+---@param spec ScriptsSpec 聚合设置
 function scripts(spec) end
 
----@alias HookPhase "pre_sync"|"on_host_activate"|"post_link"|"post_sync"
+---@class ResourceSpecBase
+---@field enabled? boolean false 表示本次不进入 Desired Set；缺省为 true
 
---- 注册生命周期钩子（effect 阶段执行）。
---- 表形式：phase 做 key，value 是单个函数或函数数组（同 phase 多钩子按数组序执行）。
----@param hooks table<HookPhase, fun()|fun()[]>
-function on(hooks) end
+---@class SymlinkResourceSpec: ResourceSpecBase
+---@field source string 相对仓库根、绝对或 `~` source path
+---@field target string 绝对或 `~` target path
 
---- per-host 块表：hostname → 配置闭包。未命中当前机且非空 → sync 硬报错。
----@param blocks table<string, fun()>
-function hosts(blocks) end
+---@class CopiedFileResourceSpec: ResourceSpecBase
+---@field source string 相对仓库根、绝对或 `~` source file
+---@field target string 绝对或 `~` target file
 
---- 设置 per-host 注入变量（仅在 hosts 块/钩子内调用）。
----@param tbl table<string, string>
-function vars(tbl) end
+---@class CargoWorkspaceBinarySource
+---@field manifest string 相对仓库根、绝对或 `~` Cargo.toml path
+---@field binary string Cargo binary target 名称
 
---- 声明 per-host 专属链接（仅在 hosts 块内调用）。
----@param src string                       # 仓库内相对路径
----@param target string                    # $HOME 侧目标（可用 ~）
-function link(src, target) end
+---@class CargoWorkspaceBinaryResourceSpec: ResourceSpecBase
+---@field source CargoWorkspaceBinarySource 仓库内 binary source
+---@field target string 绝对或 `~` 安装位置
 
----@class ToolchainsSpec
----@field only? string[]                   # 白名单：只装这些组（与 skip 互斥）
----@field skip? string[]                   # 黑名单：这些组不装
+---@class CargoCratesIoBinaryResourceSpec: ResourceSpecBase
+---@field source string crates.io package 名称；全部 bin 安装到 `~/.cargo/bin`
 
---- 声明 bootstrap 工具链安装范围（仅在 hosts 块内调用）。
---- 组名 = packages/toolchains.toml 的 [节头]；不声明 = 全装；未知组名 bootstrap 时警告。
----@param spec ToolchainsSpec
-function toolchains(spec) end
+---@alias CargoBinaryResourceSpec CargoWorkspaceBinaryResourceSpec|CargoCratesIoBinaryResourceSpec
 
----@class DotsJson
----@field merge fun(path: string, tbl: table)              # 读-改-写 JSON：合并 tbl、保留其余键
----@field set fun(path: string, keypath: string, value: any) # 设某 keypath（如 "hooks.Stop"）
----@field decode fun(text: string): table|nil, string?     # JSON 文本 → Lua 表（null→nil）；坏 JSON 返回 nil + 错误信息
+---@class ManagedBlockResourceSpec: ResourceSpecBase
+---@field target string 绝对或 `~` 文本文件
+---@field marker string 文件内稳定且唯一的 block 名称
+---@field content string 两条 marker 之间的期望内容
 
----@class DotsFile
----@field ensure_block fun(path: string, marker: string, content: string) # 文本 managed-block 幂等替换
----@field install fun(src: string, dest: string)      # 原子安装文件：无差异跳写；temp+rename（免 ETXTBSY）、保留权限位
+---@class SystemdUserUnitResourceSpec: ResourceSpecBase
+---@field unit string systemd user unit 名称
 
----@class DotsCargo
----@field build fun(dir: string, bin: string): string|nil, string? # release 编译 dir 下的 bin，返回产物绝对路径；失败/dry-run 返回 nil + 原因
+---@class DotsResource
+---@field symlink fun(spec: SymlinkResourceSpec) 声明符号链接
+---@field copied_file fun(spec: CopiedFileResourceSpec) 声明内容复制文件
+---@field cargo_binary fun(spec: CargoBinaryResourceSpec) 声明编译并安装的 Cargo binary
+---@field managed_block fun(spec: ManagedBlockResourceSpec) 声明文本 marker block
+---@field systemd_user_unit fun(spec: SystemdUserUnitResourceSpec) 声明 enabled 的 systemd user unit
 
----@class DotsRunResult
----@field code integer                     # 退出码（被信号杀死等无退出码 → -1）
----@field stdout string                    # 捕获的标准输出
----@field stderr string                    # 捕获的标准错误
----@field ok boolean                       # code == 0 的便捷判断
+---@class DotsPath
+---@field exists fun(path: string): boolean 声明阶段只读判断路径是否存在
 
 ---@class Dots
----@field host string                      # 当前主机名（只读）
----@field os "linux"|"macos"               # 当前平台（只读）
----@field home string                      # $HOME（只读）
----@field repo string                      # 仓库根（只读）
----@field json DotsJson                    # JSON 写原语（effect 阶段）
----@field file DotsFile                    # 文本写原语（effect 阶段）
----@field cargo DotsCargo                  # cargo 集成（effect 阶段）
----@field run_once fun(key: string, cmd: string): boolean # 幂等执行一次性命令
----@field run fun(cmd: string): DotsRunResult # 每次 sync 都执行（dry-run 跳过、ok=true）；非零退出留一行告警不致命
+---@field os "linux"|"macos" 当前平台
+---@field home string 当前 `$HOME`
+---@field repo string 当前 dotfiles 仓库根
+---@field resource DotsResource 显式 Resource declaration
+---@field path DotsPath 声明阶段只读 path query
 
 ---@type Dots
 dots = {}

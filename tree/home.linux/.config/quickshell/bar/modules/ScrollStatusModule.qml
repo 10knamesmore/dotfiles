@@ -185,7 +185,7 @@ BarModule {
             hoverAddress = "";
     }
     onScrolled: delta => {
-        // Hyprland 7.0+ dispatch 串按 lua 解析，须用 hl.dsp.* dispatcher 写法
+        // dispatch 字符串按 Lua 解析，必须使用 hl.dsp.* dispatcher。
         Hyprland.dispatch('hl.dsp.layout("colresize ' + (delta > 0 ? "+" : "-") + '0.05")');
     }
 
@@ -204,8 +204,7 @@ BarModule {
         }
     }
 
-    // 事件驱动：监听 Hyprland IPC 事件，仅在窗口/工作区变化时 fetch（debounce 合并突发事件）。
-    // 取代旧的 100ms 无条件轮询 —— 空闲时完全不调用 hyprctl。
+    // 监听 Hyprland IPC，仅在窗口或工作区变化时 fetch；debounce 合并突发事件，空闲时不调用 hyprctl。
     Connections {
         target: Hyprland
         function onRawEvent(event) {

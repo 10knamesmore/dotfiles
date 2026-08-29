@@ -894,7 +894,7 @@ PanelOverlay {
                     }
                     ProcHeader {}
                     Repeater {
-                        // 仅当前 tab 填充：隐藏 tab 的进程列表不再每 1.5s 重建 16 个 ProcRow
+                        // 仅当前 tab 构建进程列表，隐藏 tab 不创建 ProcRow。
                         model: root.currentTab === "cpu" ? root.topProcs(false) : []
                         delegate: ProcRow {
                             required property var modelData
@@ -1143,7 +1143,7 @@ PanelOverlay {
                     }
                     ProcHeader {}
                     Repeater {
-                        // 仅当前 tab 填充：隐藏 tab 的进程列表不再每 1.5s 重建 16 个 ProcRow
+                        // 仅当前 tab 构建进程列表，隐藏 tab 不创建 ProcRow。
                         model: root.currentTab === "memory" ? root.topProcs(true) : []
                         delegate: ProcRow {
                             required property var modelData

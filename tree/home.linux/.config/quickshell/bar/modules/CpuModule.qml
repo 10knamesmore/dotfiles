@@ -13,8 +13,7 @@ BarModule {
     readonly property var barColors: ["#69ff94", "#2aa9ff", "#f8f8f2", "#f8f8f2", "#ffffa5", "#ffffa5", "#ff9977", "#dd532e"]
     // 构建彩色柱状图富文本
     property string chartHtml: {
-        // 只在 hover 展开时构建 per-core 富文本；隐藏时提前返回，靠 QML 动态依赖追踪
-        // 自动摆脱对 cpuCorePcts 的订阅 —— 隐藏态不再每秒重算（per-screen ×2）。
+        // 只在 hover 展开时读取 cpuCorePcts；QML 动态依赖追踪保证隐藏态不参与每秒重算。
         if (!root.hovered)
             return "";
         let cores = SystemStats.cpuCorePcts;

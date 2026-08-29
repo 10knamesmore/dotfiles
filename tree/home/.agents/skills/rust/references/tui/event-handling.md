@@ -186,7 +186,7 @@ fn handle_key(&mut self, key: KeyEvent) -> Result<Option<Action>> {
 }
 ```
 
-> **警示：别让单个 `mode` enum 兼任「页面 + 焦点 + 输入路由」三职。** 这里的 `mode` 只该表达「同一组键如何被解释」（输入模式）。一旦它还兼当「现在是哪个全屏页」「哪个面板有焦点」，`match self.mode` 就会在多个文件里平行散落（television 有 8 处），加一个态要全量补 arm、漏一处静默退化。把全屏页、面板焦点、输入模式拆成正交概念，详见 `references/tui/page-focus-routing.md`。
+> **警示：别让单个 `mode` enum 兼任「页面 + 焦点 + 输入路由」三职。** 这里的 `mode` 只该表达「同一组键如何被解释」（输入模式）。混合三个概念会让 `match self.mode` 在多个文件中平行散落；新增状态时漏补任一 arm 都可能静默退化。把全屏页、面板焦点、输入模式拆成正交概念，详见 `references/tui/page-focus-routing.md`。
 
 ```rust
 fn handle_insert_key(&mut self, key: KeyEvent) -> Result<Option<Action>> {
@@ -218,7 +218,7 @@ fn handle_insert_key(&mut self, key: KeyEvent) -> Result<Option<Action>> {
 ## 鼠标事件处理
 
 ```rust
-// Cargo.toml: crossterm = { version = "0.28", features = ["event-stream"] }
+// Cargo.toml 中为 crossterm 启用 event-stream feature。
 // 启用鼠标捕获
 crossterm::execute!(stdout, EnableMouseCapture)?;
 

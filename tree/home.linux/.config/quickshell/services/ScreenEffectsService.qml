@@ -4,15 +4,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 屏幕效果常驻服务（仿 MonitorService：非单例 Scope，在 shell.qml 实例化一次）。
-// 负责：读写状态 JSON、生成 GLSL、热加载进 Hyprland、转发背光调节。
-// 数据写入 ScreenEffectsState 供 UI 读取。
-//
-// 为什么整条链路在 QML 而不是 shell 脚本：shader 生成的唯一消费者就是这个面板，
-// 过去却绕成「QML → spawn sh 写 JSON → spawn bash → jq/awk/sed → hyprctl」，
-// 每次 apply 约 12 个进程。收进来后只剩 hyprctl 一次 spawn，JSON 是原生的、
-// 数字格式化不经 locale、写盘是原子的。scripts/linux/hypr/screen_effects.sh
-// 现在只剩 brightness 一个子命令（brightnessctl + ddcutil 封装）。
+// 屏幕效果常驻服务，在 shell.qml 中实例化一次。
+// 本服务读写状态 JSON、生成 GLSL、热加载 Hyprland，并把状态写入 ScreenEffectsState。
+// shader 写入使用原子 FileView，不经过 locale 文本工具；背光调节委托给
+// scripts/linux/hypr/screen_effects.sh 的 brightness 命令。
 Scope {
     id: root
 
@@ -172,8 +167,7 @@ Scope {
         // 而 Process.running = true 只是排队、不阻塞。
         onExited: {
             root._load();
-            // 开机恢复上次效果。过去由 hyprland.lua 的 exec_cmd 调脚本负责，现在归这里 ——
-            // quickshell 本来就是 exec_once 拉起的，少一个进程和一份重复逻辑。
+            // 服务启动后恢复持久化状态，并立即应用对应效果。
             root._apply(root._current());
         }
     }

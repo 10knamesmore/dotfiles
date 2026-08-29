@@ -1,7 +1,7 @@
-# dots 管理的 zsh 主配置（Oh My Zsh 已退役，模块在 ~/.config/zsh/*.zsh）。
+# dots 管理的 Zsh 主配置；功能模块位于 ~/.config/zsh/*.zsh。
 # 改主配置改 tree/home/.zshrc_dotfiles；平台差异改 .zshrc_linux/.zshrc_macos。
 
-# dots 注入：DOTFILES_DIR / DOTS_SCRIPTS / PATH（替代旧 *_TEMPLATE 模板变量）
+# 加载 dots 生成的 DOTFILES_DIR、DOTS_SCRIPTS 与 PATH。
 source "$HOME/.config/dots/env.zsh"
 
 export EDITOR="nvim"
@@ -13,7 +13,7 @@ alias skill="cd $DOTFILES_DIR/tree/home/.agents/skills"
 
 # PATH
 [[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
-# Node 官方 tarball 落点（由 packages/toolchains.toml [js] 组安装，免版本管理器）
+# 本机若把 Node 安装到固定用户目录，则将其加入 PATH。
 [[ -d "$HOME/.local/share/node/bin" ]] && export PATH="$HOME/.local/share/node/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -40,7 +40,7 @@ command -v uv >/dev/null && {
     [[ -s "$_uvcomp" ]] && source "$_uvcomp"
 }
 proxy
-command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 替代旧 OMZ z 插件
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 提供 z 目录跳转
 # 补全覆盖：`z 词<Tab>` 直接进 fzf（默认要「空格+Tab」才进，词贴着光标时只补本地子目录）。
 # init 已 compdef z → __zoxide_z_complete，重定义函数体即可生效；选中后由 init 的 helper 直接跳转。
 # 须同时有 fzf：query --interactive 底层调 fzf，无 fzf 的服务器保留 zoxide 默认补全（补本地目录）。

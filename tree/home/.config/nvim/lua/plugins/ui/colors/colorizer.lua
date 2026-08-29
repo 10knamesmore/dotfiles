@@ -55,7 +55,7 @@ return {
           mode = "background", -- 使用背景色高亮（可选值：'background'、'foreground'、'virtualtext'）
           virtualtext = {
             char = "■", -- 用于 virtual text 模式时显示的符号
-            position = "after", -- 对应旧版 virtualtext_inline = true
+            position = "after", -- virtual text 放在颜色文本之后
             hl_mode = "foreground", -- virtual text 的颜色来自于前景色
           },
         },

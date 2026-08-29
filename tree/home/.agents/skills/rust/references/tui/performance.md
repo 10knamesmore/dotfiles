@@ -163,7 +163,7 @@ async fn good(state: Arc<Mutex<State>>) {
 
 ## 高负载场景：任务队列模式
 
-参考 [yazi](https://github.com/sxyazi/yazi) 的双优先级任务队列：
+高负载任务可以按成本拆成双优先级队列：
 
 ```rust
 // 区分轻量操作和重操作
@@ -223,7 +223,7 @@ tokio::spawn(async move {
 
 ## tokio LocalSet
 
-当所有任务可以在同一线程上运行时，用 `LocalSet` 避免跨线程同步开销（参考 yazi）：
+当所有任务可以在同一线程上运行时，用 `LocalSet` 避免跨线程同步开销：
 
 ```rust
 // 所有 spawn 的任务都在同一线程运行，不需要 Send
@@ -310,6 +310,5 @@ if self.log.len() >= MAX_LOG_LINES {
 
 - https://ratatui.rs/concepts/rendering/under-the-hood/
 - https://github.com/ratatui/ratatui/discussions/579 （性能讨论）
-- https://github.com/sxyazi/yazi （高性能异步架构参考）
 - https://keliris.dev/articles/improving-spotify-tui （异步 I/O 分离案例）
 - https://github.com/ClementTsang/bottom （实时监控 TUI 参考）

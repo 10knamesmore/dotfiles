@@ -1,9 +1,9 @@
 -- ============================================================
--- Hyprland 主配置（0.55+ Lua 入口）
+-- Hyprland Lua 主配置。
 --
 -- 一旦本文件存在，Hyprland 完全接管，忽略所有 .conf
 -- hypridle / hyprlock 仍走各自的 .conf（hyprlang）
--- 回滚：删除或重命名本文件，重启 Hyprland 即可
+-- 要切换回 .conf，删除或重命名本文件后重启 Hyprland。
 -- ============================================================
 
 local HOME = os.getenv("HOME")
@@ -19,8 +19,8 @@ end
 if not DOTFILES or DOTFILES == "" then
   DOTFILES = HOME .. "/dotfiles"
 end
-local SCRIPTS = DOTFILES .. "/.gen/scripts" -- 原 $scripts_dir
-local N = SCRIPTS -- 原 $n（原 conf 中未定义，按 SCRIPTS 同义处理）
+local SCRIPTS = DOTFILES .. "/.gen/scripts"
+local N = SCRIPTS
 
 local terminal = "kitty"
 local fileManager = "dolphin"
@@ -88,7 +88,7 @@ hl.config({
 
   render = {
     direct_scanout = 1,
-    -- 0.55 起 cm_fs_passthrough 已移除，由 cm_auto_hdr 自动处理
+    -- cm_auto_hdr 自动处理 fullscreen HDR passthrough。
   },
 
   ecosystem = { no_donation_nag = true },
@@ -131,10 +131,7 @@ hl.config({
       special = true,
       input_methods = true,
     },
-    -- 0.56 起 shadow.color 从纯色升成 gradient 类型，单字符串仍合法（被当成单 stop）。
-    -- 角度动画由 shadowangle leaf 驱动。
-    -- 同期的 decoration.glow 试过不留：那是「内发光」（CHyprInnerGlowDecoration 画在窗口
-    -- 内部、DECORATION_LAYER_OVER），淡了被 border 盖死看不见，浓了直接给贴边文字染色。
+    -- shadow.color 使用 gradient；角度动画由 shadowangle leaf 驱动。
     shadow = {
       enabled = true,
       range = 15,
@@ -143,7 +140,7 @@ hl.config({
       color_inactive = "rgba(11111b99)",
     },
 
-    -- 0.56 新增：窗口位移时的运动模糊。samples 默认 7，掉帧就往下调
+    -- 窗口位移运动模糊；掉帧时降低 samples。
     motion_blur = {
       enabled = true,
       samples = 15,
@@ -172,7 +169,7 @@ hl.config({
   },
 
   debug = {
-    vfr = true, -- 0.55 起 vfr 从 misc 搬到 debug
+    vfr = true,
   },
 })
 
@@ -188,7 +185,7 @@ hl.curve("quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } })
 hl.curve("shellDecelerate", { type = "bezier", points = { { 0.2, 0.9 }, { 0.3, 1 } } })
 hl.curve("shellStandard", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
 
--- 0.55 spring 物理动画——比 bezier 在打断时更自然
+-- spring 动画在中途打断时保持速度连续。
 -- 无回弹 ⟺ dampening ≥ 临界阻尼 2√(stiffness·mass)（源码 Spring.cpp: GAMMA<OMEGA0 才振荡）
 -- 改 stiffness 必须同步改 dampening，否则重新变欠阻尼、又开始过冲
 -- easy：稳重无弹，给工作区切换用；临界 2√150≈24.5
@@ -199,9 +196,8 @@ hl.curve("snappy", { type = "spring", mass = 1, stiffness = 200, dampening = 28.
 hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
 hl.animation({ leaf = "border", enabled = true, speed = 5.39, bezier = "easeOutQuint" })
 
--- 0.56 新增 leaf：shadow 渐变的角度动画与淡入淡出
 -- style 只接受 "loop" | "once"（AnimationManager.cpp::styleValidInConfigVar）。
--- 别改成 loop：角度会永久旋转 ⟹ 每帧重绘 ⟹ debug.vfr 白设，闲置也满负载
+-- shadowangle 必须使用 once；loop 会让角度永久旋转并导致闲置时持续重绘。
 hl.animation({ leaf = "shadowangle", enabled = true, speed = 5, bezier = "easeOutQuint", style = "once" })
 hl.animation({ leaf = "fadeShadow", enabled = true, speed = 3, bezier = "almostLinear" })
 
@@ -418,8 +414,7 @@ hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- 多媒体按键（bindel 等价：locked + repeating）
--- 0.55 起 `hyprctl dispatch global xxx` 旧语法失效，改用 lua function：
--- 先 exec_cmd 跑 shell 命令，再 dispatch global dispatcher。
+-- 多媒体键先执行 wpctl，再通过 Lua dispatcher 通知 QuickShell OSD。
 hl.bind("XF86AudioRaiseVolume", function()
   hl.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+")
   hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
@@ -463,8 +458,8 @@ hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true 
 
 -- 幂等守卫：同名进程已在跑就跳过。hyprland.start 每次 compositor 启动都触发——
 -- 对「无单实例锁」的守护（swaybg/hypridle/wl-paste），若不守卫，Hyprland 每崩溃/
--- 重启一次就再拉起一份，堆叠出孤儿进程（曾实见 3 个 hypridle 同时在跑）。
--- 依赖 exec 经 /bin/sh（`||` 短路，已实测生效）；guard 缺省取命令首 token 作进程名。
+-- 重启一次就再拉起一份，堆叠出孤儿进程。
+-- exec 通过 /bin/sh 解释 `||`；guard 缺省取命令首 token 作进程名。
 local function exec_once(cmd, guard)
   hl.exec_cmd("pidof -q " .. (guard or cmd:match("^%S+")) .. " || " .. cmd)
 end

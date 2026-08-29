@@ -106,7 +106,7 @@ map({ "n", "v" }, "K", "7gk", opts())
 map("n", "<leader>o", "o<Esc>", opts("new line below"))
 map("n", "<leader>O", "O<Esc>", opts("new line above"))
 
--- 目前让 <> 什么都不做
+-- < 和 > 保持未绑定。
 map({ "n", "v" }, "<", "<Nop>")
 map({ "n", "v" }, ">", "<Nop>")
 

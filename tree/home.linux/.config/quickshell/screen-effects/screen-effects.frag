@@ -4,8 +4,6 @@
 // SHADOW_BOOST）由 lib/shaderGen.js 生成的 const 块提供，拼在本文件之前，
 // 产物落 ~/.cache/hypr/screen-effects.glsl。所以单独把本文件送 glslangValidator
 // 会报 undeclared identifier —— 那是语义错误，语法/结构检查与高亮仍然可用。
-// 这比过去那种「双下划线占位符直接当表达式用」的写法好一个数量级：那种是 parse
-// 失败，会让整个文件的静态检查全废。
 // 注意本文件（含注释）不要出现连续两个下划线 —— 校验产物有无占位符残留时会 grep
 // 这个模式，注释里出现就会自己命中自己，让那条检查失去意义。
 //
@@ -13,10 +11,8 @@
 // （Hyprland/src/render/Shader.hpp 的 eShaderUniform），没有自定义 uniform 通道，
 // hyprctl 也没有设 uniform 的接口。自定义 screen shader 的参数只能编译进源码。
 //
-// ⚠ 别退回 `varying` / `texture2D` / `gl_FragColor` 的 GLSL ES 1.00 写法。
-// Hyprland 0.56 起自定义 screen shader 固定配 tex300.vert（`#version 300 es`），
-// 只有以 `#version 320 es` 开头才会改配 tex320.vert（见 src/render/OpenGL.cpp
-// 的 applyScreenShader）。版本不一致 glLinkProgram 必失败，而且失败是静默的 ——
+// 自定义 screen shader 默认配 tex300.vert，必须使用 GLSL ES 3.00 的 in/texture/fragColor 语法。
+// 只有以 `#version 320 es` 开头才会配 tex320.vert。版本不一致时 glLinkProgram 会失败，而且
 // hyprctl 那侧照样返回 ok，错误只落在 Hyprland 日志和屏幕错误浮层里。
 
 // `precision highp float;` 不在这里 —— 它必须先于生成的 const 块（GLSL ES 要求

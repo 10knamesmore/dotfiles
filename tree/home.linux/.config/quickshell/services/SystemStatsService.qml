@@ -5,7 +5,7 @@ import Quickshell.Io
 
 // 系统监控采集 — 每秒读一次 /proc/stat + /proc/meminfo + /proc/net/dev，
 // 进程内直读（FileView.blockAllReads），算好 CPU / 内存 / 网速写入 SystemStats。
-// 取代旧的每秒 fork `sh -c 'grep;grep;cat'`：零进程创建，消除 1Hz 采集造成的 CPU 尖峰。
+// 采集不创建外部进程。
 Scope {
     id: root
 
@@ -14,14 +14,12 @@ Scope {
     property real _prevNetRx: -1
     property real _prevNetTx: -1
 
-    // /proc 是动态伪文件：blockAllReads 让 reload() 同步重读、text() 立即拿最新内容
-    // （已实测 /proc/stat 可读，reload 后内容随之更新）。watchChanges 关掉——/proc 不触发 inotify。
+    // /proc 是动态伪文件：blockAllReads 让 reload() 同步重读，watchChanges 关闭是因为 /proc 不触发 inotify。
     FileView { id: statFile; path: "/proc/stat"; blockAllReads: true; watchChanges: false; printErrors: false }
     FileView { id: memFile; path: "/proc/meminfo"; blockAllReads: true; watchChanges: false; printErrors: false }
     FileView { id: netFile; path: "/proc/net/dev"; blockAllReads: true; watchChanges: false; printErrors: false }
 
-    // 原始 seg 语义不变：_parseCpu 自行跳过非 cpu 行、_parseMem 只挑 Mem/Swap 字段，
-    // 故直接喂整份文件内容，无需再用 grep 预过滤。
+    // parser 自行筛选所需行，因此直接接收完整 /proc 文件内容。
     function _tick() {
         statFile.reload();
         memFile.reload();

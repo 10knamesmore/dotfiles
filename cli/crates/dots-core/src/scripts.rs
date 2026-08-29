@@ -1,8 +1,8 @@
-//! scripts 聚合计划（§9）。
+//! 将通用和平台脚本聚合为链接计划。
 //!
 //! `scripts/common` + `scripts/<os>` 聚合到 `.gen/scripts/`：顶层文件链过去；
 //! 子目录默认整目录链（保持树形）；`ignore_tree` 列出的子目录递归拍平其文件。
-//! 重名 → 冲突（doctor 用）。
+//! 重名会产生 ownership 冲突。
 
 use crate::fs::{FileSystem, NodeKind};
 use crate::layer::ExpectedLink;

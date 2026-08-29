@@ -4,18 +4,18 @@
 
 核心机制是**软链接镜像**：`tree/` 下的目录结构镜像 `$HOME`，仓库即配置的单一真相源。`dots sync` 把它们链接到位——编辑仓库即生效，无需复制、无需重新安装。
 
-仓库**不做日常包管理**：`packages/` 清单只供 `dots bootstrap` 装机时一次性使用。
+仓库不管理系统包、rustup、Node 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc` 与 `cargo`；`dots sync` 会构建 `dots.lua` 显式声明的 crates.io binary，并把 Cargo 实际生成的 bin 收敛到 `~/.cargo/bin`。
 
 ## 快速开始
 
-新机器一条龙：
+本机预先装好 C 编译器和 Rust/Cargo 后：
 
 ```bash
 git clone <your-repo-url> ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
-`bootstrap.sh` 很薄：Arch 上缺 cc 则先补 base-devel（裸 base 没有编译器；git 必然已存在——仓库就是它 clone 来的）→ 缺 cargo 则装 rustup（minimal profile）→ `cargo build --release` 编出 `dots` → 转交 `dots bootstrap`。后者探测包后端（pacman / apt / brew）、按 `packages/<backend>.txt` 装包、Arch 上若 `packages/aur.txt` 非空则确保 paru（缺则 git clone + makepkg 自举）再装 AUR 包、macOS 上若 `packages/brew.txt` 非空则确保 brew（缺则官方脚本 NONINTERACTIVE 自举）、按 `packages/toolchains.toml` 幂等装工具链（AI CLI / pnpm / cargo 工具集 / rustup 组件等；条目名带 `!` 后缀表示跳过 `command -v` 探测每次执行），最后自动跑 `dots sync`。装机最前还有一步**新机 host 引导**：当前机未在 `dots.lua` 的 `hosts{}` 登记且 stdin 是交互终端时，问别名 + 工具链组，写机器本地 `~/.config/dots/host`（真名不入 git）并把 host 块插进 `dots.lua`（详见 `docs/LUA_API.md` 的 hosts 节）；非交互或跳过则照常装机，host 未命中只 warn 不致命。
+`bootstrap.sh` 检查 `cc` 与 `cargo`，执行 `cargo build --release`，再直接运行 `dots sync`。bootstrap 不自举系统包、Rust、Node 或 AI CLI；sync 会应用显式 Cargo binary Declaration。
 
 已有环境只想链配置：
 
@@ -31,38 +31,28 @@ cd ~/dotfiles
 
 ## 命令一览
 
-| 命令                                         | 作用                                                                       |
-| -------------------------------------------- | -------------------------------------------------------------------------- |
-| `dots sync [--dry-run]`                      | 把仓库配置链接到 `$HOME`（幂等，可反复跑）                                 |
-| `dots status`                                | 三态巡检：✔ 已链 / ~ 漂移 / ✘ 缺失；非全绿时退出码非零                     |
-| `dots adopt <path> [--layer …] [--mode …]`   | 把 `$HOME` 里现成的文件收进仓库管理（搬进 `tree/` + 原地建反向链接）       |
-| `dots unlink <path> [--keep-in-repo]`        | 停止管理某文件（默认把文件搬回 `$HOME`）                                   |
-| `dots undo`                                  | 撤销上一次 adopt 或 unlink                                                 |
-| `dots doctor`                                | 只读体检：未覆盖主机、脚本重名、外部链接、钩子键漂移等；有问题时退出码非零 |
-| `dots secret set <key>` / `dots secret list` | 管理 age 加密的敏感值（密文入库，明文只在渲染时出现）                      |
-| `dots bootstrap`                             | 新机装包 + 工具链 + sync（见上）                                           |
-| `dots completions <shell>`                   | 生成 shell 补全脚本                                                        |
+| 命令                       | 作用                                                                  |
+| -------------------------- | --------------------------------------------------------------------- |
+| `dots sync [--dry-run]`    | 把完整 Desired Set 收敛到本机                                          |
+| `dots status`              | 只读展示与 sync 相同的创建、更新、删除、Collision 和 Drift Plan       |
+| `dots forget <resource>`   | 不改真实对象，只从 Applied Inventory 放弃 ownership                   |
 
 ## 仓库结构
 
 ```text
 dotfiles/
-├── dots.lua          # 例外清单（人手编辑，LuaLS 类型补全；CLI 永不改它）
+├── dots.lua          # 例外清单（人手编辑，CLI 不写入）
 ├── dots.sh           # 开发期透传（cargo run --release）
-├── bootstrap.sh      # 新机入口（自举 cargo → 编译 → dots bootstrap）
+├── bootstrap.sh      # 检查 cc/cargo → 编译 → dots sync
 ├── cli/              # Rust workspace：crates/（dots-core 纯逻辑 + dots bin）、lua-api/（类型标注）
 ├── tree/             # ★ 映射根：目录结构即链接声明
 │   ├── home/         #   → $HOME（跨平台）
 │   ├── home.linux/   #   → $HOME（仅 Linux，条目级覆盖通用层）
 │   └── home.macos/   #   → $HOME（仅 macOS）
 ├── scripts/          # 脚本源（common/ linux/ macos/），聚合到 .gen/scripts/ 进 PATH
-├── hosts/  (按需)    # per-host 资产：files/<host>/、secrets.age（密文入库；目录按需创建，当前还没有）
-├── packages/         # bootstrap 装机清单（pacman.txt 等纯文本 + toolchains.toml）
-├── common/           # 手动同步参考资料（VS Code 配置；dots 不处理）
 ├── docs/             # 文档（本文件实际位置）
 ├── .gen/   (不入库)  # 派生区：scripts/ 聚合软链、injected/ 模板渲染产物
-├── .dots/  (不入库)  # state.json 链接台账（undo/unlink/漂移检测用）
-├── backup/ (不入库)  # 覆盖普通文件前的时间戳备份（sync 时按需创建）
+├── .dots/  (不入库)  # state.json Applied Inventory（删除与 Drift 判断依据）
 ├── README.md         # → docs/README.md 的符号链接
 └── AGENTS.md         # → CLAUDE.md 的符号链接
 ```
@@ -74,41 +64,41 @@ dotfiles/
 1. **纯 `$HOME` 镜像**：`tree/home/X` → `$HOME/X`；`tree/home.<os>/X` 仅在该平台生效，同名条目时平台层覆盖通用层。
 2. **链接粒度启发式**：文件直接链；层根的一级目录（如 `.config/`）是「容器」，下钻逐子项链；二级及更深目录（如 `.config/nvim/`）整目录链。
 3. **粒度覆盖**：启发式不对时在 `dots.lua` 写一行 `granularity(path, {mode=…, ignore=…})`。
-4. **链接判定**：目标已是指向仓库内的链接（含旧路径、断链）→ 无条件重建；真实文件 → 备份到 `backup/<时间戳>/` 后链；链接指向仓库外 → 报漂移、不动它。
+4. **链接判定**：未拥有且与声明完全一致的链接自动接管；未拥有且不同的目标报告 Collision，sync 不覆盖。
 
 ## dots.lua（例外清单）
 
-约定盖不住的才写这里，预期长期 < 60 行。可用 API：
+约定盖不住的才写这里。可用 API：
 
 - `granularity(path, spec)` — 覆盖某路径的链接粒度（`mode = "dir" | "children" | "file"` + `ignore`）
 - `distribute(name, spec)` — 一源多落点（如 skills 同时分发到 codex / copilot）
 - `root(name, spec)` — 声明 `$HOME` 之外的映射层（罕用，如 macOS App Support）
-- `systemd_user { … }` — sync 时 `systemctl --user enable`（幂等）
 - `scripts { ignore_tree = … }` — 脚本聚合时递归拍平的子目录（子目录默认保持树形）
-- `hosts { ["<hostname>"] = function() vars{…}; link(…) end }` — per-host 变量与专属链接；当前机器未命中且表非空时 sync 硬报错
-- `on { phase = fn }` — 全局生命周期钩子（pre_sync / on_host_activate / post_link / post_sync；value 可为函数数组），钩子内可用 `dots.json.merge` / `dots.file.ensure_block` / `dots.run_once` 等幂等写原语
-- `granularity`/`distribute` 的 spec 还支持条目级 `pre`/`post` 钩子——`pre` 返回 false 可跳过该条目
+- `dots.resource.symlink/copied_file/cargo_binary/managed_block/systemd_user_unit` — 显式持续 Resource
+- `dots.path.exists(path)` — 声明阶段只读条件，用于 Resource 的 `enabled`
 
-完整参考（每个 API 的参数、行为细节、坑与配方）见 [LUA_API.md](docs/LUA_API.md)。
+完整参考见 [LUA_API.md](LUA_API.md)。Lua API 不提供生命周期 hook、任意 shell Action、`dots.file.*`、`dots.cargo.build` 或 `dots.json.*`。
 
-CLI 永不编辑 `dots.lua`；需要清单变更时它打印建议行让你粘贴。编辑器里有完整类型补全（`.luarc.json` 挂载 `cli/lua-api/dots.meta.lua`）。
+`dots.lua` 维护全局 crates.io package inventory。字符串 `cargo_binary.source` 不需要 version、binary 或 target；Cargo 生成的全部 bin 分别成为 `~/.cargo/bin/<文件名>` Resource。该 inventory 不包含系统包、rustup、Claude、Node 或 pnpm。
+
+CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lua-api/dots.meta.lua` 提供。
 
 ## 路径注入
 
-没有模板渲染占位符——配置只引用「安装后路径」或自身相对路径：
+配置只引用「安装后路径」或自身相对路径，不使用模板路径占位符：
 
 - `dots sync` 写 `~/.config/dots/env.zsh`（export `DOTFILES_DIR` / `DOTS_SCRIPTS` + PATH），`.zshrc_dotfiles` 首行 source 它。
-- 读不到 shell 环境的消费者（systemd unit）才用模板：`.inject` 后缀 + minijinja `{{ }}`，可引用 `{{ DOTFILES }}`（仓库根）、`{{ SCRIPTS }}`（聚合脚本目录）、`{{ host.* }}`（per-host 变量）、`{{ secret.* }}`（age 解密值），产物落 `.gen/injected/` 再链过去。缺变量直接报错（strict 模式）。
+- 读不到 shell 环境的消费者（systemd unit）才用模板：`.inject` 后缀 + minijinja `{{ }}`，可引用 `{{ DOTFILES }}`（仓库根）和 `{{ SCRIPTS }}`（聚合脚本目录），产物落 `.gen/injected/` 再链过去。缺变量直接报错（strict 模式）。
 
 ## Zsh 结构
 
-无框架（Oh My Zsh 已退役），两层结构：
+Zsh 不使用框架，配置分为两层：
 
-- `~/.zshrc` — 受管 stub（首行 `# DOTS_MANAGED:` 标记），只负责 source `~/.zshrc_dotfiles`；其他软件追加的内容（conda / nvm 等）安全保留。**不要把它当主配置维护。**
+- `~/.zshrc` — `dots-env` managed block 只负责 source `~/.zshrc_dotfiles`；block 外的软件内容（conda / nvm 等）始终保留。**不要把它当主配置维护。**
 - `~/.zshrc_dotfiles` — 主配置（源在 `tree/home/.zshrc_dotfiles`），按序加载 `~/.config/zsh/*.zsh` 模块：
   - `10-options.zsh` — 历史 / 目录 / 补全 / 键绑定
   - `20-functions.zsh` — cd-ls、copypath、copyfile、allclear 等内联微函数
-  - `90-syntax-highlighting.zsh` — zsh-syntax-highlighting（冻结 vendor）
+  - `90-syntax-highlighting.zsh` — fast-syntax-highlighting（仓库内固定版本）
 - 平台差异在 `tree/home.linux/.zshrc_linux` / `tree/home.macos/.zshrc_macos`。
 
 提示符是 starship + 自写 transient prompt；`z` 由 zoxide 提供。
@@ -116,17 +106,20 @@ CLI 永不编辑 `dots.lua`；需要清单变更时它打印建议行让你粘�
 ## 修改配置的正确方式
 
 - **改已有配置**：直接编辑 `tree/` 下对应文件。已链接的文件改完即生效，无需重跑任何命令。
-- **加新配置**：放进 `tree/` 对应位置后 `dots sync`；或者用 `dots adopt <path>` 把 `$HOME` 里现成的文件收编（它会搬文件、建链、记台账供 undo）。
+- **加新配置**：把源文件放进 `tree/` 对应位置，再运行 `dots sync`。
 
-## 备份与漂移处理
+## Collision 与 Drift
 
-安装时如果目标位置已有内容：
+未拥有的目标位置已有内容时：
 
-- 是符号链接且指向仓库内 → 直接重建，不备份
-- 是普通文件或目录 → 移到 `backup/<时间戳>/` 后再链
-- 是指向仓库外的链接 → 报漂移，不动它（`dots status` / `dots doctor` 可见）
+- 与 Declaration 完全一致 → 自动接管，不重写
+- 与 Declaration 不同 → Collision，sync 不动；手工移走或删除陌生目标后再 sync
 
-预览一切写盘动作：`dots sync --dry-run`。
+已拥有的 Resource 偏离 Applied Inventory 时报告 Drift，不自动修复。Declaration 删除后，未漂移 Resource 自动删除；漂移 Resource 保留实际内容与 inventory，可以恢复实际状态后再 sync，或用 `dots forget <resource>` 放弃 ownership。
+
+`forget` 只删除 Applied Inventory 记录，不构建 Plan，也不读取或修改真实对象。Declaration 仍存在时，下次 sync 会把该对象视为未拥有：实际状态与声明一致则重新接管，否则报告 Collision。
+
+预览受管 target 与 inventory 动作：`dots sync --dry-run`。为计算 Cargo binary 内容，dry-run 仍可能更新 Cargo target 或 `.gen` derivation cache。
 
 ## AI 工具链（skills / agents / hooks）
 
@@ -147,13 +140,10 @@ Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/cr
 
 ## 更多文档
 
-- [LUA_API.md](docs/LUA_API.md) — `dots.lua` 全部 Lua API 的参考（参数、行为细节、坑与配方）
-- [MANUAL_SETUP.md](docs/MANUAL_SETUP.md) — archlinuxcn 软件源与 fcitx5-macos 的手动安装步骤
-- [packages/README.md](packages/README.md) — 装机清单角色、toolchains 分组、cargo 渠道的版本/更新/缓存管理
-- `docs/superpowers/specs/` — dots CLI 的设计文档（镜像规则、dots.lua、钩子、路径注入的完整论证）
+- [LUA_API.md](LUA_API.md) — `dots.lua` 全部 Lua API 的参考（参数、行为细节、坑与配方）
 
 ## 注意事项
 
 - 顶层 `README.md` 是指向 `docs/README.md` 的符号链接；`AGENTS.md` 指向 `CLAUDE.md`。
-- `.gen/`、`.dots/`、`backup/` 是机器本地派生物，不入库。
-- 仓库不做日常包管理；`packages/` 清单仅供装机。`pacman.txt`（核心筛选，硬件特定与大型 GUI 不入清单）与 `aur.txt`（含 paru 自举）覆盖主力机 Arch，`brew.txt` / `apt.txt` 留空待补。
+- `.gen/`、`.dots/` 是机器本地派生物，不入库。
+- 新机必须先准备 C 编译器与 Cargo。系统包、rustup、Node 和 AI CLI 由使用者管理；声明式 crates.io binary 由 sync 管理。

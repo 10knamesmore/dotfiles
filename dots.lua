@@ -2,20 +2,20 @@
 -- 镜像规则覆盖不到的才写这里；预期长期 < 60 行。
 
 -- opencode 在配置目录生成运行时垃圾，逐文件链 + 忽略它们。
--- post：自定义 tool 经 symlink 加载时，Bun 按 realpath 从仓库侧向上找 node_modules，
+-- 自定义 tool 经 symlink 加载时，Bun 按 realpath 从仓库侧向上找 node_modules，
 -- 但它是 ignore 的运行时垃圾、只在 $HOME 侧 → 断链，tool 里 import "@opencode-ai/plugin"
 -- 会 Cannot find module，连带整个 opencode server 在 resolveTools 阶段崩、任何模型都 500。
 -- 补一条仓库侧 → $HOME 侧的反向软链桥过去（软链自身在上面的 ignore + .gitignore 里）。
 granularity("home/.config/opencode", {
     mode = "file",
     ignore = { "node_modules", "package.json", "bun.lock", ".gitignore" },
-    post = function()
-        dots.run("ln -sfn '" .. dots.home .. "/.config/opencode/node_modules' '"
-            .. dots.repo .. "/tree/home/.config/opencode/node_modules'")
-    end,
 })
+dots.resource.symlink {
+    source = dots.home .. "/.config/opencode/node_modules",
+    target = dots.repo .. "/tree/home/.config/opencode/node_modules",
+}
 
--- Claude hooks：目录保持真实、逐子项链——让 post_sync 软链进来的机器本地
+-- Claude hooks：目录保持真实、逐子项链——让 cargo binary 落在机器本地目录，
 -- cc-hook bin 落在真实目录、不污染仓库。
 granularity("home/.claude/hooks", { mode = "children" })
 
@@ -47,7 +47,7 @@ distribute("commands", {
 -- 自己的 loader 内建提供 @earendil-works/pi-* 与 typebox，不读 node_modules，
 -- 故工程文件整个不必落 $HOME。tree/ 因此保持纯 $HOME 镜像、不掺开发工作区。
 -- 注意 pi 只认 extensions 下的 `*.ts` 与 `*/index.ts` 两种形态。
--- post：extension 若 import 外部依赖（非 pi 内建提供的那几个），jiti **不 resolve
+-- extension 若 import 外部依赖（非 pi 内建提供的那几个），jiti **不 resolve
 -- symlink**，只从软链所在的 ~/.pi/agent/extensions/ 逐级向上找 node_modules，
 -- 够不着仓库侧的 pi-ext/node_modules → Cannot find module。补一条 $HOME 侧 →
 -- 仓库侧的桥。注意与上面 opencode 那条方向相反：Bun 按 realpath 找、jiti 按软链
@@ -57,12 +57,13 @@ distribute("pi-extensions", {
     src = "pi-ext/src",
     to = { "~/.pi/agent/extensions" },
     mode = "children",
-    post = function()
-        local nm = dots.repo .. "/pi-ext/node_modules"
-        dots.run("test -d '" .. nm .. "' && ln -sfn '" .. nm .. "' '"
-            .. dots.home .. "/.pi/agent/node_modules' || true")
-    end,
 })
+local pi_node_modules = dots.repo .. "/pi-ext/node_modules"
+dots.resource.symlink {
+    source = pi_node_modules,
+    target = dots.home .. "/.pi/agent/node_modules",
+    enabled = dots.path.exists(pi_node_modules),
+}
 
 -- 全局 agent 指令的唯一真相源。Claude Code 只认 ~/.claude/CLAUDE.md，
 -- 那份改成 `@~/.agents/AGENTS.md` 一行 import（官方推荐的 AGENTS.md 接法）；
@@ -75,7 +76,7 @@ distribute("agents-md", {
 })
 
 -- Codex hooks 与共享规则各自住真实目录；hook 定义留在中立的 .agents/ 命名空间，
--- 规则暂由 Claude 现有 pretool.toml 单源提供，避免各 harness 漂移。
+-- `pretool.toml` 是所有 harness 的规则真相源。
 distribute("codex-hooks", {
     src = "tree/home/.agents/codex/hooks.json",
     to = { "~/.codex/hooks.json" },
@@ -87,33 +88,43 @@ distribute("agent-hook-rules", {
     mode = "file",
 })
 
--- 每次 sync 保持派生二进制新鲜：Claude cc-hook、Codex agent-hook。
-on({
-    post_sync = function()
-        local bins = {
-            ["cc-hook"] = dots.home .. "/.claude/hooks/cc-hook",
-            ["agent-hook"] = dots.home .. "/.local/bin/agent-hook",
-        }
-        for name, dest in pairs(bins) do
-            local bin = dots.cargo.build(dots.repo .. "/cli", name)
-            if bin then
-                dots.file.install(bin, dest)
-            end
-        end
-    end,
-})
+-- 每次 plan 先编译，再按 artifact 内容收敛稳定安装位置。
+dots.resource.cargo_binary {
+    source = {
+        manifest = "cli/Cargo.toml",
+        binary = "cc-hook",
+    },
+    target = "~/.claude/hooks/cc-hook",
+}
+dots.resource.cargo_binary {
+    source = {
+        manifest = "cli/Cargo.toml",
+        binary = "agent-hook",
+    },
+    target = "~/.local/bin/agent-hook",
+}
 
--- per-host：本机变量（供 .inject 引用）。monitors.conf 链接见 B7 抽取后补。
--- 未登记的新机跑 `dots bootstrap`（交互终端）会自动在此插入一个别名块（onboard.rs）；
--- 别名 key 对应机器本地 ~/.config/dots/host（真名不入 git）。未命中非致命，仅跳过 per-host。
-hosts({
-    ["wanger-arch-16p"] = function()
-        vars({ backlight = "amdgpu_bl1", ddc_index = "1" })
-    end,
-    -- 腾讯云服务器：只装 shell 基线，dev/ai/js 工具链跳过（组见 packages/toolchains.toml）
-    ["VM-0-6-ubuntu"] = function()
-        toolchains({ only = { "core" } })
-    end,
-    ["unknown"] = function()
-    end,
-})
+-- 所有主机共享的 crates.io binary inventory。Cargo 实际生成的全部 bin 由 dots
+-- 自动收敛到 ~/.cargo/bin，不在这里重复维护 package 到 binary 名称的映射。
+local cargo_binary_packages = {
+    "uv",
+    "starship",
+    "zoxide",
+    "du-dust",
+    "ripgrep",
+    "fd-find",
+    "bat",
+    "eza",
+    "git-delta",
+    "cargo-nextest",
+    "cargo-insta",
+    "cargo-watch",
+    "samply",
+    "ast-grep",
+    "prek",
+    "cargo-update",
+    "cargo-cache",
+}
+for _, package in ipairs(cargo_binary_packages) do
+    dots.resource.cargo_binary { source = package }
+end

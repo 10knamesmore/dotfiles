@@ -4,9 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 
-// 统一音量服务 — 收口全 shell 的音量读写。
-// 读：基于 PipeWire defaultAudioSink 事件驱动（取代旧的 wpctl 轮询）。
-// 写：统一封装 wpctl 命令（保留 -l 1.0 上限语义）。
+// 音量服务。读取由 PipeWire defaultAudioSink 事件驱动，写入统一通过带 -l 1.0 上限的 wpctl。
 // 不提供图标函数：各消费者图标字形不同（waybar pulseaudio vs nerdfont），自行决定。
 Singleton {
     id: root

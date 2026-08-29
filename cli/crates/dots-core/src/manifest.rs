@@ -1,8 +1,7 @@
 //! Manifest —— dots.lua 求值结果的纯数据表示。
 //!
 //! core 拥有这份数据结构但**不依赖 mlua**：bin 的 lua 求值器把 Lua table 翻译成
-//! `Manifest`，再喂给 core 计算 Plan。闭包（钩子/host 块）在此只存不透明 id，
-//! 真正的 mlua 闭包句柄留在 bin 侧的 `LuaHandles`。
+//! `Manifest`，再把 mapping declaration 与显式 Resource 编译为 Desired Set。
 
 use rustc_hash::FxHashMap;
 
@@ -17,27 +16,19 @@ pub struct Manifest {
     pub distribute: Vec<DistributeSpec>,
     /// 非 `$HOME` 镜像的额外层。
     pub roots: Vec<RootSpec>,
-    /// systemd user 单元（sync 时 `systemctl --user enable`）。
-    pub systemd_user: Vec<String>,
     /// scripts 聚合时不保树形、递归拍平的子目录名（子目录默认整目录链）。
     pub scripts_ignore_tree: Vec<String>,
-    /// per-host 块：hostname → 闭包 id（effect 阶段由 bin 执行）。
-    pub host_blocks: FxHashMap<String, ClosureId>,
-    /// 已注册的生命周期钩子。
-    pub hooks: Vec<HookReg>,
+    /// 显式 Resource declaration。
+    pub resources: Vec<ResourceDeclaration>,
 }
 
-/// 链接粒度规格（§3 规则 3）。
+/// 链接粒度规格。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GranularitySpec {
     /// 粒度模式。
     pub mode: LinkMode,
     /// 链接时跳过的子项名（如 `node_modules`）。
     pub ignore: Vec<String>,
-    /// 条目级 pre 钩子（链接该条目前执行；返回 false 则整条目跳过）。
-    pub pre: Option<ClosureId>,
-    /// 条目级 post 钩子（该条目链接完成后执行；被 pre 阻止则不执行）。
-    pub post: Option<ClosureId>,
 }
 
 /// 多目标分发规格。
@@ -51,10 +42,6 @@ pub struct DistributeSpec {
     pub to: Vec<String>,
     /// 落点处的链接粒度（`children` 逐项 / `dir` 整目录）。
     pub mode: LinkMode,
-    /// 条目级 pre 钩子（返回 false 则整个分发跳过）。
-    pub pre: Option<ClosureId>,
-    /// 条目级 post 钩子（被 pre 阻止则不执行）。
-    pub post: Option<ClosureId>,
 }
 
 /// 非 `$HOME` 镜像的额外层（罕见，如 macOS App Support）。
@@ -68,44 +55,70 @@ pub struct RootSpec {
     pub os: Option<String>,
 }
 
-/// 生命周期钩子注册项。
+/// Lua 显式声明的一项 Resource；路径仍保持面向配置的字符串形式。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HookReg {
-    /// 触发阶段。
-    pub phase: HookPhase,
-    /// 闭包 id（effect 阶段由 bin 在 `LuaHandles` 中查回真正闭包执行）。
-    pub closure: ClosureId,
+pub enum ResourceDeclaration {
+    /// 符号链接。
+    Symlink {
+        /// source；相对路径以仓库根为基准。
+        source: String,
+
+        /// 目标绝对路径或 `~` 路径。
+        target: String,
+    },
+
+    /// 内容复制安装的普通文件。
+    CopiedFile {
+        /// source；相对路径以仓库根为基准。
+        source: String,
+
+        /// 目标绝对路径或 `~` 路径。
+        target: String,
+    },
+
+    /// 从 Cargo source 派生并安装的 binary。
+    CargoBinary(CargoBinaryDeclaration),
+
+    /// 文本文件内的 marker block。
+    ManagedBlock {
+        /// 包含 block 的文件。
+        target: String,
+
+        /// block 的稳定 marker 名称。
+        marker: String,
+
+        /// marker 之间的期望内容。
+        content: String,
+    },
+
+    /// 应保持 enabled 的 systemd user unit。
+    SystemdUserUnit {
+        /// unit 名称。
+        unit: String,
+    },
 }
 
-/// 生命周期点。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HookPhase {
-    /// 链接落盘前。
-    PreSync,
-    /// 链接全部建好后（含 `.inject` 渲染）。
-    PostLink,
-    /// sync 末尾：链接 / inject / env.zsh / systemd enable 全部就绪后、台账保存前。
-    PostSync,
-    /// 命中 host 块激活时。
-    OnHostActivate,
-}
+/// 一项 Cargo binary declaration 的两种完整形态。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CargoBinaryDeclaration {
+    /// 仓库内 Cargo workspace binary 及其明确落点。
+    Workspace {
+        /// Cargo.toml；相对路径以仓库根为基准。
+        manifest: String,
 
-impl HookPhase {
-    /// 从 Lua 端传入的字符串解析。
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "pre_sync" => Some(Self::PreSync),
-            "post_link" => Some(Self::PostLink),
-            "post_sync" => Some(Self::PostSync),
-            "on_host_activate" => Some(Self::OnHostActivate),
-            _ => None,
-        }
-    }
-}
+        /// binary target 名称。
+        binary: String,
 
-/// 不透明闭包 id：core 不持有 mlua 闭包，只记一个序号，bin 据此查回。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ClosureId(pub u32);
+        /// 安装目标。
+        target: String,
+    },
+
+    /// crates.io package 的默认版本与全部 bin。
+    CratesIo {
+        /// crates.io package 名称。
+        package: String,
+    },
+}
 
 #[cfg(test)]
 mod tests {
@@ -113,17 +126,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hook_phase_parse() {
-        assert_eq!(HookPhase::parse("post_link"), Some(HookPhase::PostLink));
-        assert_eq!(HookPhase::parse("pre_sync"), Some(HookPhase::PreSync));
-        assert_eq!(HookPhase::parse("nope"), None);
-    }
-
-    #[test]
     fn manifest_default_empty() {
         let m = Manifest::default();
         assert!(m.distribute.is_empty());
-        assert!(m.hooks.is_empty());
+        assert!(m.resources.is_empty());
         assert!(m.granularity.is_empty());
     }
 }

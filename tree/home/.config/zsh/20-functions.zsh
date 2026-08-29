@@ -1,17 +1,16 @@
-# OMZ 退役内联：cd-ls / allclear / copypath / copyfile / 补全等待点
-# （取代原 omz_custom 插件与 OMZ 内置 copypath/copyfile）
+# 交互辅助函数：目录 hook、剪贴板、代理和临时 scratch。
 
 autoload -Uz add-zsh-hook
 
-# cd 后自动 ls（原 cd-ls 插件）
+# chpwd hook：切换目录后自动 ls。
 _dots_cdls() { [[ -o interactive ]] && eval "${CD_LS_COMMAND:-ls}" }
 add-zsh-hook chpwd _dots_cdls
 
-# cd 回 $HOME 自动 clear（原 zsh-allclear 插件）
+# chpwd hook：回到 $HOME 时清屏。
 _dots_allclear() { [[ $PWD == $HOME ]] && clear }
 add-zsh-hook chpwd _dots_allclear
 
-# 剪贴板写入分派（补回 OMZ clipcopy 抽象——内联时曾被硬编码成 wl-copy）
+# 按 macOS、Wayland、X11 顺序选择可用的剪贴板写入命令。
 _dots_clipcopy() {
     if command -v pbcopy >/dev/null; then pbcopy          # macOS
     elif [[ -n $WAYLAND_DISPLAY ]] && command -v wl-copy >/dev/null; then wl-copy
@@ -20,19 +19,19 @@ _dots_clipcopy() {
     fi
 }
 
-# 复制当前/指定路径到剪贴板（原 OMZ copypath）
+# 复制当前或指定路径到剪贴板。
 copypath() {
     local target="${1:-.}"
     realpath -- "$target" | tr -d '\n' | _dots_clipcopy
 }
 
-# 复制文件内容到剪贴板（原 OMZ copyfile）
+# 复制文件内容到剪贴板。
 copyfile() {
     [[ -f "$1" ]] && _dots_clipcopy < "$1"
 }
 
 # 代理开关：proxy [on|off|status]，裸调等于 on（.zshrc 启动时调）。
-# URL 可被 DOTS_PROXY_URL 覆盖（per-host 想换端口时 export 它即可，不用改这里）。
+# URL 可被 DOTS_PROXY_URL 覆盖。
 # 大小写都设：CLI 工具多读小写，requests/httpx 等会读大写。
 proxy() {
     local url="${DOTS_PROXY_URL:-http://127.0.0.1:7897}"
@@ -67,14 +66,3 @@ sc() { nvim "/tmp/scratch-$$-$(date +%H%M%S).${1:-md}" }
 _dots_scratch_widget() { BUFFER="sc"; zle accept-line }
 zle -N _dots_scratch_widget
 bindkey '^Q' _dots_scratch_widget
-
-# 补全计算慢时显示红点（原 COMPLETION_WAITING_DOTS）
-# 2026-06 起死代码：Tab 已被 25-fzf-tab.zsh 接管（source 顺序在后，^I 绑定被覆盖）。
-# 若将来弃用 fzf-tab 可解开注释恢复。
-# _dots_complete_waiting() {
-#     print -Pn "%F{red}…%f"
-#     zle expand-or-complete
-#     zle redisplay
-# }
-# zle -N _dots_complete_waiting
-# bindkey '^I' _dots_complete_waiting

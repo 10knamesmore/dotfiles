@@ -79,7 +79,7 @@ let layout = Layout::default()
 ### 简写方法
 
 ```rust
-// v0.26+ 引入的快捷构造方法
+// 方向快捷构造方法
 Layout::vertical([Constraint::Length(3), Constraint::Min(0)])
 Layout::horizontal([Constraint::Percentage(30), Constraint::Min(0)])
 ```
@@ -237,7 +237,7 @@ let inner = Layout::default()
 ### 固定尺寸 Widget 居中
 
 ```rust
-// ratatui 0.29+ Rect 自带居中方法
+// Rect 居中方法
 let widget_area = Rect::new(0, 0, 40, 10)
     .centered_horizontally(frame.area())
     .centered_vertically(frame.area());

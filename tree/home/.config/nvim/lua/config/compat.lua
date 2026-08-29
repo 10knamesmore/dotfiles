@@ -1,11 +1,6 @@
--- neovim 0.12 收紧了 `vim.glob.to_lpeg` 的文法（PR neovim/neovim#37161），
--- 以前能容忍的 glob 现在直接 assert 报错。部分 LSP server 仍会在
--- `workspace.fileOperations` 里广播这类不合规 glob（实测有空 brace 的
--- `**/*.{}`，另见 `**/*.{mdx}` / `**.dart` / `bundled:///libs/**/*`），
--- 而调用方（mini.files 的 fs-actions、原生 LSP 注册、noice）都是裸调
--- to_lpeg，一炸就把整个文件操作/注册中断。
--- 上游认定是 server 的锅、短期不放松 to_lpeg：neovim/neovim#37204。
--- 这里在边界兜底：无法解析的 glob 降级为「匹配空」而非抛错。
+-- 部分 LSP server 会在 workspace.fileOperations 中广播 `**/*.{}` 等
+-- vim.glob.to_lpeg 无法解析的 glob；异常会中断文件操作或 LSP 注册。
+-- 在解析边界把无效 glob 降级为空匹配，避免误匹配任何路径。
 local orig = vim.glob.to_lpeg
 vim.glob.to_lpeg = function(pattern)
   local ok, res = pcall(orig, pattern)
@@ -17,9 +12,7 @@ vim.glob.to_lpeg = function(pattern)
   return vim.lpeg.P(false)
 end
 
--- neovim 0.12 将 `vim.diagnostic.enable(bufnr)` 旧签名改成
--- `vim.diagnostic.enable(true, { bufnr = bufnr })`，并移除了
--- `vim.diagnostic.disable(bufnr)`。部分插件仍在 autocommand 中使用旧签名。
+-- 接受插件仍会调用的数字 bufnr 签名，并用 enable(false, filter) 提供 disable。
 do
   local diagnostic_enable = vim.diagnostic.enable
 

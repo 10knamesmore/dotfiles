@@ -105,7 +105,7 @@ detect_iface() {
 内部辅助函数只需一行说明用途，参数不直观时补一句即可。
 
 ```bash
-# cd 后自动 ls（原 cd-ls 插件）
+# chpwd hook：切换目录后自动 ls
 _dots_cdls() { [[ -o interactive ]] && eval "${CD_LS_COMMAND:-ls}" }
 
 # 复制路径到剪贴板；$1 缺省为当前目录
@@ -253,7 +253,7 @@ add-zsh-hook precmd _dots_set_title
 连续的 `bindkey` 可在行尾标键名，免去读者背 escape 序列。
 
 ```bash
-# 慢补全时先显示红点提示，再触发补全（原 COMPLETION_WAITING_DOTS）
+# 慢补全时先显示红点提示，再触发补全
 _dots_complete_waiting() {
     print -Pn "%F{red}…%f"
     zle expand-or-complete
@@ -320,5 +320,5 @@ cd "$repo" || exit 1 # cd 失败必须中止，否则后续会污染调用者目
 * 函数库统一用 shdoc 标签；脚本内部统一用一行档，不在同一文件混档。
 * 文件头一律含"职责 + Usage + 依赖 + 环境变量"四要素（无则写"无"）。
 * `set -euo pipefail` 在安装/聚合类脚本中默认开启并注明理由。
-* 私有 zsh 函数统一加 `_dots_` 前缀（如 `_dots_cdls`），注释点明对应的原插件/来源。
+* 私有 zsh 函数统一加 `_dots_` 前缀（如 `_dots_cdls`），注释点明 hook 时机和用户可见行为。
 * 注释只描述对调用者/维护者有用的语义、约束、副作用，不描述"如何实现"。

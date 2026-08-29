@@ -1,28 +1,26 @@
-//! Plan / PlanItem / PlanAction —— plan/execute 两段式的核心产物。
-//!
-//! `Plan` 是纯数据：dry-run 打印它、单测断言它、executor 落盘它。
+//! 三方状态 reconciliation 产生的唯一执行计划。
 
-use crate::types::AbsPath;
+use crate::{AppliedResource, ObservedState, OwnershipSurface, ResourceSpec};
 
-/// 一次 sync 计算出的完整计划。
+/// 一次 sync 对所有 Resource 的完整、确定性计划。
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Plan {
-    /// 逐目标位置的动作。
+    /// 按固定 apply phase 排序的计划项。
     pub items: Vec<PlanItem>,
 }
 
 impl Plan {
-    /// 空计划。
-    pub fn new() -> Self {
-        Self::default()
+    /// 返回 Plan 是否不存在 Collision 或 Drift。
+    pub fn is_healthy(&self) -> bool {
+        self.items.iter().all(|item| {
+            !matches!(
+                item.action,
+                PlanAction::Collision { .. } | PlanAction::Drift { .. }
+            )
+        })
     }
 
-    /// 追加一项。
-    pub fn push(&mut self, item: PlanItem) {
-        self.items.push(item);
-    }
-
-    /// 是否没有任何需要落盘的动作（全 Noop）。
+    /// 返回 Plan 是否完全不需要外部写入或 inventory 变化。
     pub fn is_clean(&self) -> bool {
         self.items
             .iter()
@@ -30,69 +28,55 @@ impl Plan {
     }
 }
 
-/// 单个目标位置的计划项。
+/// 一个 Ownership Surface 的三方状态与判定结果。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanItem {
-    /// 目标位置（`$HOME` 侧）。
-    pub target: AbsPath,
-    /// 对该目标采取的动作。
+    /// 本项 Resource identity。
+    pub surface: OwnershipSurface,
+
+    /// 当前 Declaration；Retired Resource 为 `None`。
+    pub desired: Option<ResourceSpec>,
+
+    /// 上一次成功记录；首次接管为 `None`。
+    pub applied: Option<AppliedResource>,
+
+    /// planning 时读取到的真实状态。
+    pub observed: ObservedState,
+
+    /// executor 应采取的动作。
     pub action: PlanAction,
 }
 
-/// 对一个目标位置的动作（§3.1 判定结果）。
+/// Planner 对一个 Resource 的判定。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PlanAction {
-    /// 目标不存在 → 建新链。
-    Link {
-        /// 链接指向的仓库内源。
-        source: AbsPath,
-    },
-    /// 目标是落在仓库内的旧链（含断链）→ 无条件重建。
-    Relink {
-        /// 新源。
-        source: AbsPath,
-        /// 旧链原指向（诊断用）。
-        old_target: std::path::PathBuf,
-    },
-    /// 目标是真实文件/目录 → 备份后建链。
-    BackupThenLink {
-        /// 链接指向的仓库内源。
-        source: AbsPath,
-    },
-    /// 期望是容器（children），但现状是整目录软链 → 转换为真实目录 + 逐子项链。
-    ContainerConvert {
-        /// 原整目录软链指向的源目录。
-        source_dir: AbsPath,
-    },
-    /// 目标是符号链接但指向仓库外 → 报漂移，不擅自动。
-    DriftForeign {
-        /// 指向的外部路径。
-        points_to: std::path::PathBuf,
-    },
-    /// 目标已正确指向期望源 → 无操作。
+    /// Desired、Applied 与 Observed 已一致。
     Noop,
-}
 
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::min_ident_chars, clippy::missing_docs_in_private_items)]
-    use super::*;
+    /// Observed 已与 Desired 一致，只需写 Applied Inventory。
+    Adopt,
 
-    #[test]
-    fn clean_plan() {
-        let mut p = Plan::new();
-        assert!(p.is_clean());
-        p.push(PlanItem {
-            target: AbsPath::new("/a"),
-            action: PlanAction::Noop,
-        });
-        assert!(p.is_clean());
-        p.push(PlanItem {
-            target: AbsPath::new("/b"),
-            action: PlanAction::Link {
-                source: AbsPath::new("/repo/b"),
-            },
-        });
-        assert!(!p.is_clean());
-    }
+    /// Ownership Surface 尚不存在，创建 Desired Resource。
+    Create,
+
+    /// Observed 仍匹配 Applied，可以安全更新到 Desired。
+    Update,
+
+    /// Retired Resource 仍匹配 Applied，安全删除。
+    Delete,
+
+    /// Retired Resource 已不存在，只需从 Applied Inventory 移除。
+    Forget,
+
+    /// 尚未拥有的 surface 被不同状态占据。
+    Collision {
+        /// 面向用户的具体冲突原因。
+        reason: String,
+    },
+
+    /// 已拥有的 surface 偏离上次成功状态。
+    Drift {
+        /// 面向用户的具体漂移原因。
+        reason: String,
+    },
 }

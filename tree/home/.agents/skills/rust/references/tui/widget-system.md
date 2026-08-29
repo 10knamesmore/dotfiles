@@ -250,7 +250,7 @@ terminal.draw(|frame| {
         &mut app.list_state,
     );
 
-    // 渲染引用型 widget（v0.26+）
+    // 渲染引用型 widget
     frame.render_widget_ref(&my_widget, area);
 
     // 设置光标位置（输入框等）

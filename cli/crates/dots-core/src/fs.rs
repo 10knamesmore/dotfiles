@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashMap;
 
-/// 目标位置的当前状态（§3.1 判定的输入）。
+/// planner 在目标位置观察到的文件系统状态。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NodeKind {
     /// 不存在。

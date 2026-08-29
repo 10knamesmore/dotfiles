@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# 切换当前 Hyprland 窗口的可逆伪全屏状态。
+# Usage: toggle_fullscreen.sh
+# 依赖：hyprctl、jq
+# 环境变量：无
+# 未定义变量或未处理的命令失败时立即退出。
 set -euo pipefail
 
-# 伪全屏 toggle。0.55 起 scrolling 的 maximize(mode 1) 被改成单向 expel、不可逆
-#   (src/layout/algorithm/tiled/scrolling/ScrollingAlgorithm.cpp::requestFullscreen)。
-# 改用 fullscreen_state：internal=FULLSCREEN 走可逆的全屏分支(铺满+记录列宽还原、不 expel)，
-# client=NONE 让应用无感(fakefullscreen)。按 .fullscreen 决定进/出。
+# scrolling 的 maximize(mode 1) 会单向 expel 窗口，不能用于 toggle。
+# fullscreen_state 的 internal=FULLSCREEN 会记录列宽并可逆恢复；client=NONE 不通知应用。
+# 当前 activewindow.fullscreen 决定进入或退出。
 
 win="$(hyprctl -j activewindow 2>/dev/null || true)"
 is_fullscreen="$(echo "$win" | jq -r '.fullscreen // 0')"

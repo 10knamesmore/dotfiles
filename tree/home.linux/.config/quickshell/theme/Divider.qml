@@ -1,6 +1,6 @@
 import QtQuick
 
-// 渐变淡出分隔线 — 两端透明，中间柔和，替代硬切直线
+// 两端透明、中间柔和的渐变分隔线。
 Rectangle {
     height: 1
 

@@ -18,6 +18,7 @@
 - `the key used to sign requests` 中 `used to` 表示用途，不是过去状态。
 - `the currently focused window`、`current connection` 等描述 runtime state，不是过期快照。
 - changelog 与 release notes 中的版本号和日期是这些 surface 的职责。
+- 活动 Spec 或 ADR 可以使用已在同一文档定义的 A/B 方案或布局代号；普通 current-state prose 中没有 owner 的代号仍需重写。
 - `old connection` 与 `new connection` 可能是同时存在的 runtime object。
 - PR 模板和贡献流程文档可以讨论 PR；问题是产品文档采用某个 PR 的视角。
 - `/v1/chat` 和 wire-format identifier 不是草稿版本 stamp。

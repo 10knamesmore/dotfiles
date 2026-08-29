@@ -100,7 +100,7 @@ test("layoutFromProfile 用当前 name 还原存档（稳定 id 可能换了接�
             "Dell U2720Q ABC": { name: "DP-3", enabled: true, mode: "3840x2160@60", x: 0, y: 0, scale: 1, transform: 0 }
         }
     };
-    // 同一台 Dell 现在挂在 DP-5
+    // 同一块屏的当前接口名与存档不同。
     const current = [{ name: "DP-5", description: "Dell U2720Q ABC" }];
     const layouts = M.layoutFromProfile(profile, current);
     assert.equal(layouts.length, 1);
@@ -144,8 +144,7 @@ test("monitorLuaLine 白点等于默认 80 时不输出", () => {
     );
 });
 
-// ipc→color 的唯一转换入口。曾经 MonitorService 和 layoutFromIpc 各写一份，
-// 加 sdrMaxLuminance 时只改了一份，面板读到的白点永远是默认 80。
+// colorFromIpc 必须读取完整色彩字段，避免调用方静默回落到默认白点。
 test("colorFromIpc 读全四个色彩字段", () => {
     assert.deepEqual(
         M.colorFromIpc({ colorManagementPreset: "hdr", sdrMaxLuminance: 250, sdrBrightness: 1.1, sdrSaturation: 1.2 }),
@@ -230,7 +229,7 @@ test("layoutFromIpc 从 colorManagementPreset 读回色彩状态", () => {
     assert.deepEqual(l.color, { cm: "hdr", sdrMaxLuminance: 250, sdrBrightness: 1.2, sdrSaturation: 1.05 });
 });
 
-test("layoutFromIpc 缺色彩字段时回落 srgb（旧 Hyprland / 禁用 cm）", () => {
+test("layoutFromIpc 缺色彩字段时回落 srgb", () => {
     const l = M.layoutFromIpc({ name: "eDP-1", width: 2560, height: 1600, refreshRate: 60, x: 0, y: 0, scale: 1 });
     assert.deepEqual(l.color, { cm: "srgb", sdrMaxLuminance: 80, sdrBrightness: 1, sdrSaturation: 1 });
 });

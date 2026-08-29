@@ -1,14 +1,8 @@
 //! 命令实现 + 共享辅助（仓库根/HOME/平台/路径展开）。
 
-pub mod adopt;
-pub mod bootstrap;
-pub mod completions;
-pub mod doctor;
-pub mod secret;
+pub mod forget;
 pub mod status;
 pub mod sync;
-pub mod undo;
-pub mod unlink;
 
 use std::path::{Path, PathBuf};
 
@@ -26,7 +20,7 @@ pub fn find_repo_root() -> Result<PathBuf> {
             return Ok(path);
         }
     }
-    // 从 cwd 向上找：认 dots.lua（已迁移）或 cli/Cargo.toml（迁移前的 dots 仓库标志）。
+    // 从 cwd 向上查找 dots.lua 或 cli/Cargo.toml 仓库标志。
     let mut cur = std::env::current_dir()?;
     loop {
         if cur.join("dots.lua").exists() || cur.join("cli").join("Cargo.toml").exists() {

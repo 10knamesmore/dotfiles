@@ -1,4 +1,4 @@
-//! tree 映射引擎（§3 规则 1/2/3 + 层覆盖）。
+//! 将 `tree/` 的目录层展开为带平台覆盖的期望链接集合。
 //!
 //! 把 `tree/<layer>/...` 的目录结构展开成「期望链接集合」。粒度启发式：
 //! 层根一级目录是容器（下钻），二级及更深目录整目录链，文件直接链；`granularity()`
@@ -54,7 +54,7 @@ pub fn expand_layers(
             continue;
         };
         let layer = Layer::parse(name);
-        if !layer.active_on(os) {
+        if !layer.active_on(os) || !root_active_on(&layer, os, manifest) {
             continue;
         }
         let target_root = target_root_for(&layer, home, manifest);
@@ -71,6 +71,16 @@ pub fn expand_layers(
     }
 
     merge_layers(raw)
+}
+
+/// 额外 root 声明的 `os` 约束；普通 home layer 没有额外限制。
+fn root_active_on(layer: &Layer, os: Os, manifest: &Manifest) -> bool {
+    manifest
+        .roots
+        .iter()
+        .find(|root| root.name == layer.name)
+        .and_then(|root| root.os.as_deref())
+        .is_none_or(|suffix| Os::parse_suffix(suffix) == Some(os))
 }
 
 /// 决定某层的目标根：默认 `$HOME`；`root()` 声明的额外层用其 path。
@@ -321,8 +331,6 @@ mod tests {
             GranularitySpec {
                 mode: LinkMode::File,
                 ignore: vec!["node_modules".into()],
-                pre: None,
-                post: None,
             },
         );
         let links = expand_layers(&fs, &root, &home, Os::Linux, &m);
@@ -357,8 +365,6 @@ mod tests {
             GranularitySpec {
                 mode: LinkMode::Children,
                 ignore: vec!["projects".into()],
-                pre: None,
-                post: None,
             },
         );
         let links = expand_layers(&fs, &root, &home, Os::Linux, &m);

@@ -1,6 +1,6 @@
-# fzf 键绑定 + fzf-tab 补全菜单（v1.3.0 冻结 vendor、不跟上游更新）。
+# fzf 键绑定与仓库内固定的 fzf-tab 补全菜单。
 # 无 fzf（如最小化的服务器）整模块跳过：Tab 回落 10-options 的原生菜单补全。
-# 注意 fzf 需 ≥0.48（--zsh 子命令），apt 的化石版本会在 source 处报错。
+# fzf 必须支持 `--zsh`；不支持时 source 会报错。
 command -v fzf >/dev/null || return
 # 顺序敏感：fzf --zsh 会绑 Tab（** 触发的模糊补全），fzf-tab 必须在它之后 source
 # 才能接管 Tab；而 fzf-tab 又要求在 compinit（10-options）之后、autosuggestions
@@ -47,8 +47,7 @@ export FZF_DEFAULT_OPTS="--layout=reverse --border=rounded --info=inline-right -
 --color=marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#fab387:underline:italic \
 --color=selected-bg:#45475a"
 
-# Ctrl-T（官方「插入路径」widget）禁用：设空串让 fzf --zsh 跳过绑定。
-# 「选文件」的需求由下面自写的 Ctrl-F（直接 nvim 打开）接管，^T 回归 zsh 默认 transpose-chars
+# Ctrl-T 不绑定路径插入；Ctrl-F 负责选文件并用 nvim 打开，Ctrl-T 保持 Zsh 默认 transpose-chars。
 export FZF_CTRL_T_COMMAND=''
 
 # Alt-C（模糊 cd）数据源：--type d 只列目录（cd 给文件候选没意义）、含隐藏目录
@@ -62,7 +61,7 @@ export FZF_ALT_C_OPTS="--preview 'eza -T --level=2 --color=always --icons {}'"
 # 预览窗在下方、高 3 行、默认隐藏（90% 的搜索用不到），Ctrl-/ 现场开关
 export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window=down:3:hidden:wrap --bind 'ctrl-/:toggle-preview'"
 
-source <(fzf --zsh)   # Ctrl-R 模糊历史 / Alt-C cd（Ctrl-T 已禁用；fzf 存在性由文件头守卫）
+source <(fzf --zsh)   # Ctrl-R 模糊历史 / Alt-C cd；Ctrl-T 未绑定
 source "${0:A:h}/vendor/fzf-tab/fzf-tab.zsh"
 
 zstyle ':fzf-tab:*' switch-group '<' '>'           # 默认 F1/F2 够不着，< > 顺手

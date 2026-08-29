@@ -7,7 +7,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 
-// 显示器管理面板（B 布局：左可拖拽画布 + 右参数控件 + 底部应用/回滚）。
+// 显示器管理面板：左侧可拖拽画布、右侧参数控件、底部应用与回滚。
 // 状态/IPC 在 MonitorService(常驻) + MonitorState(单例)；本面板只持有编辑态 draft。
 PanelOverlay {
     id: root

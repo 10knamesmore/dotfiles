@@ -12,18 +12,14 @@ rust-version = "1.85"
 [workspace.dependencies]
 color-eyre  = "0.6"
 clap        = { version = "4", features = ["derive"] }
-clap_complete = "4"
-mlua        = { version = "0.10", features = ["lua54", "vendored", "serialize"] }
+mlua        = { version = "0.10", features = ["lua54", "vendored"] }
 minijinja   = { version = "2", features = ["loader"] }
 serde       = { version = "1", features = ["derive"] }
 serde_json  = { version = "1", features = ["preserve_order"] }
-toml_edit   = "0.22"
-age         = { version = "0.11", features = ["armor"] }
-secrecy     = "0.10"
+sha2        = "0.10"
 rustc-hash  = "2"
 owo-colors  = "4"
 walkdir     = "2"
-rpassword   = "7"
 shlex       = "1"
 toml        = "0.8"
 regex-lite  = "0.1"
@@ -31,7 +27,6 @@ globset     = "0.4"
 dots-core   = { path = "crates/dots-core" }
 
 # dev
-insta       = "1"
 proptest    = "1"
 assert_cmd  = "2"
 tempfile    = "3"

@@ -6,10 +6,10 @@ local opt = vim.opt
 -- 运行 next等 自动写入
 opt.autowrite = true
 
--- 允许 .nvim.lua 提供本地配置。注意 0.12 的语义是「从 cwd 一路向上找到根」，
+-- 允许 .nvim.lua 提供本地配置。Neovim 从 cwd 向上搜索，
 -- 不是只看项目根目录——这个仓库嵌套很深（~/dotfiles/tree/home/.config/nvim），
 -- 上层任何一个 .nvim.lua 都会被拉进来。想截断就在外层写 vim.o.exrc = false。
--- 另外首次遇到未信任文件已无 (a)llow，要先 (v)iew 再 :trust。
+-- 首次遇到未信任文件时先 (v)iew，再执行 :trust。
 opt.exrc = true
 
 -- 在SSH下用OSC 等插件处理剪切板.
@@ -18,7 +18,7 @@ opt.clipboard = vim.env.SSH_CONNECTION and "" or "unnamedplus" -- Sync with syst
 --- **menu**: 使用弹出菜单显示补全项
 --- **menuone**: 即使只有一个匹配项也显示菜单
 --- **noselect**: 不自动选择第一个补全项
---- **popup**: 0.12 默认值之一，有它才显示 completionItem/resolve 的文档预览；
+--- **popup**: 显示 completionItem/resolve 的文档预览；
 ---            整体赋值时容易连它一起丢掉
 opt.completeopt = "menu,menuone,noselect,popup"
 
@@ -56,8 +56,6 @@ opt.listchars = {
   precedes = "⟨",
 }
 
--- 留一列给 ufo/treesitter 画 fillchars 里的 foldopen/foldclose 图标；
--- 设回 "0" 那两个图标就永远没有落脚点（原先 ufo 的 init 想设 "1"，被这里盖掉过）。
 opt.foldcolumn = "0"
 
 -- 小于这个level的被折叠
@@ -79,8 +77,8 @@ opt.ignorecase = true
 -- subsiture时 在同一个窗口里预览
 opt.inccommand = "nosplit"
 
--- view: 跳转时尽量恢复视图；clean 是 0.12 默认值，整体赋值会丢掉它——
--- 它负责把已卸载 buffer 从 jumplist 移除，而 H/L 被绑成了 <C-o>/<C-i>，
+-- view 在跳转时恢复视图；clean 把已卸载 buffer 从 jumplist 移除。
+-- H/L 绑定为 <C-o>/<C-i>，
 -- 跳回一堆已关 buffer 的场景很常见。
 opt.jumpoptions = "view,clean"
 
@@ -159,8 +157,7 @@ opt.shiftwidth = 4
 --- **q**：录制宏时不显示“recording @a”。
 --- **F**：编辑文件时不显示文件信息（如用 `:silent`）。
 --- **S**：搜索时不显示搜索计数（如“[1/5]”）。
--- 用 append 而不是整体赋值：0.12 默认是 "ltToOCF"，直接写 "IlcCF" 会丢掉
--- t/T（长消息截断）和 o/O（读写文件消息互相覆盖），少了它们更容易撞上
+-- 追加而不是覆盖 shortmess，保留 t/T 长消息截断与 o/O 读写消息覆盖；否则容易触发
 -- hit-enter 提示。noice 接管了大部分消息路径，但它覆盖不到的早期路径仍会漏。
 opt.shortmess:append({ I = true, c = true, C = true })
 
@@ -202,10 +199,7 @@ opt.tabstop = 4 -- Number of spaces tabs count for
 -- True color support
 opt.termguicolors = true
 
--- 按键序列等待窗口。曾为加速 which-key 弹窗设为 100ms，但 100ms 小于
--- g→Shift+Y 这类换挡序列的天然指间隔，导致不经 which-key 的原生 buffer-local
--- 映射（如 mini.files 的 gY）几乎必然超时失效、gy 偶发失效（取决于打字节奏）。
--- which-key 弹窗时机由其自身 opts.delay 控制，与 timeoutlen 无关。
+-- 500ms 允许 g→Shift+Y 等换挡序列完成；which-key 弹窗时机由 opts.delay 单独控制。
 opt.timeoutlen = vim.g.vscode and 1000 or 500
 
 -- undo
@@ -224,9 +218,7 @@ opt.wildmode = "longest:full,full"
 -- Minimum window width
 opt.winminwidth = 5
 
--- 0.12 的全局浮窗边框兜底：所有没显式指定 border 的浮窗都吃这个值。
--- 本体侧的 vim.diagnostic.open_float / vim.show_pos / inspect_tree /
--- lsp.util.open_floating_preview 原先一律裸奔，插件浮窗则各自硬编码 rounded。
+-- 为所有未显式指定 border 的浮窗提供统一圆角边框。
 opt.winborder = "rounded"
 
 -- 一行超出范围换行

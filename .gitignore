@@ -1,7 +1,3 @@
-# Backup directory
-backup/*
-!backup/.gitkeep
-
 # dots 派生区与台账（机器本地，不入库）
 .gen/
 .dots/
@@ -44,6 +40,9 @@ cli/target/
 
 # 可视化伴侣临时产物
 .superpowers/
+
+# Wayfinder 本地规划 artifact
+/specs/
 
 # mpv 运行时续播状态（~/.config/mpv 软链进仓库，mpv 会往里写；机器本地，不入库）
 tree/home/.config/mpv/watch_later/

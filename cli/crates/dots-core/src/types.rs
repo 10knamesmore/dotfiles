@@ -76,7 +76,7 @@ impl Os {
     }
 }
 
-/// 链接粒度（§3 规则 2/3）。
+/// 控制目录映射下钻或整体链接的粒度。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum LinkMode {
     /// 整目录链。

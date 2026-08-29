@@ -121,7 +121,7 @@ return {
     },
   },
 
-  -- code action 前先预览 diff（替代原生 vim.lsp.buf.code_action）
+  -- 使用 actions-preview 展示 code action diff 后再执行。
   {
     "aznhe21/actions-preview.nvim",
     event = "LspAttach",

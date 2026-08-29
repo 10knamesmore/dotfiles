@@ -39,12 +39,11 @@ Rectangle {
 }
 ```
 
-职责复杂、有历史包袱时，可多写两行交代为什么这样设计：
+职责复杂时，可多写两行交代关键副作用和共享边界：
 
 ```qml
-// 系统监控采集 — 每秒一次 fork，读 /proc/stat + /proc/meminfo + /proc/net/dev，
-// 算好 CPU / 内存 / 网速写入 SystemStats 单例。
-// 取代旧 Cpu/Memory/NetSpeed 三个 module 各自 1Hz 轮询（4 fork → 1 fork）。
+// 系统监控采集 — 每秒一次读取 /proc/stat + /proc/meminfo + /proc/net/dev，
+// 算好 CPU / 内存 / 网速写入 SystemStats 单例；所有显示器共享这一次采集。
 Scope {
     id: root
 }
@@ -162,7 +161,7 @@ function refresh() {
 长绑定、含魔法逻辑的绑定，在上方说明意图。能拆就拆成具名 function / readonly property 再注释。
 
 ```qml
-// hover 时背景提亮一档；flat 模式走半透明分支。可读性优先，别再加分支。
+// hover 时背景提亮一档；flat 模式走半透明分支。
 color: root.flat
     ? Qt.rgba(Colors.surface1.r, Colors.surface1.g, Colors.surface1.b, root.hovered ? 0.85 : 0.5)
     : (hovered ? Qt.lighter(root.backgroundColor, 1.1) : root.backgroundColor)

@@ -152,8 +152,7 @@ pub fn update(model: Model, msg: Message) -> (Model, Command) {
 
 ### 默认范式：有序栈/层 + 逆序冒泡 + 第一个 Consumed 短路
 
-**结论先行：把事件「广播给所有组件、各组件自己 `if !is_focused return`」是反模式。**
-13 个生产 ratatui 应用调研里 **0 个**真用并行广播：11/13 是「只把事件路由给当前聚焦者 / 栈顶层，未消费才向外冒泡」。唯二「广播」的例外都不构成反例——gitui 是**有序链 + 首个 Consumed 截停**（仍是短路，不是并行），bubbletea 是 Go 无借用检查才广播 + 组件自 gate。广播的代价：每键全组件 `update` 开销 + 焦点逻辑散落各组件自 gate、极易漂移失配；只有 zellij 的「同步输入到所有 pane」这种**显式 opt-in** 才该广播。
+**把事件广播给所有组件、再由各组件自行检查焦点是反模式。** 广播会让每次按键触发全部组件更新，并把焦点判断分散到多个 owner。默认应只路由给当前聚焦者或栈顶层，未消费时再向外冒泡；只有同步输入到多个 pane 这类显式功能才使用广播。
 
 正解是组件 / 页返回一个**响应枚举**，顶层按层级逆序派发、第一个 `Consumed` 即停：
 
@@ -199,12 +198,6 @@ impl App {
 }
 ```
 
-**实证锚点**：
-- **helix** `compositor.rs`：`for layer in self.layers.iter_mut().rev()`，第一个返回 `Consumed` 立即 `break`，EditorView 恒为 `layers[0]` 兜底。
-- **lazygit**：聚焦 view → 其父 view → global，逐级冒泡（不是广播）。
-- **yazi** `core.rs`：派生 `layer()` 选出当前活跃层，**只把事件喂那一层**。
-- **spotify-player**：先按 `popup.is_none()` 在「浮层 / 页面」二选一路由，未命中再 fallback 到 global。
-
 ### 焦点即时派生：别把 `is_focused` 存成组件字段
 
 即时模式下「谁聚焦」每帧都能算出来，**不该每个组件存一份 `is_focused: bool`**——那是双写漂移源（焦点切换时漏更新某个组件就花屏）。正解：焦点是渲染时从一个集中的 focus 枚举**瞬时派生**的 bool，作为参数喂给组件：
@@ -245,7 +238,7 @@ fn draw(&mut self, frame: &mut Frame, area: Rect) {
 }
 ```
 
-**实证锚点**：spotify-player `ui/page.rs` 渲染时算 `is_active && focus == This`；joshuto 渲染时把 `focused` 当参数传给目录列表；tui-textarea 焦点状态全外置、库自身不存。反面：bubbletea / gitui / tui-realm 都存 `is_focused`，且都伴随手动双写同步的负担。
+焦点应由页面激活状态与集中 focus 枚举即时计算，再作为参数传给组件。组件各自持有 `is_focused` 会要求切换时手动双写，并可能遗漏同步。
 
 > 路由组件返回意图、顶层执行副作用、`Consumed/Pass/Do` 的完整设计与「优先级单一真相源」铁律，见 `references/tui/page-focus-routing.md`。
 
@@ -382,17 +375,6 @@ async fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
 > 别用一个 enum 同时兼任「顶层架构 + 页面身份 + 面板焦点 + 输入路由」——拆开。
 
 ---
-
-## 生产项目参考
-
-| 项目 | 架构 | 特点 |
-|------|------|------|
-| [spotify-player](https://github.com/aome510/spotify-player) | 闭集 enum 页栈 + 焦点宏 | `history: Vec<PageState>` 闭集枚举栈下钻回退；`impl_focusable!` 按相邻对生成焦点环；LineInput 输入原语 |
-| [helix](https://github.com/helix-editor/helix) | compositor 层栈 | `compositor.rs` 逆序冒泡、第一个 `Consumed` 短路；EditorView 恒为 `layers[0]` 兜底 |
-| [yazi](https://github.com/sxyazi/yazi) | Action + tokio LocalSet | `core.rs` 派生 `layer()` 选活跃层、只路由那一层；Micro/Macro 任务队列，极高性能 |
-| [ncspot](https://github.com/hrkfdn/ncspot) | 泛型 ListView + CommandResult | `ListView<I>` 一份选择/滚动逻辑复用全列表；命令返回 `CommandResult` 顶层执行 |
-| [tui-input](https://github.com/sayanarijit/tui-input) | 输入原语三段式 | 事件解码 `InputRequest` 与纯态更新 `StateChanged` 分离，核心零 ratatui 依赖、好测 |
-| [gitui](https://github.com/extrawurst/gitui) | 集中式 App State | 有序链 + 首个 Consumed 截停（非广播）；同步轮询，状态机清晰 |
 
 ## 参考链接
 

@@ -92,8 +92,7 @@ BarModule {
         }
     }
 
-    // PID 在 player 生命周期内不变，且只有 hover/右键复制才用 —— 改为 player 变化时取一次，
-    // 消除旧的每 2s pgrep -fi fork（per-screen ×2，扫全 /proc）。
+    // PID 在 player 生命周期内不变，且只有 hover/右键复制使用；每次 player 变化时读取一次。
     onPlayerChanged: {
         if (root.player)
             pidReader.running = true;

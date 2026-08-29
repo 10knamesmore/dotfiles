@@ -4,9 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 网络状态单例 —— 全局只 fork 一次 network_status.sh（内含 nmcli/ip 多个子进程），
-// 取代原 NetworkModule 在每块显示器各自 5s 轮询同一份主机全局数据的浪费（per-screen ×屏数）。
-// UI（NetworkModule）只读本单例（照 AudioService/MediaService/SystemStatsService 的收口模式）。
+// 网络状态单例。每五秒全局运行一次 network_status.sh，NetworkModule 只读取本单例，
+// 因而多显示器不会重复采集同一份主机状态。
 Singleton {
     id: root
 

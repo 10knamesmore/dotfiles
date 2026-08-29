@@ -1,6 +1,6 @@
-//! 真实文件系统：实现 core 的 [`FileSystem`] 读 trait + sync/原语所需的写能力。
+//! 真实文件系统：实现 core 的 [`FileSystem`] 观测接口和命令执行所需的写能力。
 //!
-//! 写能力统一保证：atomic（temp + rename）、写前备份、无差异不写盘。
+//! 普通文件写入使用 atomic temp + rename；内容无差异时不写盘。
 
 use std::fs;
 use std::os::unix::fs as unixfs;
@@ -9,24 +9,17 @@ use std::path::{Path, PathBuf};
 use color_eyre::eyre::{Context, eyre};
 use dots_core::{FileSystem, NodeKind};
 
-/// 真实文件系统句柄，持有仓库根（用于 backup 落点）。
-pub struct RealFs {
-    /// 仓库根绝对路径。
-    repo_root: PathBuf,
-    /// 本次运行的统一备份时间戳（同一次 sync 的备份归一个目录）。
-    stamp: String,
-}
+/// 真实文件系统读写入口。
+#[derive(Default)]
+pub struct RealFs;
 
 /// 通用 Result 别名。
 pub type Result<T> = color_eyre::Result<T>;
 
 impl RealFs {
-    /// 新建。`stamp` 为 ISO 风格时间戳字符串（由调用方生成，便于测试注入）。
-    pub fn new(repo_root: impl Into<PathBuf>, stamp: impl Into<String>) -> Self {
-        Self {
-            repo_root: repo_root.into(),
-            stamp: stamp.into(),
-        }
+    /// 新建真实文件系统入口。
+    pub fn new() -> Self {
+        Self
     }
 
     /// 原子写文件：若目标内容已与 `bytes` 相同则不写（返回 `false`）。
@@ -52,28 +45,20 @@ impl RealFs {
         Ok(true)
     }
 
-    /// 把目标移入 `backup/<stamp>/`，保留 `.config` 二级结构。
-    pub fn backup(&self, path: &Path) -> Result<()> {
-        let backup_root = self.repo_root.join("backup").join(&self.stamp);
-        let name = path
-            .file_name()
-            .ok_or_else(|| eyre!("无文件名：{}", path.display()))?;
-        let dest = if path
-            .parent()
-            .and_then(|parent| parent.file_name())
-            .is_some_and(|name| name == ".config")
-        {
-            backup_root.join(".config").join(name)
-        } else {
-            backup_root.join(name)
-        };
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)
-                .wrap_err_with(|| format!("建备份目录失败：{}", parent.display()))?;
+    /// 原子写文件并确保 permission bits 与声明一致。
+    pub fn write_atomic_with_mode(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<bool> {
+        let content_changed = self.write_atomic(path, bytes)?;
+        let mut permissions = fs::metadata(path)
+            .wrap_err_with(|| format!("读取文件权限失败：{}", path.display()))?
+            .permissions();
+        use std::os::unix::fs::PermissionsExt;
+        if permissions.mode() & 0o777 != mode {
+            permissions.set_mode(mode);
+            fs::set_permissions(path, permissions)
+                .wrap_err_with(|| format!("设置文件权限失败：{}", path.display()))?;
+            return Ok(true);
         }
-        fs::rename(path, &dest)
-            .wrap_err_with(|| format!("备份移动失败：{} → {}", path.display(), dest.display()))?;
-        Ok(())
+        Ok(content_changed)
     }
 
     /// 建符号链接 `link_path → target`（先 mkdir 父目录）。
@@ -91,6 +76,17 @@ impl RealFs {
     /// 删除一个符号链接（不跟随）。
     pub fn remove_symlink(&self, path: &Path) -> Result<()> {
         fs::remove_file(path).wrap_err_with(|| format!("删链失败：{}", path.display()))?;
+        Ok(())
+    }
+
+    /// 删除普通文件或 symlink，不跟随 symlink，也不递归删除真实目录。
+    pub fn remove_file(&self, path: &Path) -> Result<()> {
+        let metadata = fs::symlink_metadata(path)
+            .wrap_err_with(|| format!("读取待删路径失败：{}", path.display()))?;
+        if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() {
+            return Err(eyre!("拒绝删除未声明的真实目录：{}", path.display()));
+        }
+        fs::remove_file(path).wrap_err_with(|| format!("删除文件失败：{}", path.display()))?;
         Ok(())
     }
 
@@ -142,7 +138,7 @@ mod tests {
     #[test]
     fn atomic_write_skips_when_identical() -> Result<()> {
         let dir = tempdir()?;
-        let fs = RealFs::new(dir.path(), "stamp");
+        let fs = RealFs::new();
         let f = dir.path().join("a.txt");
         assert!(fs.write_atomic(&f, b"hello")?); // 首次写
         assert!(!fs.write_atomic(&f, b"hello")?); // 内容相同 → 跳过
@@ -153,26 +149,13 @@ mod tests {
     #[test]
     fn symlink_and_classify() -> Result<()> {
         let dir = tempdir()?;
-        let fs = RealFs::new(dir.path(), "stamp");
+        let fs = RealFs::new();
         let target = dir.path().join("src");
         let link = dir.path().join("lnk");
         fs.write_atomic(&target, b"x")?;
         fs.make_symlink(&target, &link)?;
         assert!(matches!(fs.classify(&link), NodeKind::Symlink { .. }));
         assert_eq!(fs.classify(&target), NodeKind::File);
-        Ok(())
-    }
-
-    #[test]
-    fn backup_moves_file() -> Result<()> {
-        let dir = tempdir()?;
-        let fs = RealFs::new(dir.path(), "20260606T000000");
-        let f = dir.path().join("orig");
-        fs.write_atomic(&f, b"data")?;
-        fs.backup(&f)?;
-        assert_eq!(fs.classify(&f), NodeKind::Missing);
-        let backed = dir.path().join("backup/20260606T000000/orig");
-        assert_eq!(fs.classify(&backed), NodeKind::File);
         Ok(())
     }
 }
