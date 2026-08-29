@@ -42,9 +42,9 @@
         "ANTHROPIC_AUTH_TOKEN": "${FTAI_API_KEY}",
         "ANTHROPIC_DEFAULT_FABLE_MODEL": "glm-5.3-auto[1m]",
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.3-auto[1m]",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.3-auto[1m]",
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5.3-auto[1m]",
-        "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5.3-auto[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.3-flash[1m]",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5.3-flash[1m]",
+        "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5.3-flash[1m]",
         "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000",
         "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "500000"
       }

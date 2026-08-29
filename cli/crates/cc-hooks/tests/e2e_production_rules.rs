@@ -58,12 +58,12 @@ fn production_rules_parse_and_decide() {
     // (命令, 期望决策：None=静默放行)
     let cases: &[(&str, Option<&str>)] = &[
         // ── 既有规则（证明读到的是真生产表，而非合成 fixture）──
-        ("rm -rf ~/x", Some("deny")),        // 白名单外拦
-        ("rm -rf /usr", Some("deny")),       // 白名单外拦
+        ("rm -rf ~/x", Some("ask")),         // 白名单外需确认
+        ("rm -rf /usr", Some("ask")),        // 白名单外需确认
         ("rm -rf /tmp/x", None),             // 白名单 /tmp 内放行
-        ("rm -rf /", Some("deny")),          // 根目录保底
+        ("rm -rf /", Some("ask")),           // 根目录需确认
         ("grep foo file.txt", Some("deny")), // prefer-rg（合成 fixture 里没有）
-        ("git push origin main", Some("ask")),
+        ("git push origin main", None),      // push 守卫已移除，静默放行
         ("git add -A", None),
         // ── chmod 全局可写 ──
         ("chmod 777 file", Some("ask")),

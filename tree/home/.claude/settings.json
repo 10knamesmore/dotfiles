@@ -36,6 +36,7 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "sonnet",
   "enableAllProjectMcpServers": false,
   "hooks": {
     "PreToolUse": [
@@ -75,6 +76,7 @@
   "language": "中文",
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
+  "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "preferredNotifChannel": "kitty",

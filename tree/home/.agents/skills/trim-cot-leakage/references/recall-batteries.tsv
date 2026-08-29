@@ -1,0 +1,17 @@
+# trim-cot-leakage recall batteries 的 probe 数据，由 ../scripts/recall-batteries.sh 消费。
+# 每行四列，TAB 分隔: label, flags, pattern, glob
+#   flags  含 i 表示 rg -i（natural-language pattern）；task code 等大小写敏感 pattern 留空
+#   glob   inclusion glob（如 *.md），可空；脚本会把 exclusion glob 排在它之后
+# # 开头与空行跳过。新增 probe 时先用 known-positive string 验证 pattern 自身，
+# 并把稳定的 false-positive boundary 补到 recall-batteries.md。
+en: dead citation (decision/audit/design §/P-I/W\d/T\d)		\(decision \d|\(audit [A-Z]\d|design §|plan §|spec §|\bP-I\b|\bW\d\b|\bT\d\b
+en: PR/stack vantage	i	this PR|this branch|this stack|later PR|previous commit|this commit
+en: change narration	i	used to |no longer|previously|the old |was renamed|was moved
+en: version stamp and deferral marker	i	\bv1\b|this cut|\bcut \d|\btoday\b|\bfor now\b|roadmap
+en: review choreography	i	rejected in review|review round|reviewer|as of v\d
+en: stale snapshot	i	currently (runs?|live|deployed|supports?|on)|not yet (shipped|released|deployed)|in production|as of 20\d\d
+en: hedge and safe-claim	i	probably |should be enough|should suffice|it simply|is safe —|is safe --
+en: section ordinal		§\d
+zh: session vantage and narration		设计稿|评审|上一?轮|旧版|老的|不再|以前|本版|遗留|私有|[A-Z]方案|任务[一二三四五六七八九十0-9]+
+zh: stale snapshot		生产环境|当前版本|目前版本|尚未(发布|上线)|已上线|已部署
+zh: bare 端 in markdown		(^|[^a-zA-Z])端([^a-zA-Z]|$)	*.md

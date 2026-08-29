@@ -1,6 +1,6 @@
 ---
 name: trim-cot-leakage
-description: 审计或修复仓库 prose 中泄漏的编写过程时使用，包括无法解析的 decision/task/Spec 编号、PR 或 review 视角、版本与改动 narration、面向 reviewer 的辩护、控制流 walkthrough、无 owner 的规划残留和混入的工作语言。适用于 comments、docs、Spec 完成态、ADR、Skill 和 agent instruction。
+description: 审计或修复仓库 prose 中泄漏的编写过程时使用，包括无法解析的 decision/task/Spec 编号、PR 或 review 视角、版本与改动 narration、随时间自行失效的取值快照、落不到符号的指针、面向 reviewer 的辩护、控制流 walkthrough、无 owner 的规划残留和混入的工作语言。适用于 comments、docs、Spec 完成态、ADR、Skill 和 agent instruction。
 ---
 
 # Trim Chain-of-Thought Leakage
@@ -13,7 +13,7 @@ Chain-of-thought leakage 是从编写 session 而不是当前仓库观察事实�
 
 对每个可疑 passage 问：只拥有当前 checkout、git 中可达历史和公共资料，不知道任何 session transcript、PR thread 或未提交草稿的读者，能否解析每个引用并验证每项 claim？
 
-不能时，保留可验证事实，改成仓库视角，删除其余 transcript。能解析只表示没有泄漏；README、API docs 和代码注释等 current-state surface 中，可解析的改动故事仍可能放错位置。
+不能时，保留可验证事实，改成仓库视角，删除其余 transcript。能解析只表示没有泄漏；README、API docs 和代码注释等 current-state surface 中，可解析的改动故事仍可能放错位置。claim 还必须在读者到达时仍然成立：随 commit、deploy 或 restart 变化的值写进长寿命页面后会自行变成错误声明，见 taxonomy 第 9 条。
 
 活动 Spec、Subspec 和 proposal 的职责就是表达未来状态、open question 和计划，因此 future tense 本身不是泄漏。它们完成后必须记录真实 resolution，不能把草稿轮次、review choreography 或已失效计划当作最终事实。
 
@@ -27,6 +27,11 @@ Chain-of-thought leakage 是从编写 session 而不是当前仓库观察事实�
 6. **Restatement and derivation transcript:** `first X, then Y`、测试 walkthrough、显然分支的 proof。删除；只保留非显然 contract、assertion rationale 或 invariant。
 7. **Hedge and planning residue:** `probably fine for now`、`should be enough`、没有 owner 的 deferral。改成可验证 bound 和 failure behavior，或交给明确的 issue、TODO、Spec；不要保留 hedge。
 8. **Authoring-language slip:** 英文 prose 中混入未翻译工作语言、私有分隔符和 session shorthand，或中文 prose 中出现相反情况。翻译为目标 surface 的语言，或删除无事实内容。
+9. **Stale snapshot:** 把比页面变化更快的值写进长寿命文档：`production currently runs 2.3.1`、deployed commit hash、`currently live`、`not yet shipped`、手工同步的 object 或 migration 计数。修复方向是记录去哪里读当前答案（命令、console、符号），而不是答案本身；页面必须展示当前值时，从权威源构建期生成，使静默漂移不可能。版本与部署事实的合法归宿是 changelog、release ticket 和 git history——携带日期正是那些 surface 的职责。
+
+## Pointer resolution
+
+指向代码事实的指针必须落到一个可搜索符号：具体文件加函数、常量、数据键或标题。`see the source`、repo 根链接和裸目录让读者重新推导句子承诺的内容，不算解析。目录只在两种情况下是合法目标：事实由有序集合涌现（migrations 按序 replay），或目录是 loader 枚举的 catalog（locales、plugins、maps）；两种仍须给出可搜索的选择键——命名约定、loader 函数或对象名。当没有任何单一符号拥有该事实时，那是代码边界问题暴露成文档问题：修边界，不要靠复制字段表糊住。
 
 ## What is not leakage
 
@@ -38,7 +43,9 @@ Chain-of-thought leakage 是从编写 session 而不是当前仓库观察事实�
 - runtime lifecycle 中的 old/new object，例如旧连接 drain 后新连接接管；
 - RFC section、标准文档、committed design doc、Figma frame 等按设计在仓库外或仓库内可解析的引用；
 - proposal 的 alternatives、future tense 和未完成 acceptance criteria；
-- recorded model output、fixture、snapshot 和冻结历史中的原始声音。
+- recorded model output、fixture、snapshot 和冻结历史中的原始声音；
+- changelog、release ticket 和 git history 中承担日期意义的版本与部署记录；
+- 构建期从权威源生成的当前值表格；被禁止的是手工维护的第二份拷贝，不是表格本身。
 
 使用 [`examples`](./references/examples.md) 校准这些边界，尤其检查 proposition 被误删、modality 翻转和假设被升级成事实的情况。
 
@@ -50,5 +57,5 @@ Chain-of-thought leakage 是从编写 session 而不是当前仓库观察事实�
 4. 删除前枚举 passage 的 actor、condition、modality、negative guarantee、ownership、failure 和 consequence。
 5. owner-first 修改：事实改在 owning source，引用改到可解析 owner，活动工作改到 issue、TODO 或 Spec。
 6. 逐项检查 overcorrection：不能把 obligation 改成 endorsement，不能把 hypothetical 改成 shipped feature，不能随 transcript 删除真实事实，不能丢掉 measurement provenance。
-7. 重新运行 batteries，确认剩余 hit 都是 deliberate keep；检查每个 citation 在当前 checkout 可解析。
+7. 重新运行 batteries，确认剩余 hit 都是 deliberate keep；检查每个 citation 在当前 checkout 可解析并落到可搜索符号。
 8. 运行 touched surface 已有的最窄验证和 `git diff --check`。未经用户明确要求，不新增或修改测试。

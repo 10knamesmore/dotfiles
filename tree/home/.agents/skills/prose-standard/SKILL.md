@@ -7,7 +7,7 @@ description: 编写、审查、补全、裁剪或重构仓库内持久 prose 时
 
 写到足以保存 contract，然后删除推理过程、重复和装饰。这里的 contract 是调用方、实现方、生产者或消费者会依赖的义务、不变量、前置条件、后置条件、失败行为或兼容承诺。
 
-本 Skill 负责仓库内持久 prose 的编辑判断、代码注释语义和各语言的注释表达，不约束日常对话，也不承担专门的泄漏召回流程。使用 [`examples`](./references/examples.md) 校准完整命题和 surface 边界；发现 session、PR、review 或草稿视角时使用 [`trim-cot-leakage`](../trim-cot-leakage/SKILL.md)。本 Skill 是 guidance，不是关键词脚本或删字清单。
+本 Skill 负责仓库内持久 prose 的编辑判断、代码注释语义和各语言的注释表达，不约束日常对话，也不承担专门的泄漏召回流程。使用 [`examples`](./references/examples.md) 校准完整命题和 surface 边界；发现 session、PR、review 或草稿视角，以及过期快照和落不到符号的指针时使用 [`trim-cot-leakage`](../trim-cot-leakage/SKILL.md)。本 Skill 是 guidance，不是关键词脚本或删字清单。
 
 `contract`、`boundary`、`shape`、`surface`、`seam`、`canonical` 和 `provenance` 不是禁词，但不能代替具体事实。优先写清实际规则、字段、时机、失败状态和后果。
 

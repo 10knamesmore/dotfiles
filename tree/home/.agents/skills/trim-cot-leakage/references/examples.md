@@ -74,6 +74,22 @@ counterfactual 说明不能删除的 guard，并且不要求读者做 repo archa
 
 用真实 bound、来源和超限行为代替 hedge。
 
+## Stale snapshot
+
+**Leaked:** Production currently runs 2.3.1; consult the 2.3.1 changelog when debugging live behavior.
+
+**Fixed:** 调试线上行为前先确认部署版本：`deployctl status` 输出当前 commit；各版本变更见 changelog。
+
+长寿命页面记录读取答案的命令，不记录答案；版本号属于 changelog，四个发布之后快照自行变成错误声明。
+
+## Pointer without a symbol
+
+**Leaked:** Protocol versions are defined in the networking layer.
+
+**Fixed:** Protocol versions are defined by `PROTOCOL_VERSION` in `net/constants.py`.
+
+没有任何单一符号拥有该事实时，先修代码边界，不要在文档里复制字段表。
+
 ## Legitimate keeps
 
 - `issue #1470 owns the follow-up` 在仓库流程中可以解析。
