@@ -57,7 +57,6 @@ dotfiles/
 │   └── home.macos/   #   → $HOME（仅 macOS）
 ├── scripts/          # 脚本源（common/ linux/ macos/），聚合到 .gen/scripts/ 进 PATH
 ├── hosts/  (按需)    # per-host 资产：files/<host>/、secrets.age（密文入库；目录按需创建，当前还没有）
-├── system/           # root 级文件源（udev/systemd），dots 不链接，手动安装
 ├── packages/         # bootstrap 装机清单（pacman.txt 等纯文本 + toolchains.toml）
 ├── common/           # 手动同步参考资料（VS Code 配置；dots 不处理）
 ├── docs/             # 文档（本文件实际位置）
@@ -118,7 +117,6 @@ CLI 永不编辑 `dots.lua`；需要清单变更时它打印建议行让你粘�
 
 - **改已有配置**：直接编辑 `tree/` 下对应文件。已链接的文件改完即生效，无需重跑任何命令。
 - **加新配置**：放进 `tree/` 对应位置后 `dots sync`；或者用 `dots adopt <path>` 把 `$HOME` 里现成的文件收编（它会搬文件、建链、记台账供 undo）。
-- **root 级配置**（键盘 inhibit 等）：源在 `system/`，需手动 `sudo cp` 安装，见 [MANUAL_SETUP.md](docs/MANUAL_SETUP.md)。
 
 ## 备份与漂移处理
 
@@ -150,7 +148,7 @@ Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/cr
 ## 更多文档
 
 - [LUA_API.md](docs/LUA_API.md) — `dots.lua` 全部 Lua API 的参考（参数、行为细节、坑与配方）
-- [MANUAL_SETUP.md](docs/MANUAL_SETUP.md) — 需要 root 手动安装的部分（udev / systemd 键盘 inhibit、fcitx5-macos）
+- [MANUAL_SETUP.md](docs/MANUAL_SETUP.md) — archlinuxcn 软件源与 fcitx5-macos 的手动安装步骤
 - [packages/README.md](packages/README.md) — 装机清单角色、toolchains 分组、cargo 渠道的版本/更新/缓存管理
 - `docs/superpowers/specs/` — dots CLI 的设计文档（镜像规则、dots.lua、钩子、路径注入的完整论证）
 

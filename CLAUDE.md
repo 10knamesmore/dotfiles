@@ -34,7 +34,6 @@ tree/             # ★ 映射根：目录结构即链接声明
   home.macos/     #   → $HOME（仅 macOS）
 scripts/          # 脚本源（common/ linux/ macos/），聚合到 .gen/scripts/ 进 PATH
 hosts/            # per-host 资产：files/<host>/、secrets.age（age 加密，密文入库）
-system/           # root 级文件源（udev/systemd），dots 不链接，手动 cp 到 /etc（见 docs/MANUAL_SETUP.md）
 packages/         # bootstrap 装机清单（pacman.txt 等纯文本 + toolchains.toml）
 common/           # 手动同步参考资料（VS Code 配置；dots 不处理）
 docs/
@@ -73,8 +72,6 @@ backup/ (gitignore)# 覆盖普通文件前的时间戳备份
 1. 新增/改配置：编辑 `tree/` 下对应文件，`dots sync`（多数情况是普通文件，改完直接生效，无需渲染）。
 2. 新增整目录或非标目标：放进 `tree/` 即被镜像；`dots adopt <path>` 可把 `$HOME` 现成文件收编。
 3. `~/.zshrc` 是受管 stub（首行 `# DOTS_MANAGED:`），只 source `~/.zshrc_dotfiles`，软件追加内容（conda/nvm）安全保留——不要当主配置维护。
-4. root 级配置（keyboard inhibit）在 `system/`，需 root 手动安装，见 `docs/MANUAL_SETUP.md`。
-
 ## 备份机制
 
 - 覆盖普通文件/目录前移到 `backup/<时间戳>/`；目标是符号链接则直接重建不备份。
