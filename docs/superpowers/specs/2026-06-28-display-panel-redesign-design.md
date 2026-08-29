@@ -199,7 +199,6 @@ onClicked: {
 ## 文档维护
 
 - 本改动使用 `hyprland.lua` 既有的 `hl.monitor` / `dofile`，**未改动 cli/lua-api 本身**，故无需更新 `docs/LUA_API.md`。
-- 不涉及 AI 工具链，无需更新 `docs/AI_TOOLING.md`。
 
 ## 验收标准
 

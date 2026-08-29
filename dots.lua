@@ -87,13 +87,12 @@ distribute("agent-hook-rules", {
     mode = "file",
 })
 
--- 每次 sync 保持派生二进制新鲜：Claude cc-hook、Codex agent-hook、Claude statusline 的 cc-usage。
+-- 每次 sync 保持派生二进制新鲜：Claude cc-hook、Codex agent-hook。
 on({
     post_sync = function()
         local bins = {
             ["cc-hook"] = dots.home .. "/.claude/hooks/cc-hook",
             ["agent-hook"] = dots.home .. "/.local/bin/agent-hook",
-            ["cc-usage"] = dots.home .. "/.local/bin/cc-usage",
         }
         for name, dest in pairs(bins) do
             local bin = dots.cargo.build(dots.repo .. "/cli", name)

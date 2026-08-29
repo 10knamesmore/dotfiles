@@ -134,7 +134,7 @@ CLI 永不编辑 `dots.lua`；需要清单变更时它打印建议行让你粘�
 
 `tree/home/.agents/` 是本地 AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，`codex/hooks.json` 分发到 `~/.codex/hooks.json`。接入新工具 = `dots.lua` 的 `to` 列表加一行 + `dots sync`。
 
-Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/crates/cc-hooks/`）：`cc-hook` 保留 Claude 的 deny/ask 协议，`agent-hook` 适配 Codex；规则表 `pretool.toml` 拦高危命令、做工具偏好重定向。资产地图、协议差异、部署链与测试见 [AI_TOOLING.md](docs/AI_TOOLING.md)。
+Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/crates/cc-hooks/`）：`cc-hook` 保留 Claude 的 deny/ask 协议，`agent-hook` 适配 Codex；规则表 `pretool.toml` 拦高危命令、做工具偏好重定向。
 
 ## 当前管理的主要配置
 
@@ -150,7 +150,6 @@ Claude Code 与 Codex 共用一套 Rust PreToolUse 判定引擎（源在 `cli/cr
 ## 更多文档
 
 - [LUA_API.md](docs/LUA_API.md) — `dots.lua` 全部 Lua API 的参考（参数、行为细节、坑与配方）
-- [AI_TOOLING.md](docs/AI_TOOLING.md) — AI 工具链配置：资产地图、共享守卫引擎、规则表词汇、部署链与测试
 - [MANUAL_SETUP.md](docs/MANUAL_SETUP.md) — 需要 root 手动安装的部分（udev / systemd 键盘 inhibit、fcitx5-macos）
 - [packages/README.md](packages/README.md) — 装机清单角色、toolchains 分组、cargo 渠道的版本/更新/缓存管理
 - `docs/superpowers/specs/` — dots CLI 的设计文档（镜像规则、dots.lua、钩子、路径注入的完整论证）

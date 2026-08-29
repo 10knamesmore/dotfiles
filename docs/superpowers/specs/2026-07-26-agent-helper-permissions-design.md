@@ -384,4 +384,3 @@ P6 之后若 Rust 侧已有 2-3 个 tool，再回头做 derive 宏抽象（本�
   - `packages/coding-agent/docs/extensions.md`（2961 行，extension API 全集）
   - `packages/coding-agent/docs/settings.md`、`skills.md`、`usage.md`
 - 现有实现：`cli/crates/cc-hooks/`、`tree/home/.claude/hooks/pretool.toml`
-- 现有文档：`docs/AI_TOOLING.md`（资产地图，重命名后需同步更新）
