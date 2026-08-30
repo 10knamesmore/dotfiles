@@ -40,9 +40,12 @@ command -v uv >/dev/null && {
     [[ -s "$_uvcomp" ]] && source "$_uvcomp"
 }
 proxy
-command -v zoxide >/dev/null && eval "$(zoxide init zsh)"   # 提供 z 目录跳转
-# 补全覆盖：`z 词<Tab>` 直接进 fzf（默认要「空格+Tab」才进，词贴着光标时只补本地子目录）。
-# init 已 compdef z → __zoxide_z_complete，重定义函数体即可生效；选中后由 init 的 helper 直接跳转。
+command -v zoxide >/dev/null && {
+    eval "$(zoxide init zsh --cmd cd)"
+    alias z=cd # `cd` 和 `z` 共用 zoxide 目录记录。
+}
+# 补全覆盖：`cd|z 词<Tab>` 直接进 fzf（默认词贴着光标时只补本地子目录）。
+# init 已 compdef cd → __zoxide_z_complete，`z` 别名沿用同一 completer。
 # 须同时有 fzf：query --interactive 底层调 fzf，无 fzf 的服务器保留 zoxide 默认补全（补本地目录）。
 if command -v zoxide >/dev/null && command -v fzf >/dev/null; then
     function __zoxide_z_complete() {
