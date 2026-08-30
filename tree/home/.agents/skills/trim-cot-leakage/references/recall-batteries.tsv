@@ -4,7 +4,7 @@
 #   glob   inclusion glob（如 *.md），可空；脚本会把 exclusion glob 排在它之后
 # # 开头与空行跳过。新增 probe 时先用 known-positive string 验证 pattern 自身，
 # 并把稳定的 false-positive boundary 补到 recall-batteries.md。
-en: dead citation (decision/audit/design §/P-I/W\d/T\d)		\(decision \d|\(audit [A-Z]\d|design §|plan §|spec §|\bP-I\b|\bW\d\b|\bT\d\b
+en: dead citation (decision/audit/design §/P-I/W\d/T\d)		\(decision \d|\(audit [A-Z]\d|design §|plan §|spec §|\bP-I\b|\bW\d\b|\bT\d\b|§
 en: PR/stack vantage	i	this PR|this branch|this stack|later PR|previous commit|this commit
 en: change narration	i	used to |no longer|previously|the old |was renamed|was moved
 en: version stamp and deferral marker	i	\bv1\b|this cut|\bcut \d|\btoday\b|\bfor now\b|roadmap
