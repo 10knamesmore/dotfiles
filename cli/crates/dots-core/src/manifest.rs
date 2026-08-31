@@ -12,14 +12,44 @@ use crate::types::{LinkMode, RepoPath};
 pub struct Manifest {
     /// 链接粒度覆盖：相对 tree 的路径 → 粒度规格。
     pub granularity: FxHashMap<RepoPath, GranularitySpec>,
+
     /// 多目标分发。
     pub distribute: Vec<DistributeSpec>,
+
     /// 非 `$HOME` 镜像的额外层。
     pub roots: Vec<RootSpec>,
+
     /// scripts 聚合时不保树形、递归拍平的子目录名（子目录默认整目录链）。
     pub scripts_ignore_tree: Vec<String>,
+
     /// 显式 Resource declaration。
     pub resources: Vec<ResourceDeclaration>,
+
+    /// 绑定 dots command 生命周期的 hook。
+    pub hooks: LifecycleHooks,
+}
+
+/// dots command 暴露的 lifecycle hook 集合。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LifecycleHooks {
+    /// 在真实机器状态读取和 Resource planning 前运行的 hook。
+    pub before_sync: Vec<BeforeSyncHook>,
+}
+
+/// 在 `dots sync` planning 前运行的一条具名命令。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BeforeSyncHook {
+    /// 日志和失败诊断使用的人类可读名称。
+    pub name: String,
+
+    /// 启动程序时使用的工作目录。
+    pub cwd: String,
+
+    /// 由当前 `PATH` 或明确路径解析的程序。
+    pub program: String,
+
+    /// 按原样传给程序的参数。
+    pub args: Vec<String>,
 }
 
 /// 链接粒度规格。

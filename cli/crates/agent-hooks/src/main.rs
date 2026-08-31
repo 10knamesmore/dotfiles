@@ -7,7 +7,7 @@ use agent_hooks::common::outcome::HookRun;
 use agent_hooks::common::wire;
 use agent_hooks::pretool::envelope::PreToolUseOutput;
 use agent_hooks::pretool::rules::Decision;
-use agent_hooks::pretool::{claude, codex, evaluation, kimi, rules};
+use agent_hooks::pretool::{claude, codex, evaluation, kimi, pi, rules};
 use clap::{Parser, Subcommand};
 
 /// 中立 hook CLI。
@@ -44,6 +44,13 @@ enum Command {
     #[command(name = "kimi-pretool")]
     Kimi {
         /// 规则 TOML；缺省 `~/.kimi-code/pretool.toml`。
+        #[arg(long)]
+        rules: Option<PathBuf>,
+    },
+    /// Pi tool_call：保留 deny/ask，由 extension 处理交互确认。
+    #[command(name = "pi-pretool")]
+    Pi {
+        /// 规则 TOML；缺省 `~/.pi/agent/pretool.toml`。
         #[arg(long)]
         rules: Option<PathBuf>,
     },
@@ -101,13 +108,66 @@ impl Adapter {
 /// 解析 CLI 并运行对应 adapter。
 fn main() {
     let cli = Cli::parse();
-    let (adapter, rules_path) = match cli.command {
-        Command::Claude { rules } => (Adapter::Claude, rules),
-        Command::Codex { rules } => (Adapter::Codex, rules),
-        Command::Kimi { rules } => (Adapter::Kimi, rules),
-    };
+    match cli.command {
+        Command::Claude { rules } => run_harness_pretool(Adapter::Claude, rules),
+        Command::Codex { rules } => run_harness_pretool(Adapter::Codex, rules),
+        Command::Kimi { rules } => run_harness_pretool(Adapter::Kimi, rules),
+        Command::Pi { rules } => wire::emit(pi_pretool(rules.or_else(pi_rules_path))),
+    }
+}
+
+/// 运行输出 Claude-style PreToolUse 信封的 harness adapter。
+fn run_harness_pretool(adapter: Adapter, rules_path: Option<PathBuf>) {
     let rules_path = rules_path.or_else(|| adapter.default_rules_path());
     wire::emit(pretool(adapter, rules_path));
+}
+
+/// 返回 Pi adapter 的缺省规则副本路径。
+fn pi_rules_path() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".pi/agent/pretool.toml"))
+}
+
+/// 读取共享规则并返回 Pi extension 的中立决策。
+fn pi_pretool(rules_path: Option<PathBuf>) -> HookRun<pi::PiPreToolOutput> {
+    let Some(path) = rules_path else {
+        return HookRun::decision(pi::PiPreToolOutput::allow())
+            .with_notice("agent-hook pi-pretool: HOME 不可用，未加载规则（已放行）".to_owned());
+    };
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) => {
+            return HookRun::decision(pi::PiPreToolOutput::allow()).with_notice(format!(
+                "agent-hook pi-pretool: 规则读取失败（已放行）{}: {error}",
+                path.display()
+            ));
+        }
+    };
+    let config = match rules::Config::from_toml(&text) {
+        Ok(config) => config,
+        Err(error) => {
+            return HookRun::decision(pi::PiPreToolOutput::allow()).with_notice(format!(
+                "agent-hook pi-pretool: 规则解析失败（已放行）{}: {error}",
+                path.display()
+            ));
+        }
+    };
+    let mut stdin_text = String::new();
+    if let Err(error) = std::io::stdin().read_to_string(&mut stdin_text) {
+        return HookRun::decision(pi::PiPreToolOutput::allow()).with_notice(format!(
+            "agent-hook pi-pretool: stdin 读取失败（已放行）: {error}"
+        ));
+    }
+    let Some(stdin_text) = pi::rewrite_stdin(&stdin_text) else {
+        return HookRun::decision(pi::PiPreToolOutput::allow())
+            .with_notice("agent-hook pi-pretool: 调用信封解析失败（已放行）".to_owned());
+    };
+    let Some(matched) = evaluation::evaluate(&config, &stdin_text) else {
+        return HookRun::decision(pi::PiPreToolOutput::allow());
+    };
+    HookRun::decision(pi::PiPreToolOutput::from_decision(
+        matched.decision,
+        &matched.reason,
+    ))
 }
 
 /// 读取共享规则并生成指定 harness 的 PreToolUse 结果。

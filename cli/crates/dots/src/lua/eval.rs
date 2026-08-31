@@ -1,4 +1,4 @@
-//! 在无副作用 Lua 沙箱中收集 mapping 与 Resource declaration。
+//! 在无副作用 Lua 沙箱中收集 mapping、Resource 与 lifecycle hook declaration。
 
 use std::cell::RefCell;
 use std::rc::Rc;

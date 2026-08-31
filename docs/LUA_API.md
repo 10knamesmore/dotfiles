@@ -1,6 +1,6 @@
 # dots.lua API
 
-`dots.lua` 只声明持续状态和 mapping。它在无 `io`、`os`、`require`、`load` 的 Lua 沙箱中求值，不能直接执行命令或写文件。
+`dots.lua` 声明持续状态、mapping 和 sync lifecycle hook。它在无 `io`、`os`、`require`、`load` 的 Lua 沙箱中求值；命令只能通过 typed hook 交给 dots 执行。
 
 ## 收敛模型
 
@@ -18,7 +18,7 @@
 
 未拥有的 target 已与 Desired 完全一致时，sync 不重写 target，直接记入 inventory。未拥有且内容不同则是 Collision，普通 sync 不接管。
 
-`dots status`、`dots sync --dry-run` 与真实 `dots sync` 使用同一 Plan。dry-run 不修改受管位置和 inventory；为了精确判断 Cargo binary 内容，它会执行编译并允许 Cargo 更新 `target/` cache。
+`dots status`、`dots sync --dry-run` 与真实 `dots sync` 使用同一 Resource Plan。只有真实 sync 在 planning 前执行 lifecycle hook；dry-run 显示 hook 但不启动进程，status 完全忽略 hook。dry-run 不修改受管位置和 inventory；为了精确判断 Cargo binary 内容，它仍会执行编译并允许 Cargo 更新 `target/` cache。
 
 ## 路径规则
 
@@ -91,6 +91,33 @@ scripts { ignore_tree = { "legacy-flat" } }
 ```
 
 同名脚本产生 ownership conflict，整个 sync 在外部写入前失败。
+
+## Lifecycle hook
+
+### `dots.hook.before_sync(spec)`
+
+在真实机器状态读取和 Resource planning 前运行一条具名程序：
+
+```lua
+dots.hook.before_sync {
+    name = "install Pi dependencies",
+    cwd = dots.repo .. "/pi",
+    program = "pnpm",
+    args = { "install", "--frozen-lockfile" },
+}
+```
+
+| 字段 | 类型 | 缺省 | 行为 |
+| --- | --- | --- | --- |
+| `name` | `string` | — | 日志和失败诊断使用的名称 |
+| `cwd` | `string` | — | 启动程序时使用的工作目录 |
+| `program` | `string` | — | 由当前 `PATH` 或明确路径解析的程序 |
+| `args` | `string[]` | `{}` | 按原样传给程序的参数 |
+| `enabled` | `boolean` | `true` | `false` 时不声明该 hook |
+
+同一阶段按声明顺序执行。任一 hook 无法启动或返回非零状态时，sync 立即失败，不读取真实机器状态、不生成 Plan，也不修改 Resource 或 Applied Inventory。hook 每次真实 sync 都运行，不持有 Resource ownership，也不提供 run-once 状态。
+
+`dots sync --dry-run` 输出 `would run before_sync hook`；`dots status` 不执行或显示 hook。
 
 ## 显式 Resource
 
@@ -200,11 +227,11 @@ Declaration 存在时保持 `systemctl --user enable`；Declaration 删除时，
 声明阶段读取路径是否存在，常用于可选 source：
 
 ```lua
-local node_modules = dots.repo .. "/pi-ext/node_modules"
+local optional_runtime = dots.repo .. "/vendor/tool/runtime"
 dots.resource.symlink {
-    source = node_modules,
-    target = "~/.pi/agent/node_modules",
-    enabled = dots.path.exists(node_modules),
+    source = optional_runtime,
+    target = dots.home .. "/.local/share/tool/runtime",
+    enabled = dots.path.exists(optional_runtime),
 }
 ```
 
@@ -239,4 +266,4 @@ dots forget 'path:/Users/me/.config/tool/config'
 - `dots.cargo.build`
 - `dots.json.*`
 
-需要自动删除的持续结果必须建模为 Resource；一次性命令在 `dots sync` 之外明确执行。
+需要自动删除的持续结果必须建模为 Resource。每次 sync 在 planning 前必须完成的准备命令使用 `dots.hook.before_sync`；一次性命令仍在 `dots sync` 之外明确执行。

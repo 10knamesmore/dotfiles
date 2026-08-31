@@ -7,4 +7,5 @@ pub mod engine;
 pub mod envelope;
 pub mod evaluation;
 pub mod kimi;
+pub mod pi;
 pub mod rules;

@@ -46,6 +46,21 @@ pub struct PreparedReconciliation {
     pub script_conflicts: Vec<String>,
 }
 
+/// 从 `dots.lua` 加载、但尚未读取机器状态的 sync 配置。
+pub struct LoadedConfiguration {
+    /// 仓库根。
+    pub repo_root: PathBuf,
+
+    /// 当前 `$HOME`。
+    pub home: PathBuf,
+
+    /// 当前运行平台。
+    pub os: Os,
+
+    /// 当前声明的 Manifest。
+    pub manifest: Manifest,
+}
+
 /// 旧整目录 link 到逐子项 Resource 的结构迁移动作。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContainerConversion {
@@ -58,6 +73,11 @@ pub struct ContainerConversion {
 
 /// 从当前 checkout、Applied Inventory 与真实机器状态构建 Plan。
 pub fn prepare() -> crate::Result<PreparedReconciliation> {
+    prepare_configuration(load_configuration()?)
+}
+
+/// 求值 `dots.lua`，供 sync 在 planning 前执行 lifecycle hook。
+pub fn load_configuration() -> crate::Result<LoadedConfiguration> {
     let repo_root = find_repo_root()?;
     let home = home_dir()?;
     let os = current_os();
@@ -71,6 +91,25 @@ pub fn prepare() -> crate::Result<PreparedReconciliation> {
     for root in &mut manifest.roots {
         root.path = absolute_target(&root.path, &home)?.display().to_string();
     }
+
+    Ok(LoadedConfiguration {
+        repo_root,
+        home,
+        os,
+        manifest,
+    })
+}
+
+/// 在 lifecycle hook 完成后读取机器状态并生成 Resource Plan。
+pub fn prepare_configuration(
+    configuration: LoadedConfiguration,
+) -> crate::Result<PreparedReconciliation> {
+    let LoadedConfiguration {
+        repo_root,
+        home,
+        os,
+        manifest,
+    } = configuration;
 
     let state = State::load(&repo_root)?;
     let fs = RealFs::new();

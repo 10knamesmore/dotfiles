@@ -1,5 +1,5 @@
 ---@meta
---- dots.lua 的 LuaLS 声明。所有 sync 持续结果必须通过 Resource 或 mapping declaration 表达。
+--- dots.lua 的 LuaLS 声明。持续结果通过 Resource 或 mapping 表达，命令副作用绑定 lifecycle hook。
 
 ---@class GranularitySpec
 ---@field mode? "dir"|"children"|"file" 链接粒度，缺省为 "dir"
@@ -36,14 +36,14 @@ function root(name, spec) end
 ---@param spec ScriptsSpec 聚合设置
 function scripts(spec) end
 
----@class ResourceSpecBase
+---@class DeclarationSpecBase
 ---@field enabled? boolean false 表示本次不进入 Desired Set；缺省为 true
 
----@class SymlinkResourceSpec: ResourceSpecBase
+---@class SymlinkResourceSpec: DeclarationSpecBase
 ---@field source string 相对仓库根、绝对或 `~` source path
 ---@field target string 绝对或 `~` target path
 
----@class CopiedFileResourceSpec: ResourceSpecBase
+---@class CopiedFileResourceSpec: DeclarationSpecBase
 ---@field source string 相对仓库根、绝对或 `~` source file
 ---@field target string 绝对或 `~` target file
 
@@ -51,21 +51,21 @@ function scripts(spec) end
 ---@field manifest string 相对仓库根、绝对或 `~` Cargo.toml path
 ---@field binary string Cargo binary target 名称
 
----@class CargoWorkspaceBinaryResourceSpec: ResourceSpecBase
+---@class CargoWorkspaceBinaryResourceSpec: DeclarationSpecBase
 ---@field source CargoWorkspaceBinarySource 仓库内 binary source
 ---@field target string 绝对或 `~` 安装位置
 
----@class CargoCratesIoBinaryResourceSpec: ResourceSpecBase
+---@class CargoCratesIoBinaryResourceSpec: DeclarationSpecBase
 ---@field source string crates.io package 名称；全部 bin 安装到 `~/.cargo/bin`
 
 ---@alias CargoBinaryResourceSpec CargoWorkspaceBinaryResourceSpec|CargoCratesIoBinaryResourceSpec
 
----@class ManagedBlockResourceSpec: ResourceSpecBase
+---@class ManagedBlockResourceSpec: DeclarationSpecBase
 ---@field target string 绝对或 `~` 文本文件
 ---@field marker string 文件内稳定且唯一的 block 名称
 ---@field content string 两条 marker 之间的期望内容
 
----@class SystemdUserUnitResourceSpec: ResourceSpecBase
+---@class SystemdUserUnitResourceSpec: DeclarationSpecBase
 ---@field unit string systemd user unit 名称
 
 ---@class DotsResource
@@ -78,11 +78,21 @@ function scripts(spec) end
 ---@class DotsPath
 ---@field exists fun(path: string): boolean 声明阶段只读判断路径是否存在
 
+---@class BeforeSyncHookSpec: DeclarationSpecBase
+---@field name string 日志和失败诊断使用的人类可读名称
+---@field cwd string 程序的工作目录
+---@field program string 由当前 PATH 或明确路径解析的程序
+---@field args? string[] 按原样传给程序的参数
+
+---@class DotsHook
+---@field before_sync fun(spec: BeforeSyncHookSpec) 声明在真实状态读取和 Resource planning 前运行的 sync hook
+
 ---@class Dots
 ---@field os "linux"|"macos" 当前平台
 ---@field home string 当前 `$HOME`
 ---@field repo string 当前 dotfiles 仓库根
 ---@field resource DotsResource 显式 Resource declaration
+---@field hook DotsHook dots sync lifecycle hook
 ---@field path DotsPath 声明阶段只读 path query
 
 ---@type Dots

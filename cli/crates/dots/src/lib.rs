@@ -2,6 +2,7 @@
 
 pub mod cli;
 pub mod exec;
+pub mod hooks;
 pub mod inject;
 pub mod managed_block;
 pub mod realfs;

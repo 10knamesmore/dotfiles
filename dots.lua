@@ -41,27 +41,25 @@ distribute("commands", {
     mode = "children",
 })
 
--- pi extension：源住 pi-ext/（仓库内独立 TS 工程，含 package.json/tsconfig/
--- node_modules，全为编辑期 LSP 服务），只把 src/ 下的成品链进去。pi 运行时由
--- 自己的 loader 内建提供 @earendil-works/pi-* 与 typebox，不读 node_modules，
--- 故工程文件整个不必落 $HOME。tree/ 因此保持纯 $HOME 镜像、不掺开发工作区。
--- 注意 pi 只认 extensions 下的 `*.ts` 与 `*/index.ts` 两种形态。
--- extension 若 import 外部依赖（非 pi 内建提供的那几个），jiti **不 resolve
--- symlink**，只从软链所在的 ~/.pi/agent/extensions/ 逐级向上找 node_modules，
--- 够不着仓库侧的 pi-ext/node_modules → Cannot find module。补一条 $HOME 侧 →
--- 仓库侧的桥。注意与上面 opencode 那条方向相反：Bun 按 realpath 找、jiti 按软链
--- 路径找，所以两个工具要往相反方向搭桥。
--- 未跑 pnpm install 时 node_modules 不存在，静默跳过（纯编辑期产物，不该报警）。
-distribute("pi-extensions", {
-    src = "pi-ext/src",
-    to = { "~/.pi/agent/extensions" },
-    mode = "children",
-})
-local pi_node_modules = dots.repo .. "/pi-ext/node_modules"
+dots.hook.before_sync {
+    name = "install Pi dependencies",
+    cwd = dots.repo .. "/pi",
+    program = "pnpm",
+    args = { "install", "--frozen-lockfile" },
+}
+
+-- Pi 通过 jiti 直接加载 TypeScript；pnpm dependency 沿 source realpath 从 pi/node_modules 解析。
 dots.resource.symlink {
-    source = pi_node_modules,
-    target = dots.home .. "/.pi/agent/node_modules",
-    enabled = dots.path.exists(pi_node_modules),
+    source = dots.repo .. "/pi/src/distribution",
+    target = dots.home .. "/.pi/agent/extensions/pi-distribution",
+}
+dots.resource.symlink {
+    source = dots.repo .. "/pi/src/subagent-workflow",
+    target = dots.home .. "/.pi/agent/extensions/subagent-workflow",
+}
+dots.resource.symlink {
+    source = dots.repo .. "/pi/src/subagent-workflow/skills/workflow-authoring",
+    target = dots.home .. "/.pi/agent/skills/workflow-authoring",
 }
 
 -- 全局 agent 指令的唯一真相源。Claude Code 只认 ~/.claude/CLAUDE.md，
@@ -86,6 +84,7 @@ distribute("agent-hook-rules", {
         "~/.claude/hooks/pretool.toml",
         "~/.codex/pretool.toml",
         "~/.kimi-code/pretool.toml",
+        "~/.pi/agent/pretool.toml",
     },
     mode = "file",
 })

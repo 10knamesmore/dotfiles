@@ -4,7 +4,7 @@
 
 核心机制是**软链接镜像**：`tree/` 下的目录结构镜像 `$HOME`，仓库即配置的单一真相源。`dots sync` 把它们链接到位——编辑仓库即生效，无需复制、无需重新安装。
 
-仓库不管理系统包、rustup、Node 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc` 与 `cargo`；`dots sync` 会构建 `dots.lua` 显式声明的 crates.io binary，并把 Cargo 实际生成的 bin 收敛到 `~/.cargo/bin`。
+仓库不管理系统包、rustup、Node、pnpm 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc` 与 `cargo`；受管 Pi Distribution 还要求 Node 22.19+ 与 pnpm 11.18。`dots sync` 会运行声明的 lifecycle hook、构建 crates.io binary，并把 Cargo 实际生成的 bin 收敛到 `~/.cargo/bin`。
 
 ## 快速开始
 
@@ -15,7 +15,7 @@ git clone <your-repo-url> ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
-`bootstrap.sh` 检查 `cc` 与 `cargo`，执行 `cargo build --release`，再直接运行 `dots sync`。bootstrap 不自举系统包、Rust、Node 或 AI CLI；sync 会应用显式 Cargo binary Declaration。
+`bootstrap.sh` 检查 `cc` 与 `cargo`，执行 `cargo build --release`，再直接运行 `dots sync`。bootstrap 不自举系统包、Rust、Node、pnpm 或 AI CLI；sync 会执行声明的 hook 并应用显式 Resource。
 
 已有环境只想链配置：
 
@@ -45,6 +45,7 @@ dotfiles/
 ├── dots.sh           # 开发期透传（cargo run --release）
 ├── bootstrap.sh      # 检查 cc/cargo → 编译 → dots sync
 ├── cli/              # Rust workspace：crates/（dots-core 纯逻辑 + dots bin）、lua-api/（类型标注）
+├── pi/               # vanilla Pi 的 TypeScript extension source 与 pnpm workspace
 ├── tree/             # ★ 映射根：目录结构即链接声明
 │   ├── home/         #   → $HOME（跨平台）
 │   ├── home.linux/   #   → $HOME（仅 Linux，条目级覆盖通用层）
@@ -74,10 +75,11 @@ dotfiles/
 - `distribute(name, spec)` — 一源多落点（如 skills 同时分发到 codex / copilot）
 - `root(name, spec)` — 声明 `$HOME` 之外的映射层（罕用，如 macOS App Support）
 - `scripts { ignore_tree = … }` — 脚本聚合时递归拍平的子目录（子目录默认保持树形）
+- `dots.hook.before_sync(spec)` — 在真实 sync planning 前运行具名程序
 - `dots.resource.symlink/copied_file/cargo_binary/managed_block/systemd_user_unit` — 显式持续 Resource
 - `dots.path.exists(path)` — 声明阶段只读条件，用于 Resource 的 `enabled`
 
-完整参考见 [LUA_API.md](LUA_API.md)。Lua API 不提供生命周期 hook、任意 shell Action、`dots.file.*`、`dots.cargo.build` 或 `dots.json.*`。
+完整参考见 [LUA_API.md](LUA_API.md)。Lua API 不提供任意 shell Action、run-once 状态、`dots.file.*`、`dots.cargo.build` 或 `dots.json.*`。
 
 `dots.lua` 维护全局 crates.io package inventory。字符串 `cargo_binary.source` 不需要 version、binary 或 target；Cargo 生成的全部 bin 分别成为 `~/.cargo/bin/<文件名>` Resource。该 inventory 不包含系统包、rustup、Claude、Node 或 pnpm。
 
@@ -119,13 +121,15 @@ Zsh 不使用框架，配置分为两层：
 
 `forget` 只删除 Applied Inventory 记录，不构建 Plan，也不读取或修改真实对象。Declaration 仍存在时，下次 sync 会把该对象视为未拥有：实际状态与声明一致则重新接管，否则报告 Collision。
 
-预览受管 target 与 inventory 动作：`dots sync --dry-run`。为计算 Cargo binary 内容，dry-run 仍可能更新 Cargo target 或 `.gen` derivation cache。
+预览受管 target、inventory 动作和 sync hook：`dots sync --dry-run`。dry-run 不执行 lifecycle hook；为计算 Cargo binary 内容，它仍可能更新 Cargo target 或 `.gen` derivation cache。
 
 ## AI 工具链（skills / agents / hooks）
 
-`tree/home/.agents/` 是本地 AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，agent hook 定义与规则再分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
+`tree/home/.agents/` 是手写、跨 agent AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，agent hook 定义与规则再分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
 
-Claude Code、Codex 与 Kimi Code 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。三个 adapter 通过同一个 `agent-hook` binary 保留各自协议差异；`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
+Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。各 adapter 通过同一个 `agent-hook` binary 保留 harness 协议差异；Pi 的 `ask` 由 extension 在有 UI 时显式确认，无 UI 时拒绝。`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
+
+`pi/` 是 vanilla Pi 的本地 Distribution，不包含或 fork Pi CLI。Pi 通过 jiti 直接加载仓库内的 TypeScript extension；`dots sync` 先按 frozen lockfile 安装 Acorn，再把两个 source tree 和 workflow-authoring skill 链到 `~/.pi/agent/`。Workflow runtime 由本仓库直接维护并保留原作者 MIT license。依赖和本地 state 边界见 [pi/README.md](../pi/README.md)。
 
 ## 当前管理的主要配置
 
@@ -146,4 +150,4 @@ Claude Code、Codex 与 Kimi Code 共用 `cli/crates/agent-hooks/` 的 Rust PreT
 
 - 顶层 `README.md` 是指向 `docs/README.md` 的符号链接；`AGENTS.md` 指向 `CLAUDE.md`。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
-- 新机必须先准备 C 编译器与 Cargo。系统包、rustup、Node 和 AI CLI 由使用者管理；声明式 crates.io binary 由 sync 管理。
+- 新机必须先准备 C 编译器与 Cargo；使用 Pi Distribution 时还需 Node 22.19+ 与 pnpm 11.18。系统包、rustup、Node、pnpm 和 AI CLI 由使用者管理；声明式 hook 与 crates.io binary 由 sync 执行。

@@ -1,12 +1,12 @@
-//! 纯声明 Lua API：mapping 与显式 Resource。
+//! 纯声明 Lua API：mapping、Resource 与 lifecycle hook。
 
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
 use dots_core::manifest::{
-    CargoBinaryDeclaration, DistributeSpec, GranularitySpec, Manifest, ResourceDeclaration,
-    RootSpec,
+    BeforeSyncHook, CargoBinaryDeclaration, DistributeSpec, GranularitySpec, Manifest,
+    ResourceDeclaration, RootSpec,
 };
 use dots_core::{LinkMode, RepoPath};
 use mlua::{Lua, Table, Value};
@@ -21,7 +21,35 @@ pub fn register(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     register_root(lua, builder)?;
     register_scripts(lua, builder)?;
     register_resources(lua, builder)?;
+    register_hooks(lua, builder)?;
     register_path_queries(lua)?;
+    Ok(())
+}
+
+/// 注册只在 `dots sync` 中执行的 lifecycle hook。
+fn register_hooks(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
+    let dots: Table = lua.globals().get("dots")?;
+    let hook = lua.create_table()?;
+    let before_sync_builder = builder.clone();
+    hook.set(
+        "before_sync",
+        lua.create_function(move |_, spec: Table| {
+            if enabled(&spec)? {
+                before_sync_builder
+                    .borrow_mut()
+                    .hooks
+                    .before_sync
+                    .push(BeforeSyncHook {
+                        name: spec.get("name")?,
+                        cwd: spec.get("cwd")?,
+                        program: spec.get("program")?,
+                        args: string_sequence(&spec, "args")?,
+                    });
+            }
+            Ok(())
+        })?,
+    )?;
+    dots.set("hook", hook)?;
     Ok(())
 }
 
@@ -208,7 +236,7 @@ fn register_path_queries(lua: &Lua) -> mlua::Result<()> {
     Ok(())
 }
 
-/// 解析所有 Resource 共用的 `enabled` 字段。
+/// 解析 Resource 与 lifecycle hook 共用的 `enabled` 字段。
 fn enabled(spec: &Table) -> mlua::Result<bool> {
     Ok(spec.get::<Option<bool>>("enabled")?.unwrap_or(true))
 }

@@ -2,18 +2,21 @@
 
 use super::Result;
 use crate::exec::execute;
+use crate::hooks::run_before_sync;
 use crate::realfs::RealFs;
-use crate::reconciliation::prepare;
+use crate::reconciliation::{load_configuration, prepare_configuration};
 use crate::render;
 
 /// 运行 sync，并返回最终是否没有 Collision、Drift、脚本冲突或 apply failure。
 pub fn run(dry_run: bool) -> Result<bool> {
-    let mut prepared = prepare()?;
     render::header(if dry_run {
         "dots sync · dry-run"
     } else {
         "dots sync"
     });
+    let configuration = load_configuration()?;
+    run_before_sync(&configuration.manifest.hooks.before_sync, dry_run)?;
+    let mut prepared = prepare_configuration(configuration)?;
     if !prepared.script_conflicts.is_empty() {
         for conflict in &prepared.script_conflicts {
             render::err(&format!("scripts ownership 冲突：{conflict}"));
