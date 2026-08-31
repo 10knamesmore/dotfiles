@@ -1,10 +1,15 @@
 {
-  "npmCommand": ["pnpm"],
+  "npmCommand": [
+    "pnpm"
+  ],
   "theme": "dark",
   "lastChangelogVersion": "0.84.4",
   "editorPaddingX": 0,
   "terminal": {
     "showTerminalProgress": true
-  }
+  },
+  "tuiMode": "fullscreen",
+  "treeFilterMode": "default",
+  "doubleEscapeAction": "tree",
+  "defaultProjectTrust": "always"
 }
-
