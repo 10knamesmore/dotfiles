@@ -2,7 +2,7 @@
 
 这是一个跨平台 dotfiles 仓库。管理入口是自写的 Rust CLI **`dots`**（源码在 `cli/`）。
 
-核心机制是**声明式 Resource 管理**：仓库即配置的单一真相源——`tree/` 镜像 `$HOME`，`dots.lua` 声明显式 Resource。仓库不管理系统包、rustup、Node 或 AI CLI；crates.io binary 可作为 Resource 收敛到 `~/.cargo/bin`。
+核心机制是**声明式 Resource 管理**：仓库即配置的单一真相源——`tree/` 镜像 `$HOME`，`dots.lua` 声明显式 Resource。仓库不安装系统包、rustup、Node、pnpm 或 AI CLI；`dots install` 只执行声明的 Cargo binary 安装或升级，Cargo binary 不进入 sync lifecycle。`dots sync` 在 planning 前执行声明的 lifecycle hook，再收敛 Resource。
 
 修改核心 CLI 或 Lua API 时，同步更新 [LUA_API.md](docs/LUA_API.md)。
 
@@ -10,7 +10,8 @@
 
 ```bash
 # 开发期透传（cargo run --release，自动编译）
-./dots.sh sync            # 把 tree/ 链接到 $HOME（幂等，可反复跑）
+./dots.sh install         # 执行声明的 Cargo binary 安装或升级，不卸载
+./dots.sh sync            # 执行 lifecycle hook，再把 tree/ 链接到 $HOME
 ./dots.sh status          # 只读展示 sync 将执行的完整 Plan
 ./dots.sh forget <资源>   # 不改真实对象，只放弃对应 ownership
 
@@ -27,6 +28,7 @@ skill                     # cd 到 skills 目录
 ```
 dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json）
 cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin）+ agent-hooks（bin: agent-hook，多 agent hooks），lua-api/（类型标注）
+pi/               # vanilla Pi 的 TypeScript extension source 与 pnpm workspace
 tree/             # ★ 映射根：目录结构即链接声明
   home/           #   → $HOME（跨平台）
   home.linux/     #   → $HOME（仅 Linux，条目级覆盖通用层）
@@ -46,7 +48,7 @@ docs/
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.resource.symlink|copied_file|cargo_binary|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.path.exists`（只读条件）。字符串 `cargo_binary.source` 表示 crates.io package，Cargo 实际生成的全部 bin 归一到 `~/.cargo/bin`。生命周期 hook、条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
+只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.hook.before_sync`（真实 sync 在 planning 前执行的具名程序）、`dots.resource.symlink|copied_file|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.resource.cargo_binary`（只由 `dots install` 直接映射为 `cargo install` 的声明）、`dots.path.exists`（只读条件）。字符串 `cargo_binary.source` 表示 crates.io package；删除声明不卸载已经安装的 binary。条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
 
 ## 路径注入
 
@@ -69,13 +71,13 @@ docs/
 1. 新增/改配置：编辑 `tree/` 下对应文件，`dots sync`（多数情况是普通文件，改完直接生效，无需渲染）。
 2. 新增整目录或非标目标：把源文件放进 `tree/` 对应位置，再运行 `dots sync`。
 3. `~/.zshrc` 由 `dots-env` managed block 注入 `source ~/.zshrc_dotfiles`，block 外的软件内容（conda/nvm）始终保留——不要当主配置维护。
-`dots sync --dry-run` 只预览，不修改受管 target 或 Applied Inventory。
+`dots sync --dry-run` 显示但不执行 lifecycle hook，也不修改受管 target 或 Applied Inventory；`dots status` 不执行或显示 hook。
 
 ## 仓库约定
 
 - 顶层 `README.md` → `docs/README.md` 符号链接；`AGENTS.md` → `CLAUDE.md` 符号链接。
 - 配置管理入口是 `dots`，安装入口是 `bootstrap.sh`。
-- 不管理系统包、rustup、Node 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc` 与 `cargo`。`dots sync` 会构建 `dots.lua` 显式声明的 crates.io binary Resource。
+- 不安装系统包、rustup、Node、pnpm 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，依次运行 `dots install` 和 `dots sync`。sync 的 Pi hook 按 frozen lockfile 安装 workspace 依赖。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
 
 ## 主要配置工具

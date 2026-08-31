@@ -6,21 +6,21 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use color_eyre::eyre::{Context, eyre};
-use dots_core::manifest::{CargoBinaryDeclaration, DistributeSpec, Manifest, ResourceDeclaration};
+use crate::cmd::{
+    absolute_source, absolute_target, current_os, expand_home, find_repo_root, home_dir,
+    load_manifest, os_str,
+};
+use crate::inject::{InjectCtx, render as render_template};
+use crate::managed_block;
+use crate::realfs::RealFs;
+use crate::state::State;
+use color_eyre::eyre::Context;
+use dots_core::manifest::{DistributeSpec, Manifest, ResourceDeclaration};
 use dots_core::{
     AbsPath, AppliedResource, ExpectedLink, FileSystem, Layer, LinkMode, ManagedBlockPlacement,
     NodeKind, ObservedState, Os, OwnershipSurface, Plan, ResourceSpec, ResourceState,
     content_sha256, expand_layers, plan_scripts, reconcile,
 };
-use serde::Deserialize;
-
-use crate::cmd::{current_os, expand_home, find_repo_root, home_dir, os_str};
-use crate::inject::{InjectCtx, render as render_template};
-use crate::lua::{LuaCtx, eval_manifest};
-use crate::managed_block;
-use crate::realfs::RealFs;
-use crate::state::State;
 
 /// 一次 planning 所需的完整机器与仓库上下文。
 pub struct PreparedReconciliation {
@@ -81,13 +81,7 @@ pub fn load_configuration() -> crate::Result<LoadedConfiguration> {
     let repo_root = find_repo_root()?;
     let home = home_dir()?;
     let os = current_os();
-    let source = fs::read_to_string(repo_root.join("dots.lua")).unwrap_or_default();
-    let context = LuaCtx {
-        os: os_str(os).to_owned(),
-        home: home.display().to_string(),
-        repo: repo_root.display().to_string(),
-    };
-    let mut manifest = eval_manifest(&source, &context)?;
+    let mut manifest = load_manifest(&repo_root, &home, os)?;
     for root in &mut manifest.roots {
         root.path = absolute_target(&root.path, &home)?.display().to_string();
     }
@@ -137,7 +131,7 @@ pub fn prepare_configuration(
     })
 }
 
-/// 将所有 mapping declaration、内建生成结果和显式 API 编译为 Resource。
+/// 将 mapping、内建结果和参与 sync lifecycle 的显式 API 编译为 Resource。
 fn collect_desired(
     repo_root: &Path,
     home: &Path,
@@ -252,7 +246,7 @@ fn push_distribute(
     }
 }
 
-/// 编译一个显式 Lua Resource declaration，包括 cargo derivation。
+/// 编译一个参与 sync lifecycle 的显式 Lua Resource declaration。
 fn compile_declaration(
     declaration: &ResourceDeclaration,
     repo_root: &Path,
@@ -277,9 +271,6 @@ fn compile_declaration(
                 "dots.resource.copied_file",
             )
             .map(|resource| vec![resource])
-        }
-        ResourceDeclaration::CargoBinary(declaration) => {
-            derive_cargo_binaries(declaration, repo_root, home)
         }
         ResourceDeclaration::ManagedBlock {
             target,
@@ -314,154 +305,6 @@ fn file_resource(source: &Path, target: PathBuf, origin: &str) -> crate::Result<
         mode,
         origin: origin.to_owned(),
     })
-}
-
-/// Cargo JSON compiler-artifact 消息中需要的字段。
-#[derive(Deserialize)]
-struct CargoMessage {
-    /// 消息类型。
-    reason: String,
-
-    /// compiler-artifact 的 target metadata。
-    target: Option<CargoTarget>,
-
-    /// binary artifact path；library artifact 为 `None`。
-    executable: Option<PathBuf>,
-}
-
-/// Cargo target metadata 中需要的字段。
-#[derive(Deserialize)]
-struct CargoTarget {
-    /// target 名称。
-    name: String,
-}
-
-/// 从 workspace 或 crates.io declaration 派生一个或多个 File Resource。
-fn derive_cargo_binaries(
-    declaration: &CargoBinaryDeclaration,
-    repo_root: &Path,
-    home: &Path,
-) -> crate::Result<Vec<ResourceSpec>> {
-    match declaration {
-        CargoBinaryDeclaration::Workspace {
-            manifest,
-            binary,
-            target,
-        } => {
-            let manifest = absolute_source(manifest, repo_root, home)?;
-            let artifact = build_workspace_cargo_binary(&manifest, binary)?;
-            file_resource(
-                &artifact,
-                absolute_target(target, home)?,
-                &format!("dots.resource.cargo_binary(workspace:{binary})"),
-            )
-            .map(|resource| vec![resource])
-        }
-        CargoBinaryDeclaration::CratesIo { package } => {
-            let artifacts = install_crates_io_package(repo_root, package)?;
-            artifacts
-                .into_iter()
-                .map(|artifact| {
-                    let file_name = artifact.file_name().ok_or_else(|| {
-                        eyre!("crates.io package `{package}` 生成了无文件名的 artifact")
-                    })?;
-                    let display_name = file_name.to_string_lossy();
-                    file_resource(
-                        &artifact,
-                        home.join(".cargo").join("bin").join(file_name),
-                        &format!("dots.resource.cargo_binary(crates.io:{package}:{display_name})"),
-                    )
-                })
-                .collect()
-        }
-    }
-}
-
-/// 编译 workspace release binary 并返回 Cargo 报告的实际 artifact path。
-fn build_workspace_cargo_binary(manifest: &Path, binary: &str) -> crate::Result<PathBuf> {
-    let output = Command::new("cargo")
-        .args([
-            "build",
-            "--release",
-            "--bin",
-            binary,
-            "--message-format=json",
-        ])
-        .args(["--quiet", "--manifest-path"])
-        .arg(manifest)
-        .output()
-        .wrap_err_with(|| format!("无法启动 cargo build：{}", manifest.display()))?;
-    if !output.status.success() {
-        return Err(eyre!(
-            "cargo binary `{binary}` 编译失败：{}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Ok(message) = serde_json::from_str::<CargoMessage>(line) else {
-            continue;
-        };
-        if message.reason == "compiler-artifact"
-            && message
-                .target
-                .as_ref()
-                .is_some_and(|target| target.name == binary)
-            && let Some(executable) = message.executable
-        {
-            return Ok(executable);
-        }
-    }
-    Err(eyre!(
-        "cargo build 成功但未报告 binary `{binary}` 的 artifact"
-    ))
-}
-
-/// 把 crates.io package 安装到隔离的 derivation cache，并返回 Cargo 生成的全部 bin。
-fn install_crates_io_package(repo_root: &Path, package: &str) -> crate::Result<Vec<PathBuf>> {
-    let source_digest = content_sha256(package.as_bytes());
-    let derivation_root = repo_root
-        .join(".gen")
-        .join("cargo-install")
-        .join(source_digest);
-    let bin_dir = derivation_root.join("bin");
-    let target_dir = derivation_root.join("target");
-
-    eprintln!("  derive cargo crates.io {package}");
-    let output = Command::new("cargo")
-        .args(["install", "--quiet", "--locked"])
-        .arg("--root")
-        .arg(&derivation_root)
-        .arg("--target-dir")
-        .arg(&target_dir)
-        .arg(package)
-        .output()
-        .wrap_err_with(|| format!("无法启动 cargo install：{package}"))?;
-    if !output.status.success() {
-        return Err(eyre!(
-            "cargo crates.io package `{package}` 派生失败：{}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let entries = fs::read_dir(&bin_dir).wrap_err_with(|| {
-        format!(
-            "cargo install 成功但无法读取 package `{package}` 的 bin 目录：{}",
-            bin_dir.display()
-        )
-    })?;
-    let mut artifacts = entries
-        .map(|entry| entry.map(|entry| entry.path()))
-        .collect::<std::io::Result<Vec<_>>>()
-        .wrap_err_with(|| format!("读取 crates.io package `{package}` 的 bin 失败"))?
-        .into_iter()
-        .filter(|path| path.is_file())
-        .collect::<Vec<_>>();
-    artifacts.sort();
-    if artifacts.is_empty() {
-        return Err(eyre!(
-            "cargo install 成功但 package `{package}` 未生成任何 bin"
-        ));
-    }
-    Ok(artifacts)
 }
 
 /// 把 `.inject` 模板编译为 generated file 与其落点 symlink。
@@ -750,28 +593,6 @@ fn find_container_conversions(
         }
     }
     by_target.into_values().collect()
-}
-
-/// 解析 Resource source；相对路径以仓库根为基准。
-fn absolute_source(raw: &str, repo_root: &Path, home: &Path) -> crate::Result<PathBuf> {
-    let expanded = expand_home(raw, home);
-    let joined = if expanded.is_absolute() {
-        expanded
-    } else {
-        repo_root.join(expanded)
-    };
-    std::path::absolute(&joined)
-        .wrap_err_with(|| format!("无法规范化 Resource source：{}", joined.display()))
-}
-
-/// 解析 Resource target；只接受绝对路径或 `~`。
-fn absolute_target(raw: &str, home: &Path) -> crate::Result<PathBuf> {
-    let expanded = expand_home(raw, home);
-    if !expanded.is_absolute() {
-        return Err(eyre!("Resource target 必须是绝对路径或 `~` 路径：{raw}"));
-    }
-    std::path::absolute(&expanded)
-        .wrap_err_with(|| format!("无法规范化 Resource target：{}", expanded.display()))
 }
 
 /// 递归列出目录下全部普通文件。

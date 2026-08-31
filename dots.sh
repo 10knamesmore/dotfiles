@@ -2,6 +2,7 @@
 # 通过 release profile 运行工作区中的 dots binary，并转发全部参数。
 # Usage: ./dots.sh <dots 子命令...>
 #   ./dots.sh --help
+#   ./dots.sh install
 #   ./dots.sh sync --dry-run
 #   ./dots.sh status
 # 依赖：cargo

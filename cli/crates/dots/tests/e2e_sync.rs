@@ -286,7 +286,7 @@ fn setup_cargo_binary(repo: &Path) {
 }
 
 #[test]
-fn cargo_binary_compiles_during_dry_run_without_installing_target() {
+fn cargo_binary_runs_only_during_install() {
     let repo_dir = tempdir().unwrap();
     let home_dir = tempdir().unwrap();
     let repo = repo_dir.path();
@@ -298,18 +298,22 @@ fn cargo_binary_compiles_during_dry_run_without_installing_target() {
         r#"
 dots.resource.cargo_binary {
     source = {
-        manifest = "mini/Cargo.toml",
+        path = "mini",
         binary = "mini",
     },
-    target = "~/bin/mini",
+    root = "~",
 }
 "#,
     )
     .unwrap();
 
     run_dots(repo, home, &["sync", "--dry-run"]).success();
-    assert!(repo.join("mini/target/release/mini").is_file());
+    assert!(!repo.join("mini/target/release/mini").exists());
     assert!(!home.join("bin/mini").exists());
+
+    run_dots(repo, home, &["install"]).success();
+    assert!(repo.join("mini/target/release/mini").is_file());
+    assert!(home.join("bin/mini").is_file());
 }
 
 #[test]

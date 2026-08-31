@@ -4,23 +4,24 @@
 
 核心机制是**软链接镜像**：`tree/` 下的目录结构镜像 `$HOME`，仓库即配置的单一真相源。`dots sync` 把它们链接到位——编辑仓库即生效，无需复制、无需重新安装。
 
-仓库不管理系统包、rustup、Node、pnpm 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc` 与 `cargo`；受管 Pi Distribution 还要求 Node 22.19+ 与 pnpm 11.18。`dots sync` 会运行声明的 lifecycle hook、构建 crates.io binary，并把 Cargo 实际生成的 bin 收敛到 `~/.cargo/bin`。
+仓库不安装系统包、rustup、Node、pnpm 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18。`dots install` 执行 `dots.lua` 中的 Cargo binary 安装声明；`dots sync` 先运行声明的 lifecycle hook，再收敛配置 Resource。当前 Pi hook 会按 frozen lockfile 自动安装 workspace 依赖。
 
 ## 快速开始
 
-本机预先装好 C 编译器和 Rust/Cargo 后：
+本机预先装好 C 编译器、Rust/Cargo、Node 22.19+ 和 pnpm 11.18 后：
 
 ```bash
 git clone <your-repo-url> ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
-`bootstrap.sh` 检查 `cc` 与 `cargo`，执行 `cargo build --release`，再直接运行 `dots sync`。bootstrap 不自举系统包、Rust、Node、pnpm 或 AI CLI；sync 会执行声明的 hook 并应用显式 Resource。
+`bootstrap.sh` 检查 `cc` 与 `cargo`，执行 `cargo build --release`，再依次运行 `dots install` 和 `dots sync`。bootstrap 不自举系统包、Rust、Node、pnpm 或 AI CLI；sync 的 Pi hook 使用本机已有的 pnpm 安装 workspace 依赖。
 
-已有环境只想链配置：
+已有环境日常按需执行：
 
 ```bash
 cd ~/dotfiles
+./dots.sh install          # 安装或升级声明的 Cargo binary
 ./dots.sh sync --dry-run   # 先看会做什么
 ./dots.sh sync             # 实际执行
 ```
@@ -31,11 +32,12 @@ cd ~/dotfiles
 
 ## 命令一览
 
-| 命令                       | 作用                                                                  |
-| -------------------------- | --------------------------------------------------------------------- |
-| `dots sync [--dry-run]`    | 把完整 Desired Set 收敛到本机                                          |
-| `dots status`              | 只读展示与 sync 相同的创建、更新、删除、Collision 和 Drift Plan       |
-| `dots forget <resource>`   | 不改真实对象，只从 Applied Inventory 放弃 ownership                   |
+| 命令                     | 作用                                                               |
+| ------------------------ | ------------------------------------------------------------------ |
+| `dots install`           | 执行当前 Cargo binary 声明，只安装或升级，不卸载                    |
+| `dots sync [--dry-run]`  | 运行或预览 lifecycle hook，把配置 Resource 的 Desired Set 收敛到本机 |
+| `dots status`            | 只读展示与 sync 相同的创建、更新、删除、Collision 和 Drift Plan    |
+| `dots forget <resource>` | 不改真实对象，只从 Applied Inventory 放弃 ownership                |
 
 ## 仓库结构
 
@@ -43,7 +45,7 @@ cd ~/dotfiles
 dotfiles/
 ├── dots.lua          # 例外清单（人手编辑，CLI 不写入）
 ├── dots.sh           # 开发期透传（cargo run --release）
-├── bootstrap.sh      # 检查 cc/cargo → 编译 → dots sync
+├── bootstrap.sh      # 检查 cc/cargo → 编译 → dots install → dots sync
 ├── cli/              # Rust workspace：crates/（dots-core 纯逻辑 + dots bin）、lua-api/（类型标注）
 ├── pi/               # vanilla Pi 的 TypeScript extension source 与 pnpm workspace
 ├── tree/             # ★ 映射根：目录结构即链接声明
@@ -76,12 +78,13 @@ dotfiles/
 - `root(name, spec)` — 声明 `$HOME` 之外的映射层（罕用，如 macOS App Support）
 - `scripts { ignore_tree = … }` — 脚本聚合时递归拍平的子目录（子目录默认保持树形）
 - `dots.hook.before_sync(spec)` — 在真实 sync planning 前运行具名程序
-- `dots.resource.symlink/copied_file/cargo_binary/managed_block/systemd_user_unit` — 显式持续 Resource
+- `dots.resource.symlink/copied_file/managed_block/systemd_user_unit` — 由 sync 收敛的持续 Resource
+- `dots.resource.cargo_binary` — 由 `dots install` 执行的 Cargo binary 安装声明
 - `dots.path.exists(path)` — 声明阶段只读条件，用于 Resource 的 `enabled`
 
 完整参考见 [LUA_API.md](LUA_API.md)。Lua API 不提供任意 shell Action、run-once 状态、`dots.file.*`、`dots.cargo.build` 或 `dots.json.*`。
 
-`dots.lua` 维护全局 crates.io package inventory。字符串 `cargo_binary.source` 不需要 version、binary 或 target；Cargo 生成的全部 bin 分别成为 `~/.cargo/bin/<文件名>` Resource。该 inventory 不包含系统包、rustup、Claude、Node 或 pnpm。
+`dots.lua` 维护需要安装的 Cargo binary 清单。`dots install` 把 crates.io 和 workspace 声明直接映射为 `cargo install`，由 Cargo 的安装 metadata 判断安装或升级；dots 不自动追加 `--force`。删除声明只会停止后续执行，不会卸载已经安装的 package。该清单不包含系统包、rustup、Claude、Node 或 pnpm。
 
 CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lua-api/dots.meta.lua` 提供。
 
@@ -121,7 +124,7 @@ Zsh 不使用框架，配置分为两层：
 
 `forget` 只删除 Applied Inventory 记录，不构建 Plan，也不读取或修改真实对象。Declaration 仍存在时，下次 sync 会把该对象视为未拥有：实际状态与声明一致则重新接管，否则报告 Collision。
 
-预览受管 target、inventory 动作和 sync hook：`dots sync --dry-run`。dry-run 不执行 lifecycle hook；为计算 Cargo binary 内容，它仍可能更新 Cargo target 或 `.gen` derivation cache。
+预览受管 target、inventory 动作和 sync hook：`dots sync --dry-run`。dry-run 显示但不执行 lifecycle hook；sync、status 和 dry-run 都忽略 Cargo binary declaration，不会因此执行 Cargo 或读取已安装 binary 的内容。
 
 ## AI 工具链（skills / agents / hooks）
 
@@ -150,4 +153,4 @@ Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust
 
 - 顶层 `README.md` 是指向 `docs/README.md` 的符号链接；`AGENTS.md` 指向 `CLAUDE.md`。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
-- 新机必须先准备 C 编译器与 Cargo；使用 Pi Distribution 时还需 Node 22.19+ 与 pnpm 11.18。系统包、rustup、Node、pnpm 和 AI CLI 由使用者管理；声明式 hook 与 crates.io binary 由 sync 执行。
+- 新机必须先准备 C 编译器、Cargo、Node 22.19+ 与 pnpm 11.18。系统包、rustup、Node、pnpm 和 AI CLI 由使用者管理；Cargo binary 由 `dots install` 安装或升级，Pi workspace 依赖由 sync lifecycle hook 安装。

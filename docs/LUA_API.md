@@ -1,12 +1,12 @@
 # dots.lua API
 
-`dots.lua` 声明持续状态、mapping 和 sync lifecycle hook。它在无 `io`、`os`、`require`、`load` 的 Lua 沙箱中求值；命令只能通过 typed hook 交给 dots 执行。
+`dots.lua` 声明持续状态、mapping、sync lifecycle hook 和 Cargo binary 安装意图。它在无 `io`、`os`、`require`、`load` 的 Lua 沙箱中求值；命令只能通过 typed hook 交给 dots 执行。
 
 ## 收敛模型
 
 每次 `sync` 比较三份事实：
 
-- **Desired Set**：当前 `tree/`、`dots.lua` 与内建生成规则要求存在的 Resource。
+- **Desired Set**：当前 `tree/`、参与 sync 的 `dots.lua` 声明与内建生成规则要求存在的 Resource。
 - **Applied Inventory**：`.dots/state.json` 中上一次成功由 dots 拥有的 Resource。
 - **Observed State**：Resource 的 Ownership Surface 当前真实状态。
 
@@ -18,14 +18,14 @@
 
 未拥有的 target 已与 Desired 完全一致时，sync 不重写 target，直接记入 inventory。未拥有且内容不同则是 Collision，普通 sync 不接管。
 
-`dots status`、`dots sync --dry-run` 与真实 `dots sync` 使用同一 Resource Plan。只有真实 sync 在 planning 前执行 lifecycle hook；dry-run 显示 hook 但不启动进程，status 完全忽略 hook。dry-run 不修改受管位置和 inventory；为了精确判断 Cargo binary 内容，它仍会执行编译并允许 Cargo 更新 `target/` cache。
+`dots status`、`dots sync --dry-run` 与真实 `dots sync` 使用同一 Resource Plan。只有真实 sync 在读取机器状态和 planning 前执行 lifecycle hook；dry-run 显示 hook 但不启动进程，status 完全忽略 hook。dry-run 不修改受管位置和 inventory。这三个命令都忽略 Cargo binary declaration，不会因此执行 Cargo 或读取已安装 binary 的内容。
 
 ## 路径规则
 
-- Resource `source` 和 `manifest`：相对路径以仓库根为基准；也接受绝对路径和 `~`。
-- Resource `target`：必须是绝对路径或 `~` 路径。
+- Resource `source` 与 Cargo `path`：相对路径以仓库根为基准；也接受绝对路径和 `~`。
+- Resource `target` 与 Cargo `root`：必须是绝对路径或 `~` 路径。
 - identity 从 Ownership Surface 推导，不填写单独 id。
-- `enabled` 缺省为 `true`。设为 `false` 后该 Resource 不进入 Desired Set；之前已应用的同一 Resource 会进入 retirement。
+- `enabled` 缺省为 `true`。sync Resource 设为 `false` 后退出 Desired Set 并进入正常 retirement；Cargo binary 设为 `false` 后不被 `dots install` 执行，已经安装的 binary 保持不变。
 
 ## Mapping declaration
 
@@ -119,13 +119,15 @@ dots.hook.before_sync {
 
 `dots sync --dry-run` 输出 `would run before_sync hook`；`dots status` 不执行或显示 hook。
 
-## 显式 Resource
+## `dots.resource` declaration
 
 所有方法都在 `dots.resource` 下，接收一个 typed table。共同可选字段：
 
 | 字段 | 类型 | 缺省 | 行为 |
 | --- | --- | --- | --- |
-| `enabled` | `boolean` | `true` | `false` 时不进入 Desired Set |
+| `enabled` | `boolean` | `true` | `false` 时消费该 declaration 的命令忽略本项 |
+
+sync Resource 被禁用后退出 Desired Set 并正常 retirement；Cargo binary 被禁用后不由 `dots install` 执行，已经安装的 binary 保持不变。
 
 ### `dots.resource.symlink(spec)`
 
@@ -154,20 +156,20 @@ dots.resource.copied_file {
 ```lua
 dots.resource.cargo_binary {
     source = {
-        manifest = "cli/Cargo.toml",
+        path = "cli/crates/agent-hooks",
         binary = "agent-hook",
     },
-    target = "~/.local/bin/agent-hook",
+    root = "~/.local",
 }
 ```
 
-workspace source 在 planning 中执行：
+workspace declaration 只在 `dots install` 中执行：
 
 ```bash
-cargo build --release --bin <binary> --message-format=json --manifest-path <manifest>
+cargo install --locked --path <path> --bin <binary> --root <root>
 ```
 
-dots 使用 Cargo 报告的 `executable` path，不猜 `target/` 位置；然后把 artifact 作为普通文件 Resource 收敛到 `target`。
+`path` 指向包含目标 package 的目录，`binary` 和 `root` 原样映射为 Cargo 参数。dots 不解析 artifact，也不自行复制 binary。
 
 crates.io package 只声明 source：
 
@@ -177,11 +179,18 @@ dots.resource.cargo_binary {
 }
 ```
 
-字符串 source 表示 crates.io package；table source 表示仓库内 workspace binary。crates.io derivation 固定执行 `cargo install --locked <package>`，不接受 `version`、`binary`、`target`、额外 Cargo 参数、git source 或 shell command。Cargo 决定默认版本并安装 package 提供的全部 bin；Dots 读取实际文件名，分别归一为 `~/.cargo/bin/<文件名>` 的普通文件 Resource。例如 `ripgrep` 产生 `~/.cargo/bin/rg`，无需重复声明映射。
+字符串 source 表示 crates.io package；table source 表示仓库内 workspace binary。`dots install` 缺省对 crates.io declaration 执行 `cargo install --locked <package>`，使用真实 Cargo home 和 Cargo 自己的安装 metadata 判断安装或升级。Cargo 已记录的旧版本会按 Cargo 自身规则升级；已有但未被 Cargo 记录的同名 binary 仍由 Cargo 报错。dots 不自动追加 `--force`。
 
-derivation 产物写入 `.gen/cargo-install/<source-digest>/`；该目录只是可重建 cache，不进入 Applied Inventory，也不随 Declaration retirement 删除。声明删除后，该 package 生成的每个 target binary 都分别进入正常 retirement。
+package 含有当前平台不会安装的 gated binary、导致 Cargo 每次误判为需要重装时，可以明确选择实际需要的 binary。每个 `binaries` 条目直接映射为一个 `--bin`：
 
-两种 source 的最终 target 使用相同的文件 lifecycle：内容或权限变化产生 Update，target 被外部修改产生 Drift，Declaration 删除时只删除仍匹配 Applied 状态的 binary。planning、status 与 dry-run 都可能执行 Cargo derivation 并写入 Cargo target 或 `.gen` cache，但不会修改最终 target。
+```lua
+dots.resource.cargo_binary {
+    source = "uv",
+    binaries = { "uv", "uvx" },
+}
+```
+
+API 不接受 version、额外 Cargo 参数、git source 或 shell command。`dots install` 只遍历本次 Manifest 中存在且启用的 declaration。删除或禁用 declaration 不会执行 `cargo uninstall`，也不会删除、校验或记录之前安装的 binary。
 
 ### `dots.resource.managed_block(spec)`
 
@@ -266,4 +275,4 @@ dots forget 'path:/Users/me/.config/tool/config'
 - `dots.cargo.build`
 - `dots.json.*`
 
-需要自动删除的持续结果必须建模为 Resource。每次 sync 在 planning 前必须完成的准备命令使用 `dots.hook.before_sync`；一次性命令仍在 `dots sync` 之外明确执行。
+需要自动删除的持续结果必须建模为 sync Resource。每次 sync 在 planning 前必须完成的准备命令使用 `dots.hook.before_sync`；Cargo binary declaration 只由显式运行的 `dots install` 执行，其他一次性命令仍在 `dots sync` 之外明确执行。

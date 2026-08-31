@@ -7,8 +7,8 @@ use color_eyre::eyre::{Context, eyre};
 use dots_core::{AppliedResource, OwnershipSurface};
 use serde::{Deserialize, Serialize};
 
-/// 当前 state schema；旧 schema 直接拒绝，不做兼容读取。
-const STATE_VERSION: u32 = 3;
+/// 当前 state schema；旧 schema 直接拒绝，避免旧 Cargo file ownership 被解释为 retirement。
+const STATE_VERSION: u32 = 4;
 
 /// 通用 Result 别名。
 pub type Result<T> = color_eyre::Result<T>;

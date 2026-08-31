@@ -1,5 +1,5 @@
 ---@meta
---- dots.lua 的 LuaLS 声明。持续结果通过 Resource 或 mapping 表达，命令副作用绑定 lifecycle hook。
+--- dots.lua 的 LuaLS 声明。sync 持续结果使用 Resource 或 mapping，命令副作用绑定 lifecycle hook，Cargo binary 由 `dots install` 执行。
 
 ---@class GranularitySpec
 ---@field mode? "dir"|"children"|"file" 链接粒度，缺省为 "dir"
@@ -37,7 +37,7 @@ function root(name, spec) end
 function scripts(spec) end
 
 ---@class DeclarationSpecBase
----@field enabled? boolean false 表示本次不进入 Desired Set；缺省为 true
+---@field enabled? boolean false 表示消费该声明的命令忽略本项；缺省为 true
 
 ---@class SymlinkResourceSpec: DeclarationSpecBase
 ---@field source string 相对仓库根、绝对或 `~` source path
@@ -48,17 +48,18 @@ function scripts(spec) end
 ---@field target string 绝对或 `~` target file
 
 ---@class CargoWorkspaceBinarySource
----@field manifest string 相对仓库根、绝对或 `~` Cargo.toml path
+---@field path string 相对仓库根、绝对或 `~` package directory
 ---@field binary string Cargo binary target 名称
 
----@class CargoWorkspaceBinaryResourceSpec: DeclarationSpecBase
+---@class CargoWorkspaceBinaryInstallSpec: DeclarationSpecBase
 ---@field source CargoWorkspaceBinarySource 仓库内 binary source
----@field target string 绝对或 `~` 安装位置
+---@field root string 传给 `cargo install --root` 的绝对或 `~` 路径
 
----@class CargoCratesIoBinaryResourceSpec: DeclarationSpecBase
----@field source string crates.io package 名称；全部 bin 安装到 `~/.cargo/bin`
+---@class CargoCratesIoBinaryInstallSpec: DeclarationSpecBase
+---@field source string crates.io package 名称；由 Cargo 安装到真实 Cargo home
+---@field binaries? string[] 依次传给 `cargo install --bin` 的 binary target 名称
 
----@alias CargoBinaryResourceSpec CargoWorkspaceBinaryResourceSpec|CargoCratesIoBinaryResourceSpec
+---@alias CargoBinaryInstallSpec CargoWorkspaceBinaryInstallSpec|CargoCratesIoBinaryInstallSpec
 
 ---@class ManagedBlockResourceSpec: DeclarationSpecBase
 ---@field target string 绝对或 `~` 文本文件
@@ -71,7 +72,7 @@ function scripts(spec) end
 ---@class DotsResource
 ---@field symlink fun(spec: SymlinkResourceSpec) 声明符号链接
 ---@field copied_file fun(spec: CopiedFileResourceSpec) 声明内容复制文件
----@field cargo_binary fun(spec: CargoBinaryResourceSpec) 声明编译并安装的 Cargo binary
+---@field cargo_binary fun(spec: CargoBinaryInstallSpec) 声明直接映射为 `cargo install` 的 Cargo binary
 ---@field managed_block fun(spec: ManagedBlockResourceSpec) 声明文本 marker block
 ---@field systemd_user_unit fun(spec: SystemdUserUnitResourceSpec) 声明 enabled 的 systemd user unit
 
@@ -91,7 +92,7 @@ function scripts(spec) end
 ---@field os "linux"|"macos" 当前平台
 ---@field home string 当前 `$HOME`
 ---@field repo string 当前 dotfiles 仓库根
----@field resource DotsResource 显式 Resource declaration
+---@field resource DotsResource sync Resource 与 Cargo install declaration
 ---@field hook DotsHook dots sync lifecycle hook
 ---@field path DotsPath 声明阶段只读 path query
 

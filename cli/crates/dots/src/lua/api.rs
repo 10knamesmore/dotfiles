@@ -1,4 +1,4 @@
-//! 纯声明 Lua API：mapping、Resource 与 lifecycle hook。
+//! 纯声明 Lua API：mapping、sync Resource、lifecycle hook 与 Cargo installation。
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -131,7 +131,7 @@ fn register_scripts(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     Ok(())
 }
 
-/// 注册 `dots.resource.*` typed declaration。
+/// 注册 `dots.resource.*` typed declaration，包括独立执行的 Cargo installation。
 fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     let dots: Table = lua.globals().get("dots")?;
     let resource = lua.create_table()?;
@@ -177,10 +177,8 @@ fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
             if enabled(&spec)? {
                 cargo_builder
                     .borrow_mut()
-                    .resources
-                    .push(ResourceDeclaration::CargoBinary(
-                        parse_cargo_binary_declaration(&spec)?,
-                    ));
+                    .cargo_binaries
+                    .push(parse_cargo_binary_declaration(&spec)?);
             }
             Ok(())
         })?,
@@ -236,7 +234,7 @@ fn register_path_queries(lua: &Lua) -> mlua::Result<()> {
     Ok(())
 }
 
-/// 解析 Resource 与 lifecycle hook 共用的 `enabled` 字段。
+/// 解析 Resource、lifecycle hook 与 Cargo binary 共用的 `enabled` 字段。
 fn enabled(spec: &Table) -> mlua::Result<bool> {
     Ok(spec.get::<Option<bool>>("enabled")?.unwrap_or(true))
 }
@@ -245,21 +243,23 @@ fn enabled(spec: &Table) -> mlua::Result<bool> {
 fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDeclaration> {
     match spec.get::<Value>("source")? {
         Value::Table(source) => Ok(CargoBinaryDeclaration::Workspace {
-            manifest: source.get("manifest")?,
+            path: source.get("path")?,
             binary: source.get("binary")?,
-            target: spec.get("target")?,
+            root: spec.get("root")?,
         }),
         Value::String(package) => {
             if spec.contains_key("target")?
+                || spec.contains_key("root")?
                 || spec.contains_key("version")?
                 || spec.contains_key("binary")?
             {
                 return Err(mlua::Error::external(
-                    "crates.io cargo binary 只接受字符串 source；target、version、binary 由 Cargo 决定",
+                    "crates.io cargo binary 只接受字符串 source；root、target、version、binary 由 Cargo 决定",
                 ));
             }
             Ok(CargoBinaryDeclaration::CratesIo {
                 package: package.to_str()?.to_owned(),
+                binaries: string_sequence(spec, "binaries")?,
             })
         }
         other => Err(mlua::Error::external(format!(

@@ -89,19 +89,22 @@ distribute("agent-hook-rules", {
     mode = "file",
 })
 
--- 每次 plan 先编译，再按 artifact 内容收敛稳定安装位置。
+-- `dots install` 把声明直接映射为 cargo install --path/--bin/--root。
 dots.resource.cargo_binary {
     source = {
-        manifest = "cli/Cargo.toml",
+        path = "cli/crates/agent-hooks",
         binary = "agent-hook",
     },
-    target = "~/.local/bin/agent-hook",
+    root = "~/.local",
 }
 
--- 所有主机共享的 crates.io binary inventory。Cargo 实际生成的全部 bin 由 dots
--- 自动收敛到 ~/.cargo/bin，不在这里重复维护 package 到 binary 名称的映射。
+-- 所有主机共享的 crates.io package inventory；`dots install` 逐项交给 Cargo 安装或升级。
+dots.resource.cargo_binary {
+    source = "uv",
+    binaries = { "uv", "uvx" },
+}
+
 local cargo_binary_packages = {
-    "uv",
     "starship",
     "zoxide",
     "du-dust",

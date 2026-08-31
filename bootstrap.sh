@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 检查编译依赖，构建 dots，再收敛仓库声明。
+# 检查编译依赖，构建 dots，安装 Cargo binary，再执行 hook 并收敛配置声明。
 # Usage: ./bootstrap.sh
-# 依赖：cc、cargo
+# 依赖：cc、cargo、Node 22.19+、pnpm 11.18
 # 环境变量：无
 # 任一步失败立即退出，避免用不完整的 binary 继续修改本机配置。
 set -euo pipefail
@@ -22,5 +22,7 @@ echo "编译 dots…"
 cargo build --release --manifest-path "$HERE/cli/Cargo.toml"
 
 DOTS="$HERE/cli/target/release/dots"
+echo "运行 dots install…"
+"$DOTS" install
 echo "运行 dots sync…"
 exec "$DOTS" sync
