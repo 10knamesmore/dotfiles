@@ -95,7 +95,7 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 持久 design proposal 与本地 Spec 的信息模型接近，但 persistence 和粒度不同：proposal 都需要 problem、solution、alternatives、acceptance criteria 与 risk；Spec 还组织跨 session 的 dependency 和 implementation frontier。
 
 - **已有活动 Spec，且候选属于同一 destination:** 按当前未知量写入 `research`、`decision` 或 `implementation` Subspec，不固定塞进某一种 kind。
-- **没有活动 Spec，候选需要跨 session:** 每个 cohesive destination 交给 Wayfinder 创建一个优先为单文件的 Spec。多个互不相关候选不能只因来自同一次 audit 就塞进一个 umbrella Spec。
+- **没有活动 Spec，候选需要跨 session:** 每个 cohesive destination 交给 Wayfinder 创建一个独立 Spec。多个互不相关候选不能只因来自同一次 audit 就塞进一个 umbrella Spec。
 - **候选已清晰且一个 session 可完成:** 在 response 中给出完整 proposal，用户确认后直接实现；不要为了模仿 durable design note 强制创建 Spec。
 - **候选只是后续 decision 的证据:** 放进 owning decision Subspec 的 Context、Resolution 或 Evidence，不另建重复文档。
 - **完成后的 rationale 需要长期提交进仓库:** 只有满足 [`domain-modeling`](../domain-modeling/SKILL.md) 的 ADR 条件时才创建 ADR；本地 complete Spec 不是 committed decision record。

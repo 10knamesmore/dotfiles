@@ -5,8 +5,8 @@
 1. 读取 repo instructions、现有 spec 约定、domain glossary 和相关 ADR。
 2. 从对话中提取 destination、problem、solution、user stories、acceptance criteria、共享实现决策、测试决策和 out-of-scope。
 3. 确定测试 feature 的 seam。优先使用已有 seam，并使用项目现有测试范例。没有充分证据时，把 seam 问题写入 `Not yet specified` 或 decision Subspec，不要编造。
-4. 按 SPEC-FORMAT 创建 Spec 文件；落盘前必须评估大小——内容能由单文件容纳时只创建 Spec 文件，确实太大、一个文件装不下时才拆出 Subspec 目录。
-5. 需要拆分时，创建初始 Subspec：
+4. 按 SPEC-FORMAT 创建 Spec 目录与 `main.md`。
+5. 为当前可以精确表达的工作创建初始 Subspec：
    - 已经可以精确表达、但尚未决定的问题写成 `decision`、`research` 或 `prototype`。
    - 为解除决策阻塞必须完成的前置操作写成 `task`。
    - 只有 contract 与 acceptance criteria 已稳定时，才创建 `implementation` Subspec。

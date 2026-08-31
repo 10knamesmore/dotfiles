@@ -36,18 +36,18 @@ description: 管理 repo-local Spec 的完整生命周期——将大而模糊�
 
 ## Storage
 
-先遵守 repo 已有的 spec 目录约定。没有约定时使用：
+先遵守 repo 已有的 spec 根目录约定；没有约定时使用 `specs/`。每个 Spec 始终使用一个独立目录，主文件固定为 `main.md`，Subspec 与主文件同级：
 
 ```text
 specs/
-├── <yy-mm-dd>-<spec-slug>.md              ← 单文件 Spec（默认、优先）
-└── <yy-mm-dd>-<spec-slug>/                ← 仅当单文件装不下时才拆分
+└── <yy-mm-dd>-<spec-slug>/
+    ├── main.md                            ← canonical Spec
     ├── 1-<subspec-slug>.md
     ├── 2-<subspec-slug>.md
     └── ...
 ```
 
-创建前必须评估 Spec 大小：只有内容确实太大、单文件无法容纳时才拆出 Subspec 目录；能单文件装下的一律只创建 Spec 文件，不预留空的 Subspec 结构。
+创建 Spec 时立即创建目录与 `main.md`，不根据内容大小切换存储结构。没有可独立推进的工作时，不创建空的 Subspec 文件。
 
 写入任何 spec 文件前，先确认 repo 的 ignore 配置已排除 spec 目录（如 `specs/`）；没有就先加入。Spec 与 Subspec 是本地工作 artifact，不提交入库。
 
@@ -85,7 +85,7 @@ Subspec status：
 
 Subspec 的 kind 描述工作性质，不表示 status。不要按 user story 机械拆分 Subspec；按可以独立验收、依赖明确的决策或实现切片拆分。
 
-简化工作先使用 [`find-simplifications`](../find-simplifications/SKILL.md) 证明 consumer、ownership、behavior change 和净删除量。一个需要跨 session 推进的强候选可以形成一个优先为单文件的 Spec；多个互不相关的候选不能只因来自同一次 audit 就共享 umbrella Spec。候选已经属于活动 Spec 的 destination 时，再按未知量写成 `research`、`decision` 或 `implementation` Subspec。
+简化工作先使用 [`find-simplifications`](../find-simplifications/SKILL.md) 证明 consumer、ownership、behavior change 和净删除量。一个需要跨 session 推进的强候选可以形成一个独立 Spec；多个互不相关的候选不能只因来自同一次 audit 就共享 umbrella Spec。候选已经属于活动 Spec 的 destination 时，再按未知量写成 `research`、`decision` 或 `implementation` Subspec。
 
 ## Fog of war
 

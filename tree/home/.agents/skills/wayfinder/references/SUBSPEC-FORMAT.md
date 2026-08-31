@@ -2,7 +2,7 @@
 
 Subspec 是一个 agent session 内可以独立推进的工作单元。一个结论只保存在一个 Subspec 中。
 
-Subspec 只在 Spec 确实太大、单文件无法容纳时才存在，路径为 `specs/<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md`（`n` 从 1 开始递增，与 frontmatter 的 `id` 无关）。能单文件装下的 Spec 不创建 Subspec。
+Subspec 与 Spec 的 `main.md` 同级，路径为 `specs/<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md`（`n` 从 1 开始递增，与 frontmatter 的 `id` 无关）。只为可以独立推进的工作创建 Subspec，不预留空文件。
 
 ## Frontmatter
 
@@ -30,7 +30,7 @@ depends_on: []
 ```markdown
 # <title>
 
-Parent: [<Spec title>](../<yy-mm-dd>-<spec-slug>.md)
+Parent: [<Spec title>](main.md)
 
 ## Objective
 

@@ -1,8 +1,8 @@
 # Spec format
 
-Spec 是一个 effort 的 canonical contract。先遵守 repo 已有模板；没有模板时使用本格式。
+Spec 是一个 effort 的 canonical contract。目录与主文件命名始终遵守本格式；正文先遵守 repo 已有模板，没有模板时使用下文结构。
 
-Spec 文件路径为 `specs/<yy-mm-dd>-<spec-slug>.md`。优先单文件：只有内容确实太大、单文件无法容纳时才拆分，Subspec 放在同名目录 `specs/<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md`（`n` 从 1 开始递增）。
+Spec 主文件路径为 `specs/<yy-mm-dd>-<spec-slug>/main.md`。每个 Spec 始终使用一个独立目录；Subspec 与 `main.md` 同级，路径为 `specs/<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md`（`n` 从 1 开始递增）。
 
 写入前先确认 repo 的 ignore 配置已排除 spec 目录；没有就先加入。Spec 与 Subspec 是本地工作 artifact，不提交入库。
 
@@ -55,11 +55,11 @@ status: draft
 
 ## Subspecs
 
-- [<Subspec title>](<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md)
+- [<Subspec title>](<n>-<subspec-slug>.md)
 
 ## Decisions so far
 
-- [<Resolved Subspec title>](<yy-mm-dd>-<spec-slug>/<n>-<subspec-slug>.md) — <一句话摘要>
+- [<Resolved Subspec title>](<n>-<subspec-slug>.md) — <一句话摘要>
 
 ## Not yet specified
 
