@@ -12,6 +12,6 @@ en: review choreography	i	rejected in review|review round|reviewer|as of v\d
 en: stale snapshot	i	currently (runs?|live|deployed|supports?|on)|not yet (shipped|released|deployed)|in production|as of 20\d\d
 en: hedge and safe-claim	i	probably |should be enough|should suffice|it simply|is safe —|is safe --
 en: section ordinal		§\d
-zh: session vantage and narration		设计稿|评审|上一?轮|旧版|老的|不再|以前|本版|遗留|私有|[A-Z](方案|布局)|任务[一二三四五六七八九十0-9]+
+zh: session vantage and narration		设计稿|评审|上一?轮|旧版|老的|不再|改为|以前|本版|遗留|私有|[A-Z](方案|布局)|任务[一二三四五六七八九十0-9]+
 zh: stale snapshot		生产环境|当前版本|目前版本|尚未(发布|上线)|已上线|已部署
 zh: bare 端 in markdown		(^|[^a-zA-Z])端([^a-zA-Z]|$)	*.md

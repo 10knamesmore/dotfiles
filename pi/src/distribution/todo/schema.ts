@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
+import { GLOBAL_CONFIG } from "../../config.ts";
 
 /** Operation names accepted by the model-facing todo tool. */
 export const TODO_OPERATIONS = [
@@ -43,7 +44,9 @@ export const TodoParameters = Type.Object(
     ),
     items: Type.Optional(
       Type.Array(
-        Type.String({ description: "Tasks for a flat init or append" }),
+        Type.String({
+          description: `Tasks for a flat init or append, should be in ${GLOBAL_CONFIG.language}`,
+        }),
       ),
     ),
     reason: Type.Optional(

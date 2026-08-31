@@ -87,7 +87,7 @@ task transport 至少写清：
 - dependency-aware 执行顺序、每个 claim boundary、验证命令、Definition of Done 和停止条件；
 - B 完成后必须更新的各 Subspec Resolution/Evidence/status 与 Parent Spec 状态；
 - B 可用时应调用的 `wayfinder` / `implement`，以及不可用时仍可执行的显式 fallback；
-- B 需要返回给 A review 的具体效果、evidence、review transport 格式与 exact output path。
+- B 需要返回给 A review 的具体效果、evidence、review transport 格式、exact output path 与命名规则（时间戳取 B 写回时 session 当前时间）。
 
 A 验证 transport 后交给 B。A 不删除 outbound transport，也不在 B 完成前写第二份消息。
 
@@ -104,7 +104,7 @@ A 生成的 task transport 必须直接要求 B：
 4. 只有全部 in-scope Subspec 与 transport 的整体 outcome 均满足，才返回 `status: completed`；
 5. 基于 live state 准备 review transport，写明各 acceptance criteria 的 evidence、changed artifacts、
    验证结果、偏差、未验证项、dirty ownership 和希望 A 重点 review 的效果；
-6. 删除已完成的 inbound task transport，再按 handoff 给出的 exact path 与格式写入 review transport。
+6. 删除已完成的 inbound task transport，再按 handoff 给出的 exact path 与格式写入 review transport；命名中的时间戳以 B 写回时 session 当前时间为准。
 
 task transport 还要说明真正阻塞时的 fallback：B 写 `status: blocked` 的 review transport，提供 blocker、已尝试方案、现有 evidence 和需要 A 或用户决定的事项。这个 status 只属于 transport；Subspec frontmatter 按 Wayfinder contract 保持 `in-progress` 或释放为 `ready`，绝不写 `blocked`。
 
@@ -131,6 +131,7 @@ A 完成 review 和 canonical state 更新后删除 inbound review transport。�
 - 各 repo 的 branch、status、claim、dependency、命令、路径和 line reference 与 live state 一致；
 - 完成、剩余、失败和未验证没有矛盾；
 - dirty ownership 足以防止覆盖、误格式化或误 stage；
+- review transport 的命名与时间戳规则（取 B 写回时 session 当前时间）已内联进 task transport，B 不读取 `handoff` Skill 也能确定回传文件路径；
 - 删除命令只指向当前 inbound transport，不含 glob、变量或递归删除；
 - 不包含 secret，也没有授权未获批准的 commit、push、部署或 side effect；
 - transport 删除后，Spec、Subspec、源码和 evidence 仍能还原长期状态。

@@ -6,10 +6,11 @@
   "lastChangelogVersion": "0.84.4",
   "editorPaddingX": 0,
   "terminal": {
-    "showTerminalProgress": true
+    "showTerminalProgress": false
   },
   "tuiMode": "fullscreen",
   "treeFilterMode": "default",
   "doubleEscapeAction": "tree",
-  "defaultProjectTrust": "always"
+  "defaultProjectTrust": "always",
+  "hideThinkingBlock": false,
 }

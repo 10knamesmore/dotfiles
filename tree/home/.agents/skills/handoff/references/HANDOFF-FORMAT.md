@@ -22,6 +22,7 @@
   查找 canonical contract 留给 B 猜。
 - B 不依赖 `handoff` Skill。可用时由 B 使用 `wayfinder` / `implement`，不可用时执行 task transport 内联的等价步骤。
 - 默认把 transport 放在活动 Spec 的 artifact 目录，文件名为 `HANDOFF-$(date +%m-%d_%H-%M).md`；同一路径只能在上一份 transport 删除后复用。
+- 文件名中的时间戳取 receiver 写入该 transport 时 session 的当前时间：task transport 在 A 生成时求值，review transport 在 B 写回时求值；不得沿用或复制 channel 中前一份 transport 的时间戳。
 - 不把 transport 加入 staging、commit、issue tracker 或长期文档索引。
 
 ## 公共文件头
@@ -139,10 +140,10 @@ task transport 必须把以下协议直接写给 B，不能只让 B 读取本 re
 1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence；
 2. 准备 review transport 所需的实际结果、acceptance criteria evidence、changed artifacts、验证、偏差、未验证项和 dirty ownership；
 3. 删除 inbound task transport；
-4. 在 task transport 指定的 exact output path 创建 review transport；
+4. 在 task transport 指定的 exact output path 创建 review transport；时间戳取你（B）写回时 session 的当前时间，不要沿用 task transport 生成时的时间戳；
 5. review transport 使用下节的字段，并要求 A review 真实 diff、源码、测试和用户可见效果。
 
-把 review transport 的 required section、transport status 语义和删除命令完整内联。不得写成使用 `$handoff` 生成回复，也不得假设 B 能访问本 reference。
+把 review transport 的 required section、transport status 语义、命名规则（时间戳取 B 写回时 session 当前时间）和删除命令完整内联。不得写成使用 `$handoff` 生成回复，也不得假设 B 能访问本 reference。
 
 ## Review transport
 
@@ -226,5 +227,6 @@ review transport 不替 A 宣布验收通过。
 4. 每个完成声明是否有 current evidence？
 5. dirty ownership 是否足以防止误覆盖、误格式化和误 stage？
 6. review transport 是否要求 A 检查真实效果，而不是直接信任 B？
+9. review transport 的命名规则（时间戳取 B 写回时 session 当前时间）是否已内联进 task transport？
 7. 删除命令是否只命中当前 transport？
 8. transport 删除后，canonical artifacts 是否仍保留全部长期状态？
