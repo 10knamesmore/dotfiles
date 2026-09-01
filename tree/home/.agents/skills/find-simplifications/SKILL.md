@@ -21,6 +21,7 @@ description: 在代码库中寻找、证明、排序或记录非显然 simplific
 强候选必须删除、折叠、降级或重新归属真实成本，并有证据说明当前设计付出的成本高于收益：
 
 - public method、event、config knob、registry notification、helper、package、durable event 或 test artifact 没有 production consumer；
+- 私有函数只有一个消费方，却占用模块级作用域；实施时把它定义在该消费函数或对应代码块内，同一消费函数内多次调用仍算一个消费方。trait 方法、公开 API 和宏或属性要求的具名入口不属于这类私有 helper；
 - tests 或 docs 是唯一 consumer，且其行为不是产品、兼容或安全 contract；
 - 两个 representation 镜像同一事实，尤其跨 durable 与 transient state；
 - seam 强迫所有 implementation 支持没有 consumer 的 method；
