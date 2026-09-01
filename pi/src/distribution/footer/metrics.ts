@@ -12,43 +12,12 @@ export interface SessionUsageTotals {
 
   /** Prompt tokens served from provider caches. */
   cacheRead: number;
-
-  /** Prompt tokens written into provider caches. */
-  cacheWrite: number;
-
-  /** Provider-calculated USD cost summed across recorded usage. */
-  cost: number;
 }
-
-/** A verified Codex subscription window read from one provider response. */
-export interface RateLimitWindow {
-  /** Footer label derived from the exact backend window length. */
-  readonly label: "5h" | "168h";
-
-  /** Backend-reported fraction already consumed, expressed as 0 through 100. */
-  readonly usedPercent: number;
-}
-
-/** Codex subscription windows present on the latest response. */
-export interface RateLimitSnapshot {
-  /** Primary or secondary window whose own backend length is exactly 300 minutes. */
-  readonly fiveHour: RateLimitWindow | undefined;
-
-  /** Primary or secondary window whose own backend length is exactly 10080 minutes. */
-  readonly weekly: RateLimitWindow | undefined;
-}
-
-const EMPTY_RATE_LIMITS: RateLimitSnapshot = {
-  fiveHour: undefined,
-  weekly: undefined,
-};
 
 function addUsage(totals: SessionUsageTotals, usage: Usage): void {
   totals.input += usage.input;
   totals.output += usage.output;
   totals.cacheRead += usage.cacheRead;
-  totals.cacheWrite += usage.cacheWrite;
-  totals.cost += usage.cost.total;
 }
 
 /** Sum Pi's recorded assistant, tool, compaction, and branch-summary usage. */
@@ -57,8 +26,6 @@ export function collectSessionUsage(ctx: ExtensionContext): SessionUsageTotals {
     input: 0,
     output: 0,
     cacheRead: 0,
-    cacheWrite: 0,
-    cost: 0,
   };
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type === "message" && entry.message.role === "assistant") {
@@ -79,76 +46,127 @@ export function collectSessionUsage(ctx: ExtensionContext): SessionUsageTotals {
   return totals;
 }
 
-function responseHeader(
-  headers: Readonly<Record<string, string>>,
-  name: string,
-): string | undefined {
-  const direct = headers[name];
-  if (direct !== undefined) return direct;
-  const normalizedName = name.toLowerCase();
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === normalizedName) return value;
+/** Session-total usage: pre-filled from persisted entries, then grown by events only. */
+export class UsageCounter {
+  private totals: SessionUsageTotals = {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+  };
+
+  /** Recompute from persisted entries so resumed sessions keep full-session totals. */
+  public prescan(ctx: ExtensionContext): void {
+    this.totals = collectSessionUsage(ctx);
   }
-  return undefined;
+
+  /** Add one completed message or summary usage record exactly once. */
+  public record(usage: Usage | undefined): void {
+    if (usage) addUsage(this.totals, usage);
+  }
+
+  /** Return the accumulated totals. */
+  public snapshot(): SessionUsageTotals {
+    return this.totals;
+  }
 }
 
-function finiteNumber(value: string | undefined): number | undefined {
-  if (value === undefined || value.trim() === "") return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+/** Number of completed turns retained by recent-turn footer metrics. */
+export const RECENT_TURNS = 5;
+
+/** Cache hit rate over the most recent completed turns. */
+export class RecentHitRateTracker {
+  private readonly turnTokens: Array<{
+    input: number;
+    cacheWrite: number;
+    cacheRead: number;
+  }> = [];
+  private readonly totals = { input: 0, cacheWrite: 0, cacheRead: 0 };
+  private current = { input: 0, cacheWrite: 0, cacheRead: 0 };
+
+  /** Accumulate one assistant message's usage into the in-flight turn. */
+  public record(usage: Usage | undefined): void {
+    if (!usage) return;
+    this.current.input += usage.input;
+    this.current.cacheWrite += usage.cacheWrite ?? 0;
+    this.current.cacheRead += usage.cacheRead ?? 0;
+  }
+
+  /** Close the in-flight turn, keep only the most recent window, and skip empty turns. */
+  public endTurn(): void {
+    if (this.current.input === 0 && this.current.cacheWrite === 0 && this.current.cacheRead === 0)
+      return;
+    this.turnTokens.push(this.current);
+    this.totals.input += this.current.input;
+    this.totals.cacheWrite += this.current.cacheWrite;
+    this.totals.cacheRead += this.current.cacheRead;
+    const oldest = this.turnTokens.length > RECENT_TURNS
+      ? this.turnTokens.shift()
+      : undefined;
+    if (oldest) {
+      this.totals.input -= oldest.input;
+      this.totals.cacheWrite -= oldest.cacheWrite;
+      this.totals.cacheRead -= oldest.cacheRead;
+    }
+    this.current = { input: 0, cacheWrite: 0, cacheRead: 0 };
+  }
+
+  /** Clear window state when Pi replaces the active session. */
+  public reset(): void {
+    this.turnTokens.length = 0;
+    this.totals.input = 0;
+    this.totals.cacheWrite = 0;
+    this.totals.cacheRead = 0;
+    this.current = { input: 0, cacheWrite: 0, cacheRead: 0 };
+  }
+
+  /** Hit rate percentage over the window, undefined when the window has no input tokens. */
+  public hitRatePercent(): number | undefined {
+    const promptTokens = this.totals.input + this.totals.cacheWrite + this.totals.cacheRead;
+    if (promptTokens <= 0) return undefined;
+    return Math.round((this.totals.cacheRead / promptTokens) * 100);
+  }
 }
 
-/** Parse only the source-verified `openai-codex` primary/secondary response-header contract. */
-export function parseCodexRateLimits(
-  headers: Readonly<Record<string, string>>,
-  provider: string | undefined,
-): RateLimitSnapshot {
-  if (provider !== "openai-codex") return EMPTY_RATE_LIMITS;
-  let fiveHour: RateLimitWindow | undefined;
-  let weekly: RateLimitWindow | undefined;
-  for (const key of ["primary", "secondary"] as const) {
-    const usedPercent = finiteNumber(
-      responseHeader(headers, `x-codex-${key}-used-percent`),
-    );
-    const windowMinutes = finiteNumber(
-      responseHeader(headers, `x-codex-${key}-window-minutes`),
-    );
-    if (usedPercent === undefined || usedPercent < 0 || usedPercent > 100)
-      continue;
-    if (windowMinutes === 300) fiveHour = { label: "5h", usedPercent };
-    else if (windowMinutes === 10_080) weekly = { label: "168h", usedPercent };
-  }
-  return { fiveHour, weekly };
-}
+/** Output throughput over the most recent completed turns. */
+export class RecentTokensPerSecondTracker {
+  private readonly turns: Array<{
+    outputTokens: number;
+    modelMilliseconds: number;
+  }> = [];
+  private currentOutputTokens = 0;
 
-/** Retains only the latest provider-backed rate-limit snapshot. */
-export class RateLimitTracker {
-  private current: RateLimitSnapshot = EMPTY_RATE_LIMITS;
-
-  /** Replace the snapshot and report whether visible footer data changed. */
-  public update(
-    headers: Readonly<Record<string, string>>,
-    provider: string | undefined,
-  ): boolean {
-    const next = parseCodexRateLimits(headers, provider);
-    const changed =
-      next.fiveHour?.usedPercent !== this.current.fiveHour?.usedPercent ||
-      next.weekly?.usedPercent !== this.current.weekly?.usedPercent;
-    this.current = next;
-    return changed;
+  /** Accumulate generated tokens from one assistant message in the current turn. */
+  public record(usage: Usage | undefined): void {
+    if (usage) this.currentOutputTokens += usage.output;
   }
 
-  /** Clear data when a session or provider changes so old account usage is never shown. */
-  public clear(): boolean {
-    const changed =
-      this.current.fiveHour !== undefined || this.current.weekly !== undefined;
-    this.current = EMPTY_RATE_LIMITS;
-    return changed;
+  /** Close one turn and retain only the recent window. */
+  public endTurn(modelMilliseconds: number): void {
+    if (this.currentOutputTokens === 0 && modelMilliseconds === 0) return;
+    this.turns.push({
+      outputTokens: this.currentOutputTokens,
+      modelMilliseconds,
+    });
+    if (this.turns.length > RECENT_TURNS) this.turns.shift();
+    this.currentOutputTokens = 0;
   }
 
-  /** Return the immutable current snapshot. */
-  public snapshot(): RateLimitSnapshot {
-    return this.current;
+  /** Clear recent throughput when Pi replaces the active session. */
+  public reset(): void {
+    this.turns.length = 0;
+    this.currentOutputTokens = 0;
+  }
+
+  /** Return average generated tokens per model second in the recent window. */
+  public tokensPerSecond(): number | undefined {
+    let outputTokens = 0;
+    let modelMilliseconds = 0;
+    for (const turn of this.turns) {
+      outputTokens += turn.outputTokens;
+      modelMilliseconds += turn.modelMilliseconds;
+    }
+    if (outputTokens <= 0 || modelMilliseconds <= 0) return undefined;
+    return outputTokens / (modelMilliseconds / 1_000);
   }
 }
 
@@ -189,6 +207,92 @@ export class ModelDurationTracker {
         ? 0
         : Math.max(0, performance.now() - this.startedAt))
     );
+  }
+}
+
+/** Tool executions observed during the active session. */
+export interface ToolUsageSnapshot {
+  /** Executions since the active session started. */
+  readonly total: number;
+
+  /** Executions Pi reported as errors, included in `total`. */
+  readonly errors: number;
+
+  /** Most frequently used tools, ordered by count then name. */
+  readonly top: ReadonlyArray<{ readonly name: string; readonly count: number }>;
+}
+
+/** Counts tool executions by name from `tool_execution_end` events. */
+export class ToolUsageTracker {
+  private readonly counts = new Map<string, number>();
+  private readonly errorCounts = new Map<string, number>();
+  private total = 0;
+  private errors = 0;
+
+  public record(name: string, isError: boolean): void {
+    this.counts.set(name, (this.counts.get(name) ?? 0) + 1);
+    if (isError) {
+      this.errorCounts.set(name, (this.errorCounts.get(name) ?? 0) + 1);
+      this.errors += 1;
+    }
+    this.total += 1;
+  }
+
+  /** Clear counts when Pi replaces the active session. */
+  public reset(): void {
+    this.counts.clear();
+    this.errorCounts.clear();
+    this.total = 0;
+    this.errors = 0;
+  }
+
+  /** Pre-count tool executions already persisted in the session so resumed sessions match `in/out` scope. */
+  public prescan(ctx: ExtensionContext): void {
+    for (const entry of ctx.sessionManager.getEntries()) {
+      if (entry.type !== "message") continue;
+      const message = entry.message;
+      if (message.role === "assistant") {
+        for (const part of message.content) {
+          if (part.type === "toolCall") this.record(part.name, false);
+        }
+      } else if (message.role === "toolResult" && message.isError) {
+        this.record(message.toolName, true);
+      }
+    }
+  }
+
+  public snapshot(limit: number): ToolUsageSnapshot {
+    const top = [...this.counts.entries()]
+      .sort(([leftName, leftCount], [rightName, rightCount]) =>
+        rightCount - leftCount || leftName.localeCompare(rightName),
+      )
+      .slice(0, limit)
+      .map(([name, count]) => ({ name, count }));
+    return { total: this.total, errors: this.errors, top };
+  }
+}
+
+/** Turns and agent runs observed since the active session's latest `session_start`. */
+export class TurnTracker {
+  private turns = 0;
+  private agents = 0;
+
+  public recordTurn(): void {
+    this.turns += 1;
+  }
+
+  public recordAgent(): void {
+    this.agents += 1;
+  }
+
+  /** Clear counts when Pi replaces the active session. */
+  public reset(): void {
+    this.turns = 0;
+    this.agents = 0;
+  }
+
+  public snapshot(): { readonly turns: number; readonly agents: number } {
+    return { turns: this.turns, agents: this.agents };
   }
 }
 

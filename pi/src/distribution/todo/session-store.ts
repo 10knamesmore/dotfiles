@@ -2,7 +2,6 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { sanitizeTodoDisplayLine } from "./display.js";
 import { cloneTodoPhases, parseTodoPhases, type TodoPhase } from "./model.js";
 
 /** Custom entry type used to persist parent-session todo snapshots. */
@@ -10,28 +9,6 @@ export const TODO_STATE_ENTRY_TYPE = "dotfiles.pi.todo-state";
 
 /** Current serialized snapshot format. */
 export const TODO_STATE_VERSION = 1;
-
-/** Durable state written after one successful model or user mutation. */
-export interface TodoSnapshot {
-  /** Serialization format version. */
-  version: typeof TODO_STATE_VERSION;
-
-  /** Manual command that produced the custom snapshot. */
-  source: "command";
-
-  /** Complete canonical todo state after the mutation. */
-  phases: TodoPhase[];
-}
-
-/** Outcome of appending a manual todo snapshot to Pi's active branch. */
-export type TodoCommandCommitResult =
-  | { status: "committed" }
-  | {
-      status: "branch-diverged";
-
-      /** Flush failure that requires stopping before another entry is appended. */
-      reason: string;
-    };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,8 +23,9 @@ function phasesFromContainer(value: unknown): TodoPhase[] | undefined {
 /**
  * Owns canonical in-memory todo state and branch-local reconstruction.
  *
- * Tool mutations persist in their successful result details. Manual command
- * edits append a custom entry because they do not produce a tool result.
+ * Tool mutations persist in their successful result details. Custom entries were
+ * written by the removed manual `/todo edit` command and are still read back for
+ * compatibility with sessions created before that command was dropped.
  */
 export class TodoSessionStore {
   private phases: TodoPhase[] = [];
@@ -70,56 +48,11 @@ export class TodoSessionStore {
   }
 
   /**
-   * Append a manual edit and synchronize memory with Pi's resulting branch.
-   *
-   * Pi advances its in-memory branch before flushing the session file. If that
-   * flush throws after the branch advances, callers must stop the session before
-   * another entry can reference the unpersisted leaf.
-   */
-  public commitCommand(
-    phases: readonly TodoPhase[],
-    ctx: ExtensionContext,
-  ): TodoCommandCommitResult {
-    const next = parseTodoPhases(phases);
-    if (next === undefined)
-      throw new Error(
-        "Refusing to persist invalid or non-normalized todo state.",
-      );
-    const snapshot: TodoSnapshot = {
-      version: TODO_STATE_VERSION,
-      source: "command",
-      phases: next,
-    };
-    const branchBefore = ctx.sessionManager.getBranch();
-    const leafBefore = branchBefore.at(-1)?.id;
-    try {
-      this.pi.appendEntry(TODO_STATE_ENTRY_TYPE, snapshot);
-      this.phases = next;
-      return { status: "committed" };
-    } catch (error: unknown) {
-      const branchAfter = ctx.sessionManager.getBranch();
-      const leafAfter = branchAfter.at(-1)?.id;
-      if (
-        branchAfter.length !== branchBefore.length ||
-        leafAfter !== leafBefore
-      ) {
-        this.restore(ctx);
-        return {
-          status: "branch-diverged",
-          reason: sanitizeTodoDisplayLine(
-            error instanceof Error ? error.message : String(error),
-          ),
-        };
-      }
-      throw error;
-    }
-  }
-
-  /**
    * Restore the newest valid snapshot on the active branch.
    *
-   * Custom entries cover manual `/todo edit` changes. Tool-result details provide
-   * the same branch-local state and remain a recovery source for ordinary calls.
+   * Custom entries cover the removed manual `/todo edit` command. Tool-result
+   * details provide the same branch-local state and remain a recovery source
+   * for ordinary calls.
    */
   public restore(ctx: ExtensionContext): string | undefined {
     const branch = ctx.sessionManager.getBranch();

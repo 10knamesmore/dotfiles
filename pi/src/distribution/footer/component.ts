@@ -14,16 +14,21 @@ import {
   formatDuration,
   formatFooterCwd,
   formatTokens,
+  formatTokensPerSecond,
   sanitizeFooterText,
 } from "./format.js";
 import type { GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
 import {
-  collectSessionUsage,
   type ActiveSessionDurationTracker,
   type ModelDurationTracker,
-  type RateLimitSnapshot,
-  type RateLimitTracker,
+  type RecentHitRateTracker,
+  RecentTokensPerSecondTracker,
+  type SessionUsageTotals,
+  type ToolUsageSnapshot,
+  ToolUsageTracker,
+  TurnTracker,
+  type UsageCounter,
 } from "./metrics.js";
 import { palette, separator } from "./palette.js";
 
@@ -37,17 +42,88 @@ interface ClaudeFooterComponentOptions {
   /** Event-driven git snapshot cache owned by this component. */
   git: GitStatusCache;
 
-  /** Latest provider-backed rate-limit snapshot. */
-  rateLimits: RateLimitTracker;
-
-  /** Wall duration of model calls observed during the active extension session. */
+  /**
+   * Wall duration of model calls observed during the active extension session.
+   */
   modelDuration: ModelDurationTracker;
 
-  /** Monotonic elapsed time observed since the active session's latest `session_start`. */
+  /** Tool execution counts observed during the active extension session. */
+  tools: ToolUsageTracker;
+
+  /** Turn and agent-run counts observed during the active extension session. */
+  turns: TurnTracker;
+
+  /** Session-total usage grown by events, pre-filled from persisted entries. */
+  usage: UsageCounter;
+
+  /** Cache hit rate over the most recent completed turns. */
+  hitRate: RecentHitRateTracker;
+
+  /** Generated-token throughput over the most recent completed turns. */
+  throughput: RecentTokensPerSecondTracker;
+
+  /**
+   * Monotonic elapsed time observed since the active session's latest
+   * `session_start`.
+   */
   sessionDuration: ActiveSessionDurationTracker;
 
   /** Requests an event-driven TUI repaint. */
   requestRender: () => void;
+}
+
+interface FirstLineRenderOptions {
+  /** Terminal width available to the first footer line. */
+  width: number;
+
+  /** Sanitized current username. */
+  username: string;
+
+  /** Sanitized short hostname. */
+  host: string;
+
+  /** Current Pi extension context. */
+  ctx: ExtensionContext;
+
+  /** Current cached Git snapshot. */
+  git: GitStatusSnapshot;
+}
+
+interface SecondLineRenderOptions {
+  /** Terminal width available to the second footer line. */
+  width: number;
+
+  /** Current Pi extension context. */
+  ctx: ExtensionContext;
+
+  /** Accumulated session usage. */
+  usage: SessionUsageTotals;
+
+  /** Recent cache hit rate, already formatted for display. */
+  hitRate: string;
+}
+
+interface ThirdLineRenderOptions {
+  /** Terminal width available to the third footer line. */
+  width: number;
+
+  /** Pi-owned extension status provider. */
+  footerData: ReadonlyFooterDataProvider;
+
+  /** Model wall-duration tracker. */
+  modelDuration: ModelDurationTracker;
+
+  /** Tool execution tracker. */
+  tools: ToolUsageTracker;
+
+  /** Turn and agent-run tracker. */
+  turns: TurnTracker;
+
+  /** Recent generated-token throughput tracker. */
+  throughput: RecentTokensPerSecondTracker;
+
+  /** Active session wall-duration tracker. */
+  sessionDuration: ActiveSessionDurationTracker;
 }
 
 function currentUsername(): string {
@@ -59,80 +135,197 @@ function currentUsername(): string {
 }
 
 function shortHostname(): string {
-  return sanitizeFooterText(hostname().split(".")[0] ?? hostname());
+  const fullHostname = hostname();
+  const shortName = fullHostname.split(".")[0] ?? fullHostname;
+
+  return sanitizeFooterText(shortName);
 }
 
 function formatGitOperation(snapshot: GitStatusSnapshot): string {
-  if (snapshot.kind === "unavailable" || snapshot.operation === undefined)
+  if (snapshot.kind === "unavailable") {
     return "";
-  const progress =
-    snapshot.operation.step !== undefined &&
-    snapshot.operation.total !== undefined
-      ? ` ${snapshot.operation.step}/${snapshot.operation.total}`
-      : "";
-  return palette.yellow(`(${snapshot.operation.label}${progress})`);
+  }
+
+  if (snapshot.operation === undefined) {
+    return "";
+  }
+
+  const operation = snapshot.operation;
+  let progress = "";
+
+  if (operation.step !== undefined && operation.total !== undefined) {
+    progress = ` ${operation.step}/${operation.total}`;
+  }
+
+  return palette.yellow(`(${operation.label}${progress})`);
 }
 
 function formatGitFiles(files: GitFileStatus): string {
   const parts: string[] = [];
-  if (files.conflicted > 0) parts.push(palette.red(`👎${files.conflicted}`));
-  if (files.stashed > 0) parts.push(palette.mauve(`&${files.stashed}`));
-  if (files.deleted > 0) parts.push(palette.red(`✘${files.deleted}`));
-  if (files.renamed > 0) parts.push(palette.overlay2(`»${files.renamed}`));
-  if (files.modified > 0) parts.push(palette.sky(`!${files.modified}`));
-  if (files.staged > 0) parts.push(palette.green(`${files.staged}`));
-  if (files.untracked > 0) parts.push(palette.overlay2(`?${files.untracked}`));
-  if (files.ahead > 0 && files.behind > 0)
+
+  if (files.conflicted > 0) {
+    parts.push(palette.red(`👎${files.conflicted}`));
+  }
+
+  if (files.stashed > 0) {
+    parts.push(palette.mauve(`&${files.stashed}`));
+  }
+
+  if (files.deleted > 0) {
+    parts.push(palette.red(`✘${files.deleted}`));
+  }
+
+  if (files.renamed > 0) {
+    parts.push(palette.overlay2(`»${files.renamed}`));
+  }
+
+  if (files.modified > 0) {
+    parts.push(palette.sky(`!${files.modified}`));
+  }
+
+  if (files.staged > 0) {
+    parts.push(palette.green(`${files.staged}`));
+  }
+
+  if (files.untracked > 0) {
+    parts.push(palette.overlay2(`?${files.untracked}`));
+  }
+
+  if (files.ahead > 0 && files.behind > 0) {
     parts.push(palette.peach(`⇕⇡${files.ahead}⇣${files.behind}`));
-  else if (files.ahead > 0) parts.push(palette.peach(`⇡${files.ahead}`));
-  else if (files.behind > 0) parts.push(palette.peach(`⇣${files.behind}`));
+  } else if (files.ahead > 0) {
+    parts.push(palette.peach(`⇡${files.ahead}`));
+  } else if (files.behind > 0) {
+    parts.push(palette.peach(`⇣${files.behind}`));
+  }
+
   return parts.join(" ");
+}
+
+function renderFirstLine(options: FirstLineRenderOptions): string {
+  const { width, username, host, ctx, git } = options;
+  const identity = [
+    palette.overlay2("["),
+    palette.peach(username),
+    palette.overlay2("@"),
+    palette.red(host),
+    palette.overlay2("]"),
+  ].join("");
+  const cwd = palette.peach(
+    formatFooterCwd(ctx.sessionManager.getCwd(), homedir()),
+  );
+
+  let branch = "";
+  let files = "";
+
+  if (git.kind === "repository") {
+    branch = palette.yellow(git.branch);
+    files = formatGitFiles(git.files);
+  }
+
+  const operation = formatGitOperation(git);
+
+  return fitByDropping(
+    [identity, cwd, branch, operation, files],
+    [4, 3, 2, 0],
+    width,
+  );
 }
 
 function formatContext(ctx: ExtensionContext): string {
   const usage = ctx.getContextUsage();
   const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+
   if (usage === undefined || usage.tokens === null || usage.percent === null) {
-    return palette.overlay2(
-      `ctx ?/${contextWindow > 0 ? formatTokens(contextWindow) : "?"}`,
-    );
+    let contextWindowText = "?";
+
+    if (contextWindow > 0) {
+      contextWindowText = formatTokens(contextWindow);
+    }
+
+    return palette.overlay2(`ctx ?/${contextWindowText}`);
   }
+
   const percent = Math.round(usage.percent);
-  const body = `ctx ${formatTokens(usage.tokens)}/${formatTokens(contextWindow)} ${percent}%`;
-  if (percent >= 70) return `🥵 ${palette.red(body)}`;
-  if (percent >= 50 || usage.tokens >= 250_000)
+  const usedTokens = formatTokens(usage.tokens);
+  const contextWindowTokens = formatTokens(contextWindow);
+  const body = `ctx ${usedTokens}/${contextWindowTokens} ${percent}%`;
+
+  if (percent >= 70) {
+    return `🥵 ${palette.red(body)}`;
+  }
+
+  if (percent >= 50 || usage.tokens >= 250_000) {
     return `😢 ${palette.yellow(body)}`;
+  }
+
   return `😎 ${palette.green(body)}`;
 }
 
-function rateColor(usedPercent: number, text: string): string {
-  if (usedPercent >= 80) return palette.red(text);
-  if (usedPercent >= 50) return palette.yellow(text);
-  return palette.green(text);
+function formatToolUsage(snapshot: ToolUsageSnapshot): string {
+  if (snapshot.total === 0) {
+    return "";
+  }
+
+  const top = snapshot.top
+    .map(({ name, count }) => {
+      const cleanName = sanitizeFooterText(name);
+      return `${cleanName}:${count}`;
+    })
+    .join(" ");
+  const parts = [
+    palette.overlay2("tools"),
+    palette.peach(String(snapshot.total)),
+  ];
+
+  if (top) {
+    parts.push(palette.sky(top));
+  }
+
+  if (snapshot.errors > 0) {
+    parts.push(palette.red(`✘${snapshot.errors}`));
+  }
+
+  return parts.join(" ");
 }
 
-function formatRateLimits(snapshot: RateLimitSnapshot): {
-  fiveHour: string;
-  weekly: string;
-} {
-  return {
-    fiveHour: snapshot.fiveHour
-      ? rateColor(
-          snapshot.fiveHour.usedPercent,
-          `5h:${Math.round(snapshot.fiveHour.usedPercent)}%`,
-        )
-      : "",
-    weekly: snapshot.weekly
-      ? rateColor(
-          snapshot.weekly.usedPercent,
-          `168h:${Math.round(snapshot.weekly.usedPercent)}%`,
-        )
-      : "",
-  };
+function formatTurns(snapshot: { turns: number; agents: number }): string {
+  const turnSummary = [
+    palette.overlay2("turns"),
+    palette.lavender(String(snapshot.turns)),
+  ].join(" ");
+
+  if (snapshot.agents === 0) {
+    return turnSummary;
+  }
+
+  const agentSummary = [
+    palette.overlay2("agents"),
+    palette.lavender(String(snapshot.agents)),
+  ].join(" ");
+
+  return `${turnSummary}${separator}${agentSummary}`;
+}
+
+function formatRecentHitRate(hitRate: number | undefined): string {
+  if (hitRate === undefined) {
+    return "";
+  }
+
+  if (hitRate >= 70) {
+    return palette.green(`${hitRate}%`);
+  }
+
+  if (hitRate >= 40) {
+    return palette.yellow(`${hitRate}%`);
+  }
+
+  return palette.red(`${hitRate}%`);
 }
 
 function joined(parts: readonly string[]): string {
-  return parts.filter(Boolean).join(separator);
+  const nonEmptyParts = parts.filter(Boolean);
+  return nonEmptyParts.join(separator);
 }
 
 function modelVariants(ctx: ExtensionContext): {
@@ -142,49 +335,103 @@ function modelVariants(ctx: ExtensionContext): {
 } {
   if (!ctx.model) {
     const noModel = palette.sky("no-model");
-    return { full: noModel, withoutThinking: noModel, modelOnly: noModel };
+    return {
+      full: noModel,
+      withoutThinking: noModel,
+      modelOnly: noModel,
+    };
   }
+
   const modelName = sanitizeFooterText(ctx.model.name || ctx.model.id);
   const provider = sanitizeFooterText(ctx.model.provider);
   const modelOnly = palette.sky(modelName);
   const withoutThinking = `${palette.overlay2(`${provider}/`)}${modelOnly}`;
-  const thinking = ctx.model.reasoning
-    ? ` ${palette.mauve(`(${ctx.thinkingLevel ?? "off"})`)}`
-    : "";
-  return { full: `${withoutThinking}${thinking}`, withoutThinking, modelOnly };
+  let thinking = "";
+
+  if (ctx.model.reasoning) {
+    thinking = ` ${palette.mauve(`(${ctx.thinkingLevel ?? "off"})`)}`;
+  }
+
+  return {
+    full: `${withoutThinking}${thinking}`,
+    withoutThinking,
+    modelOnly,
+  };
 }
 
-function formatSecondLine(
+function fitModelContextLine(
   ctx: ExtensionContext,
-  rates: RateLimitSnapshot,
-  cost: number,
+  totals: string,
   width: number,
 ): string {
   const model = modelVariants(ctx);
   const context = formatContext(ctx);
-  const rate = formatRateLimits(rates);
-  const costPart = cost > 0 ? palette.overlay2(`$${cost.toFixed(4)}`) : "";
-  const optional = [rate.fiveHour, rate.weekly, costPart];
-  let visibleOptional = [...optional];
-  let line = joined([model.full, context, ...visibleOptional]);
-  for (const index of [2, 1, 0]) {
-    if (visibleWidth(line) <= width) return line;
-    visibleOptional[index] = "";
-    line = joined([model.full, context, ...visibleOptional]);
+  let line = joined([model.full, context, totals]);
+
+  if (visibleWidth(line) <= width) {
+    return line;
   }
-  if (visibleWidth(line) <= width) return line;
+
+  line = joined([model.full, context]);
+
+  if (visibleWidth(line) <= width) {
+    return line;
+  }
+
   line = joined([model.withoutThinking, context]);
-  if (visibleWidth(line) <= width) return line;
+
+  if (visibleWidth(line) <= width) {
+    return line;
+  }
+
   line = joined([model.modelOnly, context]);
-  return visibleWidth(line) <= width
-    ? line
-    : fitRequiredPair(model.modelOnly, context, width);
+
+  if (visibleWidth(line) <= width) {
+    return line;
+  }
+
+  return fitRequiredPair(model.modelOnly, context, width);
+}
+
+function renderSecondLine(options: SecondLineRenderOptions): string {
+  const { width, ctx, usage, hitRate } = options;
+  const totalsParts = [
+    palette.peach(`in:${formatTokens(usage.input + usage.cacheRead, 2)}`),
+    palette.sky(`out:${formatTokens(usage.output, 2)}`),
+  ];
+
+  if (usage.cacheRead > 0) {
+    totalsParts.push(
+      palette.green(`cached:${formatTokens(usage.cacheRead, 2)}`),
+    );
+  }
+
+  if (hitRate) {
+    totalsParts.push(hitRate);
+  }
+
+  const totals = totalsParts.join(" ");
+
+  return truncateToWidth(
+    fitModelContextLine(ctx, totals, width),
+    width,
+    palette.overlay2("…"),
+  );
 }
 
 function statusPriority(key: string): number {
-  if (key === "todo") return 0;
-  if (key === "subagent-workflow") return 1;
-  if (key === "subagent-workflow:usage") return 3;
+  if (key === "todo") {
+    return 0;
+  }
+
+  if (key === "subagent-workflow") {
+    return 1;
+  }
+
+  if (key === "subagent-workflow:usage") {
+    return 3;
+  }
+
   return 2;
 }
 
@@ -192,21 +439,93 @@ function formatExtensionStatuses(
   footerData: ReadonlyFooterDataProvider,
 ): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
-    .sort(
-      ([leftKey], [rightKey]) =>
-        statusPriority(leftKey) - statusPriority(rightKey) ||
-        leftKey.localeCompare(rightKey),
-    )
+    .sort(([leftKey], [rightKey]) => {
+      const priorityDifference =
+        statusPriority(leftKey) - statusPriority(rightKey);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      return leftKey.localeCompare(rightKey);
+    })
     .map(([key, value]) => {
       const clean = sanitizeFooterText(value);
-      if (!clean) return "";
-      return key === "subagent-workflow" ? `agents ${clean}` : clean;
+
+      if (!clean) {
+        return "";
+      }
+
+      if (key === "subagent-workflow") {
+        return `agents ${clean}`;
+      }
+
+      return clean;
     })
     .filter(Boolean);
-  return statuses.length > 0 ? palette.lavender(statuses.join(" · ")) : "";
+
+  if (statuses.length > 0) {
+    return palette.lavender(statuses.join(" · "));
+  }
+
+  return "";
 }
 
-/** Three-row Catppuccin footer backed only by in-memory Pi and git snapshots during render. */
+function renderThirdLine(options: ThirdLineRenderOptions): string {
+  const {
+    width,
+    footerData,
+    modelDuration,
+    tools,
+    turns,
+    throughput,
+    sessionDuration,
+  } = options;
+  const sessionTime = formatDuration(sessionDuration.elapsedMilliseconds());
+  const sessionDurationText = [
+    palette.overlay2("session"),
+    palette.lavender(sessionTime),
+  ].join(" ");
+
+  const modelTime = formatDuration(modelDuration.elapsedMilliseconds());
+  const modelDurationText = [
+    palette.overlay2("model"),
+    palette.sky(modelTime),
+  ].join(" ");
+
+  const tokensPerSecond = throughput.tokensPerSecond();
+  let throughputText = "";
+
+  if (tokensPerSecond !== undefined) {
+    const formattedTokensPerSecond = formatTokensPerSecond(tokensPerSecond);
+    throughputText = [
+      palette.overlay2("tps"),
+      palette.sky(formattedTokensPerSecond),
+    ].join(" ");
+  }
+
+  const toolSnapshot = tools.snapshot(3);
+  const toolUsage = formatToolUsage(toolSnapshot);
+  const turnSnapshot = turns.snapshot();
+  const turnCount = formatTurns(turnSnapshot);
+  const statuses = formatExtensionStatuses(footerData);
+  const thirdParts = [
+    sessionDurationText,
+    modelDurationText,
+    throughputText,
+    toolUsage,
+    turnCount,
+    statuses,
+  ];
+  const dropOrder = [3, 4, 2, 1, 0];
+
+  return fitByDropping(thirdParts, dropOrder, width, separator);
+}
+
+/**
+ * Three-row Catppuccin footer backed only by in-memory Pi and git snapshots
+ * during render.
+ */
 export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
@@ -214,95 +533,77 @@ export class ClaudeFooterComponent implements Component {
 
   public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
-  /** Rebind background git observation when Pi replaces the active session context. */
+  /**
+   * Rebind background git observation when Pi replaces the active session
+   * context.
+   */
   public updateContext(ctx: ExtensionContext): void {
     this.options.git.setCwd(ctx.sessionManager.getCwd());
   }
 
-  /** Refresh repository state after Pi reports a lifecycle or tool-completion event. */
+  /**
+   * Refresh repository state after Pi reports a lifecycle or tool-completion
+   * event.
+   */
   public refreshGit(): void {
     this.options.git.refreshForEvent();
   }
 
-  /** Request a repaint for provider/model lifecycle events without running an idle timer. */
+  /**
+   * Request a repaint for provider/model lifecycle events without running an
+   * idle timer.
+   */
   public requestRender(): void {
-    if (!this.disposed) this.options.requestRender();
+    if (!this.disposed) {
+      this.options.requestRender();
+    }
   }
 
   public render(width: number): string[] {
-    if (width <= 0) return ["", "", ""];
+    if (width <= 0) {
+      return ["", "", ""];
+    }
+
     const ctx = this.options.getContext();
     const git = this.options.git.snapshot();
-    const usage = collectSessionUsage(ctx);
+    const usage = this.options.usage.snapshot();
 
-    const identity = [
-      palette.overlay2("["),
-      palette.peach(this.username),
-      palette.overlay2("@"),
-      palette.red(this.host),
-      palette.overlay2("]"),
-    ].join("");
-    const cwd = palette.peach(
-      formatFooterCwd(ctx.sessionManager.getCwd(), homedir()),
-    );
-    const branch = git.kind === "repository" ? palette.yellow(git.branch) : "";
-    const operation = formatGitOperation(git);
-    const files = git.kind === "repository" ? formatGitFiles(git.files) : "";
-    const firstLine = fitByDropping(
-      [identity, cwd, branch, operation, files],
-      [4, 3, 2, 0],
-      width,
-    );
-
-    const secondLine = truncateToWidth(
-      formatSecondLine(
-        ctx,
-        this.options.rateLimits.snapshot(),
-        usage.cost,
+    return [
+      renderFirstLine({
         width,
-      ),
-      width,
-      palette.overlay2("…"),
-    );
-
-    const promptTokens = usage.input + usage.cacheWrite + usage.cacheRead;
-    const hitRate =
-      promptTokens > 0
-        ? Math.round((usage.cacheRead / promptTokens) * 100)
-        : undefined;
-    const totals = `${palette.overlay2("total")} ${palette.peach(`in:${formatTokens(usage.input)}`)} ${palette.sky(
-      `out:${formatTokens(usage.output)}`,
-    )}`;
-    const cache =
-      usage.cacheRead > 0 || usage.cacheWrite > 0
-        ? `${palette.overlay2("cache")} ${palette.yellow(`write:${formatTokens(usage.cacheWrite)}`)} ${palette.green(
-            `read:${formatTokens(usage.cacheRead)}`,
-          )}${hitRate === undefined ? "" : ` ${rateColor(hitRate, `hit:${hitRate}%`)}`}`
-        : "";
-    const sessionDuration = `${palette.overlay2("session")} ${palette.lavender(
-      formatDuration(this.options.sessionDuration.elapsedMilliseconds()),
-    )}`;
-    const modelDuration = `${palette.overlay2("model")} ${palette.sky(
-      formatDuration(this.options.modelDuration.elapsedMilliseconds()),
-    )}`;
-    const statuses = formatExtensionStatuses(this.options.footerData);
-    const thirdParts = [
-      totals,
-      cache,
-      sessionDuration,
-      modelDuration,
-      statuses,
+        username: this.username,
+        host: this.host,
+        ctx,
+        git,
+      }),
+      renderSecondLine({
+        width,
+        ctx,
+        usage,
+        hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
+      }),
+      renderThirdLine({
+        width,
+        footerData: this.options.footerData,
+        modelDuration: this.options.modelDuration,
+        tools: this.options.tools,
+        turns: this.options.turns,
+        throughput: this.options.throughput,
+        sessionDuration: this.options.sessionDuration,
+      }),
     ];
-    const dropOrder = statuses ? [1, 3, 2, 0] : [1, 3, 2];
-    const thirdLine = fitByDropping(thirdParts, dropOrder, width, separator);
-    return [firstLine, secondLine, thirdLine];
   }
 
-  public invalidate(): void {}
+  public invalidate(): void {
+    // The footer reads current state from its sources during every render.
+  }
 
   /** Stop git watchers, debounce timers, and any running git process. */
   public dispose(): void {
-    if (this.disposed) return;
+    if (this.disposed) {
+      return;
+    }
+
     this.disposed = true;
     this.options.git.dispose();
   }

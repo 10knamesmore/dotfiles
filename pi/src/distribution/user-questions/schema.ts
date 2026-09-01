@@ -29,7 +29,10 @@ const UserQuestionSchema = Type.Object(
       }),
     ),
     placeholder: Type.Optional(
-      Type.String({ description: "Placeholder shown for a free-text answer" }),
+      Type.String({
+        description:
+          "Hint text shown while the free-text answer is empty; never part of the answer",
+      }),
     ),
   },
   { additionalProperties: false },

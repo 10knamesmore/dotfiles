@@ -33,13 +33,23 @@ export function formatFooterCwd(cwd: string, home: string | undefined): string {
     : `~${sep}${sanitizeFooterText(relativeToHome)}`;
 }
 
-/** Format a non-negative token count without implying greater precision than the footer can show. */
-export function formatTokens(count: number): string {
+/**
+ * Format a non-negative token count. `fractionDigits` is the decimal count at
+ * the largest unit (k/M); the next smaller unit keeps one digit less.
+ */
+export function formatTokens(count: number, fractionDigits: number = 1): string {
   if (count < 1_000) return Math.round(count).toString();
-  if (count < 10_000) return `${(count / 1_000).toFixed(1)}k`;
-  if (count < 1_000_000) return `${Math.round(count / 1_000)}k`;
-  if (count < 10_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  return `${Math.round(count / 1_000_000)}M`;
+  if (count < 10_000) return `${(count / 1_000).toFixed(fractionDigits)}k`;
+  if (count < 1_000_000) return `${(count / 1_000).toFixed(fractionDigits - 1)}k`;
+  if (count < 10_000_000)
+    return `${(count / 1_000_000).toFixed(fractionDigits)}M`;
+  return `${(count / 1_000_000).toFixed(fractionDigits - 1)}M`;
+}
+
+/** Format generated-token throughput for compact footer display. */
+export function formatTokensPerSecond(tokensPerSecond: number): string {
+  if (tokensPerSecond < 1_000) return tokensPerSecond.toFixed(1);
+  return `${(tokensPerSecond / 1_000).toFixed(1)}k`;
 }
 
 /** Format elapsed wall time for the active session and measured model work. */

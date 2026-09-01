@@ -36,6 +36,8 @@ export interface UserQuestionAnswer {
   value: string;
   source: AnswerSource;
   label?: string;
+  /** Extra comment the user attached to this question's answer. */
+  note?: string;
 }
 
 /** Details returned by the user questions tool and used by its renderer. */
@@ -75,7 +77,17 @@ function answerText(answer: UserQuestionAnswer): string {
 }
 
 function answersText(answers: readonly UserQuestionAnswer[]): string {
-  return answers.map(answerText).join("\n");
+  return answers
+    .flatMap((answer) => {
+      const lines = [answerText(answer)];
+      if (answer.note !== undefined) {
+        lines.push(
+          `${answer.id} note: ${sanitizeQuestionDisplay(answer.note)}`,
+        );
+      }
+      return lines;
+    })
+    .join("\n");
 }
 
 function cancelledResult(
@@ -116,6 +128,8 @@ class UserQuestionsComponent implements Component, Focusable {
   private completed = false;
   private _focused = false;
   private readonly answers = new Map<string, UserQuestionAnswer>();
+  private readonly notes = new Map<string, string>();
+  private noteMode = false;
   private readonly editor: Editor;
 
   public constructor(
@@ -135,7 +149,13 @@ class UserQuestionsComponent implements Component, Focusable {
       },
     };
     this.editor = new Editor(tui, editorTheme);
-    this.editor.onSubmit = (value) => this.saveInputAndNavigate(1, value);
+    this.editor.onSubmit = (value) => {
+      if (this.noteMode) {
+        this.saveNote(value);
+        return;
+      }
+      this.saveInputAndNavigate(1, value);
+    };
     this.activateCurrentQuestion();
   }
 
@@ -145,7 +165,7 @@ class UserQuestionsComponent implements Component, Focusable {
 
   public set focused(value: boolean) {
     this._focused = value;
-    this.editor.focused = value && this.inputMode;
+    this.editor.focused = value && (this.inputMode || this.noteMode);
   }
 
   public cancel(): void {
@@ -209,6 +229,16 @@ class UserQuestionsComponent implements Component, Focusable {
       return;
     }
 
+    if (this.noteMode) {
+      if (matchesKey(data, Key.escape)) {
+        this.exitNoteMode();
+        return;
+      }
+      this.editor.handleInput(data);
+      this.refresh();
+      return;
+    }
+
     if (this.inputMode) {
       if (matchesKey(data, Key.up)) {
         const question = this.currentQuestion();
@@ -266,6 +296,11 @@ class UserQuestionsComponent implements Component, Focusable {
       if (matchesKey(data, Key.enter) && this.allAnswered()) {
         this.finish(false);
       }
+      return;
+    }
+
+    if (matchesKey(data, "n")) {
+      this.openNoteMode();
       return;
     }
 
@@ -337,10 +372,13 @@ class UserQuestionsComponent implements Component, Focusable {
     return this.questions.every((question) => this.answers.has(question.id));
   }
 
-  private orderedAnswers(): UserQuestionAnswer[] {
+  private orderedAnswers(includeNotes: boolean): UserQuestionAnswer[] {
     return this.questions.flatMap((question) => {
       const answer = this.answers.get(question.id);
-      return answer === undefined ? [] : [answer];
+      if (answer === undefined) return [];
+      const note = this.notes.get(question.id);
+      if (note === undefined || !includeNotes) return [answer];
+      return [{ ...answer, note }];
     });
   }
 
@@ -431,7 +469,32 @@ class UserQuestionsComponent implements Component, Focusable {
   private finish(cancelled: boolean): void {
     if (this.completed) return;
     this.completed = true;
-    this.done({ answers: this.orderedAnswers(), cancelled });
+    this.done({ answers: this.orderedAnswers(!cancelled), cancelled });
+  }
+
+  private openNoteMode(): void {
+    const question = this.currentQuestion();
+    if (question === undefined) throw new Error("Cannot attach a note on the submit view.");
+    this.noteMode = true;
+    this.editor.setText(this.notes.get(question.id) ?? "");
+    this.editor.focused = this._focused;
+    this.refresh();
+  }
+
+  private saveNote(value: string): void {
+    const question = this.currentQuestion();
+    if (question === undefined) throw new Error("Cannot save a note on the submit view.");
+    const trimmed = value.trim();
+    if (trimmed.length === 0) this.notes.delete(question.id);
+    else this.notes.set(question.id, trimmed);
+    this.exitNoteMode();
+  }
+
+  private exitNoteMode(): void {
+    this.noteMode = false;
+    this.editor.setText("");
+    this.editor.focused = false;
+    this.refresh();
   }
 
   private refresh(): void {
@@ -500,6 +563,15 @@ class UserQuestionsComponent implements Component, Focusable {
       }
       if (options.length > 0) lines.push("");
       addWrappedWithPrefix(" ", this.theme.fg("muted", "Your answer:"));
+      if (
+        question.placeholder !== undefined &&
+        this.editor.getText().length === 0
+      ) {
+        addWrappedWithPrefix(
+          " ",
+          this.theme.fg("dim", sanitizeQuestionDisplay(question.placeholder)),
+        );
+      }
       for (const line of this.editor.render(Math.max(1, renderWidth - 2))) {
         lines.push(` ${line}`);
       }
@@ -514,6 +586,7 @@ class UserQuestionsComponent implements Component, Focusable {
           : answer.value;
       addWrappedWithPrefix(" ", this.theme.fg("muted", "Answer: "));
       addWrappedWithPrefix(" ", this.theme.fg("text", sanitizeQuestionDisplay(value)));
+      this.renderNoteSection(question, renderWidth, lines, addWrappedWithPrefix);
       return;
     }
 
@@ -541,6 +614,31 @@ class UserQuestionsComponent implements Component, Focusable {
         );
       }
     }
+    this.renderNoteSection(question, renderWidth, lines, addWrappedWithPrefix);
+  }
+
+  private renderNoteSection(
+    question: UserQuestion,
+    renderWidth: number,
+    lines: string[],
+    addWrappedWithPrefix: (prefix: string, text: string) => void,
+  ): void {
+    if (this.noteMode) {
+      lines.push("");
+      addWrappedWithPrefix(" ", this.theme.fg("muted", "Note to model:"));
+      for (const line of this.editor.render(Math.max(1, renderWidth - 2))) {
+        lines.push(` ${line}`);
+      }
+      return;
+    }
+    const note = this.notes.get(question.id);
+    if (note !== undefined) {
+      lines.push("");
+      addWrappedWithPrefix(
+        " ",
+        this.theme.fg("dim", `Note: ${sanitizeQuestionDisplay(note)}`),
+      );
+    }
   }
 
   private renderSubmit(
@@ -559,6 +657,13 @@ class UserQuestionsComponent implements Component, Focusable {
         " ",
         `${this.theme.fg("muted", `${sanitizeQuestionDisplay(question.id)}: `)}${value}`,
       );
+      const note = this.notes.get(question.id);
+      if (note !== undefined) {
+        addWrappedWithPrefix(
+          " ",
+          this.theme.fg("dim", `note: ${sanitizeQuestionDisplay(note)}`),
+        );
+      }
     }
     lines.push("");
     addWrappedWithPrefix(
@@ -571,6 +676,9 @@ class UserQuestionsComponent implements Component, Focusable {
   }
 
   private helpText(question: UserQuestion | undefined): string {
+    if (this.noteMode) {
+      return "Type your note • Enter save • Esc discard";
+    }
     if (this.inputMode) {
       return "←→ or Tab/Shift+Tab save and navigate • Enter save and next • Alt+←/→ move cursor • Esc back/cancel";
     }
@@ -580,7 +688,7 @@ class UserQuestionsComponent implements Component, Focusable {
     if ((question.options ?? []).length === 0) {
       return "Type your answer • Enter save and next • Esc back/cancel";
     }
-    return "↑↓ choose • Enter save/edit • ←→ or Tab/Shift+Tab navigate • Esc cancel";
+    return "↑↓ choose • Enter save/edit • n note • ←→ or Tab/Shift+Tab navigate • Esc cancel";
   }
 }
 
@@ -590,7 +698,7 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
     name: "ask_user_questions",
     label: "Ask User Questions",
     description:
-      "Ask the user one or more questions. Configure each question independently: provide options for a selection question, omit options for free text, and set allowOther to control custom answers for that question.",
+      "Ask the user one or more questions. Configure each question independently: provide options for a selection question, omit options for free text, and set allowOther to control custom answers for that question. The user may attach a note to any answer; it is returned as an additional `<id> note:` line.",
     promptSnippet: "Ask the user configured questions and collect structured answers",
     promptGuidelines: [
       "Use ask_user_questions when progress depends on information only the user can provide.",
@@ -670,10 +778,14 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
       }
       return new Text(
         details.answers
-          .map(
-            (answer) =>
-              `${theme.fg("success", "✓ ")}${theme.fg("accent", answerText(answer))}`,
-          )
+          .map((answer) => {
+            const base =
+              theme.fg("success", "✓ ") +
+              theme.fg("accent", answerText(answer));
+            return answer.note === undefined
+              ? base
+              : `${base}\n  ${theme.fg("muted", `note: ${sanitizeQuestionDisplay(answer.note)}`)}`;
+          })
           .join("\n"),
         0,
         0,

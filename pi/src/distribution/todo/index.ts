@@ -32,6 +32,11 @@ export function registerSessionTodo(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => restore(ctx));
   pi.on("session_tree", (_event, ctx) => restore(ctx));
+  pi.on("turn_start", () => presentation.startTurn());
+  pi.on("turn_end", (_event, ctx) => {
+    const warning = presentation.finishTurn(ctx, store.snapshot());
+    if (warning) ctx.ui.notify(warning, "warning");
+  });
   registerTodoTool(pi, store, presentation);
   registerTodoCommand(pi, store, presentation);
 }

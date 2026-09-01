@@ -3,21 +3,31 @@ import type {
   ExtensionContext,
   SessionBeforeTreeEvent,
 } from "@earendil-works/pi-coding-agent";
+import type { Usage } from "@earendil-works/pi-ai";
 import { ClaudeFooterComponent } from "./component.js";
 import { GitStatusCache } from "./git-status.js";
 import {
   ActiveSessionDurationTracker,
   ModelDurationTracker,
-  RateLimitTracker,
+  RecentHitRateTracker,
+  RecentTokensPerSecondTracker,
+  ToolUsageTracker,
+  TurnTracker,
+  UsageCounter,
 } from "./metrics.js";
 
-/** Owns dynamic Pi context, provider timing, rate headers, and footer component disposal. */
+/** Owns dynamic Pi context, provider timing, and footer component disposal. */
 class FooterRuntime {
   private currentContext: ExtensionContext | undefined;
   private component: ClaudeFooterComponent | undefined;
-  private readonly rates = new RateLimitTracker();
   private readonly modelDuration = new ModelDurationTracker();
   private readonly sessionDuration = new ActiveSessionDurationTracker();
+  private readonly tools = new ToolUsageTracker();
+  private readonly turns = new TurnTracker();
+  private readonly usage = new UsageCounter();
+  private readonly hitRate = new RecentHitRateTracker();
+  private readonly throughput = new RecentTokensPerSecondTracker();
+  private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
@@ -25,7 +35,13 @@ class FooterRuntime {
     this.currentContext = ctx;
     this.modelDuration.reset();
     this.sessionDuration.reset();
-    this.rates.clear();
+    this.tools.reset();
+    this.turns.reset();
+    this.tools.prescan(ctx);
+    this.usage.prescan(ctx);
+    this.hitRate.reset();
+    this.throughput.reset();
+    this.lastTurnModelMilliseconds = 0;
     this.treeSummaryProviderActive = false;
     this.component?.dispose();
     this.component = undefined;
@@ -37,8 +53,12 @@ class FooterRuntime {
         getContext: () => this.currentContext ?? ctx,
         footerData,
         git,
-        rateLimits: this.rates,
         modelDuration: this.modelDuration,
+        tools: this.tools,
+        turns: this.turns,
+        usage: this.usage,
+        hitRate: this.hitRate,
+        throughput: this.throughput,
         sessionDuration: this.sessionDuration,
         requestRender: () => tui.requestRender(),
       });
@@ -58,16 +78,6 @@ class FooterRuntime {
     this.updateContext(ctx);
     if (this.treeSummaryProviderActive) return;
     if (this.modelDuration.start()) this.component?.requestRender();
-  }
-
-  /** Replace rate data from the latest verified provider response headers. */
-  public providerResponse(
-    headers: Readonly<Record<string, string>>,
-    ctx: ExtensionContext,
-  ): void {
-    this.updateContext(ctx);
-    if (this.rates.update(headers, ctx.model?.provider))
-      this.component?.requestRender();
   }
 
   /** Finish model wall-time attribution when Pi reports the corresponding work complete. */
@@ -113,14 +123,47 @@ class FooterRuntime {
     this.updateContext(ctx);
   }
 
-  /** Clear provider-specific usage after a model selection. */
+  /** Refresh context-derived fields after a model selection. */
   public modelChanged(ctx: ExtensionContext): void {
     this.updateContext(ctx);
-    this.rates.clear();
     this.component?.requestRender();
   }
 
-  /** Refresh context-derived fields without discarding account-scoped rate data. */
+  /** Count one finished tool execution. */
+  public toolEnded(name: string, isError: boolean): void {
+    this.tools.record(name, isError);
+    this.component?.requestRender();
+  }
+
+  /** Count one finished turn. */
+  public turnEnded(): void {
+    const modelMilliseconds = this.modelDuration.elapsedMilliseconds();
+    this.throughput.endTurn(modelMilliseconds - this.lastTurnModelMilliseconds);
+    this.lastTurnModelMilliseconds = modelMilliseconds;
+    this.turns.recordTurn();
+    this.hitRate.endTurn();
+    this.component?.requestRender();
+  }
+
+  /** Accumulate one assistant message's usage into the in-flight hit-rate turn. */
+  public hitRateRecorded(usage: Usage | undefined): void {
+    this.hitRate.record(usage);
+    this.throughput.record(usage);
+  }
+
+  /** Count one finished agent run. */
+  public agentEnded(): void {
+    this.turns.recordAgent();
+    this.component?.requestRender();
+  }
+
+  /** Add one completed message or summary usage record to the session total. */
+  public usageRecorded(usage: Usage | undefined): void {
+    this.usage.record(usage);
+    this.component?.requestRender();
+  }
+
+  /** Refresh context-derived fields after a non-model session change. */
   public contextChanged(ctx: ExtensionContext): void {
     this.updateContext(ctx);
     this.component?.refreshGit();
@@ -155,23 +198,44 @@ export function registerFooter(pi: ExtensionAPI): void {
   pi.on("session_before_tree", (event, ctx) =>
     runtime.treeNavigationStarted(event, ctx),
   );
-  pi.on("session_tree", (_event, ctx) => runtime.treeNavigationEnded(ctx));
+  pi.on("session_tree", (event, ctx) => {
+    runtime.treeNavigationEnded(ctx);
+    runtime.usageRecorded(event.summaryEntry?.usage);
+  });
   pi.on("session_before_compact", (_event, ctx) =>
     runtime.nextUserOperation(ctx),
   );
-  pi.on("session_compact", (_event, ctx) => runtime.modelWorkEnded(ctx));
+  pi.on("session_compact", (event, ctx) => {
+    runtime.modelWorkEnded(ctx);
+    runtime.usageRecorded(event.compactionEntry.usage);
+  });
   pi.on("session_compact_failed", (_event, ctx) => runtime.modelWorkEnded(ctx));
   pi.on("before_provider_request", (_event, ctx) =>
     runtime.providerRequestStarted(ctx),
   );
-  pi.on("after_provider_response", (event, ctx) =>
-    runtime.providerResponse(event.headers, ctx),
-  );
   pi.on("message_end", (event, ctx) => {
-    if (event.message.role === "assistant") runtime.modelWorkEnded(ctx);
-    else runtime.contextChanged(ctx);
+    if (event.message.role === "assistant") {
+      runtime.modelWorkEnded(ctx);
+      runtime.usageRecorded(event.message.usage);
+      runtime.hitRateRecorded(event.message.usage);
+    } else {
+      runtime.contextChanged(ctx);
+      if (event.message.role === "toolResult")
+        runtime.usageRecorded(event.message.usage);
+    }
   });
-  pi.on("agent_end", (_event, ctx) => runtime.modelWorkEnded(ctx));
+  pi.on("agent_end", (_event, ctx) => {
+    runtime.modelWorkEnded(ctx);
+    runtime.agentEnded();
+  });
+  pi.on("turn_end", (_event, ctx) => {
+    runtime.updateContext(ctx);
+    runtime.turnEnded();
+  });
+  pi.on("tool_execution_end", (event, ctx) => {
+    runtime.updateContext(ctx);
+    runtime.toolEnded(event.toolName, event.isError);
+  });
   pi.on("model_select", (_event, ctx) => runtime.modelChanged(ctx));
   pi.on("thinking_level_select", (_event, ctx) => runtime.contextChanged(ctx));
   pi.on("before_agent_start", (_event, ctx) => runtime.nextUserOperation(ctx));
