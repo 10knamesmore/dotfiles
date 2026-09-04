@@ -4,12 +4,13 @@
   ],
   "theme": "dark",
   "lastChangelogVersion": "0.84.4",
-  "editorPaddingX": 0,
+  "editorPaddingX": 1,
   "terminal": {
-    "showTerminalProgress": false
+    "showTerminalProgress": false,
+    "imageWidthCells": 120
   },
   "tuiMode": "fullscreen",
-  "treeFilterMode": "default",
+  "treeFilterMode": "all",
   "doubleEscapeAction": "tree",
   "defaultProjectTrust": "always",
   "hideThinkingBlock": false,

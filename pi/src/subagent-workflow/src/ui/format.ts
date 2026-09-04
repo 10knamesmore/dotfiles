@@ -6,7 +6,7 @@
  * files; this module only produces strings and counts.
  */
 
-import type { SubagentStatus } from "../types.js";
+import type { SubagentStatus, UsageSummary } from "../types.js";
 
 export { childLabel } from "../util.js";
 
@@ -65,6 +65,16 @@ export function formatTokens(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
   return `${Math.max(0, Math.round(count))}`;
+}
+
+/** Format cumulative usage as `in:<input + cacheRead> out:<output>`, matching the distribution footer. */
+export function formatTokenUsage(usage: Pick<UsageSummary, "input" | "cacheRead" | "output">): string {
+  return `in:${formatTokens(usage.input + usage.cacheRead)} out:${formatTokens(usage.output)}`;
+}
+
+/** Whether the compact in/out display has any tokens to show. */
+export function hasTokenUsage(usage: Pick<UsageSummary, "input" | "cacheRead" | "output">): boolean {
+  return usage.input > 0 || usage.cacheRead > 0 || usage.output > 0;
 }
 
 /** Human-readable elapsed: "0.8s", "12s", "3m20s". */

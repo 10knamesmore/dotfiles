@@ -27,6 +27,7 @@ import { applyLiveWorkflowSettings, globalWorkflowSettings } from "../src/settin
 import { fenceDirectlyDeliveredRun, registerSubagentTool, resolveFollowUpSpec } from "../src/tool/subagent-tool.js";
 import { registerEntryMarkers } from "../src/ui/entry-markers.js";
 import { registerNavigator, type NavigatorFollowUp, type NavigatorOpenContext } from "../src/ui/navigator/navigator.js";
+import { createAgentInputEditorFactory } from "../src/ui/input-navigation.js";
 import { FOLLOW_UP_PROMPT_PREFIX } from "../src/ui/navigator/transcript.js";
 import { SubagentStatusWidget } from "../src/ui/status-widget.js";
 import { safeDeliveryValue } from "../src/ui/delivery-safe.js";
@@ -354,6 +355,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   // autocomplete preserves registration order for equal prefix matches, so
   // typing /work now selects /workflows first without renaming public commands.
   let saveWorkflow: ReturnType<typeof registerSavedWorkflowCommands> | undefined;
+  let inputEditorFactory: ReturnType<typeof createAgentInputEditorFactory> | undefined;
   const openNavigator = registerNavigator(pi, {
     runner: subagentRunner,
     followUp: createNavigatorFollowUp(pi, selfPath, { runner: subagentRunner, widget }),
@@ -382,6 +384,23 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();
     markSessionOpen(sessionId);
+    if (ctx.hasUI) {
+      inputEditorFactory = createAgentInputEditorFactory({
+        selectNext: () => widget.selectRun(1),
+        selectPrevious: () => widget.selectRun(-1),
+        hasSelection: () => widget.hasSelectedRun(),
+        takeSelection: () => widget.takeSelectedRun(),
+        clearSelection: () => widget.clearSelectedRun(),
+        openSelection: (target) => {
+          void openNavigator(ctx, target).catch((error: unknown) => {
+            const message = `Could not open agent view: ${errorMessage(error)}`;
+            ctx.ui.notify(message, "error");
+            reportDiagnostic(`[subagent-workflow] ${message}`);
+          });
+        },
+      });
+      ctx.ui.setEditorComponent(inputEditorFactory);
+    }
     if (ctx.hasUI) setTuiSession();
     usageFooter.attach(ctx);
     try {
@@ -393,6 +412,10 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("session_shutdown", async (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();
     markSessionClosed(sessionId);
+    if (ctx.hasUI && inputEditorFactory && ctx.ui.getEditorComponent() === inputEditorFactory) {
+      ctx.ui.setEditorComponent(undefined);
+      inputEditorFactory = undefined;
+    }
     try {
       unsubscribeSettings();
     } catch (error) {

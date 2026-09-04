@@ -11,7 +11,7 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import type { SubagentStatus, UsageSummary } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
-import { countStatuses, formatDuration, formatTokens, statusGlyph, type ThemeLike } from "./format.js";
+import { countStatuses, formatDuration, formatTokenUsage, statusGlyph, type ThemeLike } from "./format.js";
 import { linesComponent } from "./component.js";
 import { sanitizeTerminalText } from "./sanitize.js";
 
@@ -76,14 +76,14 @@ export function renderRunCompleted(data: RunCompletedData, theme: ThemeLike, wid
     return [truncateToWidth(text, cap)];
   }
   const counts = countStatuses(data.perChild.map((child) => child?.status));
-  const tokens = formatTokens((data.usageTotals.input ?? 0) + (data.usageTotals.output ?? 0));
+  const usage = formatTokenUsage(data.usageTotals);
   const marker = theme.fg(counts.failed > 0 ? "error" : counts.aborted > 0 ? "warning" : "success", "●");
   const summary =
     `${marker} ${theme.bold("subagent")} ${data.runId} ${theme.fg("dim", "·")} ` +
     `${counts.completed}/${counts.total} done` +
     (counts.failed > 0 ? theme.fg("error", ` · ${counts.failed} failed`) : "") +
     (counts.aborted > 0 ? theme.fg("warning", ` · ${counts.aborted} aborted`) : "") +
-    ` ${theme.fg("dim", "·")} ${theme.fg("dim", `${tokens} tok`)} ${theme.fg("dim", "·")} ${theme.fg("dim", formatDuration(data.durationMs ?? 0))}`;
+    ` ${theme.fg("dim", "·")} ${theme.fg("dim", usage)} ${theme.fg("dim", "·")} ${theme.fg("dim", formatDuration(data.durationMs ?? 0))}`;
 
   const glyphs = data.perChild
     .map((child) => `${statusGlyph(child?.status, theme, 0, false)} ${sanitizeTerminalText(child?.label ?? "")}`)

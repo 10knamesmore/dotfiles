@@ -13,13 +13,14 @@
 
 import { statSync } from "node:fs";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
+import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { ChildSession } from "../../runner/child-session.js";
 import type { SpawnedRun } from "../../runner/runner.js";
+import { EMPTY_USAGE } from "../../store/run-store.js";
 import type { SubagentHandle } from "../../types.js";
 import { reportDiagnostic } from "../../diagnostics.js";
 import { errorMessage } from "../../util.js";
-import { formatTokens, type ThemeLike } from "../format.js";
+import { formatTokenUsage, hasTokenUsage, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import { suppressInlineImages } from "../suppress-inline-images.js";
 import { AgentView } from "./agent-view.js";
@@ -41,6 +42,12 @@ export interface NavigatorRunner {
 
 export type NavigatorOpenContext = Pick<ExtensionContext, "cwd" | "hasUI" | "ui" | "sessionManager" | "modelRegistry" | "model">;
 
+/** Optional run/child to open directly from an external input selection. */
+export interface NavigatorOpenTarget {
+  runId: string;
+  childId?: string;
+}
+
 export interface NavigatorFollowUp {
   /** Resolve + spawn; throws with a user-facing message on any refusal. */
   send(runId: string, childId: string, prompt: string, ctx: NavigatorOpenContext): { runId: string; childId: string };
@@ -58,14 +65,14 @@ interface NavigatorServices {
 }
 
 /** Register `/agents` and its `/workflows` alias, returning their shared open path. */
-export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices): (ctx: NavigatorOpenContext) => Promise<void> {
+export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices): (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget) => Promise<void> {
   let isOpen = false;
-  const open = async (ctx: NavigatorOpenContext): Promise<void> => {
-    if (!ctx.hasUI) return runNavigator(services, ctx);
+  const open = async (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> => {
+    if (!ctx.hasUI) return runNavigator(services, ctx, target);
     if (isOpen) return;
     isOpen = true;
     try {
-      await runNavigator(services, ctx);
+      await runNavigator(services, ctx, target);
     } finally {
       isOpen = false;
     }
@@ -76,7 +83,7 @@ export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices)
   return open;
 }
 
-async function runNavigator(services: NavigatorServices, ctx: NavigatorOpenContext): Promise<void> {
+async function runNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> {
   const model = new NavigatorModel(
     ctx.cwd,
     { root: services.root, describeWorkflow: services.describeWorkflow },
@@ -86,7 +93,7 @@ async function runNavigator(services: NavigatorServices, ctx: NavigatorOpenConte
     console.log(formatPlainSummary(model.runs()));
     return;
   }
-  return openNavigator(services, ctx, model);
+  return openNavigator(services, ctx, model, target);
 }
 
 export function formatPlainSummary(runs: RunSummary[]): string {
@@ -96,11 +103,11 @@ export function formatPlainSummary(runs: RunSummary[]): string {
       lines.push(`  · ${sanitizeTerminalText(run.label)} ${sanitizeTerminalText(run.runId)}`);
       continue;
     }
-    const tokens = run.tokens > 0 ? ` · ${formatTokens(run.tokens)} tok` : "";
+    const usage = hasTokenUsage(run.usage) ? ` · ${formatTokenUsage(run.usage)}` : "";
     const health = run.kind === "workflow" && run.status === "completed" && (run.failed > 0 || run.aborted > 0)
       ? `${run.completed} ok${run.failed > 0 ? ` · ${run.failed} failed` : ""}${run.aborted > 0 ? ` · ${run.aborted} aborted` : ""}`
       : `${run.done}/${run.total}`;
-    lines.push(`  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${tokens} · ${sanitizeTerminalText(run.runId)}]`);
+    lines.push(`  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${usage} · ${sanitizeTerminalText(run.runId)}]`);
   }
   return lines.join("\n");
 }
@@ -109,13 +116,25 @@ function isCommandContext(ctx: NavigatorOpenContext): ctx is ExtensionCommandCon
   return "waitForIdle" in ctx;
 }
 
-function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, model: NavigatorModel): Promise<void> {
+function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, model: NavigatorModel, target?: NavigatorOpenTarget): Promise<void> {
   const state = new NavigatorState();
   const runner = services.runner;
-  // Intersect with the model first: the runner is process-global across cwd
-  // generations, so a live run in another cwd must not defeat smart landing.
-  const visibleLiveRunIds = orderedLiveRunIds(model.runs(), runner.liveRunIds());
-  if (visibleLiveRunIds.length === 1) state.seedRun(visibleLiveRunIds[0]!);
+  if (target) {
+    state.seedRun(target.runId);
+    if (target.childId) {
+      const children = orderedChildren(model.detail(target.runId), "all");
+      const childIndex = children.findIndex((child) => child.id === target.childId);
+      if (childIndex >= 0) {
+        state.setChildCursor(childIndex, children);
+        state.drill(model);
+      }
+    }
+  } else {
+    // Intersect with the model first: the runner is process-global across cwd
+    // generations, so a live run in another cwd must not defeat smart landing.
+    const visibleLiveRunIds = orderedLiveRunIds(model.runs(), runner.liveRunIds());
+    if (visibleLiveRunIds.length === 1) state.seedRun(visibleLiveRunIds[0]!);
+  }
 
   return ctx.ui.custom<void>(
     (tui: TUI, theme: Theme, _keybindings, done: (result: void) => void) => {
@@ -183,6 +202,7 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
           } : undefined);
         }
       };
+      if (state.level === "agent") openAgentView();
 
       const cleanup = () => {
         unsubscribeSpawns();
@@ -257,7 +277,7 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
       };
 
       const act = (data: string) => {
-        const keyId = (parseKey(data) ?? "").toLowerCase() || undefined;
+        const keyId = navigatorKeyId(data);
         // A focused composer owns tab; otherwise AgentView declines it so live-run cycling can handle it.
         if (state.level === "agent" && agentView?.handleInput(data, keyId)) return;
         const action = keyToAction(keyId, state.level);
@@ -442,6 +462,12 @@ function renderContent(
   };
 }
 
+function navigatorKeyId(data: string): string | undefined {
+  if (matchesKey(data, "shift+j")) return "shift+j";
+  if (matchesKey(data, "shift+k")) return "shift+k";
+  return (parseKey(data) ?? "").toLowerCase() || undefined;
+}
+
 function orderedLiveRunIds(runs: readonly RunSummary[], liveRunIds: readonly string[]): string[] {
   const live = new Set(liveRunIds);
   return runs.filter((run) => live.has(run.runId)).map((run) => run.runId);
@@ -516,7 +542,7 @@ export function buildAgentView(
   };
   const header = () => {
     const row = child();
-    return { label: row?.label ?? childId, model: row?.model ?? "", thinking: row?.thinking, status: row?.status ?? "pending", tokens: row?.tokens ?? 0 };
+    return { label: row?.label ?? childId, model: row?.model ?? "", thinking: row?.thinking, status: row?.status ?? "pending", usage: row?.usage ?? EMPTY_USAGE() };
   };
 
   // A queued or constructing child has a durable row before it has a session.

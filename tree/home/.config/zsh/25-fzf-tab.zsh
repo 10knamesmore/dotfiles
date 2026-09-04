@@ -67,6 +67,12 @@ source "${0:A:h}/vendor/fzf-tab/fzf-tab.zsh"
 zstyle ':fzf-tab:*' switch-group '<' '>'           # 默认 F1/F2 够不着，< > 顺手
 zstyle ':fzf-tab:*' use-fzf-default-opts yes       # 补全菜单跟随上面的 Mocha 配色
 zstyle ':fzf-tab:*' prefix ''                      # 去掉候选左侧的 · 前缀（与 . 易混）
+# cd 补全预览：显示当前高亮目录的详细内容。
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --color=always --icons --git --group-directories-first -la --no-user --no-time "$realpath"'
+# cd 补全预览窗：Ctrl-U/ Ctrl-D 分别上翻/下翻半页。
+zstyle ':fzf-tab:complete:cd:*' fzf-bindings \
+    'ctrl-u:preview-half-page-up' \
+    'ctrl-d:preview-half-page-down'
 # 高度补偿帐本：外框 2 行 + input-border 2 行 + 基础 chrome 2 行 = 6。
 # fzf-tab 按「候选数 + fzf-pad」算菜单高度，对 opts 里的边框开销是盲的，pad 替它报销。
 # 注意：fzf-tab 首次补全会把算出的高度钉进 FZF_TMUX_HEIGHT（:= 赋值），同 shell 后续

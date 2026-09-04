@@ -1,110 +1,57 @@
-# Rust 项目内单独配置 rust-analyzer 编译 Feature
+# Rust 工具链与项目 Feature 配置
 
-这份配置已经支持在项目根目录放 `.nvim.lua` 做本地覆盖，因此可以针对单个 Rust 项目单独调整 `rust-analyzer` 的 Cargo feature 行为。
+## 工具归属
 
-相关基础配置：
+- rustup 管理 Rust、Cargo、rust-analyzer、rustfmt、Clippy 和 rust-src。
+- rustaceanvim 是 Rust LSP 的唯一启动入口；nvim-lspconfig 不重复启动它。
+- Rust 配置不要求 Mason 安装 rust-analyzer 或 CodeLLDB，且关闭 rustaceanvim 的 DAP 适配器和调试配置加载。
+- 格式化沿用 Conform 的 LSP 路径，由 rust-analyzer 调用 rustfmt；保存时执行 Clippy 检查。
 
-- 已启用 `exrc`，允许读取项目根目录下的 `.nvim.lua`
-- Rust 使用 `rustaceanvim`
-- `rustaceanvim` 初始化时会优先保留 `vim.g.rustaceanvim` 中已有的配置，再补默认值
+LSP 从项目根目录启动 `~/.cargo/bin/rust-analyzer`，其子进程优先使用同目录的 Rust 工具。路径随用户主目录展开，不写死用户名或工具链版本，也不依赖 Mason 的 PATH 顺序。
 
-当前全局默认值里，`rust-analyzer` 的 Cargo 配置包含：
+## 准备项目工具链
 
-```lua
-cargo = {
-    allFeatures = true,
-    loadOutDirsFromCheck = true,
-    buildScripts = {
-        enable = true,
-    },
-}
+dotfiles 不自动安装 rustup。先安装 rustup，再为项目指定的工具链安装组件，例如：
+
+```sh
+rustup toolchain install 1.88.0 --profile minimal
+rustup component add --toolchain 1.88.0 rust-analyzer rust-src rustfmt clippy
 ```
 
-因此如果某个项目想改成“只编译指定 feature”，必须显式把 `allFeatures` 改成 `false`。
+使用项目的 `rust-toolchain.toml` 固定版本；不需要修改全局默认版本。缺少组件时显式安装，不自动换用其他工具链。
 
-## 用法
+在项目根目录核对实际版本：
 
-在 Rust 项目根目录创建 `.nvim.lua`：
-
-```lua
-vim.g.rustaceanvim = {
-    server = {
-        default_settings = {
-            ["rust-analyzer"] = {
-                cargo = {
-                    allFeatures = false,
-                    noDefaultFeatures = true,
-                    features = { "feat_a", "feat_b" },
-                },
-            },
-        },
-    },
-}
+```sh
+rustup show active-toolchain
+rustc --version
+cargo --version
+rust-analyzer --version
+rustfmt --version
+cargo clippy --version
 ```
 
-保存后重新进入该项目，或在 Neovim 中执行：
+更换工具链或 LSP 启动配置后，重启 Neovim。rustaceanvim 会复用已启动的 Rust LSP；不同工具链的项目使用独立 Neovim 会话。
 
-```vim
-:LspRestart
-```
+## 项目内 Feature 覆盖
 
-## 常见配置示例
+已启用 `exrc`，项目根目录的 `.nvim.lua` 可设置 `vim.g.rustaceanvim`，已有值优先于全局默认值。全局 Cargo 配置使用 `features = "all"`，启用 build scripts 和 `loadOutDirsFromCheck`。
 
-### 1. 只启用指定 feature，保留默认 feature
+仅启用指定 feature 并禁用默认 feature：
 
 ```lua
 vim.g.rustaceanvim = {
-    server = {
-        default_settings = {
-            ["rust-analyzer"] = {
-                cargo = {
-                    allFeatures = false,
-                    features = { "feat_a", "feat_b" },
-                },
-            },
+  server = {
+    default_settings = {
+      ["rust-analyzer"] = {
+        cargo = {
+          features = { "feat_a", "feat_b" },
+          noDefaultFeatures = true,
         },
+      },
     },
+  },
 }
 ```
 
-### 2. 只启用指定 feature，并关闭默认 feature
-
-```lua
-vim.g.rustaceanvim = {
-    server = {
-        default_settings = {
-            ["rust-analyzer"] = {
-                cargo = {
-                    allFeatures = false,
-                    noDefaultFeatures = true,
-                    features = { "feat_a", "feat_b" },
-                },
-            },
-        },
-    },
-}
-```
-
-### 3. 不启用任何额外 feature
-
-```lua
-vim.g.rustaceanvim = {
-    server = {
-        default_settings = {
-            ["rust-analyzer"] = {
-                cargo = {
-                    allFeatures = false,
-                    features = {},
-                },
-            },
-        },
-    },
-}
-```
-
-## 说明
-
-- `.nvim.lua` 作用域是当前项目，不会影响别的 Rust 仓库
-- 如果没有把 `allFeatures` 设为 `false`，那么全局默认的 `allFeatures = true` 仍然会生效
-- 这里只覆盖 `cargo` 下需要改的字段，其他全局 `rust-analyzer` 配置会继续沿用默认值
-- 如果项目里有多个 crate，`rust-analyzer` 仍会按 workspace 维度工作，这份配置影响的是当前 workspace 的分析方式
+保留默认 feature 时删除 `noDefaultFeatures`；不启用额外 feature 时设置 `features = {}`。无需设置旧字段 `allFeatures`。从该项目根目录重启 Neovim 后生效，配置作用于整个 Cargo workspace。

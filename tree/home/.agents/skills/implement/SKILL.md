@@ -18,12 +18,13 @@ description: 根据 repo-local Spec 推进一个 implementation Subspec，完成
 7. 只有实际验证通过后，才在 Subspec 中填写：
    - `Resolution`：实现结果和重要 contract。
    - `Evidence`：运行过的命令、结果及必要的源码或 artifact 链接。
-   - `status: resolved`。
+   - 只有用户明确指定本轮相关改动需要 commit，且该 commit 已实际创建后，才能写入 `status: resolved`。
+   - commit gate 未满足时，保留 `status: in-progress`，可以写入已有的 `Resolution` 与 `Evidence`，但不得把它当作 resolved dependency。
 8. 更新 Spec：
    - 第一个 implementation 开始后设为 `in-progress`。
-   - 所有 required Subspec resolved 且 Spec acceptance criteria 已验证后设为 `complete`。
+   - 只有所有 required Subspec 均已满足 commit gate、状态为 `resolved`，且 Spec acceptance criteria 已验证后，才能设为 `complete`。
    - 新问题能精确表达时创建新 Subspec，否则写回 `Not yet specified`。
 
-验证失败或工作未完成时保持 `in-progress`，在 `Resolution` 中记录 blocker，不得声称 resolved。
+验证失败、工作未完成或 commit gate 未满足时保持 `in-progress`，在 `Resolution` 中记录 blocker 或当前结果，不得声称 resolved。
 
-不要自动 commit 或 push。只有用户明确要求，或 repo instructions 明确授权当前 workflow 时才执行 Git 写操作。
+不要自动 commit 或 push。只有用户明确要求，或 repo instructions 明确授权当前 workflow 时才执行 Git 写操作；但 `resolved` commit gate 只接受用户明确指定本轮相关改动需要 commit 且该 commit 已实际创建的情形。

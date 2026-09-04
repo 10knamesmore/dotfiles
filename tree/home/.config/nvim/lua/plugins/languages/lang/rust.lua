@@ -28,16 +28,6 @@ return {
     opts = { ensure_installed = { "rust", "ron" } },
   },
 
-  -- Ensure Rust debugger is installed
-  {
-    "mason-org/mason.nvim",
-    optional = true,
-    opts = function(_, opts)
-      opts.ensure_installed = opts.ensure_installed or {}
-      vim.list_extend(opts.ensure_installed, { "codelldb", "rust-analyzer" })
-    end,
-  },
-
   {
     "mrcjkb/rustaceanvim",
     ft = { "rust" },
@@ -54,7 +44,25 @@ return {
     ---@module "rustaceanvim"
     --- @type rustaceanvim.Opts
     opts = {
+      dap = {
+        adapter = false,
+        autoload_configurations = false,
+      },
       server = {
+        -- 从项目根目录启动 rustup 代理，避免 Mason 的 PATH 优先级改变工具链。
+        cmd = function()
+          return function(dispatchers, client_config)
+            local cargo_bin = vim.fn.expand("~/.cargo/bin")
+            return vim.lsp.rpc.start(
+              { cargo_bin .. "/rust-analyzer", "--log-file", client_config.logfile },
+              dispatchers,
+              {
+                cwd = client_config.root_dir,
+                env = { PATH = cargo_bin .. ":" .. vim.env.PATH },
+              }
+            )
+          end
+        end,
         -- see https://rust-analyzer.github.io/book/configuration
         default_settings = {
           -- rust-analyzer language server configuration
@@ -72,6 +80,9 @@ return {
               },
             },
             checkOnSave = true,
+            check = {
+              command = "clippy",
+            },
             diagnostics = {
               enable = true,
               -- schema 里是复数 warningsAsHint（rust-analyzer --print-config-schema）
@@ -129,12 +140,6 @@ return {
     },
     config = function(_, opts)
       vim.g.rustaceanvim = vim.tbl_deep_extend("keep", vim.g.rustaceanvim or {}, opts or {})
-      if vim.fn.executable("rust-analyzer") == 0 then
-        vim.notify(
-          "**rust-analyzer** not found in PATH, please install it.\nhttps://rust-analyzer.github.io/",
-          vim.log.levels.WARN
-        )
-      end
     end,
   },
 

@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { deriveRunStatus } from "./run-store.js";
+import { EMPTY_USAGE, deriveRunStatus, sumUsage } from "./run-store.js";
 import { activityFoldFromSnapshot, cloneActivityFold, foldActivity, type RunActivityFold } from "./activity-fold.js";
 import type { FrozenJson, RunSnapshot } from "./run-snapshot.js";
 import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentSpec, SubagentStatus, UsageSummary } from "../types.js";
@@ -22,7 +22,8 @@ export interface RunSummary {
   completed: number;
   failed: number;
   aborted: number;
-  tokens: number;
+  /** Cumulative provider usage summed across all children. */
+  usage: UsageSummary;
   /** True when the run directory could not be parsed; renders as a dim placeholder. */
   corrupt: boolean;
   /** True when disk said live but no live owner exists; statuses were reconciled (dead-parent recovery). */
@@ -38,7 +39,8 @@ export interface ChildRow {
   thinking?: string;
   phase?: string;
   status: SubagentStatus;
-  tokens: number;
+  /** Cumulative provider usage for this child. */
+  usage: UsageSummary;
   startedAt?: number;
   endedAt?: number;
   activity?: string;
@@ -128,7 +130,7 @@ export function corruptRunSummary(runDir: string, runId: string, label = "unread
     completed: 0,
     failed: 0,
     aborted: 0,
-    tokens: 0,
+    usage: EMPTY_USAGE(),
     corrupt: true,
     reconciled: false,
   };
@@ -179,7 +181,7 @@ export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options
       thinking: optionalString(child.resolved?.thinkingLevel),
       phase: optionalString(child.phase) ?? optionalString(child.spec?.phase),
       status: state.status,
-      tokens: state.tokens,
+      usage: state.usage,
       startedAt: events.startedAt,
       endedAt: events.endedAt,
       activity: events.activity,
@@ -222,7 +224,7 @@ export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options
 interface SummaryChildState {
   id: string;
   status: SubagentStatus;
-  tokens: number;
+  usage: UsageSummary;
   terminalStatus?: SubagentStatus;
 }
 
@@ -255,7 +257,7 @@ function buildSnapshotSummary(
     return {
       id,
       status: statuses[index] ?? "pending",
-      tokens: tokensForChild(status?.children?.[id]?.usage, events),
+      usage: usageForChild(status?.children?.[id]?.usage, events),
       terminalStatus: events?.terminalStatus,
     };
   });
@@ -273,7 +275,7 @@ function buildSnapshotSummary(
       completed: counts.completed,
       failed: counts.failed,
       aborted: counts.aborted,
-      tokens: children.reduce((total, child) => total + child.tokens, 0),
+      usage: sumUsage(children.map((child) => child.usage)),
       corrupt: false,
       reconciled: false,
     },
@@ -294,10 +296,14 @@ function reconcileDeadOwnerSummary(source: RunSummary, sourceChildren: readonly 
   return summary;
 }
 
-function tokensForChild(usage: UsageSummary | undefined, events: SummaryChildEventState | undefined): number {
-  if (events?.terminalTokens !== undefined) return events.terminalTokens;
-  if (usage) return usage.input + usage.output;
-  return events?.tokens ?? 0;
+function usageForChild(usage: UsageSummary | undefined, events: SummaryChildEventState | undefined): UsageSummary {
+  if (events?.terminalUsage !== undefined) return copyUsage(events.terminalUsage);
+  if (usage) return copyUsage(usage);
+  return events?.usage !== undefined ? copyUsage(events.usage) : EMPTY_USAGE();
+}
+
+function copyUsage(usage: UsageSummary): UsageSummary {
+  return { ...usage };
 }
 
 /** Reconcile a disk-live projection after proving that no process owns the run. */
@@ -328,7 +334,7 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
       model: "unknown",
       phase: event.spec.phase,
       status: "pending",
-      tokens: 0,
+      usage: EMPTY_USAGE(),
       followUpOf: event.followUpOf,
       spec: event.spec,
     });
@@ -388,11 +394,11 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
     child.activity = event.description;
     foldActivity(projection.activity, event);
   } else if (event.type === "usage") {
-    child.tokens = event.usage.input + event.usage.output;
+    child.usage = copyUsage(event.usage);
   } else if (event.type === "result") {
     child.status = event.result.status;
     projection.terminalStatuses.set(event.id, event.result.status);
-    child.tokens = event.result.usage.input + event.result.usage.output;
+    child.usage = copyUsage(event.result.usage);
     child.endedAt = timestamp;
     if (event.result.text) child.resultLine = firstLine(event.result.text);
     child.error = event.result.error;
@@ -433,7 +439,7 @@ function refreshProjection(projection: RunProjection): void {
   }
 }
 
-function refreshSummary(summary: RunSummary, children: readonly Pick<ChildRow, "status" | "tokens">[]): void {
+function refreshSummary(summary: RunSummary, children: readonly Pick<ChildRow, "status" | "usage">[]): void {
   const statuses = children.map((child) => child.status);
   if (summary.kind === "subagent") summary.status = statuses.length === 0 ? "pending" : deriveRunStatus(statuses);
   const counts = countStatuses(statuses);
@@ -442,7 +448,7 @@ function refreshSummary(summary: RunSummary, children: readonly Pick<ChildRow, "
   summary.completed = counts.completed;
   summary.failed = counts.failed;
   summary.aborted = counts.aborted;
-  summary.tokens = children.reduce((total, child) => total + child.tokens, 0);
+  summary.usage = sumUsage(children.map((child) => child.usage));
 }
 
 function labelForRun(
@@ -479,8 +485,8 @@ function workflowName(snapshot: RunSnapshot, describeWorkflow: SnapshotProjectio
 }
 
 interface SummaryChildEventState {
-  tokens?: number;
-  terminalTokens?: number;
+  usage?: UsageSummary;
+  terminalUsage?: UsageSummary;
   terminalStatus?: SubagentStatus;
 }
 
@@ -563,13 +569,13 @@ function foldSummaryChildEvent(state: SummaryChildEventState, event: Record<stri
   if (event.type === "status" && isTerminalStatus(event.status)) state.terminalStatus = event.status;
   if (event.type === "usage") {
     const usage = event.usage as UsageSummary | undefined;
-    if (usage) state.tokens = usage.input + usage.output;
+    if (usage) state.usage = copyUsage(usage);
   }
   if (event.type === "result") {
     const result = event.result as { status?: string; usage?: UsageSummary } | undefined;
     if (result?.usage) {
-      state.tokens = result.usage.input + result.usage.output;
-      state.terminalTokens = state.tokens;
+      state.usage = copyUsage(result.usage);
+      state.terminalUsage = copyUsage(result.usage);
     }
     if (isTerminalStatus(result?.status)) state.terminalStatus = result.status;
   }

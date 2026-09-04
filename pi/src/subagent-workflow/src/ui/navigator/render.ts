@@ -9,7 +9,8 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { clamp, countStatuses, formatDuration, formatTokens, modelEffort, padStart, statusGlyph, type ThemeLike } from "../format.js";
+import { clamp, countStatuses, formatDuration, formatTokenUsage, hasTokenUsage, modelEffort, padStart, statusGlyph, type ThemeLike } from "../format.js";
+import { sumUsage } from "../../store/run-store.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import type { FilterMode } from "./controls.js";
 import { orderedChildren } from "./controls.js";
@@ -18,7 +19,7 @@ import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
 const LABEL_MAX = 30;
 const MODEL_MAX = 22;
 const ELAPSED_WIDTH = 6;
-const TOKENS_WIDTH = 10;
+const USAGE_WIDTH = 20;
 
 /** Compact relative age: "12s", "5m", "3h", "2d". */
 function formatAge(ms: number): string {
@@ -81,7 +82,7 @@ function renderRunRow(row: RunSummary, selected: boolean, theme: ThemeLike, now:
   const outcome = unhealthyCompletion
     ? ["completed", `${row.completed} ok`, row.failed > 0 ? `${row.failed} failed` : "", row.aborted > 0 ? `${row.aborted} aborted` : ""]
     : [`${row.done}/${row.total}`];
-  const meta = [...outcome, row.tokens > 0 ? `${formatTokens(row.tokens)} tok` : "", formatAge(now - row.createdAt)]
+  const meta = [...outcome, hasTokenUsage(row.usage) ? formatTokenUsage(row.usage) : "", formatAge(now - row.createdAt)]
     .filter(Boolean)
     .join(" · ");
   return `${mark}${glyph} ${label}  ${theme.fg("dim", `${row.kind} · ${meta}`)}`;
@@ -172,14 +173,14 @@ export function renderRunDetail(
 
 function renderDetailHeader(detail: RunDetail, shown: number, filter: FilterMode, theme: ThemeLike, cap: number): string[] {
   const total = detail.children.length;
-  const tokens = detail.children.reduce((sum, child) => sum + child.tokens, 0);
+  const usage = sumUsage(detail.children.map((child) => child.usage));
   const counts = countStatuses(detail.children.map((child) => child.status));
   const filterNote = filter === "all" ? "" : ` · filter: ${filter} (${shown})`;
   const title = `${theme.bold(sanitizeTerminalText(detail.label))} ${theme.fg("dim", `· ${detail.kind} · ${sanitizeTerminalText(detail.runId)}`)}`;
   const health = detail.kind === "workflow" && detail.status === "completed" && (counts.failed > 0 || counts.aborted > 0)
     ? `completed · ${counts.completed} ok${counts.failed > 0 ? ` · ${counts.failed} failed` : ""}${counts.aborted > 0 ? ` · ${counts.aborted} aborted` : ""}`
     : `${counts.done}/${total} done · ${detail.status}`;
-  const stats = theme.fg("dim", `${health} · ${formatTokens(tokens)} tok${filterNote}`);
+  const stats = theme.fg("dim", `${health} · ${formatTokenUsage(usage)}${filterNote}`);
   return [truncateToWidth(title, cap), truncateToWidth(stats, cap)];
 }
 
@@ -268,11 +269,11 @@ function renderChildRow(child: ChildRow, selected: boolean, theme: ThemeLike, no
   const cells = [`${selector(selected)}${glyph} ${styledLabel}`];
   // modelEffort already fits MODEL_MAX; truncateToWidth pads it to a fixed column.
   if (child.model) cells.push(theme.fg("dim", truncateToWidth(sanitizeTerminalText(modelEffort(child.model, child.thinking, MODEL_MAX)), MODEL_MAX, "…", true)));
-  // Elapsed and tokens are right-aligned in fixed columns so the trailing
-  // activity/result text starts at the same column on every row.
+  // Elapsed and token usage are right-aligned in fixed columns so the
+  // trailing activity/result text starts at the same column on every row.
   const elapsed = child.startedAt !== undefined ? formatDuration((child.endedAt ?? now) - child.startedAt) : "";
   if (elapsed) cells.push(theme.fg("dim", padStart(elapsed, ELAPSED_WIDTH)));
-  cells.push(theme.fg("dim", padStart(`${formatTokens(child.tokens)} tok`, TOKENS_WIDTH)));
+  cells.push(theme.fg("dim", padStart(formatTokenUsage(child.usage), USAGE_WIDTH)));
   const trailing = child.error
     ? theme.fg("error", sanitizeTerminalText(child.error))
     : theme.fg("dim", sanitizeTerminalText(child.status === "running" ? child.activity ?? "" : child.resultLine ?? ""));

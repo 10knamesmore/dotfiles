@@ -60,7 +60,7 @@ Spec status：
 - `draft`：仍有 planning Subspec 或 fog，执行 contract 尚未稳定。
 - `ready`：共享决策已稳定，至少一个 implementation Subspec 位于 frontier。
 - `in-progress`：已有 implementation Subspec 正在推进。
-- `complete`：required Subspec 均已 resolved，Spec acceptance criteria 已验证。
+- `complete`：所有 required Subspec 均已满足 commit gate、状态为 `resolved`，且 Spec acceptance criteria 已验证。
 - `paused`：用户明确暂停整个 effort。
 
 Subspec status：
@@ -68,12 +68,16 @@ Subspec status：
 - `draft`：目标或 acceptance criteria 还不够清晰，不能进入 frontier。
 - `ready`：内容清晰，可以在 dependency resolved 后推进。
 - `in-progress`：已被一个 session claim。
-- `resolved`：resolution 与 evidence 已写入文件。
+- `resolved`：`Resolution` 与 `Evidence` 已写入文件，并满足下方的 commit gate。
 - `cancelled`：已确认不再属于当前路线，并记录原因。
 
 不要持久化 `blocked` status。是否 blocked 完全由 `depends_on` 指向的 Subspec status 推导，避免出现两份互相漂移的状态。
 
-开始实质工作前，先把选中的 Subspec 从 `ready` 改为 `in-progress`，并写入 `owner`。这次 frontmatter 修改就是 claim。发现 Subspec 已是 `in-progress` 且 owner 不同，就跳过它。完成前不要预先改为 `resolved`。
+### Resolved gate
+
+`resolved` 不是“验证通过”的同义词。只有在用户明确指定本轮相关改动需要 commit，且该 commit 已实际创建后，才能把任何 Subspec 标记为 `resolved`。用户未明确指定时不得自行 commit；即使实现或验证已经完成，也只能写入 `Resolution` 与 `Evidence`，保持 `status: in-progress`。Parent Spec 不得因这些 Subspec 而设为 `complete`，下游也不得把它们视为 resolved。
+
+开始实质工作前，先把选中的 Subspec 从 `ready` 改为 `in-progress`，并写入 `owner`。这次 frontmatter 修改就是 claim。发现 Subspec 已是 `in-progress` 且 owner 不同，就跳过它。
 
 ## Subspec kinds
 

@@ -1,5 +1,5 @@
 /**
- * Below-editor status widget: a glanceable list of running subagent work.
+ * Below-editor status widget: a glanceable, keyboard-selectable list of running subagent work.
  *
  * Visible only while at least one child is running or queued; cleared when idle.
  * Register the factory once and re-render by calling tui.requestRender(), rather
@@ -28,14 +28,15 @@ import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SpawnedRun, SubagentRunner } from "../runner/runner.js";
 import type { StartedWorkflow } from "../workflow/launch.js";
-import type { SubagentEvent, SubagentHandle, WorkflowPhase } from "../types.js";
+import type { SubagentEvent, SubagentHandle, UsageSummary, WorkflowPhase } from "../types.js";
+import { sumUsage } from "../store/run-store.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
 import {
   childLabel,
   countStatuses,
   formatDuration,
-  formatTokens,
+  formatTokenUsage,
   spinnerFrame,
   statusGlyph,
   type StatusCounts,
@@ -62,7 +63,7 @@ interface TrackedRun {
   handles: SubagentHandle[];
   seenHandles: Set<string>;
   startedAt: number;
-  tokens: Map<string, number>;
+  usage: Map<string, UsageSummary>;
   unsubscribers: Array<() => void>;
 }
 
@@ -74,9 +75,16 @@ export interface WidgetRunView {
   phase?: string;
   counts: StatusCounts;
   startedAt: number;
-  tokens: number;
+  usage: UsageSummary;
+  /** Whether this row owns keyboard selection from the editor. */
+  selected?: boolean;
 }
 
+/** Run target selected from the below-editor widget. */
+export interface ActiveRunTarget {
+  runId: string;
+  childId?: string;
+}
 
 function phaseView(run: Pick<TrackedRun, "kind" | "phases" | "currentPhase">): string | undefined {
   if (run.kind !== "workflow" || !run.currentPhase) return undefined;
@@ -85,10 +93,8 @@ function phaseView(run: Pick<TrackedRun, "kind" | "phases" | "currentPhase">): s
   return `${sanitizeTerminalText(run.currentPhase)}${position}`;
 }
 
-function runTokens(run: TrackedRun): number {
-  let total = 0;
-  for (const value of run.tokens.values()) total += value;
-  return total;
+function runUsage(run: TrackedRun): UsageSummary {
+  return sumUsage(run.usage.values());
 }
 
 /** Keep the widget near one quarter of the terminal, or retain the old cap when height is unavailable. */
@@ -114,16 +120,19 @@ export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width
   // Never exceed the host-supplied width: pi-tui kills the process on any
   // over-wide line, so there is no minimum layout width worth crashing for.
   const cap = Math.max(1, width);
-  const header = `${theme.fg("accent", "▸")} ${theme.bold("agents")} ${theme.fg("dim", summaryParts(runs).join(" · "))}`;
+  const selectionHint = runs.some((run) => run.selected) ? " · ↑↓ select · enter view" : " · ↓ select";
+  const header = `${theme.fg("accent", "▸")} ${theme.bold("agents")} ${theme.fg("dim", `${summaryParts(runs).join(" · ")}${selectionHint}`)}`;
   const lines: string[] = [truncateToWidth(header, cap)];
 
   for (const run of runs.slice(0, maxRows)) {
+    const cursor = run.selected ? theme.fg("accent", "❯") : " ";
     const glyph = statusGlyph("running", theme, 0, false);
-    const label = truncateToWidth(run.label, LABEL_WIDTH, "…", true);
+    const rawLabel = truncateToWidth(run.label, LABEL_WIDTH, "…", true);
+    const label = run.selected ? theme.fg("accent", theme.bold(rawLabel)) : rawLabel;
     const phase = run.phase ? `${theme.fg("dim", run.phase)}  ` : "";
     const progress = theme.fg("dim", run.counts.total > 0 ? `${run.counts.done}/${run.counts.total}` : "starting");
-    const tokens = theme.fg("dim", `${formatTokens(run.tokens)} tok`);
-    lines.push(truncateToWidth(`${glyph} ${label}  ${phase}${progress}  ${tokens}`, cap));
+    const usage = theme.fg("dim", formatTokenUsage(run.usage));
+    lines.push(truncateToWidth(`${cursor} ${glyph} ${label}  ${phase}${progress}  ${usage}`, cap));
   }
   if (runs.length > maxRows) lines.push(truncateToWidth(theme.fg("dim", `  +${runs.length - maxRows} more runs`), cap));
   return lines;
@@ -140,7 +149,7 @@ export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width
  */
 function widgetSignature(runs: WidgetRunView[]): string {
   return JSON.stringify(runs.map((run) =>
-    [run.kind, run.label, run.phase ?? "", run.counts.done, run.counts.total, run.counts.running, run.counts.failed, run.tokens]));
+    [run.kind, run.label, run.phase ?? "", run.counts.done, run.counts.total, run.counts.running, run.counts.failed, formatTokenUsage(run.usage), run.selected === true]));
 }
 
 export class SubagentStatusWidget {
@@ -151,6 +160,7 @@ export class SubagentStatusWidget {
   private lastStatus: string | undefined;
   /** Painted-content identity, so an unchanged update skips the repaint. */
   private lastSignature: string | undefined;
+  private selectedRunId: string | undefined;
   /** Line count last painted, so a shrink can be held back under an overlay. */
   private painted = 0;
   private enabled = true;
@@ -181,7 +191,7 @@ export class SubagentStatusWidget {
         handles: [],
         seenHandles: new Set(),
         startedAt: Date.now(),
-        tokens: new Map(),
+        usage: new Map(),
         unsubscribers: [],
       });
     }
@@ -196,7 +206,7 @@ export class SubagentStatusWidget {
     if (run.seenHandles.has(handle.id)) return;
     run.seenHandles.add(handle.id);
     run.handles.push(handle);
-    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(spawned.runId, run.tokens, event)));
+    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(spawned.runId, run.usage, event)));
     if (handle.spec.phase !== undefined) run.currentPhase = handle.spec.phase;
     this.safeUpdate();
   }
@@ -211,7 +221,7 @@ export class SubagentStatusWidget {
   track(runId: string, handle: SubagentHandle, ctx: WidgetCtx): void {
     if (!ctx.hasUI) return;
     this.setCtx(ctx);
-    const tokens = new Map<string, number>();
+    const usage = new Map<string, UsageSummary>();
     this.runs.set(runId, {
       kind: "subagent",
       // Computed once: the label is fixed for the run's life, and childLabel
@@ -221,8 +231,8 @@ export class SubagentStatusWidget {
       handles: [handle],
       seenHandles: new Set([handle.id]),
       startedAt: handle.startedAt,
-      tokens,
-      unsubscribers: [handle.subscribe((event) => this.onEvent(runId, tokens, event))],
+      usage,
+      unsubscribers: [handle.subscribe((event) => this.onEvent(runId, usage, event))],
     });
     this.safeUpdate();
   }
@@ -233,6 +243,7 @@ export class SubagentStatusWidget {
     this.unsubscribeSpawns = undefined;
     for (const run of this.runs.values()) run.unsubscribers.forEach((fn) => fn());
     this.runs.clear();
+    this.selectedRunId = undefined;
     this.lastSignature = undefined;
     if (this.ctx) {
       try { this.ctx.ui.setWidget(WIDGET_KEY, undefined); } catch (error) { this.logFailure(error); }
@@ -253,9 +264,66 @@ export class SubagentStatusWidget {
     this.lastStatus = undefined;
   }
 
-  private onEvent(runId: string, tokens: Map<string, number>, event: SubagentEvent): void {
-    if (event.type === "usage") tokens.set(event.id, event.usage.input + event.usage.output);
-    if (event.type === "result") tokens.set(event.id, event.result.usage.input + event.result.usage.output);
+  /** Select a visible active run from editor arrow navigation. */
+  selectRun(delta: -1 | 1): boolean {
+    if (!this.enabled) return false;
+    const runs = this.selectableRuns();
+    if (runs.length === 0) {
+      this.selectedRunId = undefined;
+      return false;
+    }
+    const current = runs.findIndex(([runId]) => runId === this.selectedRunId);
+    const index = current < 0
+      ? (delta === 1 ? 0 : runs.length - 1)
+      : (current + delta + runs.length) % runs.length;
+    this.selectedRunId = runs[index]![0];
+    this.safeUpdate();
+    return true;
+  }
+
+  /** Whether the editor currently owns a visible run selection. */
+  hasSelectedRun(): boolean {
+    return this.enabled && this.selectableRuns().some(([runId]) => runId === this.selectedRunId);
+  }
+
+  /** Consume the current widget selection and return its navigator target. */
+  takeSelectedRun(): ActiveRunTarget | undefined {
+    const selectedRunId = this.selectedRunId;
+    const selected = this.selectableRuns().find(([runId]) => runId === selectedRunId);
+    this.selectedRunId = undefined;
+    this.safeUpdate();
+    if (!selected) return undefined;
+    const [, run] = selected;
+    const childId = run.kind === "subagent" ? run.handles[0]?.id : undefined;
+    return childId === undefined ? { runId: selected[0] } : { runId: selected[0], childId };
+  }
+
+  /** Leave widget selection mode without changing editor text. */
+  clearSelectedRun(): void {
+    if (this.selectedRunId === undefined) return;
+    this.selectedRunId = undefined;
+    this.safeUpdate();
+  }
+
+  private selectableRuns(): Array<[string, TrackedRun]> {
+    return this.activeRuns().slice(0, statusWidgetRowCap(this.tui?.terminal?.rows));
+  }
+
+  private activeRuns(): Array<[string, TrackedRun]> {
+    const active: Array<[string, TrackedRun]> = [];
+    for (const [runId, run] of this.runs) {
+      if (!this.runIsActive(runId, run)) {
+        this.pruneRun(runId);
+        continue;
+      }
+      active.push([runId, run]);
+    }
+    return active.sort(([, left], [, right]) => left.startedAt - right.startedAt);
+  }
+
+  private onEvent(runId: string, usage: Map<string, UsageSummary>, event: SubagentEvent): void {
+    if (event.type === "usage") usage.set(event.id, { ...event.usage });
+    if (event.type === "result") usage.set(event.id, { ...event.result.usage });
     if (event.type === "status" || event.type === "result") this.pruneRun(runId);
     this.safeUpdate();
   }
@@ -270,6 +338,7 @@ export class SubagentStatusWidget {
     if (!run || this.runIsActive(runId, run)) return;
     run.unsubscribers.forEach((fn) => fn());
     this.runs.delete(runId);
+    if (this.selectedRunId === runId) this.selectedRunId = undefined;
   }
 
   private runIsActive(runId: string, run: TrackedRun): boolean {
@@ -279,22 +348,15 @@ export class SubagentStatusWidget {
   }
 
   private views(): WidgetRunView[] {
-    const views: WidgetRunView[] = [];
-    for (const [runId, run] of this.runs) {
-      if (!this.runIsActive(runId, run)) {
-        this.pruneRun(runId);
-        continue;
-      }
-      views.push({
-        kind: run.kind,
-        label: run.label,
-        phase: phaseView(run),
-        counts: countStatuses(run.handles.map((handle) => handle.status)),
-        startedAt: run.startedAt,
-        tokens: runTokens(run),
-      });
-    }
-    return views.sort((a, b) => a.startedAt - b.startedAt);
+    return this.activeRuns().map(([runId, run]) => ({
+      kind: run.kind,
+      label: run.label,
+      phase: phaseView(run),
+      counts: countStatuses(run.handles.map((handle) => handle.status)),
+      startedAt: run.startedAt,
+      usage: runUsage(run),
+      selected: runId === this.selectedRunId,
+    }));
   }
 
   private update(): void {
@@ -374,6 +436,7 @@ export class SubagentStatusWidget {
   }
 
   private hide(): void {
+    this.selectedRunId = undefined;
     if (!this.ctx) return;
     if (this.registered) {
       // Unregistering removes the widget's lines outright, which is the same
@@ -403,6 +466,7 @@ export class SubagentStatusWidget {
     } catch (error) {
       for (const run of this.runs.values()) run.unsubscribers.forEach((fn) => fn());
       this.runs.clear();
+      this.selectedRunId = undefined;
       this.lastSignature = undefined;
       this.registered = false;
       this.tui = undefined;

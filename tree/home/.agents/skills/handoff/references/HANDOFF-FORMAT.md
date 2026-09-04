@@ -114,9 +114,10 @@ task transport 由维护 Wayfinder 的 A 写给完成约定 coding outcome 的 B
 
 给出 dependency-aware numbered steps。每一步写明目标、seam、需要先读取或验证的内容、产生的 canonical artifact 和进入下一步的可观察条件。
 
-要求 B 按依赖顺序自行 claim 每个 Subspec：只有当前目标位于 frontier 时才 claim，完成并 resolved 后再 claim
-下一个。B 可用时使用 `wayfinder`，implementation 使用 `implement`；同时写明无 Skill 时等价的 frontmatter
-transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 owner。
+要求 B 按依赖顺序自行 claim 每个 Subspec：只有当前目标位于 frontier 时才 claim；完成 acceptance criteria、写入
+Resolution/Evidence、通过实际验证，并满足用户明确指定 commit 且 commit 已实际创建的 commit gate 后，才标记
+为 `resolved`，再 claim 下一个。B 可用时使用 `wayfinder`，implementation 使用 `implement`；同时写明无 Skill
+时等价的 frontmatter transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 owner。
 
 ### 验证与完成定义
 
@@ -126,18 +127,20 @@ transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 o
 - B 仍需运行的 exact command、cwd 和覆盖面；
 - 禁止运行的真实客户端、部署、发消息、下单、删除数据或其他 side-effect command；
 - 可逐条核验的 Definition of Done；
-- B 必须逐个写回各 in-scope Subspec 的 Resolution、Evidence 和最终 status，并在全部 outcome 达成后更新
-  Parent Spec 的状态。
+- B 必须逐个写回各 in-scope Subspec 的 Resolution、Evidence 和最终 status；只有用户明确指定本轮相关改动需要 commit，且该
+  commit 已实际创建、所有 Subspec 达成 acceptance criteria 后，才能将 Subspec 设为 `resolved` 并更新 Parent Spec 的状态。
 
 ### 停止条件
 
-具体列出需要 B 停止并返回 blocked review transport 的情形，例如改变 settled contract、public API、persisted schema、安全边界，或需要新权限、secret、发布、部署、真实业务操作和 dirty ownership 冲突。
+具体列出需要 B 停止并返回 blocked review transport 的情形，例如改变 settled contract、public API、persisted schema、安全边界，或需要新权限、secret、发布、部署、真实业务操作、用户未指定 commit 或 dirty ownership 冲突。
 
 ### 完成后的回传协议
 
 task transport 必须把以下协议直接写给 B，不能只让 B 读取本 reference：
 
-1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence；
+1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence。只有用户明确指定本轮相关
+   改动需要 commit 且该 commit 已实际创建，才将 Subspec 标记为 `resolved` 或将 Parent Spec 标记为 `complete`；
+   否则保留 `in-progress`，并以 `status: blocked` 回传 commit gate 未满足；
 2. 准备 review transport 所需的实际结果、acceptance criteria evidence、changed artifacts、验证、偏差、未验证项和 dirty ownership；
 3. 删除 inbound task transport；
 4. 在 task transport 指定的 exact output path 创建 review transport；时间戳取你（B）写回时 session 的当前时间，不要沿用 task transport 生成时的时间戳；
@@ -158,7 +161,9 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 - 希望 A 验证的用户可见效果、contract 和高风险 seam；
 - A 完成 review 后应更新的 canonical state。
 
-这里的 `status` 是 review transport 的状态，不是 Subspec frontmatter。Subspec 继续遵守 `wayfinder`：不得持久化 `blocked`，阻塞时保持 `in-progress` 或释放为 `ready` 并记录原因。
+这里的 `status` 是 review transport 的状态，不是 Subspec frontmatter。Subspec 继续遵守 `wayfinder`：不得持久化
+`blocked`，阻塞时保持 `in-progress` 或释放为 `ready` 并记录原因。用户未明确指定相关改动 commit，或指定的 commit 尚未
+实际创建时，即使 acceptance criteria 已满足，也必须使用 `status: blocked` 回传，不能把 Subspec 写成 `resolved`。
 
 ### 实际结果
 

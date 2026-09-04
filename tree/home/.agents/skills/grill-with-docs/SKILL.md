@@ -12,6 +12,6 @@ use domain-modeling，在对话从持续反复询问任何还没有确定的问�
 3. 只把跨多个 Subspec 生效的 contract 摘要写入 Spec；详细 reasoning 保留在当前 Subspec。
 4. 新问题已经清晰时创建 Subspec；仍说不清时写回 Spec 的 `Not yet specified`。
 5. 同步维护 domain glossary。只有满足难以逆转、缺少上下文会令人意外、存在真实 trade-off 三项条件时才创建 ADR。
-6. decision 与 evidence 完整后把 Subspec 标记为 `resolved`，再更新 Spec status。
+6. decision 与 evidence 完整后，只有用户明确指定本轮相关改动需要 commit 且该 commit 已实际创建，才把 Subspec 标记为 `resolved` 并更新 Spec status。否则保持 `in-progress`，记录已有的 `Resolution` 与 `Evidence`，不得把它作为 resolved dependency。
 
 如果没有活动 Spec，仍执行 grilling 与 domain-modeling 打磨 design，但不创建 Spec——确认的事实留在对话与 domain docs 中。发现工作规模确实需要跨 session 推进时，交回 wayfinder 创建 Spec。

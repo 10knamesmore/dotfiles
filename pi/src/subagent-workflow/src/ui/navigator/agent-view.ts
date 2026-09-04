@@ -9,8 +9,8 @@
  */
 
 import { Input, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
-import type { SubagentStatus } from "../../types.js";
-import { formatTokens, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
+import type { SubagentStatus, UsageSummary } from "../../types.js";
+import { formatTokenUsage, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import { messagesToLines, type TranscriptMessage } from "./transcript.js";
 
@@ -20,7 +20,7 @@ interface AgentHeader {
   /** Reasoning effort the child resolved to, shown beside the model. */
   thinking?: string;
   status: SubagentStatus;
-  tokens: number;
+  usage: UsageSummary;
 }
 
 const MODEL_MAX = 28;
@@ -157,11 +157,13 @@ export class AgentView {
         return true;
       case "pageup":
       case "shift+up":
+      case "shift+k":
         this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport);
         this.autoScroll = false;
         return true;
       case "pagedown":
       case "shift+down":
+      case "shift+j":
         this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport);
         this.autoScroll = this.scrollOffset >= max;
         return true;
@@ -231,7 +233,7 @@ export class AgentView {
     const label = sanitizeTerminalText(head.label);
     // The tight "·" binds effort to its model; the spaced " · " separates fields.
     const model = sanitizeTerminalText(head.model ? modelEffort(head.model, head.thinking, MODEL_MAX) : "?");
-    const title = `${glyph} ${theme.bold(label)} ${theme.fg("dim", `· ${model} · ${head.status} · ${formatTokens(head.tokens)} tok`)}`;
+    const title = `${glyph} ${theme.bold(label)} ${theme.fg("dim", `· ${model} · ${head.status} · ${formatTokenUsage(head.usage)}`)}`;
     const lines: string[] = [truncateToWidth(title, cap), truncateToWidth(theme.fg("dim", "─".repeat(cap)), cap)];
 
     const messages = this.deps.messages();

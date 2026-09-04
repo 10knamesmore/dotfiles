@@ -81,7 +81,7 @@ export function registerTodoTool(
     promptSnippet:
       "Track multi-step work as a parent-session phase and task list",
     promptGuidelines: [
-      "Use todo for multi-step work and keep every introduced task and phase string stable for later operations.",
+      "Use todo for multi-step work and keep every introduced task and phase string stable for later operations. make sure update todos once a task was done to help user keep in pace",
       "After a successful todo mutation, continue the real work in the same turn instead of spending a turn only updating progress.",
     ],
     parameters: TodoParameters,

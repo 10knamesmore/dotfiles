@@ -102,8 +102,10 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
     case "j":
       return { type: "move", delta: 1 };
     case "pageup":
+    case "shift+k":
       return { type: "pageMove", delta: -1 };
     case "pagedown":
+    case "shift+j":
       return { type: "pageMove", delta: 1 };
     case "tab":
       return { type: "cycleLive", delta: 1 };
@@ -150,7 +152,7 @@ interface FooterState {
 
 /** Compose the footer key-hint line for a level. Matches pi's dim selector footers. */
 export function footerHint(state: FooterState, theme: ThemeLike): string {
-  const parts: string[] = ["↑↓ select"];
+  const parts: string[] = ["↑↓ / jk select"];
   if (state.level === "runs") {
     parts.push("enter open", "esc close");
     if (state.canCycle) parts.push("tab next live");
@@ -163,7 +165,7 @@ export function footerHint(state: FooterState, theme: ThemeLike): string {
     if (state.canSave) parts.push("s save");
   } else {
     parts.length = 0;
-    parts.push("↑↓ scroll", "shift+↑↓ page");
+    parts.push("↑↓ / jk scroll", "shift+↑↓ / JK page");
     if (state.canSteer) parts.push("enter steer");
     else if (state.canMessage) parts.push("enter message");
     if (state.canCycle) parts.push("tab next live");
