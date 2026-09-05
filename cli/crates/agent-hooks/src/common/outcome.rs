@@ -5,7 +5,7 @@ use serde::Serialize;
 /// 一次 hook 调用的完整结果。
 ///
 /// - `output`：结构化 stdout 决策（由 wire 序列化）；`None` = 静默
-/// - `notice`：stderr 留痕（fail-open 告警，`claude --debug` 可见）
+/// - `notice`：stderr 留痕，向宿主报告 fail-open 告警。
 /// - `code`：进程退出码。PreToolUse fail-open 恒 0；其他 hook 事件可用 2（stderr 喂回模型）
 #[derive(Debug)]
 pub struct HookRun<T: Serialize> {

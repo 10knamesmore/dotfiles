@@ -1,14 +1,4 @@
 # ================================
-# 🤖 Agent 守卫
-# ================================
-# Claude Code 等 agent 会把交互 shell 的 alias/函数快照进自己的 Bash 工具：
-# rm -i 在无 TTY 下静默失败（exit 0 但没删）、sed -E / grep→rg 偷改语义、
-# tree() 吃不了 -L。agent 环境（CLAUDECODE=1）直接不加载本文件，模型用原生命令。
-# 注意：不能换成 [[ -o interactive ]]——CC 捕快照用的就是交互式 zsh（否则
-# .zshrc 不会被 source），交互检查拦不住它；CLAUDECODE 是唯一区分信号。
-[[ -n "$CLAUDECODE" ]] && return
-
-# ================================
 # 🧰 通用命令替代 & 默认行为增强
 # ================================
 alias activate="source ./.venv/bin/activate"
@@ -124,4 +114,4 @@ alias zja="zellij attach"
 # ================================
 # AI
 # ================================
-alias cc="claude"
+alias cc="codex"

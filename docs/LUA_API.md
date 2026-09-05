@@ -56,7 +56,7 @@ granularity("home/.config/opencode", {
 ```lua
 distribute("skills", {
     src = "tree/home/.agents/skills",
-    to = { "~/.claude/skills", "~/.codex/skills" },
+    to = { "~/.codex/skills", "~/.kimi/skills" },
     mode = "children",
 })
 ```

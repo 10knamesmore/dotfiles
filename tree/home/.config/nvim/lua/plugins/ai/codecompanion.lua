@@ -13,7 +13,7 @@ return {
   opts = {
     interactions = {
       chat = {
-        adapter = "claude_code",
+        adapter = "codex",
       },
     },
     adapters = {

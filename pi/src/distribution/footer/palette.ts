@@ -1,4 +1,4 @@
-/** Catppuccin Mocha colors used by the existing Claude Code status line. */
+/** Catppuccin Mocha colors for the Pi footer. */
 const RGB = {
   red: "243;139;168",
   peach: "250;179;135",

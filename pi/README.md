@@ -10,6 +10,7 @@ frozen pnpm install before planning the managed links, then deploys:
 
 - `src/distribution/` to `~/.pi/agent/extensions/pi-distribution`;
 - `src/subagent-workflow/` to `~/.pi/agent/extensions/subagent-workflow`;
+- `src/remember-last-model.ts` to `~/.pi/agent/extensions/remember-last-model.ts`;
 - the `workflow-authoring` skill to `~/.pi/agent/skills/`.
 
 The workflow runtime resolves Acorn from this workspace's `node_modules` through
@@ -47,3 +48,9 @@ exact pnpm lockfile; TypeBox and the Pi packages are supplied by Pi at runtime.
 Dotfiles owns Pi settings, `AGENTS.md`, shared hook rules, extensions, and the
 workflow-authoring skill. Pi continues to own `auth.json`, sessions, trust,
 model storage, workflow journals, and all other machine-local runtime state.
+
+Interactive model choices update Pi's native default provider/model, and thinking
+choices update its per-model settings. Session restoration does not change the
+default model. The extension never changes the model at startup, so Pi retains
+its own precedence for explicit CLI options, resumed sessions, and defaults.
+Workflow children and other non-TUI sessions do not persist model preferences.

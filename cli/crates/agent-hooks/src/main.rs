@@ -7,7 +7,7 @@ use agent_hooks::common::outcome::HookRun;
 use agent_hooks::common::wire;
 use agent_hooks::pretool::envelope::PreToolUseOutput;
 use agent_hooks::pretool::rules::Decision;
-use agent_hooks::pretool::{claude, codex, evaluation, kimi, pi, rules};
+use agent_hooks::pretool::{codex, evaluation, kimi, pi, rules};
 use clap::{Parser, Subcommand};
 
 /// 中立 hook CLI。
@@ -26,13 +26,6 @@ struct Cli {
 /// 当前支持的 harness adapter。
 #[derive(Subcommand)]
 enum Command {
-    /// Claude Code PreToolUse：保留共享规则的原生 deny/ask 决策。
-    #[command(name = "claude-pretool")]
-    Claude {
-        /// 规则 TOML；缺省 `~/.claude/hooks/pretool.toml`。
-        #[arg(long)]
-        rules: Option<PathBuf>,
-    },
     /// Codex PreToolUse：共享 deny 原样拦截，ask 降级为 hard deny。
     #[command(name = "codex-pretool")]
     Codex {
@@ -59,8 +52,6 @@ enum Command {
 /// 支持的 agent harness 及其协议差异。
 #[derive(Clone, Copy)]
 enum Adapter {
-    /// Claude Code adapter。
-    Claude,
     /// Codex adapter。
     Codex,
     /// Kimi Code adapter。
@@ -71,7 +62,6 @@ impl Adapter {
     /// 返回诊断中使用的 CLI 子命令名。
     const fn command_name(self) -> &'static str {
         match self {
-            Self::Claude => "claude-pretool",
             Self::Codex => "codex-pretool",
             Self::Kimi => "kimi-pretool",
         }
@@ -80,7 +70,6 @@ impl Adapter {
     /// 返回当前 harness 的缺省规则副本路径。
     fn default_rules_path(self) -> Option<PathBuf> {
         let suffix = match self {
-            Self::Claude => ".claude/hooks/pretool.toml",
             Self::Codex => ".codex/pretool.toml",
             Self::Kimi => ".kimi-code/pretool.toml",
         };
@@ -91,14 +80,13 @@ impl Adapter {
     fn rewrite_stdin(self, stdin_text: &str) -> String {
         match self {
             Self::Kimi => kimi::rewrite_stdin(stdin_text),
-            Self::Claude | Self::Codex => stdin_text.to_owned(),
+            Self::Codex => stdin_text.to_owned(),
         }
     }
 
     /// 把共享规则决策转换为当前 harness 的输出协议。
     fn output(self, decision: Decision, reason: &str) -> PreToolUseOutput {
         match self {
-            Self::Claude => claude::output(decision, reason),
             Self::Codex => codex::output(decision, reason),
             Self::Kimi => kimi::output(decision, reason),
         }
@@ -109,14 +97,13 @@ impl Adapter {
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Command::Claude { rules } => run_harness_pretool(Adapter::Claude, rules),
         Command::Codex { rules } => run_harness_pretool(Adapter::Codex, rules),
         Command::Kimi { rules } => run_harness_pretool(Adapter::Kimi, rules),
         Command::Pi { rules } => wire::emit(pi_pretool(rules.or_else(pi_rules_path))),
     }
 }
 
-/// 运行输出 Claude-style PreToolUse 信封的 harness adapter。
+/// 运行输出 PreToolUse 信封的 harness adapter。
 fn run_harness_pretool(adapter: Adapter, rules_path: Option<PathBuf>) {
     let rules_path = rules_path.or_else(|| adapter.default_rules_path());
     wire::emit(pretool(adapter, rules_path));

@@ -15,10 +15,7 @@ dots.resource.symlink {
     target = dots.repo .. "/tree/home/.config/opencode/node_modules",
 }
 
--- Claude hooks：目录保持真实、逐子项链，使运行时本地文件能与受管 hook 共存。
-granularity("home/.claude/hooks", { mode = "children" })
-
--- pi agent：同上，目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
+-- Pi agent 目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
 -- sessions/、models-store.json、npm/ 等机器本地物，整目录链会把它们卷进仓库。
 -- 注意 pi 用 writeFileSync 原地写 settings.json（跟随软链、不 temp+rename），
 -- 所以链进来的 settings.json 在 /settings 改动后会直接回流仓库——这是要的行为，
@@ -27,20 +24,9 @@ granularity("home/.pi/agent", { mode = "children" })
 
 distribute("skills", {
     src = "tree/home/.agents/skills",
-    to = { "~/.claude/skills", "~/.codex/skills", "~/.kimi/skills" },
+    to = { "~/.codex/skills", "~/.kimi/skills" },
     mode = "children",
 })
-distribute("agents", {
-    src = "tree/home/.agents/claude/agents",
-    to = { "~/.claude/agents" },
-    mode = "children",
-})
-distribute("commands", {
-    src = "tree/home/.agents/claude/commands",
-    to = { "~/.claude/commands" },
-    mode = "children",
-})
-
 dots.hook.before_sync {
     name = "install Pi dependencies",
     cwd = dots.repo .. "/pi",
@@ -57,6 +43,10 @@ dots.resource.symlink {
     source = dots.repo .. "/pi/src/subagent-workflow",
     target = dots.home .. "/.pi/agent/extensions/subagent-workflow",
 }
+dots.resource.symlink {
+    source = dots.repo .. "/pi/src/remember-last-model.ts",
+    target = dots.home .. "/.pi/agent/extensions/remember-last-model.ts",
+}
 local local_provider = dots.repo .. "/pi/src/local_provider.ts"
 dots.resource.symlink {
     source = local_provider,
@@ -68,10 +58,7 @@ dots.resource.symlink {
     target = dots.home .. "/.pi/agent/skills/workflow-authoring",
 }
 
--- 全局 agent 指令的唯一真相源。Claude Code 只认 ~/.claude/CLAUDE.md，
--- 那份改成 `@~/.agents/AGENTS.md` 一行 import（官方推荐的 AGENTS.md 接法）；
--- pi 只认 ~/.pi/agent/ 下的 AGENTS.md，够不着 ~/.agents/，只能链过去。
--- 接新工具 = to 加一行。
+-- 全局指令源统一放在 .agents；各工具从自己的全局目录加载同一文件。
 distribute("agents-md", {
     src = "tree/home/.agents/AGENTS.md",
     to = { "~/.pi/agent/AGENTS.md", "~/.codex/AGENTS.md" },
@@ -87,7 +74,6 @@ distribute("codex-hooks", {
 distribute("agent-hook-rules", {
     src = "tree/home/.agents/hooks/pretool.toml",
     to = {
-        "~/.claude/hooks/pretool.toml",
         "~/.codex/pretool.toml",
         "~/.kimi-code/pretool.toml",
         "~/.pi/agent/pretool.toml",

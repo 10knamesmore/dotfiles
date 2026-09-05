@@ -4,8 +4,6 @@
 
 use serde::Serialize;
 
-use super::rules::Decision;
-
 /// 从 PreToolUse 的 stdin JSON 提取 `(tool_name, tool_input)`。
 ///
 /// 取不出（坏 JSON / 字段缺失 / 类型不对）一律 `None`——fail-open。
@@ -40,12 +38,6 @@ pub struct PreToolUseDecision {
 }
 
 impl PreToolUseOutput {
-    /// 保留共享规则的原生决策与理由。
-    #[must_use]
-    pub fn from_decision(decision: Decision, reason: impl Into<String>) -> Self {
-        Self::new(decision.as_str(), reason)
-    }
-
     /// 输出 adapter 已确认支持的 `deny` 决策。
     #[must_use]
     pub fn deny(reason: impl Into<String>) -> Self {

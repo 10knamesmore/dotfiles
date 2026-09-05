@@ -50,8 +50,7 @@ export function followUpSpawn(spec: ChildSpawnSpec): ResolvedFollowUpSpec | unde
  * One line of framing appended to every child's system prompt. Children
  * otherwise have no idea they are subagents: small models hallucinate when
  * prompts reference orchestrator concepts, wrap answers in markdown fences,
- * and write for a human reader who is not there. Claude Code appends the
- * same kind of note to its subagents.
+ * and write for a human reader who is not there.
  */
 export const SUBAGENT_FRAMING =
   "You are a subagent: an orchestrating agent spawned you for a single task. Your final message is returned to that agent as a result - it is not shown to a person. Respond with exactly what the task asks for: raw data or findings, no preamble, no markdown code fences unless explicitly requested, no closing questions.";

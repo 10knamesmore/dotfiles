@@ -57,7 +57,7 @@ dotfiles/
 ├── .gen/   (不入库)  # 派生区：scripts/ 聚合软链、injected/ 模板渲染产物
 ├── .dots/  (不入库)  # state.json Applied Inventory（删除与 Drift 判断依据）
 ├── README.md         # → docs/README.md 的符号链接
-└── AGENTS.md         # → CLAUDE.md 的符号链接
+└── AGENTS.md         # 项目指令的真实源文件
 ```
 
 ## 映射规则
@@ -84,7 +84,7 @@ dotfiles/
 
 完整参考见 [LUA_API.md](LUA_API.md)。Lua API 不提供任意 shell Action、run-once 状态、`dots.file.*`、`dots.cargo.build` 或 `dots.json.*`。
 
-`dots.lua` 维护需要安装的 Cargo binary 清单。`dots install` 把 crates.io 和 workspace 声明直接映射为 `cargo install`，由 Cargo 的安装 metadata 判断安装或升级；dots 不自动追加 `--force`。删除声明只会停止后续执行，不会卸载已经安装的 package。该清单不包含系统包、rustup、Claude、Node 或 pnpm。
+`dots.lua` 维护需要安装的 Cargo binary 清单。`dots install` 把 crates.io 和 workspace 声明直接映射为 `cargo install`，由 Cargo 的安装 metadata 判断安装或升级；dots 不自动追加 `--force`。删除声明只会停止后续执行，不会卸载已经安装的 package。该清单不包含系统包、rustup、AI CLI、Node 或 pnpm。
 
 CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lua-api/dots.meta.lua` 提供。
 
@@ -99,7 +99,7 @@ CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lu
 
 - Zsh 不使用框架，显式启用 emacs 键模式。Ctrl-S 打开 live-grep，Ctrl-Q 打开临时 scratch，Ctrl-W/Ctrl-U 留空。
 - `tree/home/.config/zsh/` 按编号加载：`10-options.zsh` 管历史、目录、补全与键绑定；`20-functions.zsh` 管交互函数；`25-fzf-tab.zsh` 管 fzf 与 fzf-tab；`30-autosuggestions.zsh` 管历史建议；`40-aliases.zsh` 管别名；`90-syntax-highlighting.zsh` 必须最后加载。
-- `25-fzf-tab.zsh` 必须位于 compinit 和 `fzf --zsh` 之后、autosuggestions 之前。Ctrl-T 不绑定路径插入，Ctrl-F 选文件并进入 nvim。`40-aliases.zsh` 在 `CLAUDECODE` 环境中跳过。
+- `25-fzf-tab.zsh` 必须位于 compinit 和 `fzf --zsh` 之后、autosuggestions 之前。Ctrl-T 不绑定路径插入，Ctrl-F 选文件并进入 nvim。
 - `z` → zoxide；提示符 starship + 自写 transient prompt。
 - git diff 走 delta（`tree/home/.gitconfig` 受管，syntax-theme 复用 bat 主题库）；bat 主题 Catppuccin Mocha（`tree/home/.config/bat/config`），与 kitty/fzf 同色板。
 - 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `tree/home.linux/.zshrc_linux` / `tree/home.macos/.zshrc_macos`。
@@ -126,13 +126,15 @@ CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lu
 
 ## AI 工具链（skills / agents / hooks）
 
-`tree/home/.agents/` 是手写、跨 agent AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，agent hook 定义与规则再分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
+`tree/home/.agents/` 是手写、跨 agent AI 资产的唯一真相源：`skills/` 分发到 `~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），Pi 直接发现 `~/.agents/skills`。全局指令和语言规则也由 `.agents/` 持有，agent hook 定义与规则分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
 
 [全局指令](../tree/home/.agents/AGENTS.md) 保存跨项目偏好；skill 的 description 只声明用途与关键排除，入口按任务链接所需 reference。明确的小改动直接完成，跨会话目标或用户指定的 Spec 使用 [Wayfinder](../tree/home/.agents/skills/wayfinder/SKILL.md)。验收、后续修正与 Git 操作的关系由其[完成规则](../tree/home/.agents/skills/wayfinder/SKILL.md#完成与修正)定义。
 
-Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。各 adapter 通过同一个 `agent-hook` binary 保留 harness 协议差异；Pi 的 `ask` 由 extension 在有 UI 时显式确认，无 UI 时拒绝。`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
+Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。各 adapter 通过同一个 `agent-hook` binary 保留 harness 协议差异；Pi 的 `ask` 由 extension 在有 UI 时显式确认，无 UI 时拒绝。`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
 
 `pi/` 是 vanilla Pi 的本地 Distribution，不包含或 fork Pi CLI。Pi 通过 jiti 直接加载仓库内的 TypeScript extension；`dots sync` 先按 frozen lockfile 安装 Acorn，再把两个 source tree 和 workflow-authoring skill 链到 `~/.pi/agent/`。Workflow runtime 由本仓库直接维护并保留原作者 MIT license。依赖和本地 state 边界见 [pi/README.md](../pi/README.md)。
+
+Pi 的模型选择记忆写入原生 settings，不在启动时覆盖模型；显式 CLI 参数、恢复会话和默认值的优先级由 Pi 处理。共享规则保留凭据路径与高风险命令的工具级限制，不能据此推断存在 OS sandbox。
 
 ## 当前管理的主要配置
 
@@ -141,7 +143,7 @@ Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust
 - 终端：Kitty；文件管理器：Yazi；多路复用：Zellij；监控：btop
 - Linux 桌面：Hyprland（主，0.55+ Lua 入口）/ niri（备选）/ QuickShell（状态栏 + 控制中心）/ xremap / systemd user 单元
 - macOS：yabai / skhd / sketchybar / fcitx5
-- AI 工具：Claude / Codex / Kimi skills、agents 与共享 PreToolUse 守卫，opencode、pi
+- AI 工具：Codex / Pi / Kimi skills 与共享 PreToolUse 守卫，opencode
 
 以上是主要部分，完整清单以 `tree/` 实际内容为准。
 
@@ -151,6 +153,6 @@ Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust
 
 ## 注意事项
 
-- 顶层 `README.md` 是指向 `docs/README.md` 的符号链接；`AGENTS.md` 指向 `CLAUDE.md`。
+- 顶层 `README.md` 是指向 `docs/README.md` 的符号链接；`AGENTS.md` 是项目指令的真实源文件。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
 - 新机必须先准备 C 编译器、Cargo、Node 22.19+ 与 pnpm 11.18。系统包、rustup、Node、pnpm 和 AI CLI 由使用者管理；Cargo binary 由 `dots install` 安装或升级，Pi workspace 依赖由 sync lifecycle hook 安装。

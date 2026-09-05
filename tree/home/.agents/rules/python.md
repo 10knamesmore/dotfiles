@@ -1,8 +1,3 @@
----
-paths:
-  - "**/*.py"
----
-
 # Python
 
 - 新写或改过的 `.py` 交付前必须跑 `uvx basedpyright <file>` 到 **0 error 0 warning**；跑不干净就改代码，禁止 `# type: ignore` / 放宽规则蒙混
