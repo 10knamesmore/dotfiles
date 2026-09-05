@@ -1,143 +1,24 @@
 ---
 name: handoff
-description: 当需要把 contract 已明确的 coherent coding outcome 通过 handoff 文档整体交给另一个 Agent session，并要求对方完成实现、验证和 review 回传时使用；范围可以覆盖一个或多个 Wayfinder Subspec、完整 cutover 及其关联 repo。
+description: 将已明确的实现任务通过一次性交接文档交给另一 Agent 会话，或审查其回传结果。用于一个完整交付目标，可跨 Subspec 或仓库。
 ---
 
-开始前完整读取 [HANDOFF-FORMAT.md](references/HANDOFF-FORMAT.md)。
+# Handoff
 
-## 通信模型
+当前使用者 A 负责确定交付目标、写任务交接并审查结果；接收者 B 实现、验证并回传证据。B 不需要安装本 skill，执行和回传要求由 A 写进交接文件。
 
-`handoff` 与 `wayfinder` 配合，把一次跨 Agent 推进建模为两个方向相反的 once transport：
+## 路由
 
-```text
-Agent A：维护 wayfinder / Spec
-    |
-    | task transport
-    v
-Agent B：按依赖 claim、实现、验证、写 Resolution/Evidence
-    |
-    | review transport
-    v
-Agent A：review 真实效果、更新 Spec/frontier
-```
+- 准备发出任务：读取 [send.md](references/send.md) 和 [HANDOFF-FORMAT.md](references/HANDOFF-FORMAT.md) 的任务与回传格式。
+- 收到结果：读取 [review.md](references/review.md)，基于真实源码与结果完成 review。
 
-- Agent A 是本轮的 planner/reviewer，负责确定完整交付范围、维护 Spec，并在 B 返回后 review。
-- Agent B 是本轮的 executor，负责完成 transport 中约定的全部 coding outcome，并把结果和 evidence 返回给 A。
-- `handoff` Skill 只由 A 使用。B 只接收生成的 task transport，不需要安装或读取本 Skill。
-- task transport 必须包含 Parent Spec、全部 in-scope Subspec 与它们的外部 dependencies 的精确指针；它传递导航、live state 与本轮动作，不复制 Spec contract。
-- B 一般可以使用 `wayfinder` 与 `implement`。task transport 应要求 B 优先使用可用的对应 Skill，同时内联 claim、Resolution、Evidence、验证和回传步骤作为明确 fallback。
-- transport 文件构成一个 single-slot half-duplex channel。同一 channel 同一时刻只允许一份未完成 transport；不得覆盖、追加或改写对方尚未完成的 transport。
-- 接收方完成 transport 要求的动作后删除 inbound transport，再由自己写一份反向 transport。handoff 不保存长期会话历史。
+## 约定
 
-## 不变量
+- 每份交接服务一个可独立验收的完整目标，可覆盖多个依赖有序的 Subspec、crate、repo 或 worktree。不要因首个 frontier 较小而截断用户要求的交付，也不拼接互不相关的目标。
+- Spec、Subspec、领域文档、源码与项目指令保存长期约定；交接文件只传递本次任务、现场状态和回传要求，不复制完整 Spec。
+- 同一交接通道一次只保留一份未处理消息。发送者不覆盖或删除已发出的文件；接收者完成任务或记录实际阻塞后删除收到的消息，再写反向回传。长期结果先记入 Spec/Subspec。
+- A 亲自核对相关源码、git 状态和验证证据并写交接，不再委托别人生成交接文件。回传的完成声明不能代替 A 的 review。
+- 状态按 [Wayfinder 的完成与修正规则](../wayfinder/SKILL.md#完成与修正) 更新。review 发现的局部问题由 A 在原 Subspec 就地修复；需要用户决定时仅暂停依赖该决定的工作。
+- 保护用户和其他 agent 的未提交改动；交接不授予 commit、push、部署或其他外部操作权限。面向接收 agent 的指令使用中文，标识符、命令与路径保留原文。
 
-- Spec、Subspec、domain docs、源码与项目指令是 canonical authority；transport 只传递本轮任务或 review 请求。
-- 一轮 transport 只服务一个 coherent coding outcome。范围由用户要求的结果和必须一起 cut over 的边界决定，
-  可以跨多个依赖有序的 Subspec、crate、repo 或 worktree；不得因为 Wayfinder 的第一个 frontier 较小就截断
-  用户已经明确要求的完整结果，也不得把互不相关的 feat 拼成一份 transport。
-- Wayfinder frontier 决定 B 的 claim 和实施顺序，不是 handoff 的最大范围。首个 in-scope Subspec 必须位于
-  frontier；后续 Subspec 可以只被同一 transport 内更早的工作阻塞。
-- review 发现的 bug 和小修小补由 A 就地修复，不设计多轮 transport 往返。
-- A 必须亲自核对 live source、worktree、git state 与验证结果并生成 outbound transport，不把写 transport 再委托出去。
-- receiver 不因 transport 的结论而跳过 source-grounded verification。A review 时必须重新检查真实 diff、源码和测试效果。
-- 完成、剩余、失败和未验证必须分开；不得用进度百分比或模糊的完成了代替 evidence。
-- `resolved` 受 Wayfinder commit gate 约束：只有用户明确指定本轮相关改动需要 commit，且该 commit 已实际创建后，才能更新 Subspec 为 `resolved`；否则即使代码和验证完成，也保持 `in-progress`，不得更新 Parent Spec 为 `complete`。
-- 保护用户和其他 Agent 的 dirty changes。不得为整理 channel 而 reset、checkout、clean、reformat、stage、commit 或 push。
-- 所有面向接收 Agent 的 instruction 使用中文；代码 identifier、命令、路径和无法自然翻译的技术名词保持原文。
-
-## 流程
-
-### 1. 识别当前方向
-
-使用本 Skill 的当前 Agent 是 A。先确定 channel 所处阶段：
-
-- A 准备把 contract 已明确的 coding outcome 交给 B：写 `task transport`。
-- channel 中存在 B 返回的 review transport：A 先完成 review，不得直接生成下一轮任务。
-
-channel 中已有 task transport 时，说明 B 的工作仍在进行，A 不得覆盖或发送第二份消息。channel 中已有 review transport 时，A 在完成 review 前不得删除。
-
-### 2. 重新读取 authority 与 live state
-
-向上定位并完整读取适用的 `AGENTS.md`、`CLAUDE.md`、README 和维护说明。一般应存在对应的 Parent Spec
-与一个或多个 in-scope Subspec；读取完整 Spec、全部 in-scope Subspec、外部 dependencies、domain glossary
-和相关源码，不依赖对话摘要或旧行号。
-
-逐个相关 repo/worktree 检查 branch、`git status --short --branch`、scoped staged/unstaged diff、lockfile、生成物和验证记录。引用代码事实前重新读取对应文件，并使用 `path/to/file:line`。
-
-区分 user-owned、other-agent-owned、本任务和 ownership 未知的 dirty state。无法安全重跑的验证明确标记来源、时间和限制。
-
-### 3. A 写 task transport
-
-A 先确定一个可以独立验收的 delivery scope：
-
-- 单个 Subspec 已能交付用户要求的结果时，优先只交接该 Subspec。
-- public contract break、跨层 cutover、跨 repo integration 或用户明确要求完成整个 effort 时，把必须共同
-  落地才能成立的多个 Subspec 纳入同一 transport。不要为了保持单 Subspec 形式留下不能运行的平行模型、
-  compatibility shell 或中间态。
-- 仍需用户决策或 fog 未清除的内容不能伪装成 coding scope；先回到 Wayfinder/grill 完成决策。
-
-A 使用 `wayfinder` 验证首个 in-scope Subspec 位于 frontier、后续目标只依赖已 resolved 或同一 transport
-内更早的 Subspec。A 不代替 B claim，也不把 Spec contract 复制成另一套计划。
-
-task transport 至少写清：
-
-- Parent Spec、全部 in-scope Subspec、外部 dependencies 与 domain glossary 的 absolute path 或可解析链接，以及 canonical read order；
-- 一个明确的最终 outcome，以及各 Subspec/仓库如何共同构成该 outcome；
-- outcome、scope、out-of-scope 和 settled contract；
-- live code seam、dirty ownership 与保护边界；
-- dependency-aware 执行顺序、每个 claim boundary、验证命令、Definition of Done 和停止条件；
-- B 完成后必须更新的各 Subspec Resolution/Evidence/status 与 Parent Spec 状态；
-- B 可用时应调用的 `wayfinder` / `implement`，以及不可用时仍可执行的显式 fallback；
-- B 需要返回给 A review 的具体效果、evidence、review transport 格式、exact output path 与命名规则（时间戳取 B 写回时 session 当前时间）。
-
-A 验证 transport 后交给 B。A 不删除 outbound transport，也不在 B 完成前写第二份消息。
-
-### 4. 把 B 的执行与回传闭环写进 task transport
-
-A 生成的 task transport 必须直接要求 B：
-
-1. 完整读取 handoff 指向的 Parent Spec、全部 in-scope Subspec、外部 dependencies、项目指令和源码；
-2. 可用时使用 `wayfinder` 按依赖顺序逐个 claim 已到 frontier 的 Subspec，并在 `kind: implementation` 时
-   使用 `implement`；如果 Skill 不可用，按 handoff 内联步骤完成相同的 frontmatter、Resolution、Evidence
-   和验证动作；
-3. 只有某个 Subspec 实际满足 acceptance criteria、写入 Resolution/Evidence、完成要求的验证，并且用户
-   明确指定本轮相关改动需要 commit 且该 commit 已实际创建后，才把它标记为 `resolved` 并进入下一个
-   in-scope Subspec；commit gate 未满足时保持 `in-progress`；
-4. 只有全部 in-scope Subspec 均已满足 commit gate、状态为 `resolved`，且 transport 的整体 outcome 均满足，
-   才返回 `status: completed`；否则返回 `status: blocked`，说明已验证结果和未满足的 commit gate；
-5. 基于 live state 准备 review transport，写明各 acceptance criteria 的 evidence、changed artifacts、
-   验证结果、偏差、未验证项、dirty ownership 和希望 A 重点 review 的效果；
-6. 删除已完成的 inbound task transport，再按 handoff 给出的 exact path 与格式写入 review transport；命名中的时间戳以 B 写回时 session 当前时间为准。
-
-task transport 还要说明真正阻塞时的 fallback：B 写 `status: blocked` 的 review transport，提供 blocker、已尝试方案、现有 evidence 和需要 A 或用户决定的事项。这个 status 只属于 transport；Subspec frontmatter 按 Wayfinder contract 保持 `in-progress` 或释放为 `ready`，绝不写 `blocked`。
-
-### 5. A review 并推进 wayfinder
-
-A 完整读取 review transport，然后独立检查全部相关 repo 的真实 diff、源码、运行过的命令、测试覆盖和
-用户可见效果。transport 的完成声明只是 review index，不是验收证据本身。
-
-- review 通过：只有相关 Subspec 均满足 Wayfinder commit gate，才按 `wayfinder` 更新适用的 Parent Spec canonical state、frontier、fog 和整体 status，并将 Spec 设为 `complete`；只有已满足 commit gate 的 resolved decision 才进入 decision summary。若 gate 未满足，保留 Subspec 的 `in-progress` 和 Parent Spec 的非 complete 状态。
-- review 发现精确问题：bug 和小修小补由 A 就地修复并验证，不生成新一轮 task transport；只有问题构成新一轮大 feat 开发时，才写入新的 Subspec 并生成新的 task transport。不要把评论追加进旧 transport。
-- review 需要用户决定：写回 decision Subspec 或 fog，并停止，不替用户选择。
-
-A 完成 review 和 canonical state 更新后删除 inbound review transport。需要推进下一个 frontier feat 时，再创建新的 task transport；删除前不得复用同一路径。
-
-### 6. 验证 outbound transport
-
-交付前完整回读并检查：
-
-- direction、sender、receiver、transport type 和完整 delivery scope 明确；
-- Parent Spec、全部 in-scope Subspec 和外部 dependency 指针都能解析，且 B 不需要读取 `handoff` Skill；
-- `wayfinder` / `implement` route 与无 Skill 时的 fallback 都写进 task transport；
-- channel 中没有另一份尚未完成的 transport；
-- 首个目标位于 frontier，后续目标的 dependency 都能在同一 transport 内按顺序解除；
-- 各 repo 的 branch、status、claim、dependency、命令、路径和 line reference 与 live state 一致；
-- 各 Subspec 的 resolved 状态都有用户指定 commit 和实际 commit evidence；
-- 完成、剩余、失败和未验证没有矛盾；
-- dirty ownership 足以防止覆盖、误格式化或误 stage；
-- review transport 的命名与时间戳规则（取 B 写回时 session 当前时间）已内联进 task transport，B 不读取 `handoff` Skill 也能确定回传文件路径；
-- 删除命令只指向当前 inbound transport，不含 glob、变量或递归删除；
-- 不包含 secret，也没有授权未获批准的 commit、push、部署或 side effect；
-- transport 删除后，Spec、Subspec、源码和 evidence 仍能还原长期状态。
-
-向用户返回 transport 的 clickable absolute path、方向、接收者和验证边界。sender 不删除刚发布的 outbound transport。
+交付时给出文件的可点击绝对路径、方向、接收者和实际验证范围。发送者保留刚发布的文件供接收者处理。

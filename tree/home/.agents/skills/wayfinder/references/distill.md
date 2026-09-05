@@ -2,7 +2,7 @@
 
 当前对话里方向与决策已经聊清楚，直接整理为 Spec 与初始 Subspec。不要重新访谈用户，也不要把不确定内容伪装成 decision。如果还不了解代码库，先 explore 当前实现。
 
-1. 读取 repo instructions、现有 spec 约定、domain glossary 和相关 ADR。
+1. 读取 repo instructions 和现有 spec 约定；仅对对话中涉及的领域概念查阅 glossary、相关 ADR 与源码。
 2. 从对话中提取 destination、problem、solution、user stories、acceptance criteria、共享实现决策、测试决策和 out-of-scope。
 3. 确定测试 feature 的 seam。优先使用已有 seam，并使用项目现有测试范例。没有充分证据时，把 seam 问题写入 `Not yet specified` 或 decision Subspec，不要编造。
 4. 按 SPEC-FORMAT 创建 Spec 目录与 `main.md`。
@@ -15,4 +15,4 @@
 7. 仍有 planning Subspec 或 fog 时，Spec status 为 `draft`；所有共享决策稳定且至少一个 implementation Subspec 位于 frontier 时，才设为 `ready`。
 8. 最后检查 Spec 中每项事实都有对话、源码、documentation 或 ADR 依据。不确定项必须显式留在 fog 或 Subspec 中。
 
-固化只综合已有上下文并落盘，不推进任何 Subspec。
+用户只要求固化 Spec 时，综合已有上下文并落盘后停止。用户同时授权实施或推进完整目标时，固化后转入 `advance.md`，按依赖顺序继续授权范围内的工作。

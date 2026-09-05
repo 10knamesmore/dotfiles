@@ -18,7 +18,7 @@ status: draft
 
 - `id`：在 repo 内稳定、唯一的 kebab-case identifier。
 - `title`：面向人类的名称。
-- `status`：`draft`、`ready`、`in-progress`、`complete` 或 `paused`。
+- `status`：`draft` 表示仍有未定决策或 fog；`ready` 表示共享决策已稳定且至少一个 implementation 位于 frontier；`in-progress` 表示实现已开始；`complete` 表示整体验收完成；`paused` 表示用户明确暂停。完成与后续修正遵守 [Wayfinder](../SKILL.md#完成与修正)。
 
 ## Body
 
@@ -79,5 +79,5 @@ status: draft
 - Spec 不复制 Subspec 的 status、dependency、完整 resolution 或 evidence。
 - `Subspecs` 是稳定 index；完成后不删除条目。
 - `Decisions so far` 只索引已 resolved 的 decision，不替代原 Subspec。
-- `complete` 必须同时满足所有 required Subspec 均已满足 commit gate、状态为 `resolved`，以及 acceptance criteria 已验证。
+- `complete` 必须同时满足所有 required Subspec 均为 `resolved`，以及 acceptance criteria 已验证。
 - 存在真实 trade-off 时，可以增加 `Alternatives considered` 与 `Risks and consequences` section；只记录实际考虑过的 alternative，不为填模板编造陪衬。

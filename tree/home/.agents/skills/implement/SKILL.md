@@ -1,30 +1,17 @@
 ---
 name: implement
-description: 根据 repo-local Spec 推进一个 implementation Subspec，完成代码、验证、resolution 与 Spec 状态更新。
+description: 根据已有本地 Spec 实现一个 implementation Subspec，完成代码、验证、结果记录与状态更新。
 ---
 
 # Implement
 
-一次只实现一个 `kind: implementation` 的 Subspec。
+一次实现一个 `kind: implementation` 的 Subspec，再由 Wayfinder 继续授权范围内的下一个目标。
 
-## Process
+1. 读取项目指令、Parent Spec、目标 Subspec 和它直接依赖的结论；根据实现问题读取相关源码与验证入口。
+2. 用户只提供 Spec 时，优先继续当前执行者已 claim 的目标，否则按 Spec index 选择授权范围内第一个 frontier。没有可继续目标时报告具体 dependency、draft 或 stale claim，不让用户手动挑选可推导的任务。
+3. 确认目标所有 `depends_on` 均为 `resolved`；未 claim 的目标从 `ready` 改为 `in-progress` 并写入 owner。当前执行者可继续自己的 claim；不覆盖其他 owner。非 implementation 目标交回对应 workflow。
+4. 实现 acceptance criteria，遵守项目的测试约定。使用风险相称的既有验证；不引入通用 test-first 流程，也不为流程本身增加测试。
+5. 检查改动是否引入需要说明的业务概念、字段语义、失败条件或不变量；需要编辑注释或其他持久 prose 时使用 [prose-standard](../prose-standard/SKILL.md)。检查真实 diff 与用户可见结果，修复属于本次改动的问题。
+6. 在 `Resolution` 与 `Evidence` 中记录结果、实际验证和未完成项，按 [Wayfinder 的完成与修正规则](../wayfinder/SKILL.md#完成与修正) 更新 Subspec 与 Parent Spec。验收失败时继续修正，不能以状态更新代替完成工作。
 
-1. 读取 repo instructions、完整 Spec、目标 Subspec，以及它直接依赖的 resolved Subspec。格式约定见 `../wayfinder/references/SPEC-FORMAT.md` 和 `../wayfinder/references/SUBSPEC-FORMAT.md`。
-2. 如果用户只提供 Spec，读取各 Subspec frontmatter，按 Spec index 顺序选择第一个位于 frontier 的 implementation Subspec。不要让用户手动选择。
-3. 验证目标 `status: ready` 且所有 `depends_on` 均为 `resolved`。如果 kind 不是 `implementation`，交回对应 workflow；如果没有 frontier，报告具体 dependency、draft Subspec 或 stale claim。
-4. 开始实质工作前，把目标 status 改为 `in-progress` 并写入 `owner`。发现其他 owner 已 claim 时，跳过它。
-5. 在约定的 seam 上实现 acceptance criteria。只有用户明确要求时才新增、修改或删除测试；测试未获授权时，使用现有测试和其他验证，不要用通用 test-first 流程覆盖 repo instructions。
-6. 完成实现后，运行项目要求的 formatter、type check、lint 和现有 tests。使用 [`prose-standard`](../prose-standard/SKILL.md) 检查 touched code 是否需要同步注释，以及当前 diff 中新增或修改的其他持久 prose；发现 session、PR、review 或草稿视角时再使用 [`trim-cot-leakage`](../trim-cot-leakage/SKILL.md)。若安装了 code-review skill，使用它 review 当前 diff，并处理确认的问题。
-7. 只有实际验证通过后，才在 Subspec 中填写：
-   - `Resolution`：实现结果和重要 contract。
-   - `Evidence`：运行过的命令、结果及必要的源码或 artifact 链接。
-   - 只有用户明确指定本轮相关改动需要 commit，且该 commit 已实际创建后，才能写入 `status: resolved`。
-   - commit gate 未满足时，保留 `status: in-progress`，可以写入已有的 `Resolution` 与 `Evidence`，但不得把它当作 resolved dependency。
-8. 更新 Spec：
-   - 第一个 implementation 开始后设为 `in-progress`。
-   - 只有所有 required Subspec 均已满足 commit gate、状态为 `resolved`，且 Spec acceptance criteria 已验证后，才能设为 `complete`。
-   - 新问题能精确表达时创建新 Subspec，否则写回 `Not yet specified`。
-
-验证失败、工作未完成或 commit gate 未满足时保持 `in-progress`，在 `Resolution` 中记录 blocker 或当前结果，不得声称 resolved。
-
-不要自动 commit 或 push。只有用户明确要求，或 repo instructions 明确授权当前 workflow 时才执行 Git 写操作；但 `resolved` commit gate 只接受用户明确指定本轮相关改动需要 commit 且该 commit 已实际创建的情形。
+新问题属于当前验收要求时直接解决；独立的新范围写入对应 Subspec，尚不清晰的写入 Spec 的 `Not yet specified`。只按已有授权执行 commit 或 push。

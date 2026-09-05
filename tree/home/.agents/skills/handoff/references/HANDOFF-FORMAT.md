@@ -1,6 +1,6 @@
 # Handoff Format
 
-本文件只供生成 task transport 的 Agent A 使用，Agent B 不需要读取本 Skill 或本 reference。A 必须把 Spec 指针、执行要求和 review 回传协议写入生成的 handoff。`task transport` 与 `review transport` 共享一个 single-slot half-duplex channel：接收方完成当前 transport 要求的动作后删除它，sender 才能在反方向发布下一份 transport。
+本文件只供生成 task transport 的 Agent A 使用，Agent B 不需要读取本 Skill 或本 reference。A 必须把 Spec 指针、执行要求和 review 回传协议写入生成的 handoff。`task transport` 与 `review transport` 共享一个 single-slot half-duplex channel：接收方完成交付或记录实际阻塞后删除收到的消息，再发布反方向的回传。
 
 ## 目录
 
@@ -16,13 +16,13 @@
 
 - 一份 transport 只服务一个方向、一个 receiver 和一个目的。
 - channel 中已有未完成 transport 时，不得覆盖、append、rename 成回复或创建并行的第二份消息。
-- receiver 完成 transport 请求的动作后删除 inbound，再发布自己的 outbound transport。
+- receiver 完成交付或记录实际阻塞后删除 inbound，再发布自己的 outbound transport。
 - transport 不记录累计历史。长期 contract、status、Resolution 和 Evidence 必须写入 Spec/Subspec 或源码。
 - task transport 必须指向 Parent Spec、全部 in-scope Subspec 与它们的外部 dependencies；不复制 Spec，也不把
   查找 canonical contract 留给 B 猜。
 - B 不依赖 `handoff` Skill。可用时由 B 使用 `wayfinder` / `implement`，不可用时执行 task transport 内联的等价步骤。
 - 默认把 transport 放在活动 Spec 的 artifact 目录，文件名为 `HANDOFF-$(date +%m-%d_%H-%M).md`；同一路径只能在上一份 transport 删除后复用。
-- 文件名中的时间戳取 receiver 写入该 transport 时 session 的当前时间：task transport 在 A 生成时求值，review transport 在 B 写回时求值；不得沿用或复制 channel 中前一份 transport 的时间戳。
+- 文件名中的时间戳取写入该 transport 时 session 的当前时间：task transport 在 A 生成时求值，review transport 在 B 写回时求值；不得沿用或复制 channel 中前一份 transport 的时间戳。
 - 不把 transport 加入 staging、commit、issue tracker 或长期文档索引。
 
 ## 公共文件头
@@ -34,7 +34,7 @@
 
 > 方向：Agent <sender> -> Agent <receiver>
 > 类型：<task transport 或 review transport>
-> 这是一次性 transport。receiver 完成本文要求的任务或 review 后删除本文件；不要提交、移动、归档、复制或把回复追加到本文件。长期 authority 是下文列出的 Spec、Subspec、源码与 Evidence。
+> 这是一次性 transport。receiver 完成交付或记录实际阻塞、或完成结果 review 后删除本文件；不要提交、移动、归档、复制或把回复追加到本文件。长期 authority 是下文列出的 Spec、Subspec、源码与 Evidence。
 >
 > 删除命令：`<只删除本 transport 的 exact command>`
 ```
@@ -115,7 +115,7 @@ task transport 由维护 Wayfinder 的 A 写给完成约定 coding outcome 的 B
 给出 dependency-aware numbered steps。每一步写明目标、seam、需要先读取或验证的内容、产生的 canonical artifact 和进入下一步的可观察条件。
 
 要求 B 按依赖顺序自行 claim 每个 Subspec：只有当前目标位于 frontier 时才 claim；完成 acceptance criteria、写入
-Resolution/Evidence、通过实际验证，并满足用户明确指定 commit 且 commit 已实际创建的 commit gate 后，才标记
+Resolution/Evidence，并按 [Wayfinder 的完成与修正规则](../../wayfinder/SKILL.md#完成与修正) 验收后，才标记
 为 `resolved`，再 claim 下一个。B 可用时使用 `wayfinder`，implementation 使用 `implement`；同时写明无 Skill
 时等价的 frontmatter transition、owner、Resolution、Evidence 和验证步骤。A 不代替 B 写 owner。
 
@@ -127,20 +127,17 @@ Resolution/Evidence、通过实际验证，并满足用户明确指定 commit �
 - B 仍需运行的 exact command、cwd 和覆盖面；
 - 禁止运行的真实客户端、部署、发消息、下单、删除数据或其他 side-effect command；
 - 可逐条核验的 Definition of Done；
-- B 必须逐个写回各 in-scope Subspec 的 Resolution、Evidence 和最终 status；只有用户明确指定本轮相关改动需要 commit，且该
-  commit 已实际创建、所有 Subspec 达成 acceptance criteria 后，才能将 Subspec 设为 `resolved` 并更新 Parent Spec 的状态。
+- B 必须逐个写回各 in-scope Subspec 的 Resolution、Evidence 和最终 status，满足各项验收标准后按 Wayfinder 更新状态。未提交不阻止验收；commit/push 仍需相应授权。
 
 ### 停止条件
 
-具体列出需要 B 停止并返回 blocked review transport 的情形，例如改变 settled contract、public API、persisted schema、安全边界，或需要新权限、secret、发布、部署、真实业务操作、用户未指定 commit 或 dirty ownership 冲突。
+只列本次任务实际需要的停止条件，例如发现必须改变已定行为、需要尚未授权的操作，或无法区分并保护其他人的改动。已在交付范围内的 API、schema 或其他实现变更不因所属类别而再次要求审批。
 
 ### 完成后的回传协议
 
 task transport 必须把以下协议直接写给 B，不能只让 B 读取本 reference：
 
-1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence。只有用户明确指定本轮相关
-   改动需要 commit 且该 commit 已实际创建，才将 Subspec 标记为 `resolved` 或将 Parent Spec 标记为 `complete`；
-   否则保留 `in-progress`，并以 `status: blocked` 回传 commit gate 未满足；
+1. 完成或确认阻塞后，先把长期状态写入 handoff 指向的各 Subspec、Parent Spec、源码与 Evidence。按验收结果更新状态；未完成时保留 `in-progress` 并记录剩余工作；
 2. 准备 review transport 所需的实际结果、acceptance criteria evidence、changed artifacts、验证、偏差、未验证项和 dirty ownership；
 3. 删除 inbound task transport；
 4. 在 task transport 指定的 exact output path 创建 review transport；时间戳取你（B）写回时 session 的当前时间，不要沿用 task transport 生成时的时间戳；
@@ -162,8 +159,7 @@ review transport 由完成或阻塞任务的 B 按 task transport 内联的协�
 - A 完成 review 后应更新的 canonical state。
 
 这里的 `status` 是 review transport 的状态，不是 Subspec frontmatter。Subspec 继续遵守 `wayfinder`：不得持久化
-`blocked`，阻塞时保持 `in-progress` 或释放为 `ready` 并记录原因。用户未明确指定相关改动 commit，或指定的 commit 尚未
-实际创建时，即使 acceptance criteria 已满足，也必须使用 `status: blocked` 回传，不能把 Subspec 写成 `resolved`。
+`blocked`，阻塞时保持 `in-progress` 或释放为 `ready` 并记录原因。`completed` 表示 B 已完成约定交付并请求 A review，不能代替 A 的独立检查；未授权 commit 本身不是阻塞。
 
 ### 实际结果
 
@@ -222,7 +218,7 @@ review transport 不替 A 宣布验收通过。
 - POSIX 使用 `rm -- '<absolute-path>'`，PowerShell 使用 `Remove-Item -LiteralPath '<absolute-path>'`。
 - 不使用 `rm -r`、`rm -rf`、glob、环境变量、`~` 或未解析的相对路径。
 - command 只删除当前 inbound transport，不删除父目录、Spec、Subspec 或 artifact。
-- receiver 只有在完成本文请求的任务或 review 后才执行；sender 不删除刚发布的 outbound transport。
+- receiver 在完成交付或记录实际阻塞、或完成结果 review，并写入长期结果后才执行；sender 不删除刚发布的 outbound transport。
 
 ## 最终自检
 
@@ -232,6 +228,6 @@ review transport 不替 A 宣布验收通过。
 4. 每个完成声明是否有 current evidence？
 5. dirty ownership 是否足以防止误覆盖、误格式化和误 stage？
 6. review transport 是否要求 A 检查真实效果，而不是直接信任 B？
-9. review transport 的命名规则（时间戳取 B 写回时 session 当前时间）是否已内联进 task transport？
-7. 删除命令是否只命中当前 transport？
-8. transport 删除后，canonical artifacts 是否仍保留全部长期状态？
+7. review transport 的命名规则（时间戳取 B 写回时 session 当前时间）是否已内联进 task transport？
+8. 删除命令是否只命中当前 transport？
+9. transport 删除后，canonical artifacts 是否仍保留全部长期状态？

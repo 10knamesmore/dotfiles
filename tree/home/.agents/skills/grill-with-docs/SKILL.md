@@ -1,17 +1,21 @@
 ---
 name: grill-with-docs
-description: 通过持续追问打磨 Spec 或 design，并同步维护当前 Subspec、domain glossary 与必要的 ADR。
+description: 通过追问澄清尚未确定的产品或设计决策，并记录到当前 Subspec 或领域文档；已确认的决定不重新访谈。
 ---
 
-use domain-modeling，在对话从持续反复询问任何还没有确定的问题/决定，一次只问一个能够改变当前 decision 的问题。
+# Grill with Docs
 
-如果存在活动 Spec：
+一次只问一个会改变当前决策的问题。先利用已有对话、源码与文档回答事实问题，把需要用户选择的行为、范围和 trade-off 留给用户；方向已经明确时继续工作，不为走流程追问。
 
-1. 将本轮唯一问题放在一个 `kind: decision` 的 Subspec 中；格式见 `../wayfinder/references/SUBSPEC-FORMAT.md`。
-2. 每当用户确认一项事实，就立即更新该 Subspec 的 context 或 resolution，不要等到 session 末尾批量回忆。
-3. 只把跨多个 Subspec 生效的 contract 摘要写入 Spec；详细 reasoning 保留在当前 Subspec。
-4. 新问题已经清晰时创建 Subspec；仍说不清时写回 Spec 的 `Not yet specified`。
-5. 同步维护 domain glossary。只有满足难以逆转、缺少上下文会令人意外、存在真实 trade-off 三项条件时才创建 ADR。
-6. decision 与 evidence 完整后，只有用户明确指定本轮相关改动需要 commit 且该 commit 已实际创建，才把 Subspec 标记为 `resolved` 并更新 Spec status。否则保持 `in-progress`，记录已有的 `Resolution` 与 `Evidence`，不得把它作为 resolved dependency。
+有活动 Spec 时，每个独立决策放在一个 `kind: decision` 的 Subspec，用户确认后及时更新它的 Context 或 Resolution。Spec 只保存跨 Subspec 的约定摘要和链接。新问题清晰时创建 Subspec，否则写入 Spec 的 `Not yet specified`。
 
-如果没有活动 Spec，仍执行 grilling 与 domain-modeling 打磨 design，但不创建 Spec——确认的事实留在对话与 domain docs 中。发现工作规模确实需要跨 session 推进时，交回 wayfinder 创建 Spec。
+没有活动 Spec 时，确认的事实保存在对话与相关领域文档中，不为一次讨论创建 Spec；需要跨会话推进时再使用 [Wayfinder](../wayfinder/SKILL.md)。
+
+决策经用户确认、验收条件满足且证据已记录后，按 [Wayfinder 的完成与修正规则](../wayfinder/SKILL.md#完成与修正) 更新状态。确认决策不表示实现已经完成。
+
+## 领域术语与 ADR
+
+- 新术语或现有术语含义改变时，更新项目已有的 glossary 或领域文档，写清业务含义及与相近概念的区别。没有独立 glossary 时，先放在拥有该概念的文档中，不默认创建额外文件。
+- 只有决策同时满足以下条件时才创建 ADR：难以逆转、缺少上下文会令人意外、存在真实 trade-off。普通局部实现选择不写 ADR。
+- ADR 使用项目已有位置与格式；没有约定时放在 `docs/adr/`，包含问题、已选方案、实际考虑过的替代方案、取舍后果和证据。不要编造替代方案或抄录访谈轮次。
+- 本地 Spec 保存当前工作的决策和证据；需要随源码长期保存的设计原因由领域文档或 ADR 持有，不复制整份 Spec。写入文档不授予 commit 或 push 权限。

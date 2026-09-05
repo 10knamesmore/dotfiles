@@ -57,14 +57,11 @@ docs/
 - 读不到 shell 环境的消费者（systemd unit）才渲染：`.inject` 后缀 + minijinja `{{ DOTFILES }}` / `{{ SCRIPTS }}`，产物落 `.gen/injected/`。
 - Hyprland：`hyprland.lua` 读 `os.getenv("DOTFILES_DIR")`，兜底读 `~/.config/dots/root`。
 
-## Zsh 结构
+## 按任务查阅
 
-- Zsh 不使用框架，显式启用 emacs 键模式。Ctrl-S 打开 live-grep，Ctrl-Q 打开临时 scratch，Ctrl-W/Ctrl-U 留空。
-- `tree/home/.config/zsh/` 按编号加载：`10-options.zsh` 管历史、目录、补全与键绑定；`20-functions.zsh` 管交互函数；`25-fzf-tab.zsh` 管 fzf 与 fzf-tab；`30-autosuggestions.zsh` 管历史建议；`40-aliases.zsh` 管别名；`90-syntax-highlighting.zsh` 必须最后加载。
-- `25-fzf-tab.zsh` 必须位于 compinit 和 `fzf --zsh` 之后、autosuggestions 之前。Ctrl-T 不绑定路径插入，Ctrl-F 选文件并进入 nvim。`40-aliases.zsh` 在 `CLAUDECODE` 环境中跳过。
-- `z` → zoxide；提示符 starship + 自写 transient prompt。
-- git diff 走 delta（`tree/home/.gitconfig` 受管，syntax-theme 复用 bat 主题库）；bat 主题 Catppuccin Mocha（`tree/home/.config/bat/config`），与 kitty/fzf 同色板。
-- 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `.zshrc_linux`/`.zshrc_macos`。
+- 修改 shell 配置时，查阅 [Zsh 结构](docs/README.md#zsh-结构) 中的加载顺序与键绑定约定。
+- 修改 agent 指令、skill 或 hook 时，查阅 [AI 工具链](docs/README.md#ai-工具链skills--agents--hooks)，编辑 `tree/home/.agents/` 下的源文件。
+- 配置工具概览见 [README](docs/README.md#当前管理的主要配置)。
 
 ## 修改配置时的约定
 
@@ -79,10 +76,3 @@ docs/
 - 配置管理入口是 `dots`，安装入口是 `bootstrap.sh`。
 - 不安装系统包、rustup、Node、pnpm 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，依次运行 `dots install` 和 `dots sync`。sync 的 Pi hook 按 frozen lockfile 安装 workspace 依赖。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
-
-## 主要配置工具
-
-- Shell: Zsh（自管 conf.d，无框架）+ Starship
-- 编辑器: Neovim / Vim；终端: Kitty；文件管理器: Yazi；多路复用: Zellij
-- macOS: yabai / skhd / sketchybar / fcitx5
-- Linux: Hyprland（Lua 配置入口）/ niri（备选）/ QuickShell（状态栏+控制中心）/ systemd user

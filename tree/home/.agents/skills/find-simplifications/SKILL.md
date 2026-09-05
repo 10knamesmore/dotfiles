@@ -1,17 +1,17 @@
 ---
 name: find-simplifications
-description: 在代码库中寻找、证明、排序或记录非显然 simplification 候选时使用，尤其针对 dead、duplicated、speculative、over-built、added-then-removed、重复表达同一事实、无生产消费者的 API，以及已有依赖或标准库能够取代的 hand-rolled 实现。负责形成 evidence-backed proposal，不默认授权实现。
+description: 调查并证明值得删除、合并或简化的代码与依赖，形成有证据的 proposal。用于简化审计；审计本身不授权实施。
 ---
 
 # Find Simplifications
 
 把宽泛的 simplify 请求转成少量、证据充分、可以独立决定和验收的 proposal。目标是删除、合并、降级或重新归属真实 surface area，而不是制造 cleanup inventory。本 Skill 是 guidance，不是 dead-code 工具的包装或候选数量清单。
 
-本 Skill 负责发现和证明候选。用户只要求 audit、review 或 proposal 时，不修改实现；用户批准实施或提供已稳定 Spec 时，再交给 [`wayfinder`](../wayfinder/SKILL.md) 与 [`implement`](../implement/SKILL.md) 路由。
+本 Skill 负责发现和证明候选。用户只要求 audit、review 或 proposal 时，不修改实现；用户批准实施后，单次会话可完成的明确工作直接实现；已有 Spec 使用 [`implement`](../implement/SKILL.md)，需要跨会话组织的目标使用 [`wayfinder`](../wayfinder/SKILL.md)。
 
 ## Start with repository context
 
-1. 阅读 repo instructions、domain glossary、架构文档、相关 ADR、当前 Spec，以及候选附近的 code、tests 和 docs。
+1. 读取 repo instructions 和候选附近的代码、调用方与验证入口；涉及领域约定、跨模块结构或持久化行为时，再查对应 glossary、架构文档、ADR 或活动 Spec。
 2. 先识别项目明确保护的 seam、兼容承诺、durable format、安全边界和产品能力。不能因为实现复杂就把有 owner 的能力当成 cleanup。
 3. 检查项目已有依赖、标准库和 runtime floor，再考虑新增 dependency 或自写替代。
 4. 明确 scope。用户未给范围但当前 diff 或目标模块形成自然边界时使用该边界；不要自行扩成全仓库重构。
@@ -89,8 +89,6 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 - idea 正确但太局部，不值得形成 durable proposal；只有用户授权写入时才添加 actionable TODO/FIXME；
 - 证据只来自 tests。passing test 证明当前行为存在，不单独证明它仍值得保留或删除。
 
-未经用户明确要求，不新增或修改测试。proposal 可以说明哪些现有 tests 会失效、应删除或需要用户另行授权调整，但不能把该说明当成写测试授权。
-
 ## Route the proposal into the workflow
 
 持久 design proposal 与本地 Spec 的信息模型接近，但 persistence 和粒度不同：proposal 都需要 problem、solution、alternatives、acceptance criteria 与 risk；Spec 还组织跨 session 的 dependency 和 implementation frontier。
@@ -99,7 +97,7 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 - **没有活动 Spec，候选需要跨 session:** 每个 cohesive destination 交给 Wayfinder 创建一个独立 Spec。多个互不相关候选不能只因来自同一次 audit 就塞进一个 umbrella Spec。
 - **候选已清晰且一个 session 可完成:** 在 response 中给出完整 proposal，用户确认后直接实现；不要为了模仿 durable design note 强制创建 Spec。
 - **候选只是后续 decision 的证据:** 放进 owning decision Subspec 的 Context、Resolution 或 Evidence，不另建重复文档。
-- **完成后的 rationale 需要长期提交进仓库:** 只有满足 [`domain-modeling`](../domain-modeling/SKILL.md) 的 ADR 条件时才创建 ADR；本地 complete Spec 不是 committed decision record。
+- **完成后的 rationale 需要长期提交进仓库:** 只有满足 [grill-with-docs 的 ADR 条件](../grill-with-docs/SKILL.md#领域术语与-adr)时才创建 ADR；本地 complete Spec 不是 committed decision record。
 
 proposal 应包含：
 

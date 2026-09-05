@@ -1,6 +1,6 @@
 interface:
   display_name: "带文档的追问"
   short_description: "追问设计并维护 Spec、Subspec 与 domain docs"
-  default_prompt: "Use $grill-with-docs to advance the active decision Subspec one question at a time; mark it resolved only after the user-authorized commit gate is satisfied."
+  default_prompt: "Use $grill-with-docs to clarify the current design decision and record confirmed outcomes and evidence."
 policy:
   allow_implicit_invocation: true

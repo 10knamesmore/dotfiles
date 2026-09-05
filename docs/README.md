@@ -97,16 +97,14 @@ CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lu
 
 ## Zsh 结构
 
-Zsh 不使用框架，配置分为两层：
+- Zsh 不使用框架，显式启用 emacs 键模式。Ctrl-S 打开 live-grep，Ctrl-Q 打开临时 scratch，Ctrl-W/Ctrl-U 留空。
+- `tree/home/.config/zsh/` 按编号加载：`10-options.zsh` 管历史、目录、补全与键绑定；`20-functions.zsh` 管交互函数；`25-fzf-tab.zsh` 管 fzf 与 fzf-tab；`30-autosuggestions.zsh` 管历史建议；`40-aliases.zsh` 管别名；`90-syntax-highlighting.zsh` 必须最后加载。
+- `25-fzf-tab.zsh` 必须位于 compinit 和 `fzf --zsh` 之后、autosuggestions 之前。Ctrl-T 不绑定路径插入，Ctrl-F 选文件并进入 nvim。`40-aliases.zsh` 在 `CLAUDECODE` 环境中跳过。
+- `z` → zoxide；提示符 starship + 自写 transient prompt。
+- git diff 走 delta（`tree/home/.gitconfig` 受管，syntax-theme 复用 bat 主题库）；bat 主题 Catppuccin Mocha（`tree/home/.config/bat/config`），与 kitty/fzf 同色板。
+- 改主配置改 `tree/home/.zshrc_dotfiles`；平台差异改 `tree/home.linux/.zshrc_linux` / `tree/home.macos/.zshrc_macos`。
 
-- `~/.zshrc` — `dots-env` managed block 只负责 source `~/.zshrc_dotfiles`；block 外的软件内容（conda / nvm 等）始终保留。**不要把它当主配置维护。**
-- `~/.zshrc_dotfiles` — 主配置（源在 `tree/home/.zshrc_dotfiles`），按序加载 `~/.config/zsh/*.zsh` 模块：
-  - `10-options.zsh` — 历史 / 目录 / 补全 / 键绑定
-  - `20-functions.zsh` — cd-ls、copypath、copyfile、allclear 等内联微函数
-  - `90-syntax-highlighting.zsh` — fast-syntax-highlighting（仓库内固定版本）
-- 平台差异在 `tree/home.linux/.zshrc_linux` / `tree/home.macos/.zshrc_macos`。
-
-提示符是 starship + 自写 transient prompt；`z` 由 zoxide 提供。
+`~/.zshrc` 中的 `dots-env` managed block 只负责 source `~/.zshrc_dotfiles`；block 外的 conda / nvm 等软件内容保留，不把它当主配置维护。
 
 ## 修改配置的正确方式
 
@@ -129,6 +127,8 @@ Zsh 不使用框架，配置分为两层：
 ## AI 工具链（skills / agents / hooks）
 
 `tree/home/.agents/` 是手写、跨 agent AI 资产的唯一真相源：`skills/` 分发到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.kimi/skills`（逐 skill 链接），`claude/agents|commands/` 分发到 `~/.claude/` 对应目录，agent hook 定义与规则再分发到各工具配置目录。接入新工具时在 `dots.lua` 增加对应分发目标并运行 `dots sync`。
+
+[全局指令](../tree/home/.agents/AGENTS.md) 保存跨项目偏好；skill 的 description 只声明用途与关键排除，入口按任务链接所需 reference。明确的小改动直接完成，跨会话目标或用户指定的 Spec 使用 [Wayfinder](../tree/home/.agents/skills/wayfinder/SKILL.md)。验收、后续修正与 Git 操作的关系由其[完成规则](../tree/home/.agents/skills/wayfinder/SKILL.md#完成与修正)定义。
 
 Claude Code、Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。各 adapter 通过同一个 `agent-hook` binary 保留 harness 协议差异；Pi 的 `ask` 由 extension 在有 UI 时显式确认，无 UI 时拒绝。`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
 

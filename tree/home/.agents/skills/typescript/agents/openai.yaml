@@ -1,4 +1,0 @@
-interface:
-  display_name: "TypeScript"
-  short_description: "严格的 TypeScript 编写、审查、调试与验证规范"
-  default_prompt: "使用 $typescript 编写、修改或审查 TypeScript，并按项目真实工具链完成严格验证。"
