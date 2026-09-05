@@ -73,7 +73,7 @@ return {
               excludeImports = true,
             },
             cargo = {
-              features = "all",
+              -- 额外 features 由项目 .nvim.lua 设置；未指定时使用 Cargo 默认 features。
               loadOutDirsFromCheck = true,
               buildScripts = {
                 enable = true,

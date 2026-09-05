@@ -25,7 +25,6 @@ return {
           { "<leader>dp", group = "profiler" },
           { "<leader>f", group = "file/find" },
           { "<leader>g", group = "git" },
-          { "<leader>q", group = "quit/session" },
           { "<leader>r", group = "rest" },
           { "<leader>s", group = "search" },
           { "<leader>t", group = "tabs/todo" },

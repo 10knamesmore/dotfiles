@@ -124,15 +124,6 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
 })
 
 -- =========================================
--- 自定义文件类型识别：.zsh 隐藏文件识别为 sh（.alias 已迁入 .config/zsh/40-aliases.zsh）
-vim.api.nvim_create_autocmd({ "BufRead" }, {
-  group = augroup("ft"),
-  pattern = { ".zsh*" },
-  callback = function()
-    vim.bo.filetype = "bash"
-  end,
-})
-
 -- Dockerfile 文件识别
 vim.api.nvim_create_autocmd({ "BufRead" }, {
   group = augroup("ft"),

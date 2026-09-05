@@ -13,7 +13,7 @@ return {
         fish = { "fish" },
         sh = { "shellcheck" },
         bash = { "shellcheck" },
-        zsh = { "shellcheck" },
+        zsh = { "zsh" }, -- nvim-lint 内置检查器使用 zsh --no-exec，并解析未保存内容。
         yaml = { "yamllint" },
         dockerfile = { "hadolint" },
         -- 使用 "*" 对所有文件类型运行 linter

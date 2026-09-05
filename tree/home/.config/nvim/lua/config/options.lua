@@ -67,9 +67,8 @@ opt.foldmethod = "manual"
 opt.foldtext = ""
 opt.formatexpr = "v:lua.utils.format.formatexpr()"
 opt.formatoptions = "jcroqlnt" -- tcqj
--- grepformat 与本体默认逐字相同，无需重设。
--- grepprg 则是有意偏离默认（默认带 -uu）：去掉 -uu 让 :grep 尊重 .gitignore。
-opt.grepprg = "rg --vimgrep"
+-- :grep 包含隐藏文件并尊重 .gitignore，排除 Git 内部数据。
+opt.grepprg = "rg --vimgrep --hidden --glob '!.git'"
 
 -- Ignore case
 opt.ignorecase = true
@@ -111,27 +110,6 @@ opt.ruler = false
 
 -- 屏幕边缘至少多少行
 opt.scrolloff = 4
-
--- session包含哪些内容
-opt.sessionoptions = {
-  -- 缓冲区
-  "buffers",
-  -- cwd
-  "curdir",
-  -- tabs
-  "tabpages",
-  -- 窗口
-  "winsize",
-  "winpos",
-  -- :help 窗口
-  "help",
-  -- 全局变量
-  "globals",
-  "skiprtp",
-  "folds",
-  -- size
-  "resize",
-}
 
 -- 缩进舍入到 `shiftwidth` 的倍数。
 opt.shiftround = true

@@ -11,10 +11,13 @@ local ignore_patterns = {
 return {
   {
     "nvim-telescope/telescope.nvim",
-    -- 不要 event：VeryLazy 的唯一实质作用是让 telescope-ui-select 抢 vim.ui.select，
-    -- 而这件事现已交给常驻的 snacks.picker（snacks.lua 的 opts 里 picker.enabled=true，
-    -- 其 ui_select 默认为 true）。删掉后 telescope + ui-select + fzf-native + plenary
-    -- 四个都退回按键触发。
+    init = function()
+      -- 首次调用通用选择菜单时加载 Telescope；扩展初始化后会替换此入口。
+      vim.ui.select = function(...)
+        require("telescope").load_extension("ui-select")
+        return vim.ui.select(...)
+      end
+    end,
     dependencies = {
       "nvim-telescope/telescope-ui-select.nvim",
       {
@@ -26,8 +29,14 @@ return {
     opts = function()
       local actions = require("telescope.actions")
       local themes = require("telescope.themes")
+      local vimgrep_arguments = vim.list_extend(vim.deepcopy(require("telescope.config").values.vimgrep_arguments), {
+        "--hidden",
+        "--glob",
+        "!.git",
+      })
       return {
         defaults = {
+          vimgrep_arguments = vimgrep_arguments,
           default_mappings = {
             n = {
               ["?"] = actions.which_key,

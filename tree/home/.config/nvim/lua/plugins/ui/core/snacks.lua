@@ -96,6 +96,11 @@ return {
           },
         },
       }, -- 启用仪表盘功能并加载定义的各部分
+      lazygit = {
+        win = {
+          border = "rounded",
+        },
+      },
       dim = {
         scope = {
           min_size = 10,
@@ -112,10 +117,8 @@ return {
       image = { enabled = true }, -- Kitty 图形协议渲染（markdown/html 内联图片等）
       input = { enabled = true }, -- 启用输入增强（如 float 弹窗输入）
       profiler = { enabled = false },
-      -- 必须显式出现在 opts 里才会被 setup：snacks/init.lua 只对 opts 中存在的
-      -- key 补 enabled=true，缺席的模块 M.config[snack] 为 nil、UIEnter 时跳过。
-      -- setup 之后其 ui_select 默认为 true，并接管 vim.ui.select。
-      picker = { enabled = true },
+      -- 保留 Git、草稿等专用 picker；通用选择菜单交给 Telescope。
+      picker = { enabled = true, ui_select = false },
       indent = {
         indent = {
           enabled = true, -- 启用缩进线

@@ -46,11 +46,11 @@ map({ "n", "x" }, "<Down>", "v:count == 0 ? 'gj' : 'j'", { desc = "Down", expr =
 map({ "n", "x" }, "k", "v:count == 0 ? 'gk' : 'k'", { desc = "Up", expr = true, silent = true })
 map({ "n", "x" }, "<Up>", "v:count == 0 ? 'gk' : 'k'", { desc = "Up", expr = true, silent = true })
 
--- Move to window using the <ctrl> hjkl keys
-map("n", "<C-h>", "<C-w>h", { desc = "Go to Left Window", remap = true })
-map("n", "<C-j>", "<C-w>j", { desc = "Go to Lower Window", remap = true })
-map("n", "<C-k>", "<C-w>k", { desc = "Go to Upper Window", remap = true })
-map("n", "<C-l>", "<C-w>l", { desc = "Go to Right Window", remap = true })
+-- 窗口导航统一放在 <leader>w 下；Ctrl-J 留给多光标。
+map("n", "<leader>wh", "<C-w>h", { desc = "Go to Left Window", remap = true })
+map("n", "<leader>wj", "<C-w>j", { desc = "Go to Lower Window", remap = true })
+map("n", "<leader>wk", "<C-w>k", { desc = "Go to Upper Window", remap = true })
+map("n", "<leader>wl", "<C-w>l", { desc = "Go to Right Window", remap = true })
 
 map("n", "<leader>wd", "<C-W>c", { desc = "Delete Window", remap = true })
 

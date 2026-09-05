@@ -1,4 +1,4 @@
--- fzf-lua 负责 LSP 定位、grep 与文件查找；其他 picker 由 telescope 提供。
+-- fzf-lua 负责 LSP 定位、项目 grep 与文件查找。
 -- 过滤由 fzf 进程执行，不阻塞 Neovim UI。
 --
 -- 交互模型：
@@ -73,7 +73,7 @@ return {
           fd_opts = "--color=never --type f --hidden --follow " .. fd_excludes(),
         },
         grep = {
-          rg_opts = "--column --line-number --no-heading --color=always --smart-case "
+          rg_opts = "--column --line-number --no-heading --color=always --smart-case --hidden "
             .. "--max-columns=4096 "
             .. rg_excludes(),
         },
@@ -134,10 +134,9 @@ return {
       {
         "<leader><space>",
         function()
-          -- 包含 hidden 和 ignored 文件，但继续排除 ignore_globs 中的重目录。
-          require("fzf-lua").files({ fd_opts = "--color=never --type f --hidden --no-ignore " .. fd_excludes() })
+          require("fzf-lua").files()
         end,
-        desc = "Find Files (all)",
+        desc = "Find Files",
       },
     },
   },
