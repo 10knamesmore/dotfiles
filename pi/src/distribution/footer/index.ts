@@ -29,6 +29,7 @@ class FooterRuntime {
   private readonly throughput = new RecentTokensPerSecondTracker();
   private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
+  private working = false;
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
   public startSession(ctx: ExtensionContext): void {
@@ -43,9 +44,13 @@ class FooterRuntime {
     this.throughput.reset();
     this.lastTurnModelMilliseconds = 0;
     this.treeSummaryProviderActive = false;
+    this.working = false;
     this.component?.dispose();
     this.component = undefined;
     if (ctx.mode !== "tui") return;
+
+    // The footer already shows activity; drop the built-in working loader row.
+    ctx.ui.setWorkingVisible(false);
 
     ctx.ui.setFooter((tui, _theme, footerData) => {
       const git = new GitStatusCache(this.cwd(ctx), () => tui.requestRender());
@@ -77,13 +82,19 @@ class FooterRuntime {
   public providerRequestStarted(ctx: ExtensionContext): void {
     this.updateContext(ctx);
     if (this.treeSummaryProviderActive) return;
-    if (this.modelDuration.start()) this.component?.requestRender();
+    this.modelDuration.start();
+    this.working = true;
+    this.component?.setWorking(true);
+    this.component?.requestRender();
   }
 
   /** Finish model wall-time attribution when Pi reports the corresponding work complete. */
   public modelWorkEnded(ctx: ExtensionContext): void {
     this.updateContext(ctx);
-    if (this.modelDuration.finish()) this.component?.requestRender();
+    this.modelDuration.finish();
+    this.working = false;
+    this.component?.setWorking(false);
+    this.component?.requestRender();
   }
 
   /**
@@ -102,6 +113,8 @@ class FooterRuntime {
       event.preparation.userWantsSummary &&
       event.preparation.entriesToSummarize.length > 0;
     if (!this.treeSummaryProviderActive) return;
+    this.working = false;
+    this.component?.setWorking(false);
     event.signal.addEventListener(
       "abort",
       () => {
@@ -181,6 +194,7 @@ class FooterRuntime {
     this.currentContext = ctx;
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
+    this.working = false;
     this.component?.dispose();
     this.component = undefined;
     ctx.ui.setFooter(undefined);

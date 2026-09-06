@@ -32,6 +32,10 @@ import {
 } from "./metrics.js";
 import { palette, separator } from "./palette.js";
 
+/** Braille spinner frames, same pace as Pi's default working indicator. */
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+const SPINNER_INTERVAL_MS = 80;
+
 interface ClaudeFooterComponentOptions {
   /** Returns the latest event context instead of a session-start snapshot. */
   getContext: () => ExtensionContext;
@@ -121,6 +125,12 @@ interface ThirdLineRenderOptions {
 
   /** Recent generated-token throughput tracker. */
   throughput: RecentTokensPerSecondTracker;
+
+  /** True while a provider request is in flight (spinner active). */
+  working: boolean;
+
+  /** Current spinner frame index, advanced by the component's timer. */
+  spinnerFrame: number;
 
   /** Active session wall-duration tracker. */
   sessionDuration: ActiveSessionDurationTracker;
@@ -494,9 +504,12 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
     tokensPerSecond === undefined
       ? ""
       : ` ${palette.sky(formatTokensPerSecond(tokensPerSecond))} ${palette.overlay2("toks/s")}`;
+  const spinnerText = options.working
+    ? ` ${palette.sky(SPINNER_FRAMES[options.spinnerFrame] ?? SPINNER_FRAMES[0])}`
+    : "";
   const timingText =
     `${palette.overlay2("session")} ${palette.lavender(sessionTime)}` +
-    `${apiDurationText}${throughputText}`;
+    `${apiDurationText}${spinnerText}${throughputText}`;
 
   const toolSnapshot = tools.snapshot(3);
   const toolUsage = formatToolUsage(toolSnapshot);
@@ -517,6 +530,9 @@ export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
   private disposed = false;
+  private working = false;
+  private spinnerFrame = 0;
+  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
   public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
@@ -544,6 +560,27 @@ export class ClaudeFooterComponent implements Component {
     if (!this.disposed) {
       this.options.requestRender();
     }
+  }
+
+  /**
+   * Reflect provider in-flight state: start the spinner timer on transition
+   * to working, stop and clear it when idle again.
+   */
+  public setWorking(working: boolean): void {
+    if (this.working === working) return;
+    this.working = working;
+    if (working) {
+      this.spinnerFrame = 0;
+      this.spinnerTimer ??= setInterval(() => {
+        if (this.disposed) return;
+        this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
+        this.options.requestRender();
+      }, SPINNER_INTERVAL_MS);
+    } else if (this.spinnerTimer !== undefined) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = undefined;
+    }
+    this.options.requestRender();
   }
 
   public render(width: number): string[] {
@@ -577,6 +614,8 @@ export class ClaudeFooterComponent implements Component {
         turns: this.options.turns,
         throughput: this.options.throughput,
         sessionDuration: this.options.sessionDuration,
+        working: this.working,
+        spinnerFrame: this.spinnerFrame,
       }),
     ];
   }
@@ -585,13 +624,17 @@ export class ClaudeFooterComponent implements Component {
     // The footer reads current state from its sources during every render.
   }
 
-  /** Stop git watchers, debounce timers, and any running git process. */
+  /** Stop git watchers, debounce timers, the spinner timer, and any running git process. */
   public dispose(): void {
     if (this.disposed) {
       return;
     }
 
     this.disposed = true;
+    if (this.spinnerTimer !== undefined) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = undefined;
+    }
     this.options.git.dispose();
   }
 }
