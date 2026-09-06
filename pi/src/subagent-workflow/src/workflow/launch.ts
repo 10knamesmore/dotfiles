@@ -1,7 +1,6 @@
 /**
- * Shared workflow launch path used by both the `workflow` tool and the
- * `/wf-<name>` saved-workflow commands: approve, start, record the transcript
- * marker, and (in background mode) deliver completion by steering the parent turn.
+ * Shared workflow launch path: approve, start, record the transcript marker,
+ * and (in background mode) deliver completion by steering the parent turn.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

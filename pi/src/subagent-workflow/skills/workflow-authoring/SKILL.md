@@ -111,11 +111,6 @@ it (and reruns calls whose payloads change). A `generation.pending` marker
 left by a crash quarantines the run directory: run the workflow fresh and
 delete the quarantined directory rather than removing the marker.
 
-## Saved workflows
-
-`script: "@<name>"` runs a saved workflow; they also appear as `/wf-<name>`
-commands. Save a run's script from the `/agents` navigator.
-
 ## Worktree isolation
 
 `isolation: 'worktree'` gives the child its own checkout at the same

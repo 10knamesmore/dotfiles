@@ -5,7 +5,6 @@ import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil
 import type { ParentContext, ResolvedFollowUpSpec } from "../src/runner/child.js";
 import { subagentRunner, type SubagentRunner } from "../src/runner/runner.js";
 import { preflightSubprocessChild } from "../src/runner/subprocess/spawn-child.js";
-import { registerWorkflowSettingsCommands } from "../src/settings/commands.js";
 import {
   acknowledgeDeliveryMessage,
   claimRunDelivery,
@@ -37,10 +36,7 @@ import type { SubagentResult, ThinkingLevel } from "../src/types.js";
 import { childLabel, errorMessage } from "../src/util.js";
 import { approveLaunch } from "../src/workflow/approval.js";
 import type { StartedWorkflow } from "../src/workflow/launch.js";
-import { registerSavedWorkflowCommands } from "../src/workflow/commands.js";
-import { ConsentStore } from "../src/workflow/consent.js";
 import { parseWorkflowScript } from "../src/workflow/parser.js";
-import { readSavedScript, resolveSavedWorkflow } from "../src/workflow/saved.js";
 import { registerWorkflowTool } from "../src/workflow/workflow-tool.js";
 
 const selfPath = fileURLToPath(import.meta.url);
@@ -333,15 +329,10 @@ function userMessageText(content: string | Array<{ type: string; text?: string }
 export default function subagentWorkflow(pi: ExtensionAPI): void {
   const widget = new SubagentStatusWidget(subagentRunner);
   const usageFooter = new SubagentUsageFooter(subagentRunner);
-  const consent = new ConsentStore();
   const settings = globalWorkflowSettings();
   const applySettings = () => applyLiveWorkflowSettings(settings.get(), subagentRunner, widget);
   applySettings();
   const unsubscribeSettings = settings.subscribe(applySettings);
-  const resolveSaved = (name: string, cwd: string, projectTrusted: boolean): string | undefined => {
-    const workflow = resolveSavedWorkflow(name, cwd, { projectTrusted });
-    return workflow ? readSavedScript(workflow) : undefined;
-  };
   registerEntryMarkers(pi);
   registerSubagentTool(pi, selfPath, widget);
   const policy = () => settings.get().workflowApproval;
@@ -349,18 +340,14 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     usageFooter.trackRun(run.runDir, ctx);
     widget.observeWorkflowStarted(run, ctx);
   };
-  registerWorkflowTool(pi, selfPath, { consent, approve: approveLaunch, approvalPolicy: policy, observeRun, resolveSaved });
+  registerWorkflowTool(pi, selfPath, { approve: approveLaunch, approvalPolicy: policy, observeRun });
 
-  // Register the navigator before the other /work* commands. Pi's fuzzy
-  // autocomplete preserves registration order for equal prefix matches, so
-  // typing /work now selects /workflows first without renaming public commands.
-  let saveWorkflow: ReturnType<typeof registerSavedWorkflowCommands> | undefined;
+  // /agents is the canonical name; /workflows stays registered as a public alias.
   let inputEditorFactory: ReturnType<typeof createAgentInputEditorFactory> | undefined;
   const openNavigator = registerNavigator(pi, {
     runner: subagentRunner,
     followUp: createNavigatorFollowUp(pi, selfPath, { runner: subagentRunner, widget }),
     describeWorkflow: (script) => parseWorkflowScript(script).meta.name,
-    saveWorkflowScript: async (runId, ctx) => saveWorkflow?.(runId, ctx),
   });
   pi.registerShortcut("shift+down", {
     description: "Open the agent navigator (/agents)",
@@ -369,14 +356,6 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
       await openNavigator(ctx);
     },
   });
-  saveWorkflow = registerSavedWorkflowCommands(pi, {
-    consent,
-    approve: approveLaunch,
-    approvalPolicy: policy,
-    observeRun,
-    selfPath,
-  });
-  registerWorkflowSettingsCommands(pi, { settings, clearApprovals: () => consent.clear() });
   pi.on("message_start", (event, ctx) => {
     if (event.message.role !== "user") return;
     acknowledgeDeliveryMessage(ctx.sessionManager.getSessionId(), userMessageText(event.message.content));

@@ -70,10 +70,6 @@ export function hashAgentPayload(payload: unknown): string {
   return createHash("sha256").update(stableJson(payload)).digest("hex");
 }
 
-export function hashScript(script: string): string {
-  return createHash("sha256").update(script).digest("hex");
-}
-
 export function journalCallKey(call: WorkflowCallIdentity): string {
   return stableJson(call);
 }

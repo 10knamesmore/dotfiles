@@ -24,7 +24,7 @@ import {
   type WorkflowJournal,
 } from "./journal.js";
 import { parseWorkflowScript, type ParsedWorkflow } from "./parser.js";
-import { resolveRunDir } from "./saved.js";
+import { resolveRunDir } from "./run-dir.js";
 import { executeWorkflowBody, type WorkflowCallIdentity, type WorkflowVmApi } from "./vm.js";
 
 export const WORKFLOW_AGENT_CAP = 200;

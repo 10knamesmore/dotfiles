@@ -7,15 +7,14 @@ import { sanitizeTerminalText, sanitizeTerminalTextChunks, UNTRUSTED_FIELD_MAX }
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { linesComponent } from "../ui/component.js";
-import type { ApproveLaunch, LaunchOrigin, LaunchPlan, WorkflowApprovalPolicy } from "./approval.js";
-import type { ConsentStore } from "./consent.js";
+import type { ApproveLaunch, LaunchPlan, WorkflowApprovalPolicy } from "./approval.js";
 import { completeWorkflowFailureInline, completeWorkflowInline, deliverWorkflowInBackground, launchWorkflow, type StartedWorkflow } from "./launch.js";
 import { normalizeArgs, readAbsoluteScript, type WorkflowRunResult } from "./workflow-runner.js";
 import { parseWorkflowScript } from "./parser.js";
 
 const WorkflowToolParameters = Type.Object({
   script: Type.Optional(Type.String({
-    description: "Inline workflow module source, or @<saved-name>. Provide exactly one of script or scriptPath, including when resuming.",
+    description: "Inline workflow module source. Provide exactly one of script or scriptPath, including when resuming.",
   })),
   scriptPath: Type.Optional(Type.String({
     description: "Absolute path to a workflow module. Provide exactly one of script or scriptPath, including when resuming.",
@@ -34,14 +33,11 @@ const WorkflowToolParameters = Type.Object({
 
 type WorkflowToolInput = Static<typeof WorkflowToolParameters>;
 
-/** The launch-approval + saved-workflow seams, injected so the tool stays testable. */
+/** The launch-approval seam, injected so the tool stays testable. */
 interface WorkflowToolServices {
-  consent: ConsentStore;
   approve: ApproveLaunch;
   approvalPolicy: () => WorkflowApprovalPolicy;
   observeRun?: (run: StartedWorkflow, ctx: ExtensionContext) => void;
-  /** Resolve an accessible `@<name>` reference, or undefined when absent or untrusted. */
-  resolveSaved: (name: string, cwd: string, projectTrusted: boolean) => string | undefined;
 }
 
 const DESCRIPTION = `Execute deterministic JavaScript orchestration over subagents. Use workflow when results feed later spawns, when you need phases, pipelines, or resumable control flow, or for more than about eight independent items; up to that many independent one-shot tasks are just that many subagent calls in one turn. Read the workflow-authoring skill before writing a non-trivial script or diagnosing a replay error; launch and runtime errors also name the exact rule violated.
@@ -55,7 +51,7 @@ return parallel(files.map(file => () => agent('Audit ' + file)))
 
 Globals: agent(prompt, opts?), parallel(thunks), pipeline(items, ...stages), phase(title), log(message), and args. agent opts: model ("provider/model-id", never bare), thinkingLevel, tools, excludeTools, schema, cwd, isolation ('worktree' returns { value, patch, changed }; the patch is never applied automatically), label, phase. Every prompt must be self-contained: the child receives neither the parent conversation nor workflow variables unless interpolated. A failed agent() resolves to null - guard before dereferencing. Scripts must be deterministic: no wall-clock, randomness, or raw Promise concurrency - use parallel/pipeline and pass varying inputs through args. Resume with resumeRunId replays completed calls from the journal; drift on a completed call fails closed with an error naming the childId and the rerunChildIds recovery.
 
-Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) Saved workflows run via script: "@<name>" or /wf-<name>; project-scope saved workflows are available only when Pi trusts the current project. A resumeRunId still requires exactly one of script or scriptPath.`;
+Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) A resumeRunId still requires exactly one of script or scriptPath.`;
 
 /**
  * UI-side launch receipt rendered for the workflow tool row.
@@ -101,12 +97,12 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
     description: DESCRIPTION,
     parameters: WorkflowToolParameters,
     async execute(_toolCallId, params, signal, onUpdate, ctx): Promise<AgentToolResult<WorkflowToolDetails | undefined>> {
-      const { script, origin } = resolveScriptSource(params, ctx.cwd, services, ctx.isProjectTrusted());
+      const { script } = resolveScriptSource(params);
       const parsed = parseWorkflowScript(script);
       // Undefined means "reuse persisted args" on resume. Converting it to
       // null here would make the documented recovery invocation hash-miss.
       const args = normalizeWorkflowToolArgs(params.args);
-      const plan: LaunchPlan = { workflow: parsed, args, origin };
+      const plan: LaunchPlan = { workflow: parsed, args };
       const parent: ParentContext = {
         ctx,
         thinkingLevel: pi.getThinkingLevel() as ThinkingLevel,
@@ -130,7 +126,7 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
             onLog: (message: string) => onUpdate?.({ content: [{ type: "text", text: message }], details: undefined }),
           } : {}),
         },
-        { approve: services.approve, ctx, deps: { consent: services.consent, policy: services.approvalPolicy() } },
+        { approve: services.approve, ctx, deps: { policy: services.approvalPolicy() } },
       );
       try {
         services.observeRun?.(started, ctx);
@@ -172,24 +168,12 @@ export function normalizeWorkflowToolArgs(args: unknown): unknown {
   return args === undefined ? undefined : normalizeArgs(args);
 }
 
-const SAVED_REFERENCE = /^@([a-z0-9]+(?:-[a-z0-9]+)*)$/;
-
 export function resolveScriptSource(
   params: WorkflowToolInput,
-  cwd: string,
-  services: Pick<WorkflowToolServices, "resolveSaved">,
-  projectTrusted = false,
-): { script: string; origin: LaunchOrigin } {
+): { script: string } {
   const hasScript = params.script !== undefined;
   const hasPath = params.scriptPath !== undefined;
   if (hasScript === hasPath) throw new Error("Provide exactly one of workflow script or scriptPath; resumeRunId does not replace the script");
-  if (hasPath) return { script: readAbsoluteScript(params.scriptPath!), origin: "inline" };
-  const reference = params.script!.trim().match(SAVED_REFERENCE);
-  if (reference) {
-    const saved = services.resolveSaved(reference[1]!, cwd, projectTrusted);
-    const visibleScopes = projectTrusted ? "project or user scope" : "user scope";
-    if (saved === undefined) throw new Error(`No saved workflow named "${reference[1]}" was found in ${visibleScopes}`);
-    return { script: saved, origin: "saved" };
-  }
-  return { script: params.script!, origin: "inline" };
+  if (hasPath) return { script: readAbsoluteScript(params.scriptPath!) };
+  return { script: params.script! };
 }

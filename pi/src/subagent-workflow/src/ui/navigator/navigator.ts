@@ -60,8 +60,6 @@ interface NavigatorServices {
   describeWorkflow?: (script: string) => string;
   /** Override the runs root (tests); defaults to the store location. */
   root?: string;
-  /** Delegate to the 3b save flow for a workflow run's script. */
-  saveWorkflowScript?: (runId: string, ctx: ExtensionCommandContext) => Promise<void>;
 }
 
 /** Register `/agents` and its `/workflows` alias, returning their shared open path. */
@@ -110,10 +108,6 @@ export function formatPlainSummary(runs: RunSummary[]): string {
     lines.push(`  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${usage} · ${sanitizeTerminalText(run.runId)}]`);
   }
   return lines.join("\n");
-}
-
-function isCommandContext(ctx: NavigatorOpenContext): ctx is ExtensionCommandContext {
-  return "waitForIdle" in ctx;
 }
 
 function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, model: NavigatorModel, target?: NavigatorOpenTarget): Promise<void> {
@@ -224,10 +218,8 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
       };
 
       const actionsFor = (detail: RunDetail): RunActionAvailability => runActionAvailability(
-        detail,
         runner.liveRunIds().includes(detail.runId),
         runner.runHandles(detail.runId).map((handle) => handle.status),
-        services.saveWorkflowScript !== undefined && isCommandContext(ctx),
       );
 
       const stopRun = async () => {
@@ -259,21 +251,6 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
           stoppingRunId = undefined;
           rerender();
         }
-      };
-
-      const saveSelected = async () => {
-        const runId = state.currentRunId(model.runs());
-        if (!runId) return;
-        if (!services.saveWorkflowScript || !isCommandContext(ctx)) {
-          ctx.ui.notify("Saving is not available", "error");
-          return;
-        }
-        const detail = model.detail(runId);
-        if (!actionsFor(detail).canSave) {
-          ctx.ui.notify(saveRefusalMessage(detail), "warning");
-          return;
-        }
-        await services.saveWorkflowScript(runId, ctx);
       };
 
       const act = (data: string) => {
@@ -340,9 +317,6 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
             break;
           case "stop":
             void stopRun();
-            return;
-          case "save":
-            void saveSelected();
             return;
           default:
             return;
@@ -449,7 +423,7 @@ function renderContent(
   }
   state.reconcileRuns(runs);
   const selectedRunId = state.currentRunId(runs);
-  const actions = selectedRunId ? actionsFor(model.detail(selectedRunId)) : { canStop: false, canSave: false };
+  const actions = selectedRunId ? actionsFor(model.detail(selectedRunId)) : { canStop: false };
   return {
     lines: renderRunList(runs, state.cursor, theme, inner, now, budget),
     footer: footerHint({
@@ -644,18 +618,6 @@ export function buildAgentView(
       };
     },
   });
-}
-
-export function saveRefusalMessage(detail: RunDetail): string {
-  if (detail.label === "quarantined - crashed mid-resume") {
-    return `Workflow run ${detail.runId} is quarantined after a crashed generation commit and cannot be saved`;
-  }
-  if (detail.kind !== "workflow") return `Run ${detail.runId} is not a workflow and cannot be saved`;
-  if (detail.status === "failed" || detail.status === "aborted") {
-    return `Workflow run ${detail.runId} did not complete successfully and cannot be saved`;
-  }
-  if (!detail.hasScript) return `Workflow run ${detail.runId} has no saved script`;
-  return `Workflow run ${detail.runId} is not completed and cannot be saved`;
 }
 
 const BORDER = "muted";

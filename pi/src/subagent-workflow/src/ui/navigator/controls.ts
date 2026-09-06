@@ -63,19 +63,15 @@ export function orderedChildren(detail: RunDetail, filter: FilterMode): ChildRow
 
 export interface RunActionAvailability {
   canStop: boolean;
-  canSave: boolean;
 }
 
 /** The shared eligibility rules for run-detail hints and their key handlers. */
 export function runActionAvailability(
-  detail: RunDetail,
   runIsLive: boolean,
   handleStatuses: readonly SubagentStatus[],
-  saveAvailable: boolean,
 ): RunActionAvailability {
   return {
     canStop: runIsLive || handleStatuses.some((status) => status === "running" || status === "pending"),
-    canSave: saveAvailable && !detail.corrupt && detail.kind === "workflow" && detail.status === "completed" && detail.hasScript,
   };
 }
 
@@ -88,7 +84,6 @@ type NavAction =
   | { type: "close" }
   | { type: "stop" }
   | { type: "filter" }
-  | { type: "save" }
   | { type: "steer" }
   | { type: "none" };
 
@@ -125,8 +120,6 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
       return { type: "stop" };
     case "f":
       return level === "run" ? { type: "filter" } : { type: "none" };
-    case "s":
-      return { type: "save" };
     default:
       return { type: "none" };
   }
@@ -140,8 +133,6 @@ interface FooterState {
   filter?: FilterMode;
   /** Whether the selected run or agent can currently be stopped. */
   canStop?: boolean;
-  /** Whether the selected workflow can be saved. */
-  canSave?: boolean;
   /** Agent-detail only: whether the steering composer is available. */
   canSteer?: boolean;
   /** Agent-detail only: whether a persisted child can start a follow-up thread. */
@@ -157,12 +148,10 @@ export function footerHint(state: FooterState, theme: ThemeLike): string {
     parts.push("enter open", "esc close");
     if (state.canCycle) parts.push("tab next live");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
-    if (state.canSave) parts.push("s save");
   } else if (state.level === "run") {
     parts.push("enter open", "esc back", `f filter: ${state.filter ?? "all"}`);
     if (state.canCycle) parts.push("tab next live");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
-    if (state.canSave) parts.push("s save");
   } else {
     parts.length = 0;
     parts.push("↑↓ / jk scroll", "shift+↑↓ / JK page");
