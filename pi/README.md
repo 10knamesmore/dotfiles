@@ -45,8 +45,8 @@ exact pnpm lockfile; TypeBox and the Pi packages are supplied by Pi at runtime.
 
 ## Local state boundary
 
-Dotfiles owns Pi settings, `AGENTS.md`, shared hook rules, extensions, and the
-workflow-authoring skill. Pi continues to own `auth.json`, sessions, trust,
+Dotfiles owns Pi's `AGENTS.md`, shared hook rules, extensions, and the
+workflow-authoring skill. Pi owns `settings.json`, `auth.json`, sessions, trust,
 model storage, workflow journals, and all other machine-local runtime state.
 
 Interactive model choices update Pi's native default provider/model, and thinking

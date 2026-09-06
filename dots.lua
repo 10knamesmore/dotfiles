@@ -16,10 +16,8 @@ dots.resource.symlink {
 }
 
 -- Pi agent 目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
--- sessions/、models-store.json、npm/ 等机器本地物，整目录链会把它们卷进仓库。
--- 注意 pi 用 writeFileSync 原地写 settings.json（跟随软链、不 temp+rename），
--- 所以链进来的 settings.json 在 /settings 改动后会直接回流仓库——这是要的行为，
--- 代价是 pi 自写的 lastChangelogVersion 会跟着进 diff。
+-- settings.json、sessions/、models-store.json、npm/ 等机器本地物；整目录链会把
+-- 它们卷进仓库。settings.json 也留给 Pi 按机器自行维护。
 granularity("home/.pi/agent", { mode = "children" })
 
 distribute("skills", {
