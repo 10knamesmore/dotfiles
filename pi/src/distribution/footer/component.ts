@@ -482,42 +482,29 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
     sessionDuration,
   } = options;
   const sessionTime = formatDuration(sessionDuration.elapsedMilliseconds());
-  const sessionDurationText = [
-    palette.overlay2("session"),
-    palette.lavender(sessionTime),
-  ].join(" ");
-
   const modelTime = formatDuration(modelDuration.elapsedMilliseconds());
-  const modelDurationText = [
-    palette.overlay2("model"),
-    palette.sky(modelTime),
-  ].join(" ");
-
   const tokensPerSecond = throughput.tokensPerSecond();
-  let throughputText = "";
 
-  if (tokensPerSecond !== undefined) {
-    const formattedTokensPerSecond = formatTokensPerSecond(tokensPerSecond);
-    throughputText = [
-      palette.overlay2("tps"),
-      palette.sky(formattedTokensPerSecond),
-    ].join(" ");
-  }
+  // `session 1m1s(api 2m2s) 13.3 toks/s` as one cohesive timing block:
+  // API wall duration in parentheses right after the session duration (no
+  // space), then throughput; the whole block drops together when narrow.
+  const apiDurationText =
+    `${palette.overlay2("(api")} ${palette.sky(modelTime)}${palette.overlay2(")")}`;
+  const throughputText =
+    tokensPerSecond === undefined
+      ? ""
+      : ` ${palette.sky(formatTokensPerSecond(tokensPerSecond))} ${palette.overlay2("toks/s")}`;
+  const timingText =
+    `${palette.overlay2("session")} ${palette.lavender(sessionTime)}` +
+    `${apiDurationText}${throughputText}`;
 
   const toolSnapshot = tools.snapshot(3);
   const toolUsage = formatToolUsage(toolSnapshot);
   const turnSnapshot = turns.snapshot();
   const turnCount = formatTurns(turnSnapshot);
   const statuses = formatExtensionStatuses(footerData);
-  const thirdParts = [
-    sessionDurationText,
-    modelDurationText,
-    throughputText,
-    toolUsage,
-    turnCount,
-    statuses,
-  ];
-  const dropOrder = [3, 4, 2, 1, 0];
+  const thirdParts = [timingText, toolUsage, turnCount, statuses];
+  const dropOrder = [1, 2, 0];
 
   return fitByDropping(thirdParts, dropOrder, width, separator);
 }
