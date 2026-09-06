@@ -5,7 +5,9 @@ import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import type { ActiveRunTarget } from "./status-widget.js";
 
 export interface AgentInputNavigation {
+  /** Move down in the widget without wrapping at the last row. */
   selectNext(): boolean;
+  /** Move up; return false at the first row so the editor regains focus. */
   selectPrevious(): boolean;
   hasSelection(): boolean;
   takeSelection(): ActiveRunTarget | undefined;

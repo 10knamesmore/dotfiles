@@ -264,7 +264,12 @@ export class SubagentStatusWidget {
     this.lastStatus = undefined;
   }
 
-  /** Select a visible active run from editor arrow navigation. */
+  /**
+   * Move through visible active runs without wrapping at either end.
+   *
+   * Moving up from the first row clears widget selection and returns false so
+   * the editor can handle the same key, putting focus back in the input.
+   */
   selectRun(delta: -1 | 1): boolean {
     if (!this.enabled) return false;
     const runs = this.selectableRuns();
@@ -273,10 +278,18 @@ export class SubagentStatusWidget {
       return false;
     }
     const current = runs.findIndex(([runId]) => runId === this.selectedRunId);
-    const index = current < 0
-      ? (delta === 1 ? 0 : runs.length - 1)
-      : (current + delta + runs.length) % runs.length;
-    this.selectedRunId = runs[index]![0];
+    if (current < 0 && delta < 0) {
+      this.selectedRunId = undefined;
+      this.safeUpdate();
+      return false;
+    }
+    const next = current < 0 ? 0 : current + delta;
+    if (next < 0) {
+      this.selectedRunId = undefined;
+      this.safeUpdate();
+      return false;
+    }
+    this.selectedRunId = runs[Math.min(next, runs.length - 1)]![0];
     this.safeUpdate();
     return true;
   }
