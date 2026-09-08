@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, UsageSummary } from "../types.js";
+import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, ThinkingLevel, UsageSummary } from "../types.js";
 import { cloneActivityFold, type RunActivityFold } from "../store/activity-fold.js";
 import { cloneRunProjection, foldRunProjection as foldProjection, projectRunSnapshot, type RunProjection, type RunProjectionEvent } from "../store/run-projection.js";
 import { readRunSnapshot, type RunSnapshot } from "../store/run-snapshot.js";
@@ -10,7 +10,7 @@ import { EMPTY_USAGE, RunStore } from "../store/run-store.js";
 import { writeSessionClosedMarker } from "../store/session-closed-marker.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
-import { followUpSpawn, submittedSpec, type ChildSpawnSpec, type ParentContext } from "./child.js";
+import { followUpSpawn, resolveModel, submittedSpec, type ChildSpawnSpec, type ParentContext } from "./child.js";
 import { spawnSubprocessChild } from "./subprocess/spawn-child.js";
 import type { ChildSession } from "./child-session.js";
 import { STRUCTURED_REPAIR_PROMPT } from "./schema-tool.js";
@@ -54,6 +54,10 @@ export interface SpawnedRun {
   runId: string;
   runDir: string;
   parentSessionId: string;
+  /** Fully qualified provider/model used for the child, when it resolves before launch. */
+  model?: string;
+  /** Effective reasoning level used for the child, when it resolves before launch. */
+  thinking?: ThinkingLevel;
   handle: SubagentHandle;
 }
 
@@ -413,10 +417,12 @@ export class SubagentRunner {
     }
     this.stores.set(runId, store);
     this.handles.set(handle.id, handle);
+    const display = spawnDisplaySpec(spec, parent);
     this.notifySpawn({
       runId,
       runDir: store.runDir,
       parentSessionId: parent.ctx.sessionManager.getSessionId(),
+      ...display,
       handle,
     });
     handle.trackStartup(this.start(handle, store));
@@ -775,6 +781,18 @@ export class SubagentRunner {
     if ([...this.handles.values()].some((handle) => handle.runId === runId)) return;
     this.finalizedRuns.delete(runId);
     this.deliveredRuns.delete(runId);
+  }
+}
+
+function spawnDisplaySpec(spec: ChildSpawnSpec, parent: ParentContext): Pick<SpawnedRun, "model" | "thinking"> {
+  try {
+    const resolved = resolveModel(submittedSpec(spec), parent.ctx, parent.thinkingLevel);
+    return { model: `${resolved.model.provider}/${resolved.model.id}`, thinking: resolved.thinking };
+  } catch {
+    // The child startup path remains authoritative for errors. This metadata is
+    // observational only, so an unresolvable display value must not change the
+    // existing spawn and failure behavior.
+    return {};
   }
 }
 

@@ -78,7 +78,7 @@ export function createNavigatorFollowUp(
         selfPath: extensionPath,
       };
       const sessionId = ctx.sessionManager.getSessionId();
-      preflight(resolved.spec, parent, { forkSessionFile: resolved.forkSessionFile });
+      const childDisplay = preflight(resolved.spec, parent, { forkSessionFile: resolved.forkSessionFile });
       // directDelivery rides inside run.json, written before any child starts:
       // a crash at any later point leaves a run catch-up already knows to skip.
       const handle = runner.spawnRun(resolved, parent, { directDelivery: true });
@@ -94,7 +94,10 @@ export function createNavigatorFollowUp(
         reportDiagnostic(`[subagent-workflow] navigator follow-up completion failed: ${errorMessage(error)}`);
       });
       try {
-        dependencies.widget?.track(handle.runId, handle, ctx);
+        dependencies.widget?.track(handle.runId, handle, ctx, {
+          model: `${childDisplay.model.provider}/${childDisplay.model.id}`,
+          thinking: childDisplay.thinking,
+        });
       } catch (error) {
         reportDiagnostic(`[subagent-workflow] status widget failed: ${errorMessage(error)}`);
       }

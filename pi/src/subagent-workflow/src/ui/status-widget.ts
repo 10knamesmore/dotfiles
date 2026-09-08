@@ -28,7 +28,7 @@ import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SpawnedRun, SubagentRunner } from "../runner/runner.js";
 import type { StartedWorkflow } from "../workflow/launch.js";
-import type { SubagentEvent, SubagentHandle, UsageSummary, WorkflowPhase } from "../types.js";
+import type { SubagentEvent, SubagentHandle, ThinkingLevel, UsageSummary, WorkflowPhase } from "../types.js";
 import { sumUsage } from "../store/run-store.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
@@ -36,6 +36,7 @@ import {
   childLabel,
   countStatuses,
   formatDuration,
+  formatFullModel,
   formatTokenUsage,
   spinnerFrame,
   statusGlyph,
@@ -64,6 +65,8 @@ interface TrackedRun {
   seenHandles: Set<string>;
   startedAt: number;
   usage: Map<string, UsageSummary>;
+  /** Effective model/effort display per child, including workflow fan-outs. */
+  models: Map<string, string>;
   unsubscribers: Array<() => void>;
 }
 
@@ -73,6 +76,8 @@ export interface WidgetRunView {
   label: string;
   /** Formatted current-phase segment for workflow rows, e.g. "Research (2/3)". */
   phase?: string;
+  /** One model, or a comma-separated list when a workflow mixes models. */
+  model?: string;
   counts: StatusCounts;
   startedAt: number;
   usage: UsageSummary;
@@ -95,6 +100,27 @@ function phaseView(run: Pick<TrackedRun, "kind" | "phases" | "currentPhase">): s
 
 function runUsage(run: TrackedRun): UsageSummary {
   return sumUsage(run.usage.values());
+}
+
+function modelDisplay(model: string | undefined, thinking: ThinkingLevel | undefined): string | undefined {
+  const formatted = formatFullModel(model ? sanitizeTerminalText(model) : undefined, thinking);
+  return formatted || undefined;
+}
+
+function resolvedModelDisplay(handle: SubagentHandle): string | undefined {
+  const resolved = handle.resolved;
+  return resolved
+    ? modelDisplay(`${resolved.provider}/${resolved.modelId}`, resolved.thinkingLevel)
+    : undefined;
+}
+
+function runModelDisplay(run: TrackedRun): string | undefined {
+  const models = new Set(run.models.values());
+  for (const handle of run.handles) {
+    const display = resolvedModelDisplay(handle);
+    if (display) models.add(display);
+  }
+  return models.size > 0 ? [...models].join(", ") : undefined;
 }
 
 /** Keep the widget near one quarter of the terminal, or retain the old cap when height is unavailable. */
@@ -129,10 +155,12 @@ export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width
     const glyph = statusGlyph("running", theme, 0, false);
     const rawLabel = truncateToWidth(run.label, LABEL_WIDTH, "…", true);
     const label = run.selected ? theme.fg("accent", theme.bold(rawLabel)) : rawLabel;
-    const phase = run.phase ? `${theme.fg("dim", run.phase)}  ` : "";
+    const model = run.model ? theme.fg("dim", run.model) : "";
+    const phase = run.phase ? theme.fg("dim", run.phase) : "";
     const progress = theme.fg("dim", run.counts.total > 0 ? `${run.counts.done}/${run.counts.total}` : "starting");
     const usage = theme.fg("dim", formatTokenUsage(run.usage));
-    lines.push(truncateToWidth(`${cursor} ${glyph} ${label}  ${phase}${progress}  ${usage}`, cap));
+    const metadata = [model, phase, progress].filter((part) => part.length > 0).join("  ");
+    lines.push(truncateToWidth(`${cursor} ${glyph} ${label}  ${metadata}  ${usage}`, cap));
   }
   if (runs.length > maxRows) lines.push(truncateToWidth(theme.fg("dim", `  +${runs.length - maxRows} more runs`), cap));
   return lines;
@@ -149,7 +177,7 @@ export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width
  */
 function widgetSignature(runs: WidgetRunView[]): string {
   return JSON.stringify(runs.map((run) =>
-    [run.kind, run.label, run.phase ?? "", run.counts.done, run.counts.total, run.counts.running, run.counts.failed, formatTokenUsage(run.usage), run.selected === true]));
+    [run.kind, run.label, run.phase ?? "", run.model ?? "", run.counts.done, run.counts.total, run.counts.running, run.counts.failed, formatTokenUsage(run.usage), run.selected === true]));
 }
 
 export class SubagentStatusWidget {
@@ -192,6 +220,7 @@ export class SubagentStatusWidget {
         seenHandles: new Set(),
         startedAt: Date.now(),
         usage: new Map(),
+        models: new Map(),
         unsubscribers: [],
       });
     }
@@ -206,7 +235,9 @@ export class SubagentStatusWidget {
     if (run.seenHandles.has(handle.id)) return;
     run.seenHandles.add(handle.id);
     run.handles.push(handle);
-    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(spawned.runId, run.usage, event)));
+    const model = modelDisplay(spawned.model, spawned.thinking) ?? resolvedModelDisplay(handle);
+    if (model) run.models.set(handle.id, model);
+    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(spawned.runId, run, event)));
     if (handle.spec.phase !== undefined) run.currentPhase = handle.spec.phase;
     this.safeUpdate();
   }
@@ -218,11 +249,15 @@ export class SubagentStatusWidget {
   }
 
   /** Register a spawned run for live display. No-op without dialog-capable UI. */
-  track(runId: string, handle: SubagentHandle, ctx: WidgetCtx): void {
+  track(runId: string, handle: SubagentHandle, ctx: WidgetCtx,
+    display: { model?: string; thinking?: ThinkingLevel } = {}): void {
     if (!ctx.hasUI) return;
     this.setCtx(ctx);
     const usage = new Map<string, UsageSummary>();
-    this.runs.set(runId, {
+    const models = new Map<string, string>();
+    const model = modelDisplay(display.model, display.thinking) ?? resolvedModelDisplay(handle);
+    if (model) models.set(handle.id, model);
+    const run: TrackedRun = {
       kind: "subagent",
       // Computed once: the label is fixed for the run's life, and childLabel
       // rescans the whole prompt - not worth repeating on every repaint.
@@ -232,8 +267,11 @@ export class SubagentStatusWidget {
       seenHandles: new Set([handle.id]),
       startedAt: handle.startedAt,
       usage,
-      unsubscribers: [handle.subscribe((event) => this.onEvent(runId, usage, event))],
-    });
+      models,
+      unsubscribers: [],
+    };
+    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(runId, run, event)));
+    this.runs.set(runId, run);
     this.safeUpdate();
   }
 
@@ -334,9 +372,12 @@ export class SubagentStatusWidget {
     return active.sort(([, left], [, right]) => left.startedAt - right.startedAt);
   }
 
-  private onEvent(runId: string, usage: Map<string, UsageSummary>, event: SubagentEvent): void {
-    if (event.type === "usage") usage.set(event.id, { ...event.usage });
-    if (event.type === "result") usage.set(event.id, { ...event.result.usage });
+  private onEvent(runId: string, run: TrackedRun, event: SubagentEvent): void {
+    if (event.type === "usage") run.usage.set(event.id, { ...event.usage });
+    if (event.type === "result") run.usage.set(event.id, { ...event.result.usage });
+    const handle = run.handles.find((candidate) => candidate.id === event.id);
+    const model = handle ? resolvedModelDisplay(handle) : undefined;
+    if (model) run.models.set(event.id, model);
     if (event.type === "status" || event.type === "result") this.pruneRun(runId);
     this.safeUpdate();
   }
@@ -365,6 +406,7 @@ export class SubagentStatusWidget {
       kind: run.kind,
       label: run.label,
       phase: phaseView(run),
+      model: runModelDisplay(run),
       counts: countStatuses(run.handles.map((handle) => handle.status)),
       startedAt: run.startedAt,
       usage: runUsage(run),

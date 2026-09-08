@@ -320,7 +320,7 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
       let display: { modelId?: string; thinking?: ThinkingLevel } = {};
       try {
         const resolved = resolveModel(spec, ctx, parent.thinkingLevel);
-        display = { modelId: resolved.model.id, thinking: resolved.thinking };
+        display = { modelId: `${resolved.model.provider}/${resolved.model.id}`, thinking: resolved.thinking };
       } catch { /* the child will fail (or not) on its own terms */ }
       const handle = runner.spawnRun(spawnSpec, parent);
       const { runId, runDir } = handle;
@@ -331,7 +331,7 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
         labels: [spec.label ?? childLabel(spec)],
       });
       try {
-        widget?.track(runId, handle, ctx);
+        widget?.track(runId, handle, ctx, { model: display.modelId, thinking: display.thinking });
       } catch (error) {
         // The status widget is observational. Delivery and runner cleanup must
         // remain wired even if a host UI implementation rejects the widget.

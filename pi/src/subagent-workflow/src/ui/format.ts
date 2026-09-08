@@ -113,6 +113,11 @@ export function modelEffort(model: string, thinking: string | undefined, max: nu
   return `${truncate(model, Math.max(1, max - suffix.length))}${suffix}`;
 }
 
+/** Full provider/model display used where the UI has no dedicated model column. */
+export function formatFullModel(model: string | undefined, thinking: string | undefined): string {
+  return model ? modelEffort(model, thinking, Number.MAX_SAFE_INTEGER) : "";
+}
+
 /** Width-truncate a plain (ANSI-free) string with an ellipsis. */
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
