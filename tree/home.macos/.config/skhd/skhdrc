@@ -56,8 +56,15 @@ alt - v : yabai -m window --toggle float
 # windowed-fullscreen: 占据全屏, 但不是native全屏
 cmd - f : yabai -m window --toggle windowed-fullscreen
 
-# toggle splist
+# toggle split mode
 cmd - s : yabai -m window --toggle split
+
+# stack the most recently focused window on the current window
+cmd + ctrl - s : yabai -m window --stack recent
+
+# cycle through windows in the current stack, wrapping at both ends
+cmd - n : yabai -m window --focus stack.next || yabai -m window --focus stack.first
+cmd - p : yabai -m window --focus stack.prev || yabai -m window --focus stack.last
 
 # toggle sketchybar, mirrors Hyprland's SUPER+T -> waybar toggle
 cmd - t : $HOME/.config/sketchybar/plugins/toggle_bar.sh
