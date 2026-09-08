@@ -199,8 +199,8 @@ opt.winminwidth = 5
 -- 为所有未显式指定 border 的浮窗提供统一圆角边框。
 opt.winborder = "rounded"
 
--- 一行超出范围换行
-opt.wrap = true
+-- 禁用长行自动换行
+opt.wrap = false
 
 --
 -- LazyVim root dir detection
