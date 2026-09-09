@@ -7,6 +7,15 @@ description: 将已明确的实现任务通过一次性交接文档交给另一 
 
 当前使用者 A 负责确定交付目标、写任务交接并审查结果；接收者 B 实现、验证并回传证据。B 不需要安装本 skill，执行和回传要求由 A 写进交接文件。
 
+## 为什么用 handoff
+
+A 通常是昂贵的前沿模型，预算应该花在规划、架构、问题定位和方案取舍上；实现、验证、回传这类高 token 密度、低判断密度的工作交给 B。
+
+- B 不一定是一个廉价模型, handoff可能只是为了在provider之间额度负载均衡
+- B 从自包含的交接文件起步，不继承 A 的探索历史；A 的上下文只用于规划和 review。
+- 收益来自分工，不来自免除验收：A 仍要亲自核对源码、写交接、独立 review 结果。
+- 所以 handoff 要求 contract 已定、目标完整到可独立验收。目标过小或设计未定时，交接加 review 的成本超过收益。
+
 ## 路由
 
 - 准备发出任务：读取 [send.md](references/send.md) 和 [HANDOFF-FORMAT.md](references/HANDOFF-FORMAT.md) 的任务与回传格式。
