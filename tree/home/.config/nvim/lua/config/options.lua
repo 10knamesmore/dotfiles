@@ -200,7 +200,7 @@ opt.winminwidth = 5
 opt.winborder = "rounded"
 
 -- 禁用长行自动换行
-opt.wrap = false
+opt.wrap = true
 
 --
 -- LazyVim root dir detection

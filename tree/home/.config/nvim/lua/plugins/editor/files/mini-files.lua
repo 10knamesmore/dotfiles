@@ -284,6 +284,7 @@ return {
     },
     options = {
       permanent_delete = false,
+      lsp_timeout = 0, -- 禁用创建、删除、重命名的 LSP 联动。
     },
   },
   config = function(_, opts)
@@ -394,14 +395,6 @@ return {
         local buf_id = args.data.buf_id
         set_mini_files_keymaps(buf_id)
         show_symlink_targets(buf_id)
-      end,
-    })
-
-    --- 在 mini.files 重命名后同步 snacks 的文件重命名处理。
-    vim.api.nvim_create_autocmd("User", {
-      pattern = "MiniFilesActionRename",
-      callback = function(event)
-        require("snacks").rename.on_rename_file(event.data.from, event.data.to)
       end,
     })
 
