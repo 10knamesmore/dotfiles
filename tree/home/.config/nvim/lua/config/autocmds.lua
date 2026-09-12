@@ -134,6 +134,16 @@ vim.api.nvim_create_autocmd({ "BufRead" }, {
 })
 
 -- =========================================
+-- zsh 文件按 bash 处理
+vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("zsh_as_bash"),
+  pattern = { "zsh" },
+  callback = function()
+    vim.bo.filetype = "bash"
+  end,
+})
+
+-- =========================================
 -- CSV 文件打开时禁用换行
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   pattern = "*.csv",

@@ -69,7 +69,7 @@ return {
           top = 0,
           bottom = 0,
         },
-        z_index = 1,
+        z_index = 30,
         window_border = "rounded",
         persist = true,
       },
