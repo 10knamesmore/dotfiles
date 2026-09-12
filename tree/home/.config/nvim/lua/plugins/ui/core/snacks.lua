@@ -61,6 +61,25 @@ return {
   priority = 1000, -- 优先加载
   lazy = false, -- 启动时立即加载插件
   opts = function()
+    --- lazygit 里按 e（os.edit / os.editAtLine / os.openDirInEditor）的完整命令。
+    --- snacks 内建的 os.editPreset = "nvim-remote" 用 --remote-tab，会新开 tab；这里换成：
+    --- 先关掉 lazygit 浮窗（utils.lazygit.hide，lazygit 进程留后台），窗口让回打开 lazygit
+    --- 之前的位置，再用 --remote-silent（nvim 侧等价 :drop）把文件开进那个窗口。
+    --- 行号只能等文件开出来之后单独发，否则会被仍是 terminal-mode 的 lazygit 浮窗吃掉。
+    ---@param target string 占位符，{{filename}} 或 {{dir}}
+    ---@param line? string 占位符 {{line}}，给了就在文件打开后跳转
+    local function lazygit_edit(target, line)
+      local commands = {
+        -- nvim 侧的引号交给 luaeval 的字符串，免得 shell 再去括一层
+        [==[nvim --server "$NVIM" --remote-expr 'luaeval("require([[utils.lazygit]]).hide()")']==],
+        'nvim --server "$NVIM" --remote-silent ' .. target,
+      }
+      if line then
+        commands[#commands + 1] = 'nvim --server "$NVIM" --remote-send ":' .. line .. '<CR>"'
+      end
+      return table.concat(commands, " && ")
+    end
+
     ---@type snacks.Config
     local opts = {
       -- fps 只压低步进下限、不缩短动画时长，调高只是在同样时长里多画帧和
@@ -99,6 +118,16 @@ return {
       lazygit = {
         win = {
           border = "rounded",
+        },
+        -- os.edit/editAtLine/openDirInEditor 换成 lazygit_edit 的写法；editPreset 保持
+        -- snacks 默认的 "nvim-remote" 不动：editAtLineAndWait（staging 里编辑 patch 文件）
+        -- 与 os.edit 的 suspend 判定还靠它。
+        config = {
+          os = {
+            edit = lazygit_edit("{{filename}}"),
+            editAtLine = lazygit_edit("{{filename}}", "{{line}}"),
+            openDirInEditor = lazygit_edit("{{dir}}"),
+          },
         },
       },
       dim = {
@@ -271,7 +300,8 @@ return {
       {
         "<leader>gg",
         function()
-          require("snacks").lazygit()
+          -- 经 utils.lazygit 转发：它要记住终端对象，lazygit 里的 e 才能把浮窗藏起来
+          require("utils.lazygit").open()
         end,
         desc = "Lazygit (cwd)",
         mode = "n",

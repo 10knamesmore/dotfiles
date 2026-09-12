@@ -64,6 +64,7 @@ end
 ---@field warn fun(msg: string|string[], opts?: table)
 ---@field error fun(msg: string|string[], opts?: table)
 ---@field format table
+---@field lazygit table
 ---@field lsp table
 ---@field lualine table
 ---@field math table

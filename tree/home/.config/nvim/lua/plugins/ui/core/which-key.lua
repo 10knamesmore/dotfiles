@@ -24,6 +24,7 @@ return {
           { "<leader>dp", group = "profiler" },
           { "<leader>f", group = "file/find" },
           { "<leader>g", group = "git" },
+          { "<leader>m", group = "minimap" },
           { "<leader>r", group = "rest" },
           { "<leader>s", group = "search" },
           { "<leader>t", group = "tabs/todo" },

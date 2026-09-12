@@ -23,6 +23,7 @@ return {
             { path = "snacks.nvim", words = { "Snacks" } },
             -- LazyKeysSpec/LazyKeys/LazyUtil 等 lazy.nvim 类型按 Lazy 前缀触发加载
             { path = "lazy.nvim", words = { "Lazy" } },
+            { path = "neominimap.nvim", words = { "Neominimap" } },
           },
         },
       },
@@ -37,7 +38,7 @@ return {
         diagnostics = {
           underline = true,
           update_in_insert = false,
-          virtual_text = false, -- 用户自定义：关闭 virtual_text
+          virtual_text = false,
           severity_sort = true,
           signs = {
             text = {
