@@ -7,8 +7,8 @@ import type { ActiveRunTarget } from "./status-widget.js";
 export interface AgentInputNavigation {
   /** Move down in the widget without wrapping at the last row. */
   selectNext(): boolean;
-  /** Move up; return false at the first row so the editor regains focus. */
-  selectPrevious(): boolean;
+  /** Move up, clearing selection at the first row to return to the editor. */
+  selectPrevious(): void;
   hasSelection(): boolean;
   takeSelection(): ActiveRunTarget | undefined;
   clearSelection(): void;
@@ -41,7 +41,9 @@ export class AgentInputEditor extends CustomEditor {
       && this.navigation.selectNext()) {
       return;
     }
-    if (selected && this.inputKeybindings.matches(data, "tui.editor.cursorUp") && this.navigation.selectPrevious()) {
+    if (selected && this.inputKeybindings.matches(data, "tui.editor.cursorUp")) {
+      this.navigation.selectPrevious();
+      // Returning to the editor consumes this key; history and cursor movement start with the next one.
       return;
     }
     if (selected) {

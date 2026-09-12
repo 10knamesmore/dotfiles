@@ -305,8 +305,8 @@ export class SubagentStatusWidget {
   /**
    * Move through visible active runs without wrapping at either end.
    *
-   * Moving up from the first row clears widget selection and returns false so
-   * the editor can handle the same key, putting focus back in the input.
+   * Returns whether a run remains selected. Moving up from the first row clears
+   * selection; the editor must consume that key without moving its cursor or history.
    */
   selectRun(delta: -1 | 1): boolean {
     if (!this.enabled) return false;
