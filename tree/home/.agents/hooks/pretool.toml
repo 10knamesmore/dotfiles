@@ -58,21 +58,6 @@ decision = "deny"
 reason   = "全局工具权限不允许直接执行 dd。"
 
 # ════ 工具偏好重定向：deny 的 reason 喂回模型，模型自动换工具重试 ════
-[[bash]]
-cmd      = "grep"
-decision = "deny"
-reason   = "工具偏好：用 rg 替代 grep"
-
-[[bash]]
-cmd      = "rg"
-any      = ["-r", "--replace"]
-decision = "deny"
-reason   = "rg 的 -r/--replace 是替换文本不是递归（递归本就是默认）——`-rn` 是「替换成 n」不是「递归+行号」。要行号用 -n。确需 replace 请说明理由让用户手动执行。"
-
-[[bash]]
-cmd      = "find"
-decision = "deny"
-reason   = "工具偏好：用 fd 替代 find（fd PATTERN PATH；-name 直接写模式；-exec → fd -x）。确需 find 独有特性时说明理由。"
 
 [[bash]]
 cmd      = "pip"
@@ -83,16 +68,6 @@ reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直�
 cmd      = "pip3"
 decision = "deny"
 reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
-
-[[bash]]
-cmd      = "python"
-decision = "deny"
-reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
-
-[[bash]]
-cmd      = "python3"
-decision = "deny"
-reason   = "Python 一律走 uv：uv run python …（脚本/-c 一次性代码同理）。"
 
 [[bash]]
 cmd      = "npm"
@@ -114,12 +89,6 @@ decision = "deny"
 reason   = "全局工具权限不允许直接编辑 SSH 或 agent 登录凭据。"
 
 [[tool]]
-tool     = "WebFetch"
-where    = { url = { domain = "github.com" } }
-decision = "deny"
-reason   = "GitHub 操作一律用 gh CLI."
-
-[[tool]]
 tool     = "Read"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
@@ -136,23 +105,3 @@ tool     = "Write"
 where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
 decision = "deny"
 reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
-
-# ════ ~/.zshrc 不受 dotfiles 接管，且可能含 API key ════
-
-# [[tool]]
-# tool     = "Read"
-# where    = { file_path = { glob = ["**/.zshrc"] } }
-# decision = "deny"
-# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接读。需要 shell 配置内容时读 ~/dotfiles/tree/home/.zshrc_dotfiles（受管源）。"
-#
-# [[tool]]
-# tool     = "Edit"
-# where    = { file_path = { glob = ["**/.zshrc"] } }
-# decision = "deny"
-# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"
-#
-# [[tool]]
-# tool     = "Write"
-# where    = { file_path = { glob = ["**/.zshrc"] } }
-# decision = "deny"
-# reason   = "~/.zshrc 不受 dotfiles 接管且可能含 API key，不直接改写。改 shell 配置走 ~/dotfiles/tree/home/.zshrc_dotfiles + dots sync。"

@@ -13,6 +13,11 @@ frozen pnpm install before planning the managed links, then deploys:
 - `src/remember-last-model.ts` to `~/.pi/agent/extensions/remember-last-model.ts`;
 - the `workflow-authoring` skill to `~/.pi/agent/skills/`.
 
+The FT LLM Proxy model catalog is machine-local at `~/.pi/agent/models.json`, next
+to `settings.json`: dots does not manage it. It is JSON with comments, carries no
+credentials (the key is interpolated from `$FTAI_API_KEY`), and Pi re-reads it
+every time `/model` opens.
+
 The workflow runtime resolves Acorn from this workspace's `node_modules` through
 the extension source realpath. Pi supplies its own extension packages and
 TypeBox at runtime. Their exact development versions remain installed here for
@@ -46,8 +51,9 @@ exact pnpm lockfile; TypeBox and the Pi packages are supplied by Pi at runtime.
 ## Local state boundary
 
 Dotfiles owns Pi's `AGENTS.md`, shared hook rules, extensions, and the
-workflow-authoring skill. Pi owns `settings.json`, `auth.json`, sessions, trust,
-model storage, workflow journals, and all other machine-local runtime state.
+workflow-authoring skill. `settings.json`, the hand-maintained `models.json`
+catalog, `auth.json`, `models-store.json`, sessions, trust, workflow journals,
+and all other machine-local state stay outside dotfiles.
 
 Interactive model choices update Pi's native default provider/model, and thinking
 choices update its per-model settings. Session restoration does not change the

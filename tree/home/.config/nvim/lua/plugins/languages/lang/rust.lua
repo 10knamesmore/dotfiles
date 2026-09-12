@@ -108,13 +108,6 @@ return {
               closureCaptureHints = {
                 enable = true,
               },
-              expressionAdjustmentHints = {
-                enable = "reborrow",
-              },
-              lifetimeElisionHints = {
-                enable = "skip_trivial",
-              },
-              -- genericParameterHints = { type = { enable = true } },
             },
             procMacro = {
               enable = true,

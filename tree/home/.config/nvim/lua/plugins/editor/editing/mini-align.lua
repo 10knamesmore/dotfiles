@@ -3,6 +3,15 @@ return {
   version = false,
   event = { "BufReadPost", "BufWritePost", "BufNewFile" },
   opts = function()
+    -- 读取用户输入的一行文本；取消（<Esc>/<C-c>）或直接回车时返回 nil，表示不改变当前设置
+    local read_input = function(prompt)
+      local ok, input = pcall(vim.fn.input, { prompt = "(mini.align) " .. prompt .. ": " })
+      if not ok or input == nil or input == "" then
+        return nil
+      end
+      return input
+    end
+
     -- No need to copy this inside `setup()`. Will be used automatically.
     local opts = {
       -- Module mappings. Use `''` (empty string) to disable one.
@@ -12,6 +21,24 @@ return {
       },
 
       modifiers = {
+        -- 按原样匹配输入的字符或字符序列（如 "=>"、"::"、"--"）
+        -- 需要 Lua pattern 时用大写 'S'；内置 's' 会把输入当 pattern，输入 ( [ % 会报错，输入 . 匹配任意字符
+        s = function(_, opts)
+          local input = read_input("输入要对齐的字符序列")
+          if input == nil then
+            return
+          end
+          opts.split_pattern = vim.pesc(input)
+        end,
+
+        S = function(_, opts)
+          local input = read_input("输入 split Lua pattern")
+          if input == nil then
+            return
+          end
+          opts.split_pattern = input
+        end,
+
         j = function(_, opts)
           local next_side = {
             left = "center",
