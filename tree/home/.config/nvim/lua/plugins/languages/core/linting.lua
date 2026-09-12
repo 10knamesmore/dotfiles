@@ -33,8 +33,6 @@ return {
       },
     },
     config = function(_, opts)
-      local M = {}
-
       local lint = require("lint")
       for name, linter in pairs(opts.linters) do
         if type(linter) == "table" and type(lint.linters[name]) == "table" then
@@ -53,52 +51,21 @@ return {
       ---@param ms integer
       ---@param fn function
       ---@return function
-      function M.debounce(ms, fn)
+      local function debounce(ms, fn)
         local timer = vim.uv.new_timer()
-        return function(...)
-          local argv = { ... }
+        return function()
           timer:start(ms, 0, function()
             timer:stop()
-            vim.schedule_wrap(fn)(unpack(argv))
+            vim.schedule_wrap(fn)()
           end)
-        end
-      end
-
-      --- 根据当前文件类型解析并执行可用的 linter。
-      function M.lint()
-        -- 解析文件类型对应的 linters
-        local names = lint._resolve_linter_by_ft(vim.bo.filetype)
-        names = vim.list_extend({}, names)
-
-        -- 添加 fallback linters
-        if #names == 0 then
-          vim.list_extend(names, lint.linters_by_ft["_"] or {})
-        end
-
-        -- 添加全局 linters
-        vim.list_extend(names, lint.linters_by_ft["*"] or {})
-
-        -- 过滤不存在或不匹配条件的 linters
-        local ctx = { filename = vim.api.nvim_buf_get_name(0) }
-        ctx.dirname = vim.fn.fnamemodify(ctx.filename, ":h")
-        names = vim.tbl_filter(function(name)
-          local linter = lint.linters[name]
-          if not linter then
-            local Util = require("utils")
-            Util.warn("Linter not found: " .. name, { title = "nvim-lint" })
-          end
-          return linter and not (type(linter) == "table" and linter.condition and not linter.condition(ctx))
-        end, names)
-
-        -- 运行 linters
-        if #names > 0 then
-          lint.try_lint(names)
         end
       end
 
       vim.api.nvim_create_autocmd(opts.events, {
         group = vim.api.nvim_create_augroup("nvim-lint", { clear = true }),
-        callback = M.debounce(100, M.lint),
+        callback = debounce(100, function()
+          lint.try_lint()
+        end),
       })
     end,
   },

@@ -36,7 +36,6 @@ return {
   {
     "ibhagwan/fzf-lua",
     cmd = "FzfLua",
-    dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = function()
       ---@type fzf-lua.Config
       return {

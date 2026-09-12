@@ -10,14 +10,8 @@ vim.api.nvim_create_autocmd("User", {
 vim.api.nvim_set_hl(0, "@spell", { italic = true })
 
 -- 绝对路径 markdown link 不是 marksman 的 definition 输入；链接上直接打开文件，其他位置保留 LSP fallback。
-local function decode_uri_component(value)
-  return (value:gsub("%%(%x%x)", function(hex)
-    return string.char(tonumber(hex, 16))
-  end))
-end
-
 local function normalize_markdown_anchor(value)
-  value = decode_uri_component(vim.trim(value)):lower()
+  value = vim.uri_decode(vim.trim(value)):lower()
   value = value:gsub("`([^`]*)`", "%1")
   value = value:gsub("%[([^%]]-)%]%([^)]-%)", "%1")
   value = value:gsub("[%*_~]", "")
@@ -111,7 +105,7 @@ local function resolve_markdown_target(raw_target)
     end
     path_part = vim.uri_to_fname(path_part)
   else
-    path_part = decode_uri_component(path_part)
+    path_part = vim.uri_decode(path_part)
     if path_part == "" then
       path_part = source
     elseif path_part:sub(1, 1) ~= "/" then

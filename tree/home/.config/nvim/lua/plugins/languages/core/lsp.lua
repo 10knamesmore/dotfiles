@@ -31,7 +31,6 @@ return {
     opts = function()
       local Util = require("utils")
       ---@class PluginLspOpts
-      ---@field capabilities? table 其他 spec 经 opts 合并注入的全局 capabilities（本文件不直接赋值）
       local ret = {
         -- options for vim.diagnostic.config()
         ---@type vim.diagnostic.Opts
@@ -66,10 +65,6 @@ return {
         -- InsertLeave 时补，这个是边打边同步、且由 server 权威判定而非 treesitter 猜。
         linked_editing = {
           enabled = true,
-        },
-        format = {
-          formatting_options = nil,
-          timeout_ms = nil,
         },
         ---@type table<string, LspServerConfig|boolean>
         servers = {
@@ -126,50 +121,6 @@ return {
               },
               { "<leader>cr", vim.lsp.buf.rename, desc = "Rename", has = "rename" },
               { "<leader>cA", Util.lsp.action.source, desc = "Source Action", has = "codeAction" },
-              {
-                "]]",
-                function()
-                  Snacks.words.jump(vim.v.count1)
-                end,
-                has = "documentHighlight",
-                desc = "Next Reference",
-                enabled = function()
-                  return Snacks.words.is_enabled()
-                end,
-              },
-              {
-                "[[",
-                function()
-                  Snacks.words.jump(-vim.v.count1)
-                end,
-                has = "documentHighlight",
-                desc = "Prev Reference",
-                enabled = function()
-                  return Snacks.words.is_enabled()
-                end,
-              },
-              {
-                "<a-n>",
-                function()
-                  Snacks.words.jump(vim.v.count1, true)
-                end,
-                has = "documentHighlight",
-                desc = "Next Reference",
-                enabled = function()
-                  return Snacks.words.is_enabled()
-                end,
-              },
-              {
-                "<a-p>",
-                function()
-                  Snacks.words.jump(-vim.v.count1, true)
-                end,
-                has = "documentHighlight",
-                desc = "Prev Reference",
-                enabled = function()
-                  return Snacks.words.is_enabled()
-                end,
-              },
             },
           },
           stylua = { enabled = false },
@@ -281,27 +232,7 @@ return {
         end
 
         -- diagnostics
-        if type(opts.diagnostics.virtual_text) == "table" and opts.diagnostics.virtual_text.prefix == "icons" then
-          opts.diagnostics.virtual_text.prefix = function(diagnostic)
-            -- 是 Util.icons 不是 Util.config.icons：utils 下没有 config 子模块，
-            -- 惰性加载的 __index 会静默返回 nil，写错只会在真正走到这个分支时才炸。
-            local icons = Util.icons.diagnostics
-            for d, icon in pairs(icons) do
-              if diagnostic.severity == vim.diagnostic.severity[d:upper()] then
-                return icon
-              end
-            end
-            return "●"
-          end
-        end
         vim.diagnostic.config(vim.deepcopy(opts.diagnostics))
-
-        if opts.capabilities then
-          local base = opts.servers["*"]
-          opts.servers["*"] = vim.tbl_deep_extend("force", type(base) == "table" and base or {}, {
-            capabilities = opts.capabilities,
-          })
-        end
 
         if opts.servers["*"] then
           vim.lsp.config("*", opts.servers["*"])

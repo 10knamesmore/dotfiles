@@ -1,12 +1,4 @@
 local default_type_check_mode = "standard"
-local python_root_markers = {
-  "pyproject.toml",
-  "ruff.toml",
-  ".ruff.toml",
-  "setup.py",
-  "setup.cfg",
-  ".git",
-}
 local warned_invalid_type_check_mode = false
 
 local python_inlay_hints = {
@@ -72,41 +64,6 @@ local function get_python_analysis_settings()
   }
 end
 
---- 从项目根目录下常见虚拟环境目录中查找 Python 解释器。
----@return string|nil
-local function get_project_python()
-  local root = vim.fs.root(0, python_root_markers) or vim.uv.cwd()
-  if not root then
-    return nil
-  end
-
-  for _, dirname in ipairs({ ".venv", "venv", "env", ".env" }) do
-    local candidate = vim.fs.joinpath(root, dirname, "bin", "python")
-    if vim.fn.executable(candidate) == 1 then
-      return candidate
-    end
-  end
-end
-
---- 为调试和测试解析当前应使用的 Python 解释器。
----@return string
-local function resolve_python()
-  local ok, venv_selector = pcall(require, "venv-selector")
-  if ok then
-    local python = venv_selector.python()
-    if type(python) == "string" and python ~= "" and vim.fn.executable(python) == 1 then
-      return python
-    end
-  end
-
-  local project_python = get_project_python()
-  if project_python then
-    return project_python
-  end
-
-  return vim.fn.exepath("python3") ~= "" and vim.fn.exepath("python3") or "python3"
-end
-
 return {
   {
     "nvim-treesitter/nvim-treesitter",
@@ -162,19 +119,6 @@ return {
   },
 
   {
-    "mason-org/mason.nvim",
-    optional = true,
-    ---@module "mason"
-    ---@param opts MasonSettings | {ensure_installed: string[]}
-    opts = function(_, opts)
-      opts.ensure_installed = opts.ensure_installed or {}
-      if not vim.tbl_contains(opts.ensure_installed, "debugpy") then
-        table.insert(opts.ensure_installed, "debugpy")
-      end
-    end,
-  },
-
-  {
     "stevearc/conform.nvim",
     optional = true,
     ---@module "conform"
@@ -196,37 +140,6 @@ return {
       adapters = {
         ["neotest-python"] = {},
       },
-    },
-  },
-
-  {
-    "mfussenegger/nvim-dap",
-    optional = true,
-    dependencies = {
-      "mfussenegger/nvim-dap-python",
-      keys = {
-        {
-          "<leader>dPt",
-          function()
-            require("dap-python").test_method()
-          end,
-          desc = "Debug Method",
-          ft = "python",
-        },
-        {
-          "<leader>dPc",
-          function()
-            require("dap-python").test_class()
-          end,
-          desc = "Debug Class",
-          ft = "python",
-        },
-      },
-      config = function()
-        local dap_python = require("dap-python")
-        dap_python.setup("debugpy-adapter")
-        dap_python.resolve_python = resolve_python
-      end,
     },
   },
 
@@ -253,15 +166,5 @@ return {
       opts.auto_brackets = opts.auto_brackets or {}
       table.insert(opts.auto_brackets, "python")
     end,
-  },
-
-  {
-    "jay-babu/mason-nvim-dap.nvim",
-    optional = true,
-    opts = {
-      handlers = {
-        python = function() end,
-      },
-    },
   },
 }

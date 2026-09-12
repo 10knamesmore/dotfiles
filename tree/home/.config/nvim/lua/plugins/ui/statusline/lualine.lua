@@ -56,25 +56,9 @@ local my_theme = {
   },
 }
 
--- 获取根目录与 cwd 的关系,返回目录名或 nil
+-- 状态栏显示项目根目录名。
 local function dirname()
-  local cwd = utils.path.cwd()
-  local root = utils.path.get_root({ normalize = true })
-  local name = vim.fs.basename(root)
-
-  if root == cwd then
-    -- 根目录即为 cwd
-    return name
-  elseif root and cwd and root:find(cwd, 1, true) == 1 then
-    -- 根目录是 cwd 的子目录
-    return name
-  elseif root and cwd and cwd:find(root, 1, true) == 1 then
-    -- 根目录是 cwd 的父目录
-    return name
-  else
-    -- 根目录与 cwd 无关
-    return name
-  end
+  return vim.fs.basename(utils.path.get_root())
 end
 
 return {
@@ -115,9 +99,6 @@ return {
           {
             function()
               return "󱉭 " .. dirname()
-            end,
-            cond = function()
-              return true
             end,
             color = function()
               return { fg = Snacks.util.color("Directory") }
@@ -195,19 +176,6 @@ return {
             end,
             color = function()
               return { fg = Snacks.util.color("Statement") }
-            end,
-          },
-
-          -- nvim-dap 插件：显示当前调试状态
-          {
-            function()
-              return "  " .. require("dap").status()
-            end,
-            cond = function()
-              return package.loaded["dap"] and require("dap").status() ~= ""
-            end,
-            color = function()
-              return { fg = Snacks.util.color("Debug") }
             end,
           },
 

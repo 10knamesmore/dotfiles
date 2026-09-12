@@ -1,9 +1,6 @@
 return {
   "Bekaboo/dropbar.nvim",
   event = { "BufReadPost", "BufWritePost", "BufNewFile" },
-  dependencies = {
-    "nvim-tree/nvim-web-devicons",
-  },
   ---@type dropbar_configs_t
   opts = {
     bar = {

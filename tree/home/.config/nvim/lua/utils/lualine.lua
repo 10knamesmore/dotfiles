@@ -1,28 +1,6 @@
 ---@class util.lualine
 local M = {}
 
---- 根据状态函数返回值构造带高亮的图标组件。
----@param icon string
----@param status fun(): nil|"ok"|"error"|"pending"
-function M.status(icon, status)
-  local colors = {
-    ok = "Special",
-    error = "DiagnosticError",
-    pending = "DiagnosticWarn",
-  }
-  return {
-    function()
-      return icon
-    end,
-    cond = function()
-      return status() ~= nil
-    end,
-    color = function()
-      return { fg = Snacks.util.color(colors[status()] or colors.ok) }
-    end,
-  }
-end
-
 --- 按指定高亮组包装 lualine 文本片段。
 ---@param component any
 ---@param text string
@@ -84,7 +62,7 @@ function M.pretty_path(opts)
     end
 
     path = M.norm(path)
-    local root = utils.path.get_root({ normalize = true })
+    local root = utils.path.get_root()
     local cwd = utils.path.cwd()
 
     -- original path is preserved to provide user with expected result of pretty_path, not a normalized one,
