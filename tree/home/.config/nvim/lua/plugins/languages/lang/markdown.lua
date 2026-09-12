@@ -348,7 +348,7 @@ return {
   {
     "MeanderingProgrammer/render-markdown.nvim",
     opts = render_md_opt,
-    ft = { "markdown", "norg", "rmd", "org", "codecompanion" },
+    ft = { "markdown", "norg", "rmd", "org" },
     config = function(_, opts)
       local render_md = require("render-markdown")
       vim.b.md_left_margin = 0
