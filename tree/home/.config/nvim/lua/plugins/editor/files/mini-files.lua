@@ -289,6 +289,7 @@ return {
   },
   config = function(_, opts)
     require("mini.files").setup(opts)
+    require("utils.mini-files.git").setup()
 
     --- 切换 mini.files 中隐藏文件的显示状态。
     --- 传 content.filter 是必须的：refresh 靠 `#vim.tbl_keys(content_opts) > 0`
