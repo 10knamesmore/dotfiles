@@ -45,12 +45,6 @@ dots.resource.symlink {
     source = dots.repo .. "/pi/src/remember-last-model.ts",
     target = dots.home .. "/.pi/agent/extensions/remember-last-model.ts",
 }
-local local_provider = dots.repo .. "/pi/src/local_provider.ts"
-dots.resource.symlink {
-    source = local_provider,
-    target = dots.home .. "/.pi/agent/extensions/local_provider.ts",
-    enabled = dots.path.exists(local_provider),
-}
 dots.resource.symlink {
     source = dots.repo .. "/pi/src/subagent-workflow/skills/workflow-authoring",
     target = dots.home .. "/.pi/agent/skills/workflow-authoring",

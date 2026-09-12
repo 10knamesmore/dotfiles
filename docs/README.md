@@ -132,10 +132,6 @@ CLI 不编辑 `dots.lua`。编辑器类型补全由 `.luarc.json` 挂载 `cli/lu
 
 Codex、Kimi Code 与 Pi 共用 `cli/crates/agent-hooks/` 的 Rust PreToolUse 判定引擎。各 adapter 通过同一个 `agent-hook` binary 保留 harness 协议差异；Pi 的 `ask` 由 extension 在有 UI 时显式确认，无 UI 时拒绝。`tree/home/.agents/hooks/pretool.toml` 负责高风险操作提示和工具偏好重定向。它是引导模型的启发式守卫，不替代 sandbox、permission 或系统权限。
 
-`pi/` 是 vanilla Pi 的本地 Distribution，不包含或 fork Pi CLI。Pi 通过 jiti 直接加载仓库内的 TypeScript extension；`dots sync` 先按 frozen lockfile 安装 Acorn，再把两个 source tree 和 workflow-authoring skill 链到 `~/.pi/agent/`。Workflow runtime 由本仓库直接维护并保留原作者 MIT license。依赖和本地 state 边界见 [pi/README.md](../pi/README.md)。
-
-Pi 的模型选择记忆写入由 Pi 自己维护的原生 settings，不在启动时覆盖模型；显式 CLI 参数、恢复会话和默认值的优先级由 Pi 处理。共享规则保留凭据路径与高风险命令的工具级限制，不能据此推断存在 OS sandbox。
-
 ## 当前管理的主要配置
 
 - Shell：Zsh（自管 conf.d，无框架）+ Starship
