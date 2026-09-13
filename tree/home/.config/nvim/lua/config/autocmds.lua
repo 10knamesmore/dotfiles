@@ -133,6 +133,14 @@ vim.api.nvim_create_autocmd({ "BufRead" }, {
   end,
 })
 
+vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
+  group = augroup("log_filetype"),
+  pattern = { "*.log", "*.log.*" },
+  callback = function(event)
+    vim.bo[event.buf].filetype = "log"
+  end,
+})
+
 -- =========================================
 -- zsh 文件按 bash 处理
 vim.api.nvim_create_autocmd("FileType", {
