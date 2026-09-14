@@ -4,6 +4,7 @@ import { registerFooter as registerFooter } from "./footer/index.js";
 import { registerHook } from "./hook/index.js";
 import { registerSettledNotification } from "./notification/index.js";
 import { registerProviderScope } from "./provider-scope/index.js";
+import { registerTitlebar } from "./titlebar/index.js";
 import { registerSessionTodo } from "./todo/index.js";
 import { registerUserQuestions } from "./user-questions/index.js";
 
@@ -14,6 +15,7 @@ export default function registerDistribution(pi: ExtensionAPI): void {
   registerSettledNotification(pi);
   registerProviderScope(pi);
   registerSessionTodo(pi);
+  registerTitlebar(pi);
   registerUserQuestions(pi);
   registerFooter(pi);
 }
