@@ -4,13 +4,7 @@ return {
   version = "v3.x.x",
   lazy = false, -- 作者推荐不使用 lazy load，以便正确挂载 buffer/window 监听
   keys = {
-    { "<leader>mm", "<cmd>Neominimap Toggle<cr>", desc = "Toggle Global Minimap" },
-    { "<leader>mf", "<cmd>Neominimap ToggleFocus<cr>", desc = "Toggle Minimap Focus" },
-    { "<leader>mr", "<cmd>Neominimap Refresh<cr>", desc = "Refresh Global Minimap" },
-    -- { "<leader>mw", "<cmd>Neominimap WinToggle<cr>", desc = "Toggle Minimap (Window)" },
-    -- { "<leader>mb", "<cmd>Neominimap BufToggle<cr>", desc = "Toggle Minimap (Buffer)" },
-    -- 兼顾 UI 组快捷键
-    { "<leader>uM", "<cmd>Neominimap Toggle<cr>", desc = "Toggle Minimap" },
+    { "<leader>m", "<cmd>Neominimap Toggle<cr>", desc = "Toggle Global Minimap" },
   },
   init = function()
     ---@type Neominimap.UserConfig

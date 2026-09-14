@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerBashBackground } from "./bash-background/index.js";
 import { registerEffortAlias } from "./effort/index.js";
 import { registerFooter as registerFooter } from "./footer/index.js";
 import { registerHook } from "./hook/index.js";
@@ -10,6 +11,7 @@ import { registerUserQuestions } from "./user-questions/index.js";
 
 /** Register every first-party capability owned by the dotfiles Pi distribution. */
 export default function registerDistribution(pi: ExtensionAPI): void {
+  registerBashBackground(pi);
   registerEffortAlias(pi);
   registerHook(pi);
   registerSettledNotification(pi);
