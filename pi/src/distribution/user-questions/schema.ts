@@ -1,5 +1,5 @@
 import { type Static, Type } from "typebox";
-import { GLOBAL_CONFIG } from "../../config.ts";
+import { readPersonalConfig } from "../../config/index.js";
 
 const UserQuestionOptionSchema = Type.Object(
   {
@@ -42,7 +42,7 @@ const UserQuestionSchema = Type.Object(
 export const AskUserQuestionsParameters = Type.Object(
   {
     questions: Type.Array(UserQuestionSchema, {
-      description: `Questions to ask, each with its own input configuration, shoule be in ${GLOBAL_CONFIG.language}`,
+      description: `Questions to ask, each with its own input configuration, should be in ${readPersonalConfig().language}`,
     }),
   },
   { additionalProperties: false },

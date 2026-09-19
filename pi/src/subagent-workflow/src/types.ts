@@ -6,6 +6,8 @@
  * or registries anywhere - a worker is exactly what its spec says.
  */
 
+import type { ModelTier } from "../../config/index.js";
+
 /** Thinking levels mirror pi's own vocabulary. */
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -13,11 +15,10 @@ export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhi
 export interface SubagentSpec {
   /** Task prompt written by the orchestrator. Required. */
   prompt: string;
-  /**
-   * Model for the child as "provider/model-id" (e.g. "openai-codex/gpt-5.6-luna").
-   * Default: inherit the parent session's current model.
-   */
+  /** Internal provider/model-id, resolved from a tier or a persisted follow-up. */
   model?: string;
+  /** Publicly selected tier, recorded alongside the pinned model for new children. */
+  modelTier?: ModelTier;
   /** Thinking level for the child. Default: inherit from parent. */
   thinkingLevel?: ThinkingLevel;
   /**

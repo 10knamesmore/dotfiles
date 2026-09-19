@@ -76,7 +76,7 @@ export interface RunRecordFile {
   runId?: string;
   kind?: string;
   createdAt?: string;
-  children?: Array<{ id?: string; spec?: SubagentSpec; resolved?: ResolvedSpec; sessionFile?: string; followUpOf?: FollowUpReference; phase?: string }>;
+  children?: Array<{ id?: string; spec?: SubagentSpec; resolved?: ResolvedSpec; sessionFile?: string; followUpOf?: FollowUpReference }>;
   phases?: Array<{ title?: string }>;
 }
 
@@ -179,7 +179,7 @@ export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options
       label: persistedChildLabel(child, state.id || "agent"),
       model: shortModel(optionalString(child.resolved?.modelId)),
       thinking: optionalString(child.resolved?.thinkingLevel),
-      phase: optionalString(child.phase) ?? optionalString(child.spec?.phase),
+      phase: optionalString(child.spec?.phase),
       status: state.status,
       usage: state.usage,
       startedAt: events.startedAt,

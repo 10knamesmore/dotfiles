@@ -1,5 +1,5 @@
 /**
- * Workflow launch approval - the injectable seam behind the workflow tool.
+ * Workflow launch approval in Pi's TUI.
  *
  * Non-TUI modes (json / print / rpc) auto-approve: a headless caller already made
  * an explicit tool call. In the TUI a dialog previews the workflow (name,
@@ -9,6 +9,7 @@
  */
 
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import type { WorkflowSettings } from "../../../config/index.js";
 import { scriptOverlayFactory } from "../ui/script-overlay.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 import type { ParsedWorkflow } from "./parser.js";
@@ -28,13 +29,7 @@ export interface ApprovalContext {
   ui: Pick<ExtensionUIContext, "select" | "editor" | "custom" | "notify">;
 }
 
-export interface ApprovalDeps {
-  policy?: WorkflowApprovalPolicy;
-}
-
-export type WorkflowApprovalPolicy = "always-prompt" | "remember" | "auto";
-
-export type ApproveLaunch = (plan: LaunchPlan, ctx: ApprovalContext, deps: ApprovalDeps) => Promise<void>;
+export type WorkflowApprovalPolicy = WorkflowSettings["workflowApproval"];
 
 const RUN_ONCE = "Run once";
 const VIEW = "View script";
@@ -50,12 +45,11 @@ export function buildApprovalSummary(plan: LaunchPlan): string {
   return lines.join("\n");
 }
 
-export const approveLaunch: ApproveLaunch = async (plan, ctx, deps) => {
+export async function approveLaunch(plan: LaunchPlan, ctx: ApprovalContext, policy: WorkflowApprovalPolicy): Promise<void> {
   // Headless (json/print) and rpc auto-approve; the dialog is TUI-only.
   if (ctx.mode !== "tui") return;
-  const policy = deps.policy ?? "remember";
   if (policy === "auto") return;
-  if (policy !== "remember" && policy !== "always-prompt") {
+  if (policy !== "always-prompt") {
     throw new TypeError(`Invalid workflow approval policy: ${String(policy)}`);
   }
   const { meta, script } = plan.workflow;
@@ -78,4 +72,4 @@ export const approveLaunch: ApproveLaunch = async (plan, ctx, deps) => {
     }
     throw new Error(`Workflow "${meta.name}" launch was denied by the user. Do not retry unless the user explicitly asks to run it.`);
   }
-};
+}

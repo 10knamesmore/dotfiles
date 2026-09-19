@@ -18,8 +18,7 @@ const NOTICE = "[subagent-workflow] render failed";
  *
  * Renderers here must therefore be total. Shape checks at each call site are the
  * first line of defence and keep the output useful; this is the backstop that
- * holds for the fields nobody thought to check, including details written by a
- * different version of this extension.
+ * holds when a persisted payload still fails during rendering.
  *
  * The notice itself is width-clamped, and that is not decoration: pi-tui aborts
  * the process on any line wider than the terminal, from inside its paint and

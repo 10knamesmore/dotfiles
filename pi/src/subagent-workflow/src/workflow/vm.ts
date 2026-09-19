@@ -1,12 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { existsSync } from "node:fs";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 import { errorMessage } from "../util.ts";
-// Explicit .ts specifier: this module is a worker entry (new Worker(import.meta.url))
-// loaded by plain Node type stripping when running from source, which does not remap
-// .js specifiers to .ts files. rewriteRelativeImportExtensions emits .js in dist.
+// Node loads this worker directly from source and does not remap .js imports to .ts.
 import { runInConstrainedContext, type SandboxHostBridge, type WorkflowSandboxInput } from "./vm-sandbox.ts";
 
 export interface WorkflowCallScopeSegment {
@@ -35,42 +31,7 @@ export interface WorkflowVmApi {
 }
 
 const DEFAULT_SYNCHRONOUS_TIMEOUT_MS = 30_000;
-const WORKER_MARKER = "pi-subagent-workflow-vm-v1";
-
-/**
- * Resolve the worker entry for this module.
- *
- * The host runs under jiti, which transpiles .ts imports in-process, but a
- * worker_threads entry is loaded by Node's native loader, which refuses to
- * type-strip files under node_modules (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING).
- * For npm installs the package always ships a fresh compiled worker, so redirect
- * to it. Outside node_modules (dev checkouts, path installs) keep the source
- * entry: dist/ may be stale there, and native type stripping is permitted.
- */
-export function resolveWorkerEntryUrl(moduleUrl: string, exists: (path: string) => boolean = existsSync): URL {
-  const url = new URL(moduleUrl);
-  const installedSource = url.protocol === "file:"
-    && url.pathname.endsWith("/src/workflow/vm.ts")
-    && url.pathname.includes("/node_modules/");
-  if (!installedSource) return url;
-
-  const compiled = new URL(url.href);
-  compiled.pathname = url.pathname.replace(/\/src\/workflow\/vm\.ts$/, "/dist/src/workflow/vm.js");
-  compiled.search = "";
-  compiled.hash = "";
-  // Under node_modules the compiled worker is the only entry that can work, so a
-  // missing one is fatal rather than a reason to fall back. Falling back here used
-  // to re-create the exact bug this redirect exists to prevent, and reported it as
-  // an opaque ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING from deep inside Node.
-  if (!exists(fileURLToPath(compiled))) {
-    throw new Error(
-      `Workflow worker is missing from the installed package: ${fileURLToPath(compiled)}. `
-      + "Node cannot strip types from .ts files under node_modules, so the compiled worker must ship. "
-      + "Reinstall pi-subagent-workflow.",
-    );
-  }
-  return compiled;
-}
+const WORKER_MARKER = "pi-subagent-workflow-vm";
 
 interface WorkflowWorkerData extends WorkflowSandboxInput {
   marker: typeof WORKER_MARKER;
@@ -142,7 +103,7 @@ export async function executeWorkflowBody(
   };
 
   return new Promise<unknown>((resolve, reject) => {
-    const worker = new Worker(resolveWorkerEntryUrl(import.meta.url), {
+    const worker = new Worker(new URL(import.meta.url), {
       workerData: data,
       resourceLimits: {
         maxOldGenerationSizeMb: 128,
@@ -169,9 +130,7 @@ export async function executeWorkflowBody(
       if (settled) return;
       settled = true;
       cleanup();
-      // In particular, wait for termination when abort races worker startup.
-      // Resolving first can let a not-yet-online Bun worker start afterward
-      // and keep the process alive while blocked inside node:vm.
+      // Await termination so cancellation cannot leave a worker running.
       void worker.terminate().then(
         () => {
           if ("error" in outcome) reject(outcome.error);
@@ -344,20 +303,6 @@ function isWorkflowWorkerData(value: unknown): value is WorkflowWorkerData {
 async function runWorkflowWorker(data: WorkflowWorkerData): Promise<void> {
   const port = parentPort;
   if (!port) throw new Error("Workflow worker started without a parent message port");
-
-  // Bun's node:vm stack formatter reads the worker realm's Error controls
-  // rather than the context's controls. The worker is disposable, so seal
-  // both layers before any authored Error can capture host-specific frames.
-  Object.defineProperty(Error, "stackTraceLimit", {
-    value: 0,
-    writable: false,
-    configurable: false,
-  });
-  Object.defineProperty(Error, "prepareStackTrace", {
-    value: () => undefined,
-    writable: false,
-    configurable: false,
-  });
 
   const pendingAgents = new Map<number, PendingAgentRequest>();
   const bufferedAgentResponses = new Map<number, Extract<WorkerResponse, { type: "agent-result" | "agent-error" }>>();

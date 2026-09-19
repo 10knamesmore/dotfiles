@@ -6,8 +6,7 @@
 
 import { randomUUID } from "node:crypto";
 import { accessSync, constants, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, extname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { childLabel } from "../../util.js";
 import { missingExplicitTools, resolveModel, SUBAGENT_FRAMING, type ConstructedChild, type ParentContext } from "../child.js";
 import type { SchemaCapture } from "../schema-tool.js";
@@ -24,42 +23,13 @@ const TOOL_REPORT_POLL_MS = 100;
 /** Extension UI methods that block the child until someone answers. */
 const ANSWER_REQUIRED_UI_METHODS = new Set(["select", "confirm", "input", "editor"]);
 
-/**
- * The pi CLI entry to run children with. Prefer the exact entry the parent
- * process is running, so children always match the parent's pi version; fall
- * back to the pi-coding-agent copy this extension resolves. Subpath exports
- * are resolved by hand (createRequire + sibling path) because the host's
- * extension loader may shim import.meta.resolve without exports-map support.
- */
-export function resolveChildPiEntry(): string {
+/** Children use the same installed Pi CLI as their parent process. */
+function resolveChildPiEntry(): string {
   const invoked = process.argv[1];
-  if (invoked) {
-    try {
-      const real = realpathSync(invoked);
-      if (/[\\/]cli\.js$/.test(real)) return real;
-    } catch {
-      // The invoked script may not exist as a file (embedded runtimes); fall through.
-    }
-  }
-  // Bare id only: some loaders mis-resolve exports-map subpaths, and the
-  // return value may be a file URL (node, bun) or a plain path (jiti shims).
-  const resolved = import.meta.resolve("@earendil-works/pi-coding-agent");
-  const index = resolved.startsWith("file:") ? fileURLToPath(resolved) : resolved;
-  return join(dirname(index), "cli.js");
-}
-
-/** The shim ships beside this extension. Match the host's file extension so a
- * compiled `.js` install resolves child-shim.js, not the unshipped .ts. */
-export function resolveShimPath(selfPath: string): string {
-  return join(dirname(selfPath), `child-shim${extname(selfPath) || ".ts"}`);
-}
-
-type SpawnRpc = (command: readonly string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) => ChildRpc;
-
-export interface LaunchArtifactOverrides {
-  childPiEntry?: string;
-  shimPath?: string;
-  forkSessionFile?: string;
+  if (!invoked) throw new Error("Child launch requires a running Pi CLI");
+  const entry = realpathSync(invoked);
+  if (!entry.endsWith("/cli.js")) throw new Error(`Child launch requires the Pi CLI entry, received ${entry}`);
+  return entry;
 }
 
 function validateLaunchArtifact(path: string, label: string): void {
@@ -75,7 +45,7 @@ function validateLaunchArtifact(path: string, label: string): void {
 }
 
 /** Side-effect-free checks that must pass before any launch artifact is written. */
-export function preflightSubprocessChild(spec: SubagentSpec, parent: ParentContext, overrides: LaunchArtifactOverrides = {}) {
+export function preflightSubprocessChild(spec: SubagentSpec, parent: ParentContext, options: { forkSessionFile?: string } = {}) {
   const cwd = spec.cwd ?? parent.ctx.cwd;
   let isDirectory: boolean;
   try {
@@ -93,20 +63,19 @@ export function preflightSubprocessChild(spec: SubagentSpec, parent: ParentConte
   for (const name of [...(tools ?? []), ...(excludeTools ?? [])]) {
     if (name.includes(",")) throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
   }
-  const shimPath = overrides.shimPath ?? resolveShimPath(parent.selfPath);
-  const childPiEntry = overrides.childPiEntry ?? resolveChildPiEntry();
+  const shimPath = join(dirname(parent.selfPath), "child-shim.ts");
+  const childPiEntry = resolveChildPiEntry();
   validateLaunchArtifact(childPiEntry, "Child pi CLI entry");
   validateLaunchArtifact(shimPath, "Child shim");
-  if (overrides.forkSessionFile !== undefined) validateLaunchArtifact(overrides.forkSessionFile, "Fork session file");
+  if (options.forkSessionFile !== undefined) validateLaunchArtifact(options.forkSessionFile, "Fork session file");
   return { cwd, model, thinking, tools, excludeTools, shimPath, childPiEntry };
 }
 
-/** The child construction backend; the runner's ChildBuilder seam. */
+/** Start a child and wait until its RPC session and tool list are ready. */
 export async function spawnSubprocessChild(
   spec: SubagentSpec,
   parent: ParentContext,
   persistence: { sessionsDir: string; forkSessionFile?: string },
-  spawnRpc: SpawnRpc = spawnChildRpc,
 ): Promise<ConstructedChild> {
   // Everything that can fail synchronously (cwd, model, arg validation, entry
   // resolution) runs before any file is written. buildChildArgs rechecks its
@@ -136,7 +105,7 @@ export async function spawnSubprocessChild(
 
   let rpc: ChildRpc;
   try {
-    rpc = spawnRpc([process.execPath, childPiEntry, ...args], {
+    rpc = spawnChildRpc([process.execPath, childPiEntry, ...args], {
       cwd,
       env: { ...process.env, [SHIM_SPEC_ENV]: specPath },
     });

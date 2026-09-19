@@ -2,13 +2,12 @@ import { readdirSync, type Dirent } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ParentContext, ResolvedFollowUpSpec } from "../src/runner/child.js";
-import { subagentRunner, type SubagentRunner } from "../src/runner/runner.js";
+import type { ParentContext } from "../src/runner/child.js";
+import { subagentRunner } from "../src/runner/runner.js";
 import { preflightSubprocessChild } from "../src/runner/subprocess/spawn-child.js";
 import {
   acknowledgeDeliveryMessage,
   claimRunDelivery,
-  DELIVERY_PROTOCOL_VERSION,
   deliveryMarkerMatches,
   markSessionClosed,
   markSessionOpen,
@@ -22,7 +21,10 @@ import { runOwnerIsLive } from "../src/store/lease.js";
 import { isLiveStatus, projectRunSnapshot, reconcileDeadOwnerProjection, snapshotSaysLive, type RunProjection } from "../src/store/run-projection.js";
 import { encodeCwd, persistReconciledProjection } from "../src/store/run-store.js";
 import { jsonObject, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
-import { applyLiveWorkflowSettings, globalWorkflowSettings } from "../src/settings/runtime.js";
+import { readPersonalConfig } from "../../config/index.js";
+import { applyWorkflowSettings } from "../src/settings/runtime.js";
+import { registerModelTiersCommand } from "../src/settings/model-tiers-command.js";
+import { registerModelTierGuidance } from "../src/settings/model-tier-guidance.js";
 import { fenceDirectlyDeliveredRun, registerSubagentTool, resolveFollowUpSpec } from "../src/tool/subagent-tool.js";
 import { registerEntryMarkers } from "../src/ui/entry-markers.js";
 import { registerNavigator, type NavigatorFollowUp, type NavigatorOpenContext } from "../src/ui/navigator/navigator.js";
@@ -34,7 +36,6 @@ import { SubagentUsageFooter } from "../src/ui/usage-footer.js";
 import { reportDiagnostic, setTuiSession } from "../src/diagnostics.js";
 import type { SubagentResult, ThinkingLevel } from "../src/types.js";
 import { childLabel, errorMessage } from "../src/util.js";
-import { approveLaunch } from "../src/workflow/approval.js";
 import type { StartedWorkflow } from "../src/workflow/launch.js";
 import { parseWorkflowScript } from "../src/workflow/parser.js";
 import { registerWorkflowTool } from "../src/workflow/workflow-tool.js";
@@ -44,41 +45,26 @@ const CATCH_UP_RUN_CAP = 10;
 
 type TerminalStatus = "completed" | "failed" | "aborted";
 
-type NavigatorFollowUpResolver = (id: string, prompt: string, cwd: string) => ResolvedFollowUpSpec;
-
-interface NavigatorFollowUpDependencies {
-  runner?: SubagentRunner;
-  resolveFollowUp?: NavigatorFollowUpResolver;
-  preflight?: typeof preflightSubprocessChild;
-  runsRoot?: string;
-  widget?: SubagentStatusWidget;
-}
-
-
-export function createNavigatorFollowUp(
+function createNavigatorFollowUp(
   pi: ExtensionAPI,
   extensionPath: string,
-  dependencies: NavigatorFollowUpDependencies = {},
+  widget: SubagentStatusWidget,
 ): NavigatorFollowUp {
-  const runner = dependencies.runner ?? subagentRunner;
-  const runsRoot = dependencies.runsRoot ?? join(getAgentDir(), "subagent-workflow", "runs");
-  const resolveFollowUp = dependencies.resolveFollowUp
-    ?? ((id, prompt, cwd) => resolveFollowUpSpec(id, prompt, cwd, runsRoot));
-  const preflight = dependencies.preflight ?? preflightSubprocessChild;
+  const runner = subagentRunner;
 
   return {
     send(runId, childId, prompt, ctx) {
       const message = prompt.trim();
       if (!message) throw new Error("Follow-up message must not be empty");
       if (message.startsWith("/")) throw new Error("Slash commands are not supported in agent follow-up messages");
-      const resolved = resolveFollowUp(`${runId}/${childId}`, `${FOLLOW_UP_PROMPT_PREFIX}${message}`, ctx.cwd);
+      const resolved = resolveFollowUpSpec(`${runId}/${childId}`, `${FOLLOW_UP_PROMPT_PREFIX}${message}`, ctx.cwd);
       const parent: ParentContext = {
         ctx,
         thinkingLevel: pi.getThinkingLevel() as ThinkingLevel,
         selfPath: extensionPath,
       };
       const sessionId = ctx.sessionManager.getSessionId();
-      const childDisplay = preflight(resolved.spec, parent, { forkSessionFile: resolved.forkSessionFile });
+      const childDisplay = preflightSubprocessChild(resolved.spec, parent, { forkSessionFile: resolved.forkSessionFile });
       // directDelivery rides inside run.json, written before any child starts:
       // a crash at any later point leaves a run catch-up already knows to skip.
       const handle = runner.spawnRun(resolved, parent, { directDelivery: true });
@@ -94,7 +80,7 @@ export function createNavigatorFollowUp(
         reportDiagnostic(`[subagent-workflow] navigator follow-up completion failed: ${errorMessage(error)}`);
       });
       try {
-        dependencies.widget?.track(handle.runId, handle, ctx, {
+        widget.track(handle.runId, handle, ctx, {
           model: `${childDisplay.model.provider}/${childDisplay.model.id}`,
           thinking: childDisplay.thinking,
         });
@@ -124,7 +110,6 @@ function claimCatchUpRuns(
   cwd: string,
   sessionId: string,
   runsRoot: string = join(getAgentDir(), "subagent-workflow", "runs"),
-  ownerIsLive: (runDir: string) => boolean = runOwnerIsLive,
 ): CatchUpRun[] {
   const runRoot = join(runsRoot, encodeCwd(cwd));
   let entries: Dirent<string>[];
@@ -147,11 +132,9 @@ function claimCatchUpRuns(
       // queueing them to the model would leak a private follow-up thread.
       if (record?.directDelivery === true) continue;
       const identity = parseRunDeliveryIdentity(record);
-      // Records without a protocol identity predate acknowledgement tracking.
-      // Redelivering them could create a duplicate model turn, so leave them visible only.
       if (!identity || deliveryMarkerMatches(runDir, identity)) continue;
       const parent = jsonObject(record?.parent);
-      if (parent?.sessionId !== sessionId || ownerIsLive(runDir)) continue;
+      if (parent?.sessionId !== sessionId || runOwnerIsLive(runDir)) continue;
       const evaluation = evaluateCatchUpRun(snapshot, entry.name);
       if (!evaluation) continue;
       const { liveProjection, status, interruptedChildIds } = evaluation;
@@ -175,7 +158,7 @@ function claimCatchUpRuns(
   for (const candidate of candidates) {
     let claim: ClaimedDeliveryTarget | "conflict" | undefined;
     try {
-      if (ownerIsLive(candidate.runDir)) continue;
+      if (runOwnerIsLive(candidate.runDir)) continue;
       const identity = catchUpIdentity(candidate);
       claim = claimRunDelivery(candidate.runDir, identity);
       if (claim === "conflict" || !claim) continue;
@@ -231,7 +214,7 @@ export function catchUpUndeliveredRuns(
   // was consumed in a previous session cannot be re-queued as undelivered.
   retryDeferredPublications();
   const sessionId = ctx.sessionManager.getSessionId();
-  const runs = claimCatchUpRuns(ctx.cwd, sessionId, runsRoot, runOwnerIsLive);
+  const runs = claimCatchUpRuns(ctx.cwd, sessionId, runsRoot);
   if (runs.length === 0) return runs;
   const message = formatCatchUpMessage(runs);
   queueAcknowledgedDelivery(pi, {
@@ -244,7 +227,7 @@ export function catchUpUndeliveredRuns(
 }
 
 function catchUpIdentity(run: CatchUpRun): RunDeliveryIdentity {
-  return { protocol: DELIVERY_PROTOCOL_VERSION, generation: run.generation };
+  return { generation: run.generation };
 }
 
 function evaluateCatchUpRun(snapshot: RunSnapshot, runId: string) {
@@ -332,24 +315,22 @@ function userMessageText(content: string | Array<{ type: string; text?: string }
 export default function subagentWorkflow(pi: ExtensionAPI): void {
   const widget = new SubagentStatusWidget(subagentRunner);
   const usageFooter = new SubagentUsageFooter(subagentRunner);
-  const settings = globalWorkflowSettings();
-  const applySettings = () => applyLiveWorkflowSettings(settings.get(), subagentRunner, widget);
-  applySettings();
-  const unsubscribeSettings = settings.subscribe(applySettings);
+  const settings = readPersonalConfig()["subagent-workflow"];
+  applyWorkflowSettings(settings, widget);
   registerEntryMarkers(pi);
+  registerModelTiersCommand(pi);
+  registerModelTierGuidance(pi);
   registerSubagentTool(pi, selfPath, widget);
-  const policy = () => settings.get().workflowApproval;
   const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => {
     usageFooter.trackRun(run.runDir, ctx);
     widget.observeWorkflowStarted(run, ctx);
   };
-  registerWorkflowTool(pi, selfPath, { approve: approveLaunch, approvalPolicy: policy, observeRun });
+  registerWorkflowTool(pi, selfPath, { approvalPolicy: settings.workflowApproval, observeRun });
 
   // /agents is the canonical name; /workflows stays registered as a public alias.
   let inputEditorFactory: ReturnType<typeof createAgentInputEditorFactory> | undefined;
   const openNavigator = registerNavigator(pi, {
-    runner: subagentRunner,
-    followUp: createNavigatorFollowUp(pi, selfPath, { runner: subagentRunner, widget }),
+    followUp: createNavigatorFollowUp(pi, selfPath, widget),
     describeWorkflow: (script) => parseWorkflowScript(script).meta.name,
   });
   pi.registerShortcut("shift+down", {
@@ -397,11 +378,6 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     if (ctx.hasUI && inputEditorFactory && ctx.ui.getEditorComponent() === inputEditorFactory) {
       ctx.ui.setEditorComponent(undefined);
       inputEditorFactory = undefined;
-    }
-    try {
-      unsubscribeSettings();
-    } catch (error) {
-      reportDiagnostic(`[subagent-workflow] settings disposal failed: ${errorMessage(error)}`);
     }
     try {
       widget.dispose();

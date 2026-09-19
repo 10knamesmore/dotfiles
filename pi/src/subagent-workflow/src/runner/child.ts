@@ -61,14 +61,14 @@ export function parseModel(value: string, registry: ExtensionContext["modelRegis
     // Stay strict (multiple providers can expose same-named models), but make
     // the most common authoring mistake - a bare model id - self-healing by
     // naming the qualified id when it is unambiguous.
-    throw new Error(`Invalid model ${JSON.stringify(value)}. Expected "provider/model-id"${suggestQualified(value, registry)}, or omit model to inherit the parent's.`);
+    throw new Error(`Invalid resolved model ${JSON.stringify(value)}. Expected "provider/model-id"${suggestQualified(value, registry)}.`);
   }
   return [value.slice(0, slash), value.slice(slash + 1)];
 }
 
 /**
- * Full validity check for a spec's model reference, shared by subagent
- * tool-call and workflow launch validation. Returns undefined when the model
+ * Validate an internal model reference after tier or follow-up resolution.
+ * Returns undefined when the model
  * resolves; otherwise a message with a near-miss suggestion (the exact id
  * under another provider, or the same name tokens in a different order, e.g.
  * anthropic/claude-5-sonnet -> claude-bridge/claude-sonnet-5).

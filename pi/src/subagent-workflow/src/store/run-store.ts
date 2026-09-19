@@ -8,7 +8,6 @@ import { errorMessage, isRecord } from "../util.js";
 import { commitAtomicFile, discardAtomicFile, replaceAtomicFile, stageAtomicFile, syncDirectoryDurably } from "./atomic-file.js";
 import {
   DELIVERED_FILE,
-  DELIVERY_PROTOCOL_VERSION,
   parseRunDeliveryIdentity,
   type RunDeliveryIdentity,
 } from "./delivery-marker.js";
@@ -19,7 +18,6 @@ import {
 } from "./lease.js";
 import type { RunProjection } from "./run-projection.js";
 import { readRunSnapshot, type FrozenJson, type RunSnapshot } from "./run-snapshot.js";
-import { writeSessionClosedMarker } from "./session-closed-marker.js";
 
 export const EMPTY_USAGE = (): UsageSummary => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 });
 
@@ -32,23 +30,12 @@ export function sumUsage(usages: Iterable<UsageSummary>): UsageSummary {
   return total;
 }
 
-export const reconcileProjectionWrites = {
-  writeStatus(path: string, contents: string): void {
-    replaceAtomicFile(path, contents, {
-      mode: 0o600,
-      fsync: true,
-      syncParentDirectory: true,
-    });
-  },
-};
-
 /** Persist a dead-owner projection while the caller holds run ownership. */
 export function persistReconciledProjection(
   snapshot: RunSnapshot,
   projection: RunProjection,
   generation: number,
   interruptedChildIds: readonly string[],
-  writeStatus: (path: string, contents: string) => void = reconcileProjectionWrites.writeStatus,
 ): void {
   const projectedStatus = isTerminalStatus(projection.summary.status) ? projection.summary.status : undefined;
   const status: unknown = structuredClone(snapshot.status);
@@ -82,7 +69,11 @@ export function persistReconciledProjection(
       syncParentDirectory: true,
     });
   }
-  writeStatus(join(snapshot.runDir, "status.json"), `${JSON.stringify(status, null, 2)}\n`);
+  replaceAtomicFile(join(snapshot.runDir, "status.json"), `${JSON.stringify(status, null, 2)}\n`, {
+    mode: 0o600,
+    fsync: true,
+    syncParentDirectory: true,
+  });
 }
 
 interface ChildRecord {
@@ -91,12 +82,9 @@ interface ChildRecord {
   resolved?: ResolvedSpec;
   sessionFile?: string;
   followUpOf?: FollowUpReference;
-  /** Legacy records stored phase beside spec. */
-  phase?: string;
 }
 
 interface RunRecord {
-  v?: 2 | 3;
   runId: string;
   kind: "subagent" | "workflow";
   createdAt: string;
@@ -104,7 +92,7 @@ interface RunRecord {
   children: ChildRecord[];
   phases?: Array<{ title: string; detail?: string }>;
   workflowPolicy?: { maxAgentsPerWorkflow: number };
-  delivery?: RunDeliveryIdentity;
+  delivery: RunDeliveryIdentity;
   /** Results go directly to a human (navigator follow-up); catch-up must never
    * queue them to the model. If a third delivery mode ever appears, replace
    * this boolean with a delivery-policy value rather than adding a sibling. */
@@ -118,7 +106,6 @@ interface RunStatus {
 
 interface RunStoreOptions {
   rootDir?: string;
-  now?: () => Date;
   kind?: "subagent" | "workflow";
   phases?: readonly Readonly<{ title: string; detail?: string }>[];
   maxAgentsPerWorkflow?: number;
@@ -129,31 +116,7 @@ interface RunStoreOptions {
   existingSnapshot?: RunSnapshot;
 }
 
-interface StagingFileOperations {
-  open(path: string, flags: string, mode: number): number;
-  write(fd: number, buffer: Uint8Array, offset: number, length: number): number;
-  close(fd: number): void;
-  remove(path: string): void;
-}
-
-const STAGING_FILE_OPERATIONS: StagingFileOperations = {
-  open: (path, flags, mode) => openSync(path, flags, mode),
-  write: (fd, buffer, offset, length) => writeSync(fd, buffer, offset, length),
-  close: (fd) => closeSync(fd),
-  remove: (path) => rmSync(path, { force: true }),
-};
-
 const GENERATION_PENDING_FILE = "generation.pending";
-
-/** Create a complete staging file without ever truncating a colliding path. */
-export function stageFileExclusive(
-  path: string,
-  content: string,
-  operations: StagingFileOperations = STAGING_FILE_OPERATIONS,
-): string {
-  mkdirSync(dirname(path), { recursive: true });
-  return stageAtomicFile(path, content, { mode: 0o600, operations });
-}
 
 export class RunStoreOwnershipError extends Error {
   constructor(message: string) {
@@ -188,7 +151,6 @@ export class RunStore {
   readonly sessionsDir: string;
   private record: RunRecord;
   private status: RunStatus = { status: "pending", children: {} };
-  private readonly now: () => Date;
   private readonly runId: string;
   private openedSnapshot?: RunSnapshot;
   private runOwnership?: RunOwnership;
@@ -199,7 +161,6 @@ export class RunStore {
   private degradedReason?: string;
 
   constructor(runId: string, parentCwd: string, parentSessionId: string, parentSessionFile?: string, options: RunStoreOptions = {}) {
-    this.now = options.now ?? (() => new Date());
     this.runId = runId;
     const root = options.rootDir ?? join(getAgentDir(), "subagent-workflow", "runs");
     this.runDir = options.existingRunDir ?? join(root, encodeCwd(parentCwd), runId);
@@ -232,15 +193,13 @@ export class RunStore {
     }
     const kind = options.kind ?? "subagent";
     this.record = {
-      v: 3,
       runId,
       kind,
-      createdAt: this.now().toISOString(),
+      createdAt: new Date().toISOString(),
       parent: { sessionId: parentSessionId, sessionFile: parentSessionFile },
       children: [],
       phases: options.phases?.map((phase) => ({ ...phase })),
       delivery: {
-        protocol: DELIVERY_PROTOCOL_VERSION,
         generation: kind === "workflow" ? 0 : 1,
       },
       ...(kind === "workflow" && options.maxAgentsPerWorkflow !== undefined
@@ -291,10 +250,9 @@ export class RunStore {
     return this.record.kind;
   }
 
-  /** Protocol identity captured by completion results and delivery acknowledgements. */
-  get deliveryIdentity(): RunDeliveryIdentity | undefined {
-    const identity = parseRunDeliveryIdentity(this.record);
-    return identity ? { ...identity } : undefined;
+  /** Execution attempt captured by completion results and delivery acknowledgements. */
+  get deliveryIdentity(): RunDeliveryIdentity {
+    return { ...this.record.delivery };
   }
 
   /** Immutable admission policy captured when a workflow run is created. */
@@ -315,8 +273,6 @@ export class RunStore {
   addChild(id: string, spec: SubagentSpec, followUpOf?: FollowUpReference): void {
     if (!isSafeChildId(id)) throw new TypeError("Child id must be a non-empty safe object key");
     if (this.record.children.some((child) => child.id === id)) throw new TypeError(`Child id ${JSON.stringify(id)} already exists in this run`);
-    // spec.phase rides inside the spec; the navigator reads it from there
-    // (with a child.phase fallback kept for runs written before this change).
     this.writeOwned(() => {
       this.record.children.push({ id, spec, ...(followUpOf ? { followUpOf } : {}) });
       this.status.children[id] = { status: "pending", usage: EMPTY_USAGE() };
@@ -362,13 +318,10 @@ export class RunStore {
         originalEvents = readFileSync(eventsPath, "utf8");
       }
 
-      const priorIdentity = parseRunDeliveryIdentity(this.record);
-      const nextGeneration = (priorIdentity?.generation ?? 0) + 1;
+      const nextGeneration = this.record.delivery.generation + 1;
       const nextRecord: RunRecord = {
         ...this.record,
-        v: 3,
         delivery: {
-          protocol: DELIVERY_PROTOCOL_VERSION,
           generation: nextGeneration,
         },
       };
@@ -406,7 +359,7 @@ export class RunStore {
         child.status = "aborted";
       }
       const nextStatus: RunStatus = { status: "running", children: nextChildren };
-      const startedAt = this.now().toISOString();
+      const startedAt = new Date().toISOString();
       // Rerun authorizations are recorded on the generation they applied to,
       // so a post-hoc reader can tell an authorized re-execution from replay.
       const reconciliationEvents = inheritedLiveChildren.map((id) => JSON.stringify({
@@ -450,14 +403,10 @@ export class RunStore {
       const staged: StagedChange[] = changes.map((change) => ({ ...change }));
       let archiveTemporary: string | undefined;
 
-      if (this.record.v !== 3) {
-        for (const child of this.record.children) writeSessionClosedMarker(this.runDir, child.id);
-      }
-
       // Once this intent is visible, every failed stage or rename quarantines
       // the run instead of attempting a fallible multi-file rollback.
       const markerPath = join(this.runDir, GENERATION_PENDING_FILE);
-      const markerTemporary = stageAtomicFile(markerPath, this.jsonText({ v: 1, startedAt, reason: "generation-commit" }), {
+      const markerTemporary = stageAtomicFile(markerPath, this.jsonText({ startedAt, reason: "generation-commit" }), {
         mode: 0o600,
         fsync: true,
       });
@@ -500,11 +449,6 @@ export class RunStore {
   appendJournal(value: unknown): void {
     this.writeOwned(() => {
       this.appendDurableJsonl(join(this.runDir, "journal.jsonl"), value);
-      // Deterministic crash boundary for durability and resume testing: the
-      // entry is fsynced but nothing after it has happened yet.
-      if (process.env.PI_SUBAGENT_WORKFLOW_CRASH_AFTER_JOURNAL_APPEND === "1") {
-        process.kill(process.pid, "SIGKILL");
-      }
     }, { ownershipRequired: true });
   }
 
@@ -609,7 +553,7 @@ export class RunStore {
     }
     this.writeOwned(() => {
       this.applyEventState(event);
-      this.appendLine({ timestamp: this.now().toISOString(), ...event });
+      this.appendLine({ timestamp: new Date().toISOString(), ...event });
       this.writeJson("status.json", this.status, { durable: releaseAfterWrite });
     });
     // A failed terminal status write is degraded but must not leave ownership
@@ -702,7 +646,7 @@ export class RunStore {
   }
 
   private appendLifecycle(type: string, data: Record<string, unknown> = {}): { event: FrozenJson; line: string } {
-    const event = Object.freeze({ timestamp: this.now().toISOString(), type, ...data }) as FrozenJson;
+    const event = Object.freeze({ timestamp: new Date().toISOString(), type, ...data }) as FrozenJson;
     return { event, line: this.appendLine(event) };
   }
 
@@ -768,8 +712,7 @@ export class RunStore {
   }
 
   private stageFile(path: string, content: string, options: { durable?: boolean } = {}): string {
-    if (!options.durable) return stageFileExclusive(path, content);
-    return stageAtomicFile(path, content, { mode: 0o600, fsync: true });
+    return stageAtomicFile(path, content, { mode: 0o600, fsync: options.durable });
   }
 
   private replaceStagedFile(temporary: string, path: string): void {
@@ -799,7 +742,7 @@ export class RunStore {
 
   private validateWorkflowPolicy(record: RunRecord): void {
     const policy = record.workflowPolicy as unknown;
-    if (policy === undefined) return;
+    if (policy === undefined && record.kind !== "workflow") return;
     if (!isRecord(policy) || !("maxAgentsPerWorkflow" in policy)) {
       throw new Error(`Cannot resume run ${this.runId}: invalid run.json workflowPolicy; expected maxAgentsPerWorkflow`);
     }
@@ -811,15 +754,14 @@ export class RunStore {
 
   private validateResumeRecord(record: RunRecord): void {
     if (!isRecord(record)
-      || (record.v !== undefined && record.v !== 2 && record.v !== 3)
       || record.runId !== this.runId
       || !Array.isArray(record.children)
       || !record.children.every((child) => isRecord(child)
         && isSafeChildId(child.id) && isRecord(child.spec))) {
       throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json: expected matching runId and children array of {id, spec}`);
     }
-    if (record.v === 3 && !parseRunDeliveryIdentity(record)) {
-      throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json delivery protocol identity`);
+    if (!parseRunDeliveryIdentity(record)) {
+      throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json delivery generation`);
     }
     if (new Set(record.children.map((child) => child.id)).size !== record.children.length) {
       throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json: child IDs must be unique`);
@@ -1018,7 +960,7 @@ function reconcileResumePhases(
   const seen = new Set(phases.map((phase) => phase.title));
   const referenced = new Set(
     children
-      .map((child) => child.phase ?? child.spec.phase)
+      .map((child) => child.spec.phase)
       .filter((phase): phase is string => typeof phase === "string"),
   );
 

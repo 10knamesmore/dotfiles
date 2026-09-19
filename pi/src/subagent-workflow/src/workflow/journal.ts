@@ -4,20 +4,6 @@ import { isRecord } from "../util.js";
 import type { WorkflowCallIdentity, WorkflowCallScopeSegment } from "./vm.js";
 
 /**
- * Manual compatibility epoch for CallFingerprint, distinct from the journal
- * entry format version: bump it when resolution semantics or child framing
- * change materially enough that results produced under the old semantics
- * should no longer replay, even though the entry format still parses.
- *
- * v2: the subprocess-child cutover. Children became separate pi processes,
- * extensionTools moved from a filtered in-process scan to the unfiltered
- * discovery a child process actually performs, and childExtensionExclusions
- * ceased to exist as policy. v1 entries were produced under semantics no
- * child can reproduce, so they must rerun rather than replay.
- */
-export const CALL_FINGERPRINT_VERSION = 2;
-
-/**
  * The resolved execution environment a completed call ran under. Replay
  * requires it to match the environment the call would resolve to now.
  *
@@ -26,16 +12,13 @@ export const CALL_FINGERPRINT_VERSION = 2;
  * repository contents (a workflow's own children mutate them, so hashing
  * them would invalidate the run's completed work and re-run side effects;
  * authored state that matters must be interpolated into the prompt), extension
- * implementation digests and Pi/builtin-tool versions (any upgrade would void
- * all cached work, disabling resume exactly when recovery is most valuable;
- * the version field above is the deliberate escape hatch), tools an extension
- * registers dynamically during session_start (observing them requires
+ * implementation changes (an upgrade must not discard completed work during
+ * recovery), tools an extension registers dynamically during session_start (observing them requires
  * constructing a live session, which executes third-party side effects; they
  * change with extension behavior, so relevant authored state likewise belongs
  * in the prompt), and external web state (unknowable).
  */
 export interface CallFingerprint {
-  version: number;
   provider: string;
   modelId: string;
   thinkingLevel: string;
@@ -45,7 +28,6 @@ export interface CallFingerprint {
 }
 
 export interface JournalEntry {
-  v: 4;
   call: WorkflowCallIdentity;
   hash: string;
   fingerprint: CallFingerprint;
@@ -94,9 +76,6 @@ export function readJournal(path: string): WorkflowJournal {
     if (isJournalEntry(value)) {
       journal.entries.set(journalCallKey(value.call), value);
       continue;
-    }
-    if (isPriorJournalEntry(value) || isPreLineageJournalEntry(value)) {
-      throw new JournalUnreadableError(path, index + 1, "predates the current format, so this run cannot be resumed");
     }
     throw new JournalUnreadableError(path, index + 1, "is unreadable because the entry does not match the current format");
   }
@@ -156,8 +135,7 @@ function isWorkflowCallIdentity(value: unknown): value is WorkflowCallIdentity {
 
 function isJournalEntry(value: unknown): value is JournalEntry {
   if (!isRecord(value)) return false;
-  return value.v === 4
-    && isWorkflowCallIdentity(value.call)
+  return isWorkflowCallIdentity(value.call)
     && typeof value.hash === "string"
     && isCallFingerprint(value.fingerprint)
     && "result" in value
@@ -167,8 +145,7 @@ function isJournalEntry(value: unknown): value is JournalEntry {
 export function isCallFingerprint(value: unknown): value is CallFingerprint {
   if (!isRecord(value)) return false;
   const fingerprint = value as Partial<CallFingerprint>;
-  return Number.isSafeInteger(fingerprint.version)
-    && typeof fingerprint.provider === "string"
+  return typeof fingerprint.provider === "string"
     && typeof fingerprint.modelId === "string"
     && typeof fingerprint.thinkingLevel === "string"
     && typeof fingerprint.cwd === "string"
@@ -181,7 +158,7 @@ export function isCallFingerprint(value: unknown): value is CallFingerprint {
  */
 export function describeFingerprintDrift(persisted: CallFingerprint, current: CallFingerprint): string[] {
   const drift: string[] = [];
-  const scalars = ["version", "provider", "modelId", "thinkingLevel", "cwd"] as const;
+  const scalars = ["provider", "modelId", "thinkingLevel", "cwd"] as const;
   for (const field of scalars) {
     if (persisted[field] !== current[field]) {
       drift.push(`${field} was ${JSON.stringify(persisted[field])} and is now ${JSON.stringify(current[field])}`);
@@ -198,17 +175,6 @@ export function describeFingerprintDrift(persisted: CallFingerprint, current: Ca
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function isPriorJournalEntry(value: unknown): boolean {
-  return isRecord(value)
-    && (value.v === undefined || value.v === 2 || value.v === 3)
-    && isWorkflowCallIdentity(value.call)
-    && typeof value.hash === "string";
-}
-
-function isPreLineageJournalEntry(value: unknown): boolean {
-  return isRecord(value) && Number.isSafeInteger(value.index) && (value.index as number) >= 0;
 }
 
 function stableJson(value: unknown): string {

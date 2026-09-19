@@ -6,18 +6,20 @@ import {
   PublicSubagentOptionFields,
   SubagentPromptSchema,
   assertSchemaValue,
+  type TierSubagentSpec,
 } from "../subagent-spec.js";
+import { isModelTier, readPersonalConfig } from "../../../config/index.js";
+import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, ThinkingLevel } from "../types.js";
 import { resolveModel, submittedSpec, unknownModelError, type ChildSpawnSpec, type ParentContext, type ResolvedFollowUpSpec } from "../runner/child.js";
 import { runOwnerIsLive } from "../store/lease.js";
 import {
-  DELIVERY_PROTOCOL_VERSION,
   queueAcknowledgedDelivery,
   writeDeliveryMarker,
   type RunDeliveryIdentity,
 } from "../store/delivery-marker.js";
 import { encodeCwd, sumUsage } from "../store/run-store.js";
-import { jsonObject, readRunSnapshot, type RunSnapshot } from "../store/run-snapshot.js";
+import { jsonObject, readRunSnapshot } from "../store/run-snapshot.js";
 import { hasSessionClosedMarker } from "../store/session-closed-marker.js";
 import { subagentRunner, type SubagentRunner } from "../runner/runner.js";
 import { initialDetails, renderCallHeader, renderSubagentResult, type SubagentDetails } from "../ui/tool-render.js";
@@ -31,6 +33,7 @@ import { bindAbort, childLabel, errorMessage } from "../util.js";
 export const SubagentToolParameters = Type.Object({
   prompt: Type.Optional(SubagentPromptSchema),
   ...PublicSubagentOptionFields,
+  model: Type.Optional(PublicSubagentOptionFields.model),
   followUp: Type.Optional(Type.Object({
     id: Type.String({ minLength: 1 }),
     prompt: Type.String({ minLength: 1 }),
@@ -41,7 +44,7 @@ export type SubagentToolInput = Static<typeof SubagentToolParameters>;
 const OPTION_FIELDS = Object.keys(PublicSubagentOptionFields) as Array<keyof typeof PublicSubagentOptionFields>;
 
 export type ValidatedSubagentInput =
-  | { type: "spawn"; spec: SubagentSpec }
+  | { type: "spawn"; spec: TierSubagentSpec }
   | { type: "followUp"; id: string; prompt: string; label?: string };
 
 /**
@@ -68,6 +71,7 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
     if (!params.followUp!.prompt.trim()) throw new Error("Subagent prompt must not be empty");
     return { type: "followUp", id: params.followUp!.id, prompt: params.followUp!.prompt, label: params.label };
   }
+  if (!isModelTier(params.model)) throw new Error('New subagents require model: "high", "mid", or "low"');
   // TypeBox's minLength does not catch whitespace-only prompts.
   if (!params.prompt!.trim()) throw new Error("Subagent prompt must not be empty");
   return {
@@ -88,31 +92,21 @@ interface FollowUpCandidate {
   child: Record<string, unknown>;
   status: unknown;
   generationPending: boolean;
-  requiresSessionClosedMarker: boolean;
 }
 
-interface FollowUpPersistenceReads {
-  readRecord(runDir: string): unknown;
-  readSnapshot(runDir: string): RunSnapshot;
+function readFollowUpRecord(runDir: string): unknown {
+  try {
+    return JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+  } catch {
+    return undefined;
+  }
 }
-
-const FOLLOW_UP_PERSISTENCE_READS: FollowUpPersistenceReads = {
-  readRecord: (runDir) => {
-    try {
-      return JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
-    } catch {
-      return undefined;
-    }
-  },
-  readSnapshot: readRunSnapshot,
-};
 
 export function resolveFollowUpSpec(
   id: string,
   prompt: string,
   cwd: string,
   runsRoot: string = join(getAgentDir(), "subagent-workflow", "runs"),
-  reads: FollowUpPersistenceReads = FOLLOW_UP_PERSISTENCE_READS,
 ): ResolvedFollowUpSpec {
   const qualified = parseQualifiedFollowUpId(id);
   const runRoot = join(runsRoot, encodeCwd(cwd));
@@ -129,11 +123,11 @@ export function resolveFollowUpSpec(
       if ((error as NodeJS.ErrnoException).code === "ENOENT") entries = [];
       else throw error;
     }
-    entries = entries.filter((runId) => recordHasChild(reads.readRecord(join(runRoot, runId)), id));
+    entries = entries.filter((runId) => recordHasChild(readFollowUpRecord(join(runRoot, runId)), id));
   }
   for (const runId of entries) {
     const runDir = join(runRoot, runId);
-    const snapshot = reads.readSnapshot(runDir);
+    const snapshot = readRunSnapshot(runDir);
     const record = jsonObject(snapshot.record);
     if (!record || !Array.isArray(record.children)) continue;
     const createdAt = typeof record.createdAt === "string" ? Date.parse(record.createdAt) : NaN;
@@ -154,7 +148,6 @@ export function resolveFollowUpSpec(
         child: child as Record<string, unknown>,
         status,
         generationPending: snapshot.generationPending,
-        requiresSessionClosedMarker: record.v === 3,
       });
     }
   }
@@ -190,7 +183,7 @@ export function resolveFollowUpSpec(
   if (!existsSync(sessionFile)) {
     throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted sessionFile is missing`);
   }
-  if (candidate.requiresSessionClosedMarker && !hasSessionClosedMarker(candidate.runDir, candidate.childId)) {
+  if (!hasSessionClosedMarker(candidate.runDir, candidate.childId)) {
     throw new Error(`Cannot follow up ${candidateName(candidate)}: source session closure is not confirmed; wait for child shutdown to finish and retry`);
   }
   const provider = requiredString(resolved.provider, candidate, "resolved provider");
@@ -299,13 +292,13 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
   runner: SubagentRunner = subagentRunner, resolveFollowUp: FollowUpResolver = resolveFollowUpSpec): void {
   const tool: ToolDefinition<typeof SubagentToolParameters, SubagentDetails | undefined> = {
     name: "subagent", label: "Subagent", parameters: SubagentToolParameters,
-    description: "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt and inherits the parent's provider/model and thinking level unless overridden ('provider/model-id', never a bare model name). Add schema (JSON Schema) for validated structured output. Use isolation: 'worktree' for parallel edits; changes return as a patch, never applied automatically. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, cwd, and isolation, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
+    description: "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'high', 'mid', or 'low'; choose by task difficulty using the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. Use isolation: 'worktree' for parallel edits; changes return as a patch, never applied automatically. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, cwd, and isolation, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try { input = validateSubagentInput(params); } catch (error) { throw new Error(errorMessage(error)); }
       const spawnSpec: ChildSpawnSpec = input.type === "followUp"
         ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.cwd), input.label)
-        : input.spec;
+        : resolveTierSpec(input.spec, readPersonalConfig()["model-tier"], ctx.modelRegistry);
       const spec = submittedSpec(spawnSpec);
       // A child doomed by an unknown model fails fast with a suggestion instead
       // of spawning.
@@ -463,5 +456,5 @@ function resultDeliveryIdentity(runId: string, result: SubagentResult): RunDeliv
   if (generation === undefined || !Number.isSafeInteger(generation) || generation < 1) {
     throw new Error(`Run ${runId} completed without a valid delivery generation`);
   }
-  return { protocol: DELIVERY_PROTOCOL_VERSION, generation };
+  return { generation };
 }

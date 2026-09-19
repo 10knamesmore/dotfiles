@@ -1,6 +1,11 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { SubagentSpec } from "./types.js";
+import { MODEL_TIERS, type ModelTier } from "../../config/index.js";
+
+/** Public requests select a tier; the runner receives its resolved model. */
+export type TierSubagentSpec = Omit<SubagentSpec, "model" | "modelTier"> & { model: ModelTier };
 
 const ThinkingLevelSchema = Type.Union([
   Type.Literal("off"),
@@ -17,11 +22,11 @@ export const SubagentPromptSchema = Type.String({
   description: "Self-contained task for the child. The child does not receive the parent conversation; include every fact and output requirement it needs.",
 });
 
-export const MODEL_DESCRIPTION = 'Fully qualified "provider/model-id", e.g. "openai-codex/gpt-5.6-luna" - the provider prefix is required because several providers can be configured. Omit to inherit the parent conversation\'s provider and model.';
+export const MODEL_DESCRIPTION = 'Required model tier: high, mid, or low. Choose by task difficulty using the current model-tier mappings and guidance in the system prompt. Provider/model-id strings are not accepted. No default or parent-model inheritance.';
 
 /** Options shared by the subagent tool and workflow agent() calls. */
 export const PublicSubagentOptionFields = {
-  model: Type.Optional(Type.String({ minLength: 1, description: MODEL_DESCRIPTION })),
+  model: StringEnum(MODEL_TIERS, { description: MODEL_DESCRIPTION }),
   thinkingLevel: Type.Optional(ThinkingLevelSchema),
   tools: Type.Optional(Type.Array(Type.String(), {
     description: "Tool-name allowlist. Normally omit to use tools discovered for the child cwd; requesting an unavailable tool fails that child.",
@@ -47,7 +52,7 @@ const WorkflowAgentOptionsSchema = Type.Object({
   phase: Type.Optional(Type.String()),
 }, { additionalProperties: false });
 
-type WorkflowAgentOptions = Omit<SubagentSpec, "prompt">;
+type WorkflowAgentOptions = Omit<TierSubagentSpec, "prompt">;
 
 export function validateWorkflowAgentOptions(value: unknown): WorkflowAgentOptions {
   const options = value === undefined ? {} : value;

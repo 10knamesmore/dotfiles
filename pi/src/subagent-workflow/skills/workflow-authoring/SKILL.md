@@ -15,10 +15,10 @@ injected globals; imports are unavailable.
 
 ```js
 export const meta = { name: 'audit-routes', description: 'Audit routes', phases: [{ title: 'Discover' }, { title: 'Audit' }] }
-const result = await agent('List route files', { schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
+const result = await agent('List route files', { model: 'low', schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
 const files = result?.files.filter(Boolean) ?? []
 phase('Audit')
-return parallel(files.map(file => () => agent('Audit ' + file)))
+return parallel(files.map(file => () => agent('Audit ' + file, { model: 'mid' })))
 ```
 
 `meta.name` must be kebab-case; `description` is required; `phases` is
@@ -26,7 +26,7 @@ optional. The header must be a literal - no computed values.
 
 ## Globals
 
-- `agent(prompt, opts?)` - run one subagent. Returns the schema-validated
+- `agent(prompt, opts)` - run one subagent. Returns the schema-validated
   value when `schema` is set, otherwise the child's final text. On child
   failure it resolves to `null` (never throws) - guard results before
   dereferencing. With `isolation: 'worktree'` it returns
@@ -53,9 +53,19 @@ branch group should intentionally run below the global limit.
 `model`, `thinkingLevel`, `tools`, `excludeTools`, `schema`, `cwd`,
 `isolation`, `label`, `phase`.
 
-- `model` must be fully qualified `"provider/model-id"`
-  (e.g. `"openai-codex/gpt-5.6-luna"`); bare names are rejected at launch for
-  string literals and at spawn otherwise.
+- `model` is required and must be `"high"`, `"mid"`, or `"low"`. Direct
+  provider/model-id values are rejected. The parent system prompt shows the
+  current tier-to-model mappings; these IDs are informational, not arguments.
+- Choose `low` for targeted lookup, extraction, formatting, and mechanical
+  edits; `mid` for ordinary implementation, bounded debugging, tests, and
+  focused review; `high` for complex root-cause analysis, cross-module design,
+  substantial uncertainty, or costly mistakes. Use the lowest adequate tier
+  and respect an explicit user choice. File count and prompt length alone do
+  not determine difficulty. `thinkingLevel` is independent of the model tier.
+- Tiers are configured by the user through `/model-tiers` or the `model-tier`
+  field in `~/.pi/agent/config.json`. Unconfigured or unavailable tiers fail;
+  ask the user to fix the binding instead of changing it or substituting a tier.
+  Each launch/resume snapshots the mappings so in-flight calls keep their models.
 - An explicit `tools` list is a capability contract: a requested name that
   does not resolve for the child fails that call with a missing-tool
   diagnostic instead of silently running without it.
@@ -98,7 +108,8 @@ top: matching entries replay instantly; an edited call and its causal tail run
 live while completed sibling branches are preserved. Failed calls are never
 journaled, so resume retries them.
 
-A completed call whose environment changed fails the resume closed, naming
+Changing a tier binding changes the resolved model fingerprint. A completed
+call whose environment changed fails the resume closed, naming
 the drifted fields and the childId. Recovery is one mechanism: resume with
 `rerunChildIds: ["<childId from the error>"]` to authorize re-running exactly
 that entry and its causal tail once, or run the workflow fresh. Repository

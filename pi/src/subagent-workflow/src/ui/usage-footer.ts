@@ -9,7 +9,7 @@ import type { ResolvedSpec, SubagentStatus, UsageSummary } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { formatTokens } from "./format.js";
-import { defaultRunsRoot, runsDirFor, type RunRecordFile, type RunStatusFile } from "./navigator/store-read.js";
+import { runsDirFor, type RunRecordFile, type RunStatusFile } from "./navigator/store-read.js";
 
 export const USAGE_STATUS_KEY = "subagent-workflow:usage";
 
@@ -45,15 +45,13 @@ export class SubagentUsageFooter {
   private readonly usage = new Map<string, UsageSummary>();
   private readonly models = new Map<string, Pick<ResolvedSpec, "modelId" | "provider">>();
   private readonly hydratedRuns = new Set<string>();
-  private readonly runsRoot: string;
   private unsubscribeSpawns: (() => void) | undefined;
   private unsubscribeChildEvents: (() => void) | undefined;
   private lastStatus: string | undefined;
   private uiFailed = false;
   private disposed = false;
 
-  constructor(runner: FooterRunner, runsRoot: string = defaultRunsRoot()) {
-    this.runsRoot = runsRoot;
+  constructor(runner: FooterRunner) {
     this.unsubscribeSpawns = runner.subscribeSpawns((run) => this.observeSpawn(run));
     this.unsubscribeChildEvents = runner.subscribeChildEvents((event) => this.observeChildEvent(event));
   }
@@ -191,7 +189,7 @@ export class SubagentUsageFooter {
 
   private isAllowedRunDir(runDir: string): boolean {
     if (!this.ctx) return false;
-    const base = resolve(runsDirFor(this.ctx.cwd, this.runsRoot));
+    const base = resolve(runsDirFor(this.ctx.cwd));
     const candidate = resolve(runDir);
     return candidate.startsWith(`${base}${sep}`);
   }

@@ -15,7 +15,7 @@ import { statSync } from "node:fs";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { ChildSession } from "../../runner/child-session.js";
-import type { SpawnedRun } from "../../runner/runner.js";
+import { subagentRunner, type SubagentRunner } from "../../runner/runner.js";
 import { EMPTY_USAGE } from "../../store/run-store.js";
 import type { SubagentHandle } from "../../types.js";
 import { reportDiagnostic } from "../../diagnostics.js";
@@ -29,16 +29,6 @@ import { NavigatorModel, NavigatorState } from "./model.js";
 import { pageRunDetail, renderRunDetail, renderRunList } from "./render.js";
 import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
 import { readSessionMessages, type TranscriptMessage } from "./transcript.js";
-
-/** The slice of SubagentRunner the navigator needs; small enough to fake in tests. */
-export interface NavigatorRunner {
-  liveRunIds(): string[];
-  runHandles(runId: string): SubagentHandle[];
-  liveSession(childId: string): ChildSession | undefined;
-  get(childId: string): SubagentHandle | undefined;
-  stopRun(runId: string): Promise<void>;
-  subscribeSpawns(listener: (run: SpawnedRun) => void): () => void;
-}
 
 export type NavigatorOpenContext = Pick<ExtensionContext, "cwd" | "hasUI" | "ui" | "sessionManager" | "modelRegistry" | "model">;
 
@@ -54,12 +44,9 @@ export interface NavigatorFollowUp {
 }
 
 interface NavigatorServices {
-  runner: NavigatorRunner;
   followUp?: NavigatorFollowUp;
   /** Extract a workflow's display name from its script for run rows. */
   describeWorkflow?: (script: string) => string;
-  /** Override the runs root (tests); defaults to the store location. */
-  root?: string;
 }
 
 /** Register `/agents` and its `/workflows` alias, returning their shared open path. */
@@ -84,8 +71,8 @@ export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices)
 async function runNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> {
   const model = new NavigatorModel(
     ctx.cwd,
-    { root: services.root, describeWorkflow: services.describeWorkflow },
-    (id) => services.runner.liveRunIds().includes(id),
+    { describeWorkflow: services.describeWorkflow },
+    (id) => subagentRunner.liveRunIds().includes(id),
   );
   if (!ctx.hasUI) {
     console.log(formatPlainSummary(model.runs()));
@@ -112,7 +99,7 @@ export function formatPlainSummary(runs: RunSummary[]): string {
 
 function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, model: NavigatorModel, target?: NavigatorOpenTarget): Promise<void> {
   const state = new NavigatorState();
-  const runner = services.runner;
+  const runner = subagentRunner;
   if (target) {
     state.seedRun(target.runId);
     if (target.childId) {
@@ -493,7 +480,7 @@ export function isMessageableChild(child: ChildRow | undefined): boolean {
 }
 
 export function buildAgentView(
-  runner: NavigatorRunner,
+  runner: SubagentRunner,
   tui: TUI,
   model: NavigatorModel,
   runId: string,

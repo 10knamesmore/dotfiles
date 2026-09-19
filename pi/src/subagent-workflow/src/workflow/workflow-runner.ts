@@ -4,16 +4,17 @@ import { isAbsolute, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadChildExtensionEnvironment, resolveModel, type ParentContext } from "../runner/child.js";
 import { assertInlineWorktreePatch, isInlineWorktreePatch } from "../runner/inline-patch.js";
-import { subagentRunner, type SubagentRunner } from "../runner/runner.js";
+import { subagentRunner } from "../runner/runner.js";
 import { readRunSnapshot } from "../store/run-snapshot.js";
 import { RunStore } from "../store/run-store.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
-import { validateWorkflowAgentOptions } from "../subagent-spec.js";
+import { validateWorkflowAgentOptions, type TierSubagentSpec } from "../subagent-spec.js";
+import { readPersonalConfig, type ModelTiers } from "../../../config/index.js";
+import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentSpec } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { bindAbort, errorMessage, isRecord } from "../util.js";
 import {
-  CALL_FINGERPRINT_VERSION,
   describeFingerprintDrift,
   hashAgentPayload,
   isInCausalTail,
@@ -23,19 +24,12 @@ import {
   type JournalEntry,
   type WorkflowJournal,
 } from "./journal.js";
-import { parseWorkflowScript, type ParsedWorkflow } from "./parser.js";
+import type { ParsedWorkflow } from "./parser.js";
 import { resolveRunDir } from "./run-dir.js";
 import { executeWorkflowBody, type WorkflowCallIdentity, type WorkflowVmApi } from "./vm.js";
 
 export const WORKFLOW_AGENT_CAP = 200;
 const MAX_WORKFLOW_AGENT_CAP = 1_000;
-
-interface WorkflowRunInput {
-  readonly script: string;
-  readonly args?: unknown;
-  readonly resumeRunId?: string;
-  readonly rerunChildIds?: readonly string[];
-}
 
 interface ParsedWorkflowRunInput {
   readonly workflow: ParsedWorkflow;
@@ -66,25 +60,10 @@ export class WorkflowRunError extends Error {
 }
 
 interface WorkflowRunnerOptions {
-  runner?: SubagentRunner;
-  rootDir?: string;
+  /** One mapping snapshot per launch/resume, shared by validation and all calls. */
+  modelTiers?: Readonly<ModelTiers>;
   onLog?: (message: string) => void;
   signal?: AbortSignal;
-}
-
-export async function runWorkflow(input: WorkflowRunInput, parent: ParentContext, options: WorkflowRunnerOptions = {}): Promise<WorkflowRunResult> {
-  const workflow = parseWorkflowScript(input.script);
-  const runner = options.runner ?? subagentRunner;
-  const started = startParsedWorkflow(
-    { workflow, args: input.args, resumeRunId: input.resumeRunId, rerunChildIds: input.rerunChildIds },
-    parent,
-    { ...options, runner },
-  );
-  try {
-    return await started.execution;
-  } finally {
-    runner.releaseRunActivity?.(started.runId);
-  }
 }
 
 export function startParsedWorkflow(
@@ -93,12 +72,13 @@ export function startParsedWorkflow(
   options: WorkflowRunnerOptions = {},
 ): { runId: string; runDir: string; execution: Promise<WorkflowRunResult> } {
   const { workflow } = input;
+  const modelTiers = { ...(options.modelTiers ?? readPersonalConfig()["model-tier"]) };
   validateRerunChildIds(input.rerunChildIds, input.resumeRunId);
   const rerunAuthorized = new Set(input.rerunChildIds ?? []);
   const normalizedInputArgs = normalizeArgs(input.args);
   if (!input.resumeRunId || input.args !== undefined) validateWorkflowArgs(normalizedInputArgs);
-  const runner = options.runner ?? subagentRunner;
-  const root = options.rootDir ?? join(getAgentDir(), "subagent-workflow", "runs");
+  const runner = subagentRunner;
+  const root = join(getAgentDir(), "subagent-workflow", "runs");
   const runId = input.resumeRunId ?? `workflow-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
   // RunStore guards ownership at the OS level. Keep this session check for the
   // more actionable stop-from-/agents error before touching the run directory.
@@ -127,7 +107,6 @@ export function startParsedWorkflow(
     const cwd = spec.cwd ?? parent.ctx.cwd;
     const environment = await loadChildExtensionEnvironment(cwd);
     return {
-      version: CALL_FINGERPRINT_VERSION,
       provider: model.provider,
       modelId: model.id,
       thinkingLevel: thinking,
@@ -161,10 +140,9 @@ export function startParsedWorkflow(
   try {
     agentAttemptCount = store.childCount;
     if (existingRunDir) {
-      // The limit is persisted run policy. Legacy runs use the historical
-      // fixed limit when no policy was captured.
-      agentCap = store.maxAgentsPerWorkflow ?? WORKFLOW_AGENT_CAP;
-      validateAgentCap(agentCap, `Cannot resume workflow ${runId}: persisted maxAgentsPerWorkflow`);
+      const persistedCap = store.maxAgentsPerWorkflow;
+      validateAgentCap(persistedCap, `Cannot resume workflow ${runId}: persisted maxAgentsPerWorkflow`);
+      agentCap = persistedCap;
       args = input.args === undefined ? readPersistedArgs(existingRunDir) : normalizedInputArgs;
       generationInputs = {
         ...(input.args !== undefined ? { args: { value: args } } : {}),
@@ -199,7 +177,7 @@ export function startParsedWorkflow(
     store.startWorkflowGeneration(workflow.script, workflow.meta.phases, generationInputs, {
       requireExistingScript: existingRunDir !== undefined,
     });
-    generation = store.deliveryIdentity?.generation ?? 0;
+    generation = store.deliveryIdentity.generation;
     if (generation < 1) throw new Error(`Workflow run ${runId} has no active delivery generation`);
   } catch (error) {
     // Resume setup happens after atomic ownership acquisition. If validation or
@@ -284,18 +262,20 @@ export function startParsedWorkflow(
     },
     agent: async (prompt: string, suppliedOptions: unknown, call: WorkflowCallIdentity) => {
       if (abortSignal.aborted) throw new WorkflowAbortedError();
-      if (typeof prompt !== "string" || !prompt.trim()) throw new TypeError("agent(prompt, opts?) requires a non-empty prompt string");
+      if (typeof prompt !== "string" || !prompt.trim()) throw new TypeError("agent(prompt, opts) requires a non-empty prompt string");
       // Validate the VM-origin value before it can affect call identity, replay,
       // or spawning. This is the same runtime contract used by the direct tool.
       const rawOptions = validateWorkflowAgentOptions(suppliedOptions);
       const phase = rawOptions.phase ?? currentPhase;
       const { phase: _phase, ...optionsWithoutPhase } = rawOptions;
-      const spec: SubagentSpec = { prompt, ...optionsWithoutPhase, phase };
+      const request: TierSubagentSpec = { prompt, ...optionsWithoutPhase, phase };
       const hash = hashAgentPayload({ prompt, opts: optionsWithoutPhase, phase });
       const key = journalCallKey(call);
       const cached = journal.entries.get(key);
+      let spec: SubagentSpec;
       let fingerprint: CallFingerprint;
       try {
+        spec = resolveTierSpec(request, modelTiers, parent.ctx.modelRegistry);
         fingerprint = await resolveCallFingerprint(spec);
       } catch (error) {
         // For a cached call this is a replay decision, and an unresolvable
@@ -304,7 +284,7 @@ export function startParsedWorkflow(
         if (cached?.hash === hash) {
           replayRefused = true;
           throw new WorkflowReplayRefusedError(
-            `Cannot replay workflow call ${cached.childId}${callLabel(spec)}: the current execution environment cannot be resolved: ${errorMessage(error)}. ${REPLAY_RECOVERY_OPTIONS(cached.childId)}`,
+            `Cannot replay workflow call ${cached.childId}${callLabel(request)}: the current execution environment cannot be resolved: ${errorMessage(error)}. ${REPLAY_RECOVERY_OPTIONS(cached.childId)}`,
           );
         }
         throw error;
@@ -383,7 +363,7 @@ export function startParsedWorkflow(
         // Its declared boundary: the scan reads the authored cwd, so a
         // worktree-isolated child of a dirty checkout can differ from it -
         // repository contents are deliberately outside the fingerprint.
-        const entry: JournalEntry = { v: 4, call, hash, fingerprint, result, childId: child.id };
+        const entry: JournalEntry = { call, hash, fingerprint, result, childId: child.id };
         journal.entries.set(key, entry);
         store.appendJournal(entry);
       }
@@ -501,8 +481,8 @@ async function deferWorkflowExecution(execute: () => Promise<WorkflowRunResult>)
   return execute();
 }
 
-function validateAgentCap(value: number, context: string): void {
-  if (!Number.isInteger(value) || value < 1 || value > MAX_WORKFLOW_AGENT_CAP) {
+function validateAgentCap(value: unknown, context: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_WORKFLOW_AGENT_CAP) {
     throw new TypeError(`${context} must be an integer from 1 to ${MAX_WORKFLOW_AGENT_CAP}`);
   }
 }

@@ -7,15 +7,12 @@ import { replaceAtomicFile } from "./atomic-file.js";
 import { acquireRunOwnership, runOwnerIsLive, RunOwnershipConflictError, type RunOwnership } from "./lease.js";
 
 export const DELIVERED_FILE = "delivered.json";
-export const DELIVERY_PROTOCOL_VERSION = 1 as const;
 
 export interface RunDeliveryIdentity {
-  protocol: typeof DELIVERY_PROTOCOL_VERSION;
   generation: number;
 }
 
 export interface DeliveryMarker {
-  v: 1;
   sessionId: string;
   catchUp: boolean;
   generation: number;
@@ -43,10 +40,10 @@ const closedSessions = new Set<string>();
 const deferredPublications: Array<{ target: DeliveryTarget; sessionId: string; catchUp: boolean }> = [];
 
 export function parseRunDeliveryIdentity(record: unknown): RunDeliveryIdentity | undefined {
-  if (!isRecord(record) || record.v !== 3 || !isRecord(record.delivery)) return undefined;
-  const { protocol, generation } = record.delivery;
-  return protocol === DELIVERY_PROTOCOL_VERSION && Number.isSafeInteger(generation) && (generation as number) >= 0
-    ? { protocol, generation: generation as number }
+  if (!isRecord(record) || !isRecord(record.delivery)) return undefined;
+  const { generation } = record.delivery;
+  return Number.isSafeInteger(generation) && (generation as number) >= 0
+    ? { generation: generation as number }
     : undefined;
 }
 
@@ -59,7 +56,6 @@ export function readDeliveryMarker(runDir: string): DeliveryMarker | undefined {
   try {
     const value: unknown = JSON.parse(readFileSync(join(runDir, DELIVERED_FILE), "utf8"));
     if (!isRecord(value)
-      || value.v !== 1
       || typeof value.sessionId !== "string"
       || typeof value.catchUp !== "boolean"
       || !Number.isSafeInteger(value.generation)
@@ -110,7 +106,6 @@ export function publishClaimedDelivery(claim: ClaimedDeliveryTarget, sessionId: 
   if (existing && existing.generation > claim.identity.generation) return false;
 
   replaceAtomicFile(join(claim.runDir, DELIVERED_FILE), markerText({
-    v: 1,
     sessionId,
     catchUp,
     generation: claim.identity.generation,
@@ -248,7 +243,7 @@ export function markSessionOpen(sessionId: string): void {
 }
 
 function sameIdentity(left: RunDeliveryIdentity, right: RunDeliveryIdentity): boolean {
-  return left.protocol === right.protocol && left.generation === right.generation;
+  return left.generation === right.generation;
 }
 
 function removePending(pending: PendingDelivery): void {

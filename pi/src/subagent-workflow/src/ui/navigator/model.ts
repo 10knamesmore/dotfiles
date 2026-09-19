@@ -32,7 +32,7 @@ export class NavigatorModel {
   }
 
   detail(runId: string): RunDetail {
-    const runDir = join(runsDirFor(this.cwd, this.opts.root), runId);
+    const runDir = join(runsDirFor(this.cwd), runId);
     return readRunDetail(runDir, runId, { ...this.opts, bypassCache: true });
   }
 }

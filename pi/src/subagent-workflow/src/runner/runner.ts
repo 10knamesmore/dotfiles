@@ -18,21 +18,12 @@ import type { SchemaCapture } from "./schema-tool.js";
 import { Semaphore } from "./semaphore.js";
 import { cleanupWorktree, collectWorktree, createWorktree, WorktreeCollectionError, type Worktree } from "./worktree.js";
 
-// Anchored on globalThis: pi re-evaluates this module per cwd generation
-// (moduleCache: false), so a plain module-level semaphore would let each
-// cwd's children run under their own cap. One process-wide gate keeps the
-// concurrency ceiling honest across every module instance. Its version suffix
-// changes only when the semaphore's shared-state shape changes.
-// Resizing adds mutable capacity state, so this generation cannot safely adopt
-// the fixed-capacity instance left by an older hot-loaded extension.
-const SEMAPHORE_STATE_VERSION = "v2";
-const SEMAPHORE_KEY = `__piSubagentWorkflowSemaphore_${SEMAPHORE_STATE_VERSION}__`;
+// Pi reloads modules per cwd. Share one semaphore so all module instances
+// respect the process-wide concurrency limit.
+const SEMAPHORE_KEY = "__piSubagentWorkflowSemaphore__";
 const globalScope = globalThis as unknown as Record<string, Semaphore | undefined>;
 const globalSemaphore: Semaphore = globalScope[SEMAPHORE_KEY] ??= new Semaphore(Math.max(1, Math.min(16, cpus().length - 2)));
 
-type ChildBuilder = typeof spawnSubprocessChild;
-type StoreBuilder = (runId: string, parent: ParentContext, storeOptions?: { directDelivery?: boolean }) => RunStore;
-type Delay = (ms: number) => Promise<void>;
 interface SpawnRunOptions {
   runId?: string;
   store?: RunStore;
@@ -291,13 +282,7 @@ export class SubagentRunner {
   // contract (that is async-lineage identity + payload hash), so process
   // uniqueness is all they need.
   private readonly nonce = randomUUID().replaceAll("-", "").slice(0, 8);
-  constructor(
-    private buildChild: ChildBuilder = spawnSubprocessChild,
-    private semaphore: Semaphore = globalSemaphore,
-    private buildStore: StoreBuilder = (runId, parent, storeOptions) =>
-      new RunStore(runId, parent.ctx.cwd, parent.ctx.sessionManager.getSessionId(), parent.ctx.sessionManager.getSessionFile(), storeOptions),
-    private delay: Delay = defaultDelay,
-  ) {}
+  private readonly semaphore = globalSemaphore;
 
   /** Apply a process-wide admission limit. Existing agents are never cancelled. */
   setMaxConcurrentAgents(capacity: number): void { this.semaphore.resize(capacity); }
@@ -337,7 +322,7 @@ export class SubagentRunner {
   }
 
   /** @internal Handle-to-runner grace timer handoff. */
-  waitForSettleGrace(): Promise<void> { return this.delay(SETTLE_GRACE_MS); }
+  waitForSettleGrace(): Promise<void> { return defaultDelay(SETTLE_GRACE_MS); }
 
   /** @internal Settle a child whose RPC process ignored cancellation, then terminate it. */
   abandonChild(handle: Handle, reason: string): void {
@@ -370,18 +355,14 @@ export class SubagentRunner {
     reportDiagnostic(`[subagent-workflow] child ${handle.id} disposal did not settle within ${SETTLE_GRACE_MS / 1_000}s; continuing shutdown`);
   }
 
-  spawn(spec: SubagentSpec, parent: ParentContext): SubagentHandle {
-    return this.spawnRun(spec, parent);
-  }
-
   spawnRun(spec: ChildSpawnSpec, parent: ParentContext, options: SpawnRunOptions = {}): SubagentHandle {
     const runId = options.runId ?? `run-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
     const existingStore = this.stores.get(runId);
     const store = options.store ?? existingStore
-      ?? this.buildStore(runId, parent, options.directDelivery ? { directDelivery: true } : undefined);
+      ?? new RunStore(runId, parent.ctx.cwd, parent.ctx.sessionManager.getSessionId(), parent.ctx.sessionManager.getSessionFile(), { directDelivery: options.directDelivery });
     const ownsUnregisteredStore = options.store === undefined && existingStore === undefined;
     const identity = store.deliveryIdentity;
-    if (!identity || identity.generation < 1) {
+    if (identity.generation < 1) {
       if (ownsUnregisteredStore) store.releaseOwnership();
       throw new Error(`Run ${runId} has no active delivery generation`);
     }
@@ -601,7 +582,7 @@ export class SubagentRunner {
         releaseAdmission();
         return;
       }
-      const child = await this.buildChild(childSpec, handle.parent, {
+      const child = await spawnSubprocessChild(childSpec, handle.parent, {
         sessionsDir: store.sessionsDir,
         forkSessionFile: handle.forkSessionFile,
       });
@@ -809,12 +790,8 @@ function summarizeCall(name: string, args: unknown): string {
   return `${name} ${summary.replace(/\s+/g, " ").slice(0, 120)}`.trim();
 }
 
-// Also a process singleton (see globalSemaphore) so every module instance,
-// and the tools they register, share one handle/store registry.
-// Bump whenever Handle/SubagentRunner state or behavior changes incompatibly.
-// A separate key from the semaphore lets a hot reload adopt the new runner
-// without temporarily creating a second concurrency pool.
-const RUNNER_STATE_VERSION = "v17";
-const RUNNER_KEY = `__piSubagentWorkflowRunner_${RUNNER_STATE_VERSION}__`;
+// Share one handle/store registry across module instances. Restart Pi after
+// changing runner code so the process picks up the new implementation.
+const RUNNER_KEY = "__piSubagentWorkflowRunner__";
 const runnerScope = globalThis as unknown as Record<string, SubagentRunner | undefined>;
 export const subagentRunner: SubagentRunner = runnerScope[RUNNER_KEY] ??= new SubagentRunner();

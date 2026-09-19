@@ -37,30 +37,26 @@ interface ParsedFile {
 
 /**
  * Read and parse the persisted files for one run. Corruption is data here:
- * consumers decide which diagnostics, shapes, and marker states are fatal. The
- * read callback is a narrow seam for deterministic read-race tests.
+ * consumers decide which diagnostics, shapes, and marker states are fatal.
  */
-export function readRunSnapshot(
-  runDir: string,
-  readText: (path: string) => string = (path) => readFileSync(path, "utf8"),
-): RunSnapshot {
+export function readRunSnapshot(runDir: string): RunSnapshot {
   let recordDiagnostics: RunSnapshotDiagnostic[] = [];
   const diagnostics: RunSnapshotDiagnostic[] = [];
   // Record marker presence at both edges of the read. Consumers still decide
   // whether an observed in-progress generation is fatal.
   const pendingBefore = existsSync(join(runDir, "generation.pending"));
-  let record = readJsonFile(runDir, "run.json", recordDiagnostics, readText);
+  let record = readJsonFile(runDir, "run.json", recordDiagnostics);
   // Match saved-run ordering: the generation commit publishes status before
   // script and args, so reading status last cannot pair an old completed status
   // with a newly committed script or args value.
   const scriptPath = join(runDir, "script.js");
   const scriptPresent = existsSync(scriptPath);
-  const script = readOptionalText(scriptPath, "script.js", diagnostics, readText, scriptPresent);
-  const argsText = readOptionalText(join(runDir, "args.json"), "args.json", diagnostics, readText);
-  const status = readJsonFile(runDir, "status.json", diagnostics, readText);
-  const eventFile = readRequiredText(runDir, "events.jsonl", diagnostics, readText);
+  const script = readOptionalText(scriptPath, "script.js", diagnostics, scriptPresent);
+  const argsText = readOptionalText(join(runDir, "args.json"), "args.json", diagnostics);
+  const status = readJsonFile(runDir, "status.json", diagnostics);
+  const eventFile = readRequiredText(runDir, "events.jsonl", diagnostics);
   const events = parseEventLines(eventFile, diagnostics);
-  const ownerText = readOptionalText(join(runDir, "owner.json"), "owner.json", diagnostics, readText);
+  const ownerText = readOptionalText(join(runDir, "owner.json"), "owner.json", diagnostics);
   const ownerMetadata = parseJsonFile(ownerText, "owner.json", diagnostics);
 
   // addChild publishes run.json before status.json and its event. If the first
@@ -68,7 +64,7 @@ export function readRunSnapshot(
   // Re-read only the early file once rather than repeating the full snapshot.
   if (referencesUnrecordedChild(record.value, status.value, events)) {
     recordDiagnostics = [];
-    record = readJsonFile(runDir, "run.json", recordDiagnostics, readText);
+    record = readJsonFile(runDir, "run.json", recordDiagnostics);
     if (recordDiagnostics.length === 0 && referencesUnrecordedChild(record.value, status.value, events)) {
       recordDiagnostics.push({
         file: "run.json",
@@ -102,9 +98,8 @@ function readJsonFile(
   runDir: string,
   file: string,
   diagnostics: RunSnapshotDiagnostic[],
-  readText: (path: string) => string,
 ): ParsedFile {
-  const text = readRequiredText(runDir, file, diagnostics, readText);
+  const text = readRequiredText(runDir, file, diagnostics);
   return parseJsonFile(text, file, diagnostics);
 }
 
@@ -126,10 +121,9 @@ function readRequiredText(
   runDir: string,
   file: string,
   diagnostics: RunSnapshotDiagnostic[],
-  readText: (path: string) => string,
 ): string | undefined {
   try {
-    return readText(join(runDir, file));
+    return readFileSync(join(runDir, file), "utf8");
   } catch (error) {
     diagnostics.push({ file, problem: errorMessage(error) });
     return undefined;
@@ -140,11 +134,10 @@ function readOptionalText(
   path: string,
   file: string,
   diagnostics: RunSnapshotDiagnostic[],
-  readText: (path: string) => string,
   diagnoseMissing = false,
 ): string | undefined {
   try {
-    return readText(path);
+    return readFileSync(path, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT" && !diagnoseMissing) return undefined;
     diagnostics.push({ file, problem: errorMessage(error) });

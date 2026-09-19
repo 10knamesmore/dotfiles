@@ -28,24 +28,8 @@ export type {
 import type { RunDetail, RunSummary } from "../../store/run-projection.js";
 
 export interface ReadOptions {
-  /** Root of the runs tree; defaults to the store's location. */
-  root?: string;
   /** Extract a workflow's display name from its script.js contents. */
   describeWorkflow?: (script: string) => string;
-  /** Read seams used to make snapshot, listing, and ownership races deterministic. */
-  readSnapshot?: (runDir: string) => RunSnapshot;
-  listRunIds?: (runsDir: string) => string[];
-  ownerIsLive?: (runDir: string) => boolean;
-  /**
-   * Cache-key stat seam. The invalidation contract is "any change to mtime,
-   * ctime, or size is a change", and a test cannot vary those one at a time on a
-   * real filesystem: tmpfs derives ctime from the kernel's coarse clock, whose
-   * granularity is one jiffy (4ms at CONFIG_HZ=250), so two writes inside a tick
-   * are indistinguishable no matter how the test sleeps.
-   */
-  statFile?: (path: string) => { mtimeNs: bigint; ctimeNs: bigint; size: bigint } | undefined;
-  /** In-memory projection seam; defaults to the process-wide runner. */
-  ownedProjection?: (runId: string) => RunProjection | undefined;
   /** Selected non-owned runs bypass the mtime cache to preserve fresh detail. */
   bypassCache?: boolean;
 }
@@ -79,31 +63,16 @@ export function defaultRunsRoot(): string {
   return join(getAgentDir(), "subagent-workflow", "runs");
 }
 
-export function runsDirFor(cwd: string, root: string = defaultRunsRoot()): string {
-  return join(root, encodeCwd(cwd));
-}
-
-/** Parse one run directory into a summary. Never throws. */
-export function readRunSummary(runDir: string, runId: string, opts: ReadOptions = {}): RunSummary {
-  const owned = readOwnedProjection(runId, runDir, opts);
-  if (owned) {
-    diskRuns.delete(resolve(runDir));
-    return owned.summary;
-  }
-  try {
-    return readDiskSummary(runDir, runId, opts);
-  } catch {
-    diskRuns.delete(resolve(runDir));
-    return corruptRunSummary(runDir, runId);
-  }
+export function runsDirFor(cwd: string): string {
+  return join(defaultRunsRoot(), encodeCwd(cwd));
 }
 
 /** All runs for a cwd, newest first. Corrupt directories are included as dim rows. */
 export function listRunSummaries(cwd: string, opts: ReadOptions = {}): RunSummary[] {
-  const dir = runsDirFor(cwd, opts.root ?? defaultRunsRoot());
+  const dir = runsDirFor(cwd);
   let ids: string[];
   try {
-    ids = (opts.listRunIds ?? readdirSync)(dir);
+    ids = readdirSync(dir);
   } catch {
     pruneDiskRuns(dir, new Set());
     return [];
@@ -126,7 +95,7 @@ export function listRunSummaries(cwd: string, opts: ReadOptions = {}): RunSummar
     // before any non-owned run in this scan tries to occupy a slot.
     const slot = summaries.length;
     summaries.length += 1;
-    const owned = readOwnedProjection(id, runDir, opts);
+    const owned = readOwnedProjection(id, runDir);
     if (owned) {
       diskRuns.delete(resolve(runDir));
       summaries[slot] = owned.summary;
@@ -149,7 +118,7 @@ export function listRunSummaries(cwd: string, opts: ReadOptions = {}): RunSummar
 
 /** Parse one run directory into a detail view. Never throws. */
 export function readRunDetail(runDir: string, runId: string, opts: ReadOptions = {}): RunDetail {
-  const owned = readOwnedProjection(runId, runDir, opts);
+  const owned = readOwnedProjection(runId, runDir);
   if (owned) {
     diskRuns.delete(resolve(runDir));
     return owned.detail;
@@ -162,11 +131,8 @@ export function readRunDetail(runDir: string, runId: string, opts: ReadOptions =
   }
 }
 
-function readOwnedProjection(runId: string, runDir: string, opts: ReadOptions): RunProjection | undefined {
-  const supplied = opts.ownedProjection?.(runId);
-  const projection = opts.ownedProjection
-    ? supplied ? cloneRunProjection(supplied) : undefined
-    : subagentRunner.runProjection(runId);
+function readOwnedProjection(runId: string, runDir: string): RunProjection | undefined {
+  const projection = subagentRunner.runProjection(runId);
   if (!projection) return undefined;
   projection.summary.runDir = runDir;
   projection.detail.runDir = runDir;
@@ -180,16 +146,16 @@ function readDiskSummary(
   protectedCacheKeys?: ReadonlySet<string>,
 ): RunSummary {
   const cacheKey = resolve(runDir);
-  const signatures = relevantFileSignatures(cacheKey, opts);
+  const signatures = relevantFileSignatures(cacheKey);
   const entry = matchingDiskRun(cacheKey, runId, opts);
   if (!opts.bypassCache && entry && sameFileSignatures(entry.signatures, signatures)) {
-    reprobeOwner(entry, runDir, opts);
+    reprobeOwner(entry, runDir);
     touchDiskRun(cacheKey, entry);
     return summaryForCaller(summaryForEntry(entry), runDir);
   }
 
-  const snapshot = (opts.readSnapshot ?? readRunSnapshot)(runDir);
-  const ownership = diskOwnership(snapshot, runDir, entry, opts);
+  const snapshot = readRunSnapshot(runDir);
+  const ownership = diskOwnership(snapshot, runDir, entry);
   const summaries = projectRunSnapshotSummary(snapshot, runId, { describeWorkflow: opts.describeWorkflow });
   const next: DiskRunEntry = {
     runId,
@@ -206,10 +172,10 @@ function readDiskSummary(
 
 function readDiskProjection(runDir: string, runId: string, opts: ReadOptions): RunProjection {
   const cacheKey = resolve(runDir);
-  const signatures = relevantFileSignatures(cacheKey, opts);
+  const signatures = relevantFileSignatures(cacheKey);
   const entry = matchingDiskRun(cacheKey, runId, opts);
   if (!opts.bypassCache && entry && sameFileSignatures(entry.signatures, signatures)) {
-    reprobeOwner(entry, runDir, opts);
+    reprobeOwner(entry, runDir);
     const projection = projectionForEntry(entry);
     if (projection) {
       touchDiskRun(cacheKey, entry);
@@ -217,8 +183,8 @@ function readDiskProjection(runDir: string, runId: string, opts: ReadOptions): R
     }
   }
 
-  const snapshot = (opts.readSnapshot ?? readRunSnapshot)(runDir);
-  const ownership = diskOwnership(snapshot, runDir, entry, opts);
+  const snapshot = readRunSnapshot(runDir);
+  const ownership = diskOwnership(snapshot, runDir, entry);
   const liveProjection = projectRunSnapshot(snapshot, runId, { describeWorkflow: opts.describeWorkflow });
   const reconciledProjection = ownership.diskLive ? reconcileDeadOwnerProjection(liveProjection) : undefined;
   const next: DiskRunEntry = {
@@ -248,7 +214,6 @@ function diskOwnership(
   snapshot: RunSnapshot,
   runDir: string,
   entry: DiskRunEntry | undefined,
-  opts: ReadOptions,
 ): Pick<DiskRunEntry, "diskLive" | "ownerLive" | "ownerProbedAt"> {
   const diskLive = snapshotSaysLive(snapshot);
   if (!diskLive) return { diskLive, ownerLive: false, ownerProbedAt: 0 };
@@ -258,15 +223,15 @@ function diskOwnership(
   }
   return {
     diskLive,
-    ownerLive: (opts.ownerIsLive ?? runOwnerIsLive)(runDir),
+    ownerLive: runOwnerIsLive(runDir),
     ownerProbedAt: now,
   };
 }
 
-function reprobeOwner(entry: DiskRunEntry, runDir: string, opts: ReadOptions): void {
+function reprobeOwner(entry: DiskRunEntry, runDir: string): void {
   const now = Date.now();
   if (!entry.diskLive || now - entry.ownerProbedAt < OWNERSHIP_REPROBE_MS) return;
-  entry.ownerLive = (opts.ownerIsLive ?? runOwnerIsLive)(runDir);
+  entry.ownerLive = runOwnerIsLive(runDir);
   entry.ownerProbedAt = now;
 }
 
@@ -315,30 +280,23 @@ function projectionForCaller(projection: RunProjection, runDir: string): RunProj
   return cloned;
 }
 
-function relevantFileSignatures(runDir: string, opts: ReadOptions): RelevantFileSignatures {
-  const stat = opts.statFile ?? defaultStatFile;
+function relevantFileSignatures(runDir: string): RelevantFileSignatures {
   return {
-    run: fileSignature(join(runDir, "run.json"), stat),
-    status: fileSignature(join(runDir, "status.json"), stat),
-    events: fileSignature(join(runDir, "events.jsonl"), stat),
-    script: fileSignature(join(runDir, "script.js"), stat),
-    generationPending: fileSignature(join(runDir, "generation.pending"), stat),
+    run: fileSignature(join(runDir, "run.json")),
+    status: fileSignature(join(runDir, "status.json")),
+    events: fileSignature(join(runDir, "events.jsonl")),
+    script: fileSignature(join(runDir, "script.js")),
+    generationPending: fileSignature(join(runDir, "generation.pending")),
   };
 }
 
-type StatFile = NonNullable<ReadOptions["statFile"]>;
-
-function defaultStatFile(path: string): ReturnType<StatFile> {
+function fileSignature(path: string): string {
   try {
-    return statSync(path, { bigint: true });
+    const value = statSync(path, { bigint: true });
+    return `${value.mtimeNs}:${value.ctimeNs}:${value.size}`;
   } catch {
-    return undefined;
+    return "missing";
   }
-}
-
-function fileSignature(path: string, stat: StatFile): string {
-  const value = stat(path);
-  return value === undefined ? "missing" : `${value.mtimeNs}:${value.ctimeNs}:${value.size}`;
 }
 
 function sameFileSignatures(left: RelevantFileSignatures, right: RelevantFileSignatures): boolean {

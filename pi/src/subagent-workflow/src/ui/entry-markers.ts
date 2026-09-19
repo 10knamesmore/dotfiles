@@ -44,9 +44,8 @@ export function appendEntrySafely(pi: ExtensionAPI, type: string, data: unknown)
 
 /**
  * Entry data comes straight off the session JSONL, so it is the least trusted
- * input any renderer here sees: a truncated write, or an entry appended by a
- * different version of this extension, arrives with whatever shape it has. A
- * throw would land in pi's render loop and kill the TUI on every resume, so the
+ * input any renderer here sees. Malformed entries must not throw in pi's render
+ * loop and kill the TUI on every resume, so the
  * arrays are checked rather than assumed.
  */
 function textList(value: unknown): string[] | undefined {

@@ -7,7 +7,7 @@ import { sanitizeTerminalText, sanitizeTerminalTextChunks, UNTRUSTED_FIELD_MAX }
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { linesComponent } from "../ui/component.js";
-import type { ApproveLaunch, LaunchPlan, WorkflowApprovalPolicy } from "./approval.js";
+import type { LaunchPlan, WorkflowApprovalPolicy } from "./approval.js";
 import { completeWorkflowFailureInline, completeWorkflowInline, deliverWorkflowInBackground, launchWorkflow, type StartedWorkflow } from "./launch.js";
 import { normalizeArgs, readAbsoluteScript, type WorkflowRunResult } from "./workflow-runner.js";
 import { parseWorkflowScript } from "./parser.js";
@@ -33,10 +33,8 @@ const WorkflowToolParameters = Type.Object({
 
 type WorkflowToolInput = Static<typeof WorkflowToolParameters>;
 
-/** The launch-approval seam, injected so the tool stays testable. */
 interface WorkflowToolServices {
-  approve: ApproveLaunch;
-  approvalPolicy: () => WorkflowApprovalPolicy;
+  approvalPolicy: WorkflowApprovalPolicy;
   observeRun?: (run: StartedWorkflow, ctx: ExtensionContext) => void;
 }
 
@@ -44,12 +42,12 @@ const DESCRIPTION = `Execute deterministic JavaScript orchestration over subagen
 
 The script is a module string beginning with a literal header:
 export const meta = { name: 'audit-routes', description: 'Audit routes', phases: [{ title: 'Discover' }, { title: 'Audit' }] }
-const result = await agent('List route files', { schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
+const result = await agent('List route files', { model: 'low', schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
 const files = result?.files.filter(Boolean) ?? []
 phase('Audit')
-return parallel(files.map(file => () => agent('Audit ' + file)))
+return parallel(files.map(file => () => agent('Audit ' + file, { model: 'mid' })))
 
-Globals: agent(prompt, opts?), parallel(thunks), pipeline(items, ...stages), phase(title), log(message), and args. agent opts: model ("provider/model-id", never bare), thinkingLevel, tools, excludeTools, schema, cwd, isolation ('worktree' returns { value, patch, changed }; the patch is never applied automatically), label, phase. Every prompt must be self-contained: the child receives neither the parent conversation nor workflow variables unless interpolated. A failed agent() resolves to null - guard before dereferencing. Scripts must be deterministic: no wall-clock, randomness, or raw Promise concurrency - use parallel/pipeline and pass varying inputs through args. Resume with resumeRunId replays completed calls from the journal; drift on a completed call fails closed with an error naming the childId and the rerunChildIds recovery.
+Globals: agent(prompt, opts), parallel(thunks), pipeline(items, ...stages), phase(title), log(message), and args. agent opts: model (required: 'high', 'mid', or 'low'; direct provider/model-id values are rejected; choose by task difficulty using the current model-tier mappings and guidance in the system prompt), thinkingLevel, tools, excludeTools, schema, cwd, isolation ('worktree' returns { value, patch, changed }; the patch is never applied automatically), label, phase. Every prompt must be self-contained: the child receives neither the parent conversation nor workflow variables unless interpolated. A failed agent() resolves to null - guard before dereferencing. Scripts must be deterministic: no wall-clock, randomness, or raw Promise concurrency - use parallel/pipeline and pass varying inputs through args. Resume with resumeRunId replays completed calls from the journal; drift on a completed call fails closed with an error naming the childId and the rerunChildIds recovery.
 
 Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) A resumeRunId still requires exactly one of script or scriptPath.`;
 
@@ -70,11 +68,7 @@ export interface WorkflowToolDetails {
 export function workflowSummaryLines(details: WorkflowToolDetails): string[] {
   const safe = (value: string | number): string => sanitizeTerminalText(String(value));
   const lines = [`${safe(details.runId)} - ${safe(details.status)}`];
-  // Details round-trip through the session JSONL, so a resumed session can replay
-  // a payload written by a different version of this file. Unlike the subagent
-  // rows these lines are built eagerly in renderResult, which pi wraps in its own
-  // try/catch, so a throw degrades to pi's fallback rather than killing the TUI -
-  // checking the one collection is enough to keep the real summary instead.
+  // Persisted details are untrusted; keep the summary usable if phases are absent.
   const phases = Array.isArray(details.phases) ? details.phases : [];
   if (phases.length > 0) lines.push(`phases: ${phases.map((phase) => safe(phase.title)).join(", ")}`);
   lines.push(`run dir: ${safe(details.runDir)}`);
@@ -126,7 +120,7 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
             onLog: (message: string) => onUpdate?.({ content: [{ type: "text", text: message }], details: undefined }),
           } : {}),
         },
-        { approve: services.approve, ctx, deps: { policy: services.approvalPolicy() } },
+        { ctx, policy: services.approvalPolicy },
       );
       try {
         services.observeRun?.(started, ctx);

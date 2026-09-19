@@ -7,7 +7,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ParentContext } from "../runner/child.js";
 import { subagentRunner } from "../runner/runner.js";
 import { activityFoldFromSnapshot, type RunActivityFold } from "../store/activity-fold.js";
-import { DELIVERY_PROTOCOL_VERSION, queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
+import { queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
 import { readRunSnapshot } from "../store/run-snapshot.js";
 import type { WorkflowPhase } from "../types.js";
 import { buildDeliveryEnvelope } from "../ui/delivery-envelope.js";
@@ -15,8 +15,9 @@ import { chunkDeliveryText, formatFailureText, safeDeliveryValue, stringifyDeliv
 import { appendEntrySafely } from "../ui/entry-markers.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
-import { unknownModelError } from "../runner/child.js";
-import type { ApprovalContext, ApprovalDeps, ApproveLaunch, LaunchPlan } from "./approval.js";
+import { resolveTierModel } from "../runner/model-tier.js";
+import { readPersonalConfig, type ModelTiers } from "../../../config/index.js";
+import { approveLaunch, type ApprovalContext, type LaunchPlan, type WorkflowApprovalPolicy } from "./approval.js";
 import { startParsedWorkflow, WorkflowRunError, type WorkflowRunResult } from "./workflow-runner.js";
 
 interface WorkflowLaunchInput {
@@ -29,9 +30,8 @@ interface WorkflowLaunchInput {
 }
 
 interface WorkflowApproval {
-  approve: ApproveLaunch;
   ctx: ApprovalContext;
-  deps: ApprovalDeps;
+  policy: WorkflowApprovalPolicy;
 }
 
 export interface StartedWorkflow {
@@ -52,13 +52,15 @@ interface LaunchedWorkflow {
  */
 export async function launchWorkflow(pi: ExtensionAPI, parent: ParentContext, input: WorkflowLaunchInput, approval: WorkflowApproval): Promise<LaunchedWorkflow> {
   const { workflow } = input.plan;
-  const modelError = validateLiteralModels(workflow.literalModels, parent.ctx.modelRegistry);
+  const modelTiers = readPersonalConfig()["model-tier"];
+  const modelError = validateLiteralModels(workflow.literalModels, modelTiers, parent.ctx.modelRegistry);
   if (modelError) throw new Error(modelError);
-  await approval.approve(input.plan, approval.ctx, approval.deps);
+  await approveLaunch(input.plan, approval.ctx, approval.policy);
   const launch = startParsedWorkflow(
     { workflow, args: input.plan.args, resumeRunId: input.resumeRunId, rerunChildIds: input.rerunChildIds },
     parent,
     {
+      modelTiers,
       onLog: input.onLog,
       signal: input.signal,
     },
@@ -73,7 +75,7 @@ export async function launchWorkflow(pi: ExtensionAPI, parent: ParentContext, in
   appendEntrySafely(
     pi,
     "subagent-workflow:run-started",
-    workflowStartedMarker(started, approval.ctx.mode === "tui" && approval.deps.policy === "auto"),
+    workflowStartedMarker(started, approval.ctx.mode === "tui" && approval.policy === "auto"),
   );
   return { started, execution: launch.execution };
 }
@@ -207,13 +209,18 @@ function workflowDeliveryIdentity(generation: number | undefined): RunDeliveryId
   if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation < 1) {
     throw new Error("Workflow completion has no valid delivery generation");
   }
-  return { protocol: DELIVERY_PROTOCOL_VERSION, generation };
+  return { generation };
 }
 
-function validateLiteralModels(models: readonly string[], registry: ParentContext["ctx"]["modelRegistry"]): string | undefined {
-  const problems = [...new Set(models
-    .map((value) => unknownModelError(value, registry))
-    .filter((message): message is string => message !== undefined))];
+function validateLiteralModels(models: readonly string[], tiers: Readonly<ModelTiers>, registry: ParentContext["ctx"]["modelRegistry"]): string | undefined {
+  const problems = [...new Set(models.flatMap((value) => {
+    try {
+      resolveTierModel(value, tiers, registry);
+      return [];
+    } catch (error) {
+      return [errorMessage(error)];
+    }
+  }))];
   if (problems.length === 0) return undefined;
   return `Workflow was not launched; fix the script's model values first. ${problems.join(" ")}`;
 }

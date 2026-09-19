@@ -13,7 +13,6 @@ import {
 } from "./sqlite-lock.js";
 
 interface RunOwnerRecord {
-  v: 1;
   pid: number;
   host: string;
   startedAt: string;
@@ -59,7 +58,6 @@ export function acquireRunOwnership(runDir: string): RunOwnership {
       );
     }
     const owner: RunOwnerRecord = {
-      v: 1,
       pid: process.pid,
       host,
       startedAt: new Date().toISOString(),
@@ -114,7 +112,7 @@ export function runOwnerIsLive(runDir: string): boolean {
 
 function readOwner(runDir: string): RunOwnerRecord | undefined {
   const value = readOwnerMetadata(runDir) as Partial<RunOwnerRecord> | undefined;
-  return value?.v === 1
+  return value !== undefined
     && Number.isSafeInteger(value.pid)
     && (value.pid as number) > 0
     && typeof value.host === "string"
