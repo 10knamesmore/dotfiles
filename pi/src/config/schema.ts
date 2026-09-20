@@ -32,7 +32,7 @@ const WebSettingsSchema = Type.Object({
 
 export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "exa" | "codex" };
 
-const ModelReferenceSchema = Type.String({ pattern: "^[^/\\s]+/\\S+$" });
+const ModelReferenceSchema = Type.String({ pattern: "^[^/\]+/\\S+$" });
 const PersonalConfigSchema = Type.Object({
   language: Type.Optional(Type.String({ minLength: 1 })),
   "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
