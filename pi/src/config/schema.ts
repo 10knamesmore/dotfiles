@@ -25,10 +25,18 @@ const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> = {
   showStatusWidget: true,
 };
 
+const WebSettingsSchema = Type.Object({
+  searchProvider: Type.Optional(Type.Union([Type.Literal("exa"), Type.Literal("codex")])),
+  codexModel: Type.Optional(Type.String({ minLength: 1, pattern: "^\\S+$" })),
+}, { additionalProperties: false });
+
+export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "exa" | "codex" };
+
 const ModelReferenceSchema = Type.String({ pattern: "^[^/\\s]+/\\S+$" });
 const PersonalConfigSchema = Type.Object({
   language: Type.Optional(Type.String({ minLength: 1 })),
   "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
+  web: Type.Optional(WebSettingsSchema),
   "model-tier": Type.Optional(Type.Object({
     high: Type.Optional(ModelReferenceSchema),
     mid: Type.Optional(ModelReferenceSchema),
@@ -43,6 +51,8 @@ export interface PersonalConfig {
   /** User-selected provider/model-id bindings. Unconfigured tiers remain absent. */
   "model-tier": ModelTiers;
   "subagent-workflow": WorkflowSettings;
+  /** Default search backend and optional Codex model; authentication stays in Pi. */
+  web: WebSettings;
   [key: string]: unknown;
 }
 
@@ -57,5 +67,6 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     language: config.language ?? "中文",
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
+    web: { searchProvider: "exa", ...config.web },
   };
 }

@@ -8,6 +8,7 @@ import { registerProviderScope } from "./provider-scope/index.js";
 import { registerTitlebar } from "./titlebar/index.js";
 import { registerSessionTodo } from "./todo/index.js";
 import { registerUserQuestions } from "./user-questions/index.js";
+import { registerWebTools } from "./web/index.js";
 
 /** Register every first-party capability owned by the dotfiles Pi distribution. */
 export default function registerDistribution(pi: ExtensionAPI): void {
@@ -19,5 +20,6 @@ export default function registerDistribution(pi: ExtensionAPI): void {
   registerSessionTodo(pi);
   registerTitlebar(pi);
   registerUserQuestions(pi);
+  registerWebTools(pi);
   registerFooter(pi);
 }
