@@ -25,11 +25,6 @@ node_modules
 
 /pi/src/local_provider.ts
 
-tree/home/.config/opencode/node_modules
-tree/home/.config/opencode/package.json
-tree/home/.config/opencode/bun.lock
-tree/home/.config/opencode/.gitignore
-
 __pycache__
 
 cli/target/
