@@ -49,7 +49,7 @@ export default registerSettledNotification;
 function reportOnce(kind: NotificationFailureKind, reason: string): void {
   if (reportedFailures.has(kind)) return;
   reportedFailures.add(kind);
-  console.error(`[pi-distribution] notification ${kind} failed: ${reason}`);
+  console.error(`[pi-notification] ${kind} failed: ${reason}`);
 }
 
 /** Convert an unexpected rejection into a bounded one-line diagnostic. */

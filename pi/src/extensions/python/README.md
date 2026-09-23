@@ -42,10 +42,10 @@ worker 使用 fd3 接收 LF 分隔的 JSON 请求，fd4 返回事件。每次调
 
 ```bash
 pnpm --dir pi typecheck
-uv lock --project pi/src/distribution/python --check
-uv run --project pi/src/distribution/python --locked -- python pi/src/distribution/python/worker.py --describe-environment
+uv lock --project pi/src/extensions/python --check
+uv run --project pi/src/extensions/python --locked -- python pi/src/extensions/python/worker.py --describe-environment
 ```
 
 在真实 Pi 会话中验证跨调用状态复用、异常后继续执行，以及超时和取消后的环境状态。
 
-增加运行库时使用 `uv add --project pi/src/distribution/python <package>`，同时维护 `pyproject.toml` 与生成的 `uv.lock`。新启动的 worker 会同步锁定环境，已经导入的模块继续留在运行中的 Python 内存里。
+增加运行库时使用 `uv add --project pi/src/extensions/python <package>`，同时维护 `pyproject.toml` 与生成的 `uv.lock`。新启动的 worker 会同步锁定环境，已经导入的模块继续留在运行中的 Python 内存里。

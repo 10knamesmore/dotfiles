@@ -193,7 +193,7 @@ function reportOnce(
 ): void {
   if (reportedDiagnostics.has(kind)) return;
   reportedDiagnostics.add(kind);
-  const diagnostic = `[pi-distribution] ${sanitizeDisplay(message)}`;
+  const diagnostic = `[pi-hook] ${sanitizeDisplay(message)}`;
   console.error(diagnostic);
   if (ctx.hasUI) ctx.ui.notify(diagnostic, "warning");
 }

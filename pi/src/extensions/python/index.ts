@@ -174,6 +174,8 @@ export function registerPython(pi: ExtensionAPI): void {
   }
 }
 
+export default registerPython;
+
 function hasPythonHistory(ctx: ExtensionContext): boolean {
   const { sessionManager } = ctx;
   // Walk backwards so a recent Python call can be found without building the full branch.

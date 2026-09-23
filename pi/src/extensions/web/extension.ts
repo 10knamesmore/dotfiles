@@ -135,6 +135,8 @@ export function registerWebTools(pi: ExtensionAPI): void {
   });
 }
 
+export default registerWebTools;
+
 function normalizeDomains(domains: string[] | undefined): string[] | undefined {
   return domains?.map(value => {
     const excluded = value.startsWith("-");

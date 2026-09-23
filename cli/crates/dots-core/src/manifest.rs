@@ -75,6 +75,8 @@ pub struct DistributeSpec {
     pub to: Vec<String>,
     /// 落点处的链接粒度（`children` 逐项 / `dir` 整目录）。
     pub mode: LinkMode,
+    /// 目标父目录不存在时仍收敛链接；sync 会创建所需父目录。
+    pub required: bool,
 }
 
 /// 非 `$HOME` 镜像的额外层（罕见，如 macOS App Support）。

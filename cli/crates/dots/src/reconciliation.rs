@@ -186,7 +186,7 @@ fn symlink_resource(link: ExpectedLink) -> ResourceSpec {
     }
 }
 
-/// 展开 distribute mapping，并在目标工具根不存在时保持该分发不进入 Desired Set。
+/// 展开 distribute mapping；可选目标的父目录不存在时不进入 Desired Set。
 fn collect_distribute_links(
     filesystem: &dyn FileSystem,
     repo: &AbsPath,
@@ -202,10 +202,11 @@ fn collect_distribute_links(
         let source = repo.join(spec.src.as_path());
         for target in &spec.to {
             let target = AbsPath::new(expand_home(target, home));
-            if target
-                .as_path()
-                .parent()
-                .is_some_and(|parent| !parent.exists())
+            if !spec.required
+                && target
+                    .as_path()
+                    .parent()
+                    .is_some_and(|parent| !parent.exists())
             {
                 continue;
             }

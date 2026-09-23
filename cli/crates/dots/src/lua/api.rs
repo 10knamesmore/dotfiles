@@ -83,6 +83,7 @@ fn register_distribute(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
             src: RepoPath::new(source),
             to: targets,
             mode,
+            required: spec.get::<Option<bool>>("required")?.unwrap_or(false),
         });
         Ok(())
     })?;
