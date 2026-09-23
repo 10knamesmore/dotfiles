@@ -1,0 +1,51 @@
+# Python 工具
+
+`python` 在一个活跃 Pi 会话中复用同一个 Python 进程。会话启动时通过 `uv run --project … --locked` 准备环境并读取实际 Python 版本及已安装的第三方发行包版本，注入工具描述。包列表包含传递依赖，按名称排序。持久 worker 在首次调用时启动，后续调用直接发送代码。
+
+环境信息从 uv 选定的解释器及其安装元数据读取，不从 `requires-python` 或锁文件推测。每次 worker 启动时再次报告环境并刷新描述；更新依赖后执行 `/reload`，会重新读取环境并清空旧进程。读取失败时描述标明版本信息不可用，诊断写入运行日志，worker 启动成功后仍可补全信息。
+
+运行依赖由本目录的 `pyproject.toml` 和 `uv.lock` 管理，`.venv/` 是本地产物。需要 uv 和符合 `requires-python` 的解释器；uv 按自身配置查找或准备解释器。
+
+工具参数：
+
+```ts
+{ code: string; timeout?: number }
+```
+
+`code` 是完整代码块；通过 `print()` 输出结果，最后一个表达式不会自动显示。不完整代码作为语法错误返回，不等待下一次输入。`timeout` 单位为秒，默认 60，必须是有限正数，最大值受 Node 定时器上限约束。代码收到执行开始确认后计时；uv 启动准备单独限时 120 秒。标准输入为 EOF。
+
+初始工作目录是 Pi 会话目录，项目中的 Python 模块可以直接导入。Python 内的目录变化保留到后续调用，不改变 Pi 或 bash 的工作目录。工具使用 Pi 的串行调度，因此包含 Python 调用的同一批工具按顺序执行。
+
+## 状态与取消
+
+变量、函数、导入及 `__future__` 编译状态跨调用保留。模型切换和上下文压缩不清空环境。Python 异常和 `SystemExit` 作为本次执行失败返回；异常前的变量修改、文件写入和其他副作用不会回滚。
+
+取消或超时先向 worker 进程组发送 SIGINT。若一秒内没有完成，终止 worker 与 uv 的进程组，内存状态丢失。已结束的调用不会自动重放。下一次调用可以启动空环境。
+
+状态丢失时，扩展向会话历史追加一条模型可见、界面隐藏的通知；正在执行工具时，由 Pi 在本轮所有工具结果之后、下一次模型请求之前追加。通知持久保留在原位置，不随请求移动，也不在新环境启动后删除，避免破坏已有消息的缓存前缀。模型请求失败重试仍能读到通知。同一轮后续的 Python 调用可以已经建立新环境，因此通知描述旧环境的丢失，不断言当前环境仍为空。
+
+退出、重载扩展、切换会话和实际的会话树导航关闭环境。恢复历史会话、fork 和 clone 都从空环境开始。父会话与 subagent 的变量互不共享。会话文件只保存调用和结果，不保存 Python 对象，也没有 reset 命令。
+
+代码应在当前调用内完成。持续后台任务使用 bash。进程组清理覆盖仍属于受管组的子进程；主动创建新 session/group 的进程不受这项清理保证。执行环境采用普通交互式 Python 语义，动态定义的函数没有可供其他解释器导入的源码模块。
+
+## 输出与诊断
+
+worker 使用 fd3 接收 LF 分隔的 JSON 请求，fd4 返回事件。每次调用将 stdout/stderr 的文件描述符指向独立输出文件，捕获 Python、底层写入及同步子进程的输出。完成事件在输出刷新后发送。
+
+工具返回最后 2000 行或 50 KiB；超限时保留完整输出文件并返回路径，短输出文件在读取后删除。traceback 通过虚拟文件名和缓存的源代码定位到调用中的行。
+
+运行事件写入 Pi agent 目录下的 `python/events.jsonl`，记录会话、调用、进程、解释器、包数量、耗时和退出原因，不记录用户代码或变量。日志保留当前与上一份 5 MiB 文件。uv 和 worker 的基础设施诊断写入单独的临时日志，失败结果提供路径。
+
+## 维护与验证
+
+从仓库根目录执行：
+
+```bash
+pnpm --dir pi typecheck
+uv lock --project pi/src/distribution/python --check
+uv run --project pi/src/distribution/python --locked -- python pi/src/distribution/python/worker.py --describe-environment
+```
+
+在真实 Pi 会话中验证跨调用状态复用、异常后继续执行，以及超时和取消后的环境状态。
+
+增加运行库时使用 `uv add --project pi/src/distribution/python <package>`，同时维护 `pyproject.toml` 与生成的 `uv.lock`。新启动的 worker 会同步锁定环境，已经导入的模块继续留在运行中的 Python 内存里。

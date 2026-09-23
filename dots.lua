@@ -38,15 +38,11 @@ dots.resource.symlink {
     target = dots.home .. "/.pi/agent/extensions/pi-distribution",
 }
 dots.resource.symlink {
-    source = dots.repo .. "/pi/src/subagent-workflow",
-    target = dots.home .. "/.pi/agent/extensions/subagent-workflow",
-}
-dots.resource.symlink {
     source = dots.repo .. "/pi/src/remember-last-model.ts",
     target = dots.home .. "/.pi/agent/extensions/remember-last-model.ts",
 }
 dots.resource.symlink {
-    source = dots.repo .. "/pi/src/subagent-workflow/skills/workflow-authoring",
+    source = dots.repo .. "/pi/src/distribution/subagent-workflow/skills/workflow-authoring",
     target = dots.home .. "/.pi/agent/skills/workflow-authoring",
 }
 

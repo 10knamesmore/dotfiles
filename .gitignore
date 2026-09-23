@@ -6,34 +6,25 @@
 .DS_Store
 Thumbs.db
 
-# Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# qmlls (QML Language Server) 本地工作区状态——每次 quickshell 构建会变
 *.qmlls.ini
 
-# codex自动创建的
 **/skills/.system/
 **/.codex
 
-# 随时更改, 这个不需要
 btop/
 
 node_modules
 
-# pnpm 项目本地缓存，可由 frozen install 重新生成
 .pnpm-store/
 
-# 本机私有 Pi provider
 /pi/src/local_provider.ts
 
-# opencode 自动生成的文件
-# node_modules 不带尾斜杠：dots.lua 的 post 钩子会在此放一条反向软链（不是目录），
-# 尾斜杠只匹配目录、漏掉软链，会让它意外进 git。
 tree/home/.config/opencode/node_modules
 tree/home/.config/opencode/package.json
 tree/home/.config/opencode/bun.lock
@@ -41,20 +32,16 @@ tree/home/.config/opencode/.gitignore
 
 __pycache__
 
-# dots CLI 构建产物
 cli/target/
 
-# 可视化伴侣临时产物
 .superpowers/
 
-# Wayfinder 本地规划 artifact
 /specs/
 
-# mpv 运行时续播状态（~/.config/mpv 软链进仓库，mpv 会往里写；机器本地，不入库）
 tree/home/.config/mpv/watch_later/
 
-# kitty session 定义（ksession 用）：常带本机专属路径，机器本地，不入库
 tree/home/.config/kitty/sessions/
 
-# uosc 缩略图助手 ziggy（多平台二进制，uosc 运行时按需自取；不入库）
 tree/home/.config/mpv/scripts/uosc/bin/
+
+.venv

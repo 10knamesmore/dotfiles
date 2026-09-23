@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
-export const MODEL_TIERS = ["high", "mid", "low"] as const;
+export const MODEL_TIERS = ["max", "high", "mid"] as const;
 export type ModelTier = typeof MODEL_TIERS[number];
 export type ModelTiers = Partial<Record<ModelTier, string>>;
 
@@ -38,9 +38,9 @@ const PersonalConfigSchema = Type.Object({
   "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
   web: Type.Optional(WebSettingsSchema),
   "model-tier": Type.Optional(Type.Object({
+    max: Type.Optional(ModelReferenceSchema),
     high: Type.Optional(ModelReferenceSchema),
     mid: Type.Optional(ModelReferenceSchema),
-    low: Type.Optional(ModelReferenceSchema),
   }, { additionalProperties: false })),
 }, { additionalProperties: true });
 
