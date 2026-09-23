@@ -1,5 +1,11 @@
 import { CustomEditor, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, truncateToWidth, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
+import {
+  stripTerminalSequences,
+  truncateToWidth,
+  visibleWidth,
+  type EditorTheme,
+  type TUI,
+} from "@earendil-works/pi-tui";
 import { formatDuration, formatTokensPerSecond, formatTokenLatency, sanitizeFooterText } from "../footer/format.js";
 import { palette } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
@@ -31,9 +37,11 @@ export class PromptEditor extends CustomEditor {
     }
 
     const selected = navigation.hasSelection();
-    if (this.inputKeybindings.matches(data, "tui.editor.cursorDown")
-      && (selected || this.isOnLastInputLine())
-      && navigation.selectNext()) {
+    if (
+      this.inputKeybindings.matches(data, "tui.editor.cursorDown") &&
+      (selected || this.isOnLastInputLine()) &&
+      navigation.selectNext()
+    ) {
       return;
     }
     if (selected && this.inputKeybindings.matches(data, "tui.editor.cursorUp")) {
@@ -71,10 +79,9 @@ export class PromptEditor extends CustomEditor {
     const modelLabel = model
       ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
       : palette.sky("no-model");
-    const sides = [
-      ...lines.slice(1, bottom),
-      ...lines.slice(bottom + 1),
-    ].map((line) => `${this.borderColor("│")}${line}${this.borderColor("│")}`);
+    const sides = [...lines.slice(1, bottom), ...lines.slice(bottom + 1)].map(
+      (line) => `${this.borderColor("│")}${line}${this.borderColor("│")}`,
+    );
     return [
       this.frameBorder(lines[0] ?? "", top, width, "╭", "╮", this.todoStatus()),
       ...sides,
@@ -89,29 +96,39 @@ export class PromptEditor extends CustomEditor {
       case "writing":
       case "compacting":
         return palette.modelBadge(` ${activity.spinner} ${activity.kind.toUpperCase()} `);
-      case "tool": return palette.toolBadge(activity.toolCount > 1
-        ? ` ${activity.spinner} TOOLS ${activity.toolCount} `
-        : ` ${activity.spinner} TOOL · ${sanitizeFooterText(activity.toolName)} `);
-      case "ready": return palette.readyBadge(" READY ");
+      case "tool":
+        return palette.toolBadge(
+          activity.toolCount > 1
+            ? ` ${activity.spinner} TOOLS ${activity.toolCount} `
+            : ` ${activity.spinner} TOOL · ${sanitizeFooterText(activity.toolName)} `,
+        );
+      case "ready":
+        return palette.readyBadge(" READY ");
     }
   }
 
   private timingLabel(status: EditorStatus): string {
     const showLatency = status.activity.kind !== "tool" && status.activity.kind !== "compacting";
-    const latency = status.timeToFirstTokenMilliseconds === undefined
-      ? status.activity.kind === "waiting" ? "…" : undefined
-      : formatTokenLatency(status.timeToFirstTokenMilliseconds);
-    const ttft = showLatency && latency !== undefined
-      ? `${palette.overlay2("ttft")} ${palette.sky(latency)}${palette.overlay2(" · ")}`
-      : "";
-    const idle = status.idleMilliseconds === undefined
-      ? ""
-      : `${palette.overlay2("idle")} ${palette.lavender(formatDuration(status.idleMilliseconds))}${palette.overlay2(" · ")}`;
+    const latency =
+      status.timeToFirstTokenMilliseconds === undefined
+        ? status.activity.kind === "waiting"
+          ? "…"
+          : undefined
+        : formatTokenLatency(status.timeToFirstTokenMilliseconds);
+    const ttft =
+      showLatency && latency !== undefined
+        ? `${palette.overlay2("ttft")} ${palette.sky(latency)}${palette.overlay2(" · ")}`
+        : "";
+    const idle =
+      status.idleMilliseconds === undefined
+        ? ""
+        : `${palette.overlay2("idle")} ${palette.lavender(formatDuration(status.idleMilliseconds))}${palette.overlay2(" · ")}`;
     const session = palette.lavender(formatDuration(status.sessionMilliseconds));
     const api = palette.sky(formatDuration(status.apiMilliseconds));
-    const tps = status.tokensPerSecond === undefined
-      ? ""
-      : `${palette.overlay2(" · ")}${palette.sky(formatTokensPerSecond(status.tokensPerSecond))} ${palette.overlay2("t/s")}`;
+    const tps =
+      status.tokensPerSecond === undefined
+        ? ""
+        : `${palette.overlay2(" · ")}${palette.sky(formatTokensPerSecond(status.tokensPerSecond))} ${palette.overlay2("t/s")}`;
     return ` ${ttft}${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
   }
 
@@ -124,28 +141,36 @@ export class PromptEditor extends CustomEditor {
     rightStatus?: string,
   ): string {
     const prefix = left === "╭" ? "╭─" : "╰─ ";
-    const rightLabel = rightStatus && width >= 32
-      ? truncateToWidth(
-        palette.lavender(sanitizeFooterText(rightStatus)),
-        Math.floor((width - 6) * 0.48),
-        palette.overlay2("…"),
-      )
-      : "";
+    const rightLabel =
+      rightStatus && width >= 32
+        ? truncateToWidth(
+            palette.lavender(sanitizeFooterText(rightStatus)),
+            Math.floor((width - 6) * 0.48),
+            palette.overlay2("…"),
+          )
+        : "";
     const rightWidth = visibleWidth(rightLabel);
     const budget = Math.max(0, width - visibleWidth(prefix) - (rightLabel ? rightWidth + 6 : 3));
     const scroll = /^─── ([↑↓]) (\d+) more /u.exec(stripTerminalSequences(original));
     const hint = scroll ? `${scroll[1]}${scroll[2]}` : "";
     const textWidth = hint && visibleWidth(hint) + 1 < budget ? budget - visibleWidth(hint) - 1 : budget;
-    const label = truncateToWidth(text, textWidth, palette.overlay2("…"))
-      + (textWidth < budget ? ` ${hint}` : "");
+    const label = truncateToWidth(text, textWidth, palette.overlay2("…")) + (textWidth < budget ? ` ${hint}` : "");
     const remaining = width - visibleWidth(prefix) - visibleWidth(label) - 1;
     if (rightLabel) {
       const fill = "─".repeat(remaining - (label ? 1 : 0) - rightWidth - 3);
-      return this.borderColor(prefix) + label
-        + this.borderColor(`${label ? " " : ""}${fill} `) + rightLabel + this.borderColor(` ─${right}`);
+      return (
+        this.borderColor(prefix) +
+        label +
+        this.borderColor(`${label ? " " : ""}${fill} `) +
+        rightLabel +
+        this.borderColor(` ─${right}`)
+      );
     }
-    return this.borderColor(prefix) + label
-      + this.borderColor(`${label ? " " : ""}${"─".repeat(remaining - (label ? 1 : 0))}${right}`);
+    return (
+      this.borderColor(prefix) +
+      label +
+      this.borderColor(`${label ? " " : ""}${"─".repeat(remaining - (label ? 1 : 0))}${right}`)
+    );
   }
 
   private isOnLastInputLine(): boolean {

@@ -59,9 +59,7 @@ export function probeSqliteLock(path: string): "held" | "free" {
 function isSqliteBusyError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const value = error as { code?: unknown; errcode?: unknown };
-  return value.code === "ERR_SQLITE_ERROR"
-    && typeof value.errcode === "number"
-    && (value.errcode & 0xff) === 5;
+  return value.code === "ERR_SQLITE_ERROR" && typeof value.errcode === "number" && (value.errcode & 0xff) === 5;
 }
 
 function acquireWriterLock(database: DatabaseSync, deadline: number): void {

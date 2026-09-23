@@ -8,12 +8,5 @@ export function registerUserQuestions(pi: ExtensionAPI): void {
 
 export default registerUserQuestions;
 
-export type {
-  AskUserQuestionsDetails,
-  UserQuestionAnswer,
-} from "./tool.js";
-export type {
-  AskUserQuestionsParams,
-  UserQuestion,
-  UserQuestionOption,
-} from "./schema.js";
+export type { AskUserQuestionsDetails, UserQuestionAnswer } from "./tool.js";
+export type { AskUserQuestionsParams, UserQuestion, UserQuestionOption } from "./schema.js";

@@ -1,9 +1,6 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
-import {
-  sanitizeSingleLine,
-  type SettledNotificationMessage,
-} from "./message.js";
+import { sanitizeSingleLine, type SettledNotificationMessage } from "./message.js";
 import { isDirectKittyTerminal, sendKittyNotification } from "./kitty.js";
 import { findExecutable, runNotificationProcess } from "./process.js";
 
@@ -17,15 +14,8 @@ const DISPLAY_NOTIFICATION_SCRIPT = [
   "}",
 ].join("\n");
 
-export type NotificationBackendName =
-  | "kitty"
-  | "terminal-notifier"
-  | "osascript"
-  | "notify-send";
-export type NotificationFailureKind =
-  | NotificationBackendName
-  | "unavailable"
-  | "unexpected";
+export type NotificationBackendName = "kitty" | "terminal-notifier" | "osascript" | "notify-send";
+export type NotificationFailureKind = NotificationBackendName | "unavailable" | "unexpected";
 
 /** Result of one best-effort delivery attempt. */
 export type NotificationDelivery =
@@ -58,9 +48,7 @@ interface NotificationBackend {
 let selectedBackend: Promise<NotificationBackend | undefined> | undefined;
 
 /** Deliver through the first supported backend without throwing into Pi lifecycle code. */
-export async function sendSystemNotification(
-  message: SettledNotificationMessage,
-): Promise<NotificationDelivery> {
+export async function sendSystemNotification(message: SettledNotificationMessage): Promise<NotificationDelivery> {
   try {
     selectedBackend ??= selectBackend();
     const backend = await selectedBackend;
@@ -137,12 +125,7 @@ async function selectBackend(): Promise<NotificationBackend | undefined> {
     if (notifySend !== undefined) {
       return {
         name: "notify-send",
-        send: (message) =>
-          runNotificationProcess(notifySend, [
-            "--app-name=Pi",
-            message.title,
-            message.body,
-          ]),
+        send: (message) => runNotificationProcess(notifySend, ["--app-name=Pi", message.title, message.body]),
       };
     }
   }

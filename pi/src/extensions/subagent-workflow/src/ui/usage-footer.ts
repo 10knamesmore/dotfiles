@@ -75,7 +75,11 @@ export class SubagentUsageFooter {
     const runs = new Set<string>();
     for (const entry of ctx.sessionManager.getEntries()) {
       if (entry.type !== "custom") continue;
-      if (entry.customType !== "subagent-workflow:run-started" && entry.customType !== "subagent-workflow:run-completed") continue;
+      if (
+        entry.customType !== "subagent-workflow:run-started" &&
+        entry.customType !== "subagent-workflow:run-completed"
+      )
+        continue;
       const data = entry.data;
       if (!isRecord(data) || typeof data.runDir !== "string" || typeof data.runId !== "string") continue;
       if (!this.isAllowedRunDir(data.runDir)) continue;
@@ -110,17 +114,28 @@ export class SubagentUsageFooter {
   }
 
   private observeSpawn(run: SpawnedRun): void {
-    if (this.disposed || run.parentSessionId !== this.ctx?.sessionManager.getSessionId() || !this.isAllowedRunDir(run.runDir)) return;
+    if (
+      this.disposed ||
+      run.parentSessionId !== this.ctx?.sessionManager.getSessionId() ||
+      !this.isAllowedRunDir(run.runDir)
+    )
+      return;
     this.hydrateRun(resolve(run.runDir));
     this.render();
   }
 
   private observeChildEvent(observed: ChildRunEvent): void {
-    if (this.disposed || observed.parentSessionId !== this.ctx?.sessionManager.getSessionId() || !this.isAllowedRunDir(observed.runDir)) return;
+    if (
+      this.disposed ||
+      observed.parentSessionId !== this.ctx?.sessionManager.getSessionId() ||
+      !this.isAllowedRunDir(observed.runDir)
+    )
+      return;
     const runDir = resolve(observed.runDir);
     this.hydrateRun(runDir);
     const key = childKey(runDir, observed.event.id);
-    if (observed.resolved) this.models.set(key, { provider: observed.resolved.provider, modelId: observed.resolved.modelId });
+    if (observed.resolved)
+      this.models.set(key, { provider: observed.resolved.provider, modelId: observed.resolved.modelId });
     if (observed.event.type === "usage") this.mergeUsage(key, observed.event.usage);
     if (observed.event.type === "result") {
       this.mergeUsage(key, observed.event.result.usage);
@@ -210,9 +225,7 @@ export function readUsageSnapshot(runDir: string): UsageSnapshot {
     if (validUsage(child.usage)) usage.set(childId, copyUsage(child.usage));
   }
   const run = snapshot.record as unknown as RunRecordFile | undefined;
-  const runChildren = Array.isArray(run?.children) && run.children.every(validRunChild)
-    ? run.children
-    : undefined;
+  const runChildren = Array.isArray(run?.children) && run.children.every(validRunChild) ? run.children : undefined;
   for (const child of runChildren ?? []) {
     if (validResolved(child.resolved)) {
       models.set(child.id, { provider: child.resolved.provider, modelId: child.resolved.modelId });
@@ -225,23 +238,23 @@ export function readUsageSnapshot(runDir: string): UsageSnapshot {
   // cannot add usage or OAuth classification data left out by a degraded
   // write. Keep the fold for every live/incomplete state and for corruption
   // recovery; avoid it for fully persisted long-running workflows.
-  const statusIsComplete = runChildren !== undefined
-    && isTerminalStatus(status?.status)
-    && runChildren.every((child) => {
+  const statusIsComplete =
+    runChildren !== undefined &&
+    isTerminalStatus(status?.status) &&
+    runChildren.every((child) => {
       const childStatus = status?.children?.[child.id];
-      return validResolved(child.resolved)
-        && isTerminalStatus(childStatus?.status)
-        && validUsage(childStatus.usage);
+      return validResolved(child.resolved) && isTerminalStatus(childStatus?.status) && validUsage(childStatus.usage);
     });
   if (statusIsComplete) return { usage, models };
 
   for (const event of snapshot.events) {
     if (!isRecord(event) || typeof event.id !== "string") continue;
-    const eventUsage = event.type === "usage"
-      ? event.usage
-      : event.type === "result" && isRecord(event.result)
-        ? event.result.usage
-        : undefined;
+    const eventUsage =
+      event.type === "usage"
+        ? event.usage
+        : event.type === "result" && isRecord(event.result)
+          ? event.result.usage
+          : undefined;
     if (validUsage(eventUsage)) {
       const current = usage.get(event.id);
       usage.set(event.id, current ? cumulativeMax(current, eventUsage) : copyUsage(eventUsage));
@@ -273,13 +286,21 @@ function cumulativeMax(left: UsageSummary, right: UsageSummary): UsageSummary {
 }
 
 function hasUsage(usage: UsageSummary): boolean {
-  return usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cacheWrite > 0 || usage.cost > 0 || usage.turns > 0;
+  return (
+    usage.input > 0 ||
+    usage.output > 0 ||
+    usage.cacheRead > 0 ||
+    usage.cacheWrite > 0 ||
+    usage.cost > 0 ||
+    usage.turns > 0
+  );
 }
 
 function validUsage(value: unknown): value is UsageSummary {
   if (!isRecord(value)) return false;
-  return [value.input, value.output, value.cacheRead, value.cacheWrite, value.cost, value.turns]
-    .every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0);
+  return [value.input, value.output, value.cacheRead, value.cacheWrite, value.cost, value.turns].every(
+    (item) => typeof item === "number" && Number.isFinite(item) && item >= 0,
+  );
 }
 
 function validResolved(value: unknown): value is Pick<ResolvedSpec, "modelId" | "provider"> {

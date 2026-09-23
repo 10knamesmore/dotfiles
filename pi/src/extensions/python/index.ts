@@ -1,28 +1,15 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { PythonSession, type PythonToolDetails } from "./session.js";
-import {
-  executionText,
-  renderPythonCall,
-  renderPythonResult,
-} from "./render.js";
-import {
-  describePythonEnvironment,
-  inspectPythonEnvironment,
-  type PythonEnvironment,
-} from "./environment.js";
+import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
+import { describePythonEnvironment, inspectPythonEnvironment, type PythonEnvironment } from "./environment.js";
 import { logPythonEvent } from "./diagnostics.js";
 
 const Parameters = Type.Object(
   {
     code: Type.String({
       minLength: 1,
-      description:
-        "Complete Python code to execute. Use print() to display values.",
+      description: "Complete Python code to execute. Use print() to display values.",
     }),
     timeout: Type.Optional(
       Type.Number({
@@ -47,11 +34,7 @@ export function registerPython(pi: ExtensionAPI): void {
   const inspectionController = new AbortController();
 
   const createSession = (ctx: ExtensionContext): PythonSession =>
-    new PythonSession(
-      ctx.sessionManager.getSessionId(),
-      notifyEnvironmentCleared,
-      updateEnvironment,
-    );
+    new PythonSession(ctx.sessionManager.getSessionId(), notifyEnvironmentCleared, updateEnvironment);
 
   pi.on("session_start", async (_event, ctx) => {
     session = createSession(ctx);
@@ -60,11 +43,7 @@ export function registerPython(pi: ExtensionAPI): void {
     const started = Date.now();
     logPythonEvent({ sessionId, phase: "environment_inspection_start" });
     try {
-      const environment = await inspectPythonEnvironment(
-        pi.exec,
-        ctx.cwd,
-        inspectionController.signal,
-      );
+      const environment = await inspectPythonEnvironment(pi.exec, ctx.cwd, inspectionController.signal);
       if (inspectionController.signal.aborted) return;
       updateEnvironment(environment);
       logPythonEvent({
@@ -105,53 +84,42 @@ export function registerPython(pi: ExtensionAPI): void {
     return undefined;
   });
 
-  const tool: ToolDefinition<typeof Parameters, PythonToolDetails | undefined> =
-    {
-      name: "python",
-      label: "Python",
-      description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
-      promptSnippet:
-        "Run Python calculations and data analysis with variables preserved across calls",
-      promptGuidelines: [
-        "Use python for Python calculations and structured data analysis instead of wrapping Python code in bash. Reuse variables from earlier python calls",
-      ],
-      parameters: Parameters,
-      executionMode: "sequential",
-      async execute(callId, params, signal, onUpdate, ctx) {
-        if (!params.code.trim()) throw new Error("code must not be blank.");
-        const runtime = (session ??= createSession(ctx));
+  const tool: ToolDefinition<typeof Parameters, PythonToolDetails | undefined> = {
+    name: "python",
+    label: "Python",
+    description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
+    promptSnippet: "Run Python calculations and data analysis with variables preserved across calls",
+    promptGuidelines: [
+      "Use python for Python calculations and structured data analysis instead of wrapping Python code in bash. Reuse variables from earlier python calls",
+    ],
+    parameters: Parameters,
+    executionMode: "sequential",
+    async execute(callId, params, signal, onUpdate, ctx) {
+      if (!params.code.trim()) throw new Error("code must not be blank.");
+      const runtime = (session ??= createSession(ctx));
+      onUpdate?.({
+        content: [
+          {
+            type: "text",
+            text: runtime.available ? "Preparing Python execution…" : "Starting Python with uv…",
+          },
+        ],
+        details: undefined,
+      });
+      const result = await runtime.execute(params.code, params.timeout ?? 60, callId, ctx.cwd, signal, () => {
         onUpdate?.({
-          content: [
-            {
-              type: "text",
-              text: runtime.available
-                ? "Preparing Python execution…"
-                : "Starting Python with uv…",
-            },
-          ],
+          content: [{ type: "text", text: "Running Python…" }],
           details: undefined,
         });
-        const result = await runtime.execute(
-          params.code,
-          params.timeout ?? 60,
-          callId,
-          ctx.cwd,
-          signal,
-          () => {
-            onUpdate?.({
-              content: [{ type: "text", text: "Running Python…" }],
-              details: undefined,
-            });
-          },
-        );
-        return {
-          content: [{ type: "text", text: executionText(result) }],
-          details: result.details,
-        };
-      },
-      renderCall: renderPythonCall,
-      renderResult: renderPythonResult,
-    };
+      });
+      return {
+        content: [{ type: "text", text: executionText(result) }],
+        details: result.details,
+      };
+    },
+    renderCall: renderPythonCall,
+    renderResult: renderPythonResult,
+  };
   pi.registerTool(tool);
 
   function notifyEnvironmentCleared(): void {
@@ -185,10 +153,10 @@ function hasPythonHistory(ctx: ExtensionContext): boolean {
       const message = entry.message;
       if (
         (message.role === "toolResult" && message.toolName === "python") ||
-        (message.role === "assistant" && message.content.some(
-          (part) => part.type === "toolCall" && part.name === "python",
-        ))
-      ) return true;
+        (message.role === "assistant" &&
+          message.content.some((part) => part.type === "toolCall" && part.name === "python"))
+      )
+        return true;
     }
     entry = entry.parentId ? sessionManager.getEntry(entry.parentId) : undefined;
   }

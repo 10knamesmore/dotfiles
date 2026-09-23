@@ -111,7 +111,9 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
   const stdoutDecoder = new StringDecoder("utf8");
 
   let resolveExited: (exit: RpcExit) => void;
-  const exited = new Promise<RpcExit>((resolve) => { resolveExited = resolve; });
+  const exited = new Promise<RpcExit>((resolve) => {
+    resolveExited = resolve;
+  });
   /** After 'exit', bound how long we wait for stdout 'close' before settling. */
   let settleGrace: ReturnType<typeof setTimeout> | undefined;
   const SETTLE_AFTER_EXIT_MS = 250;
@@ -121,7 +123,11 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
       if (child.pid === undefined) throw new Error("child pid unavailable");
       process.kill(-child.pid, signal);
     } catch {
-      try { child.kill(signal); } catch { /* already gone */ }
+      try {
+        child.kill(signal);
+      } catch {
+        /* already gone */
+      }
     }
   }
 
@@ -153,9 +159,10 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
       const segmentLength = end - offset;
       if (stdoutBuffer.length + segmentLength > RPC_MAX_FRAME_CHARS) {
         const characters = stdoutBuffer.length + segmentLength;
-        const prefix = stdoutBuffer.length >= RPC_FRAME_TYPE_PREFIX_CHARS
-          ? stdoutBuffer.slice(0, RPC_FRAME_TYPE_PREFIX_CHARS)
-          : stdoutBuffer + decoded.slice(offset, offset + RPC_FRAME_TYPE_PREFIX_CHARS - stdoutBuffer.length);
+        const prefix =
+          stdoutBuffer.length >= RPC_FRAME_TYPE_PREFIX_CHARS
+            ? stdoutBuffer.slice(0, RPC_FRAME_TYPE_PREFIX_CHARS)
+            : stdoutBuffer + decoded.slice(offset, offset + RPC_FRAME_TYPE_PREFIX_CHARS - stdoutBuffer.length);
         const frameType = /"type":"([^"\\]*)"/.exec(prefix)?.[1];
         stdoutBuffer = "";
         if (frameType === undefined || prefix.includes('"type":"response"')) {
@@ -244,13 +251,19 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
         }
         request.resolve(message.data);
       } else {
-        request.reject(new RpcCommandRejectedError(typeof message.error === "string" ? message.error : `RPC ${String(request.command)} failed`));
+        request.reject(
+          new RpcCommandRejectedError(
+            typeof message.error === "string" ? message.error : `RPC ${String(request.command)} failed`,
+          ),
+        );
       }
       return;
     }
     if (typeof message.type === "string") {
       for (const listener of eventListeners) {
-        try { listener(message); } catch (error) {
+        try {
+          listener(message);
+        } catch (error) {
           reportDiagnostic(`[subagent-workflow] child event listener failed: ${errorMessage(error)}`);
         }
       }
@@ -276,17 +289,25 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
 
   /** Settle process exit exactly once and notify exit listeners. */
   function settleChannel(result: RpcExit, reason?: string): void {
-    if (settleGrace) { clearTimeout(settleGrace); settleGrace = undefined; }
+    if (settleGrace) {
+      clearTimeout(settleGrace);
+      settleGrace = undefined;
+    }
     if (channelDone) return;
     channelDone = true;
     exitInfo ??= result;
     const detail = reason ? `${reason}. ` : "";
-    closeRequestPlane(channelFailure ?? new RpcChannelClosedError(
-      `${detail}Child pi channel closed (code ${exitInfo.code ?? "null"}, signal ${exitInfo.signal ?? "null"}). Stderr: ${stderr || "(empty)"}`,
-    ));
+    closeRequestPlane(
+      channelFailure ??
+        new RpcChannelClosedError(
+          `${detail}Child pi channel closed (code ${exitInfo.code ?? "null"}, signal ${exitInfo.signal ?? "null"}). Stderr: ${stderr || "(empty)"}`,
+        ),
+    );
     resolveExited(exitInfo);
     for (const listener of exitListeners) {
-      try { listener(exitInfo); } catch (error) {
+      try {
+        listener(exitInfo);
+      } catch (error) {
         reportDiagnostic(`[subagent-workflow] child exit listener failed: ${errorMessage(error)}`);
       }
     }
@@ -330,14 +351,21 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
   child.on("error", (error) => failChannel({ code: null, signal: null }, `child spawn error: ${errorMessage(error)}`));
   // Unhandled stdin errors (EPIPE when the child closes its input while alive)
   // would otherwise crash the whole parent process.
-  child.stdin.on("error", (error) => failChannel({ code: null, signal: null }, `child stdin error: ${errorMessage(error)}`));
+  child.stdin.on("error", (error) =>
+    failChannel({ code: null, signal: null }, `child stdin error: ${errorMessage(error)}`),
+  );
 
   return {
     request(command: Record<string, unknown>, requestOptions?: RpcRequestOptions): Promise<unknown> {
       if (channelFailure !== undefined) return Promise.reject(channelFailure);
       const id = `req-${++requestId}`;
       return new Promise((resolve, reject) => {
-        const entry: PendingRequest = { command: command.type, resolve, reject, onResponse: requestOptions?.onResponse };
+        const entry: PendingRequest = {
+          command: command.type,
+          resolve,
+          reject,
+          onResponse: requestOptions?.onResponse,
+        };
         if (requestOptions?.timeoutMs !== undefined) {
           entry.timer = setTimeout(() => {
             if (!pending.delete(id)) return;
@@ -348,10 +376,9 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
         pending.set(id, entry);
         child.stdin.write(`${JSON.stringify({ ...command, id })}\n`, (error) => {
           if (!error) return;
-          const failure = new RpcChannelClosedError(
-            `Child RPC request write failed: ${errorMessage(error)}`,
-            { cause: error },
-          );
+          const failure = new RpcChannelClosedError(`Child RPC request write failed: ${errorMessage(error)}`, {
+            cause: error,
+          });
           // Keep this request in the shared pending set. settleChannel owns timer
           // cleanup and rejects every request with the same terminal failure.
           failChannel({ code: null, signal: null }, failure.message, failure);
@@ -362,10 +389,9 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
       if (channelFailure !== undefined) return;
       child.stdin.write(`${JSON.stringify(message)}\n`, (error) => {
         if (!error) return;
-        const failure = new RpcChannelClosedError(
-          `Child RPC send write failed: ${errorMessage(error)}`,
-          { cause: error },
-        );
+        const failure = new RpcChannelClosedError(`Child RPC send write failed: ${errorMessage(error)}`, {
+          cause: error,
+        });
         failChannel({ code: null, signal: null }, failure.message, failure);
       });
     },
@@ -382,7 +408,8 @@ export function spawnChildRpc(command: readonly string[], options: { cwd: string
       return () => exitListeners.delete(listener);
     },
     kill(signal: NodeJS.Signals = "SIGKILL") {
-      if (!channelDone && child.exitCode === null && child.signalCode === null && child.pid !== undefined) killProcessGroup(signal);
+      if (!channelDone && child.exitCode === null && child.signalCode === null && child.pid !== undefined)
+        killProcessGroup(signal);
     },
     exited,
     stderrTail: () => stderr,

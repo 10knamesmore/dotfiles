@@ -29,48 +29,68 @@ interface RpcState {
 }
 
 function isRpcState(value: unknown): value is RpcState {
-  return isRecord(value)
-    && typeof value.isStreaming === "boolean"
-    && typeof value.isCompacting === "boolean"
-    && typeof value.pendingMessageCount === "number"
-    && Number.isSafeInteger(value.pendingMessageCount)
-    && value.pendingMessageCount >= 0
-    && (value.sessionFile === undefined || typeof value.sessionFile === "string");
+  return (
+    isRecord(value) &&
+    typeof value.isStreaming === "boolean" &&
+    typeof value.isCompacting === "boolean" &&
+    typeof value.pendingMessageCount === "number" &&
+    Number.isSafeInteger(value.pendingMessageCount) &&
+    value.pendingMessageCount >= 0 &&
+    (value.sessionFile === undefined || typeof value.sessionFile === "string")
+  );
 }
 
 const KNOWN_ASSISTANT_UPDATE_TYPES = new Set([
-  "start", "text_start", "text_delta", "text_end", "thinking_start", "thinking_delta", "thinking_end",
-  "toolcall_start", "toolcall_delta", "toolcall_end", "done", "error",
+  "start",
+  "text_start",
+  "text_delta",
+  "text_end",
+  "thinking_start",
+  "thinking_delta",
+  "thinking_end",
+  "toolcall_start",
+  "toolcall_delta",
+  "toolcall_end",
+  "done",
+  "error",
 ]);
 
 function isRunActivity(event: ChildSessionEvent): boolean {
   if (event.type === "message_start" || event.type === "message_end") {
     return event.message.role === "assistant" || event.message.role === "user" || event.message.role === "toolResult";
   }
-  return event.type === "message_update"
-    || event.type === "turn_end"
-    || event.type === "tool_execution_start"
-    || event.type === "tool_execution_end";
+  return (
+    event.type === "message_update" ||
+    event.type === "turn_end" ||
+    event.type === "tool_execution_start" ||
+    event.type === "tool_execution_end"
+  );
 }
 
 /** Narrow the untyped JSONL transport to the events this repository consumes. */
 function childSessionEvent(event: Record<string, unknown>): ChildSessionEvent | undefined {
   if (typeof event.type !== "string") return undefined;
   switch (event.type) {
-    case "agent_start": return { type: "agent_start" };
-    case "agent_settled": return { type: "agent_settled" };
+    case "agent_start":
+      return { type: "agent_start" };
+    case "agent_settled":
+      return { type: "agent_settled" };
     case "tool_execution_start":
-      return typeof event.toolCallId === "string"
-        && typeof event.toolName === "string"
-        && Object.hasOwn(event, "args")
+      return typeof event.toolCallId === "string" && typeof event.toolName === "string" && Object.hasOwn(event, "args")
         ? { type: "tool_execution_start", toolCallId: event.toolCallId, toolName: event.toolName, args: event.args }
         : undefined;
     case "tool_execution_end":
-      return typeof event.toolCallId === "string"
-        && typeof event.toolName === "string"
-        && Object.hasOwn(event, "result")
-        && typeof event.isError === "boolean"
-        ? { type: "tool_execution_end", toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError }
+      return typeof event.toolCallId === "string" &&
+        typeof event.toolName === "string" &&
+        Object.hasOwn(event, "result") &&
+        typeof event.isError === "boolean"
+        ? {
+            type: "tool_execution_end",
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            result: event.result,
+            isError: event.isError,
+          }
         : undefined;
     case "turn_end":
     case "message_start":
@@ -88,10 +108,10 @@ function childSessionEvent(event: Record<string, unknown>): ChildSessionEvent | 
       }
       return isRecord(event.message) && event.message.role === "assistant"
         ? {
-          type: "message_update",
-          message: event.message as unknown as AssistantMessage,
-          assistantMessageEvent: update as unknown as AssistantMessageEvent,
-        }
+            type: "message_update",
+            message: event.message as unknown as AssistantMessage,
+            assistantMessageEvent: update as unknown as AssistantMessageEvent,
+          }
         : undefined;
     }
     default:
@@ -103,7 +123,7 @@ type KnownAssistantMessageUpdate = Extract<ChildSessionEvent, { type: "message_u
 
 function knownAssistantMessageUpdate(event: ChildSessionEvent): KnownAssistantMessageUpdate | undefined {
   return event.type === "message_update" && Object.hasOwn(event, "message")
-    ? event as KnownAssistantMessageUpdate
+    ? (event as KnownAssistantMessageUpdate)
     : undefined;
 }
 
@@ -119,11 +139,11 @@ function foldedAssistantUsage(message: Message): FoldedAssistantUsage | undefine
   if (message.role !== "assistant" || !isRecord(message.usage) || !isRecord(message.usage.cost)) return undefined;
   const { input, output, cacheRead, cacheWrite } = message.usage;
   const cost = message.usage.cost.total;
-  return typeof input === "number"
-    && typeof output === "number"
-    && typeof cacheRead === "number"
-    && typeof cacheWrite === "number"
-    && typeof cost === "number"
+  return typeof input === "number" &&
+    typeof output === "number" &&
+    typeof cacheRead === "number" &&
+    typeof cacheWrite === "number" &&
+    typeof cost === "number"
     ? { input, output, cacheRead, cacheWrite, cost }
     : undefined;
 }
@@ -219,7 +239,10 @@ export class RpcChildSession implements ChildSession {
   private exitError: Error | undefined;
   private disposal?: Promise<void>;
 
-  constructor(private readonly rpc: ChildRpc, init: RpcChildSessionInit) {
+  constructor(
+    private readonly rpc: ChildRpc,
+    init: RpcChildSessionInit,
+  ) {
     this.startupSessionFile = init.sessionFile;
     this.lifecycleEventsEnabled = init.lifecycleEventsEnabled ?? true;
     rpc.onEvent((event) => {
@@ -231,7 +254,9 @@ export class RpcChildSession implements ChildSession {
     });
     rpc.onExit((exit) => {
       this.assistantInProgress = undefined;
-      this.exitError = new Error(`Child pi process exited before settling (code ${exit.code ?? "null"}, signal ${exit.signal ?? "null"}). Stderr: ${rpc.stderrTail() || "(empty)"}`);
+      this.exitError = new Error(
+        `Child pi process exited before settling (code ${exit.code ?? "null"}, signal ${exit.signal ?? "null"}). Stderr: ${rpc.stderrTail() || "(empty)"}`,
+      );
       // A prompt awaiting its turn must fail, never hang, on child death.
       this.turn?.fail(this.exitError);
     });
@@ -338,21 +363,35 @@ export class RpcChildSession implements ChildSession {
   private async confirmImmediateCompletion(turn: PromptTurn): Promise<void> {
     let idleObservations = 0;
     for (let poll = 0; poll < IMMEDIATE_COMPLETION_MAX_POLLS; poll++) {
-      await new Promise((resolve) => { const timer = setTimeout(resolve, IMMEDIATE_COMPLETION_POLL_MS); timer.unref?.(); });
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, IMMEDIATE_COMPLETION_POLL_MS);
+        timer.unref?.();
+      });
       if (turn.done || turn.runStarted) return;
       let state: RpcState;
       try {
-        const response = await this.rpc.request({ type: "get_state" }, {
-          timeoutMs: CONTROL_REQUEST_TIMEOUT_MS,
-          onResponse: (candidate) => {
-            if (isRpcState(candidate) && candidate.isStreaming) turn.observeAcceptance();
+        const response = await this.rpc.request(
+          { type: "get_state" },
+          {
+            timeoutMs: CONTROL_REQUEST_TIMEOUT_MS,
+            onResponse: (candidate) => {
+              if (isRpcState(candidate) && candidate.isStreaming) turn.observeAcceptance();
+            },
           },
-        });
+        );
         if (turn.done || turn.runStarted) return;
-        if (!isRpcState(response)) throw new Error("response did not contain boolean streaming/compaction state, a nonnegative safe pending count, and an optional string session file");
+        if (!isRpcState(response))
+          throw new Error(
+            "response did not contain boolean streaming/compaction state, a nonnegative safe pending count, and an optional string session file",
+          );
         state = response;
       } catch (error) {
-        if (!turn.runStarted && !turn.done) turn.fail(new Error(`Child state read failed while confirming prompt completion: ${error instanceof Error ? error.message : String(error)}`));
+        if (!turn.runStarted && !turn.done)
+          turn.fail(
+            new Error(
+              `Child state read failed while confirming prompt completion: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
         return;
       }
       if (turn.done || turn.runStarted) return;
@@ -371,9 +410,16 @@ export class RpcChildSession implements ChildSession {
         continue;
       }
       idleObservations += 1;
-      if (idleObservations >= 2) { turn.observeImmediateCompletion(); return; }
+      if (idleObservations >= 2) {
+        turn.observeImmediateCompletion();
+        return;
+      }
     }
-    turn.fail(new Error(`Child neither started an agent run nor settled within ${IMMEDIATE_COMPLETION_MAX_POLLS} polls of the prompt ack`));
+    turn.fail(
+      new Error(
+        `Child neither started an agent run nor settled within ${IMMEDIATE_COMPLETION_MAX_POLLS} polls of the prompt ack`,
+      ),
+    );
   }
 
   private emitPromptAttempt(event: PromptAttemptEvent): void {
@@ -392,10 +438,7 @@ export class RpcChildSession implements ChildSession {
     // it, and only agent_settled or process exit clears it.
     if (assistantUpdate) {
       this.assistantInProgress = assistantUpdate.message;
-    } else if (
-      (event.type === "message_start" || event.type === "message_end")
-      && event.message.role === "assistant"
-    ) {
+    } else if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
       this.assistantInProgress = event.message;
     }
     if (event.type === "message_end" && event.message.role === "assistant") {

@@ -32,7 +32,8 @@ export const OVERSIZED_RECORD_OMISSION = "(oversized session record omitted)";
 /** Neutral wording: unscanned records may include non-message entries, so this
  * never claims transcript messages were omitted. */
 export const UNSCANNED_TRANSCRIPT_OMISSION = "(older session records not scanned: reader limit reached)";
-export const LARGE_RECORD_SCAN_OMISSION = "(a large session record and older records not scanned: reader limit reached)";
+export const LARGE_RECORD_SCAN_OMISSION =
+  "(a large session record and older records not scanned: reader limit reached)";
 const SESSION_ENTRY_PREFIX_BYTES = 256;
 const SESSION_ENTRY_MAX_COUNT = 512;
 /** Complete records inspected per render, including malformed and non-message records. */
@@ -40,14 +41,24 @@ export const SESSION_RECORD_MAX_COUNT = 4_096;
 const SESSION_MATERIALIZED_MAX_BYTES = 2 * 1024 * 1024;
 
 type StandardTranscriptRole = "user" | "assistant" | "toolResult";
-type OversizedMessageEntry = { type: "oversized_message"; role?: StandardTranscriptRole; toolName?: string; unproven?: true };
+type OversizedMessageEntry = {
+  type: "oversized_message";
+  role?: StandardTranscriptRole;
+  toolName?: string;
+  unproven?: true;
+};
 type OversizedPrefixClassification = OversizedMessageEntry | "non-message" | undefined;
 type ScanOmissionEntry = { type: "scan_omission"; largeRecord?: boolean };
 type PersistedTranscriptEntry = SessionEntry | { type: string } | OversizedMessageEntry | ScanOmissionEntry;
 
 type PrefixScanStatus = "complete" | "incomplete" | "invalid";
-interface PrefixScanResult { status: PrefixScanStatus; next: number }
-interface PrefixStringResult extends PrefixScanResult { value?: string }
+interface PrefixScanResult {
+  status: PrefixScanStatus;
+  next: number;
+}
+interface PrefixStringResult extends PrefixScanResult {
+  value?: string;
+}
 
 function skipPrefixWhitespace(input: string, start: number): number {
   let index = start;
@@ -56,7 +67,7 @@ function skipPrefixWhitespace(input: string, start: number): number {
 }
 
 function scanPrefixString(input: string, start: number): PrefixStringResult {
-  if (input[start] !== "\"") return { status: "invalid", next: start };
+  if (input[start] !== '"') return { status: "invalid", next: start };
   let escaped = false;
   for (let index = start + 1; index < input.length; index += 1) {
     const character = input[index]!;
@@ -68,7 +79,7 @@ function scanPrefixString(input: string, start: number): PrefixStringResult {
       escaped = true;
       continue;
     }
-    if (character !== "\"") continue;
+    if (character !== '"') continue;
     try {
       return { status: "complete", next: index + 1, value: JSON.parse(input.slice(start, index + 1)) as string };
     } catch {
@@ -89,7 +100,7 @@ function oversizedMessageEntry(prefix: string): OversizedPrefixClassification {
     if (depth > 24) return { status: "invalid", next: start };
     let index = skipPrefixWhitespace(prefix, start);
     if (index >= prefix.length) return { status: "incomplete", next: index };
-    if (prefix[index] === "\"") {
+    if (prefix[index] === '"') {
       const string = scanPrefixString(prefix, index);
       return { status: string.status, next: string.next };
     }
@@ -114,9 +125,7 @@ function oversizedMessageEntry(prefix: string): OversizedPrefixClassification {
     if (!token) return { status: "invalid", next: index };
     const next = index + token.length;
     if (next === prefix.length) return { status: "incomplete", next };
-    return /[\s,}\]]/u.test(prefix[next]!)
-      ? { status: "complete", next }
-      : { status: "invalid", next };
+    return /[\s,}\]]/u.test(prefix[next]!) ? { status: "complete", next } : { status: "invalid", next };
   };
 
   const scanObject = (start: number, depth: number, context: "top" | "message" | "other"): PrefixScanResult => {
@@ -138,17 +147,21 @@ function oversizedMessageEntry(prefix: string): OversizedPrefixClassification {
       };
 
       let value: PrefixScanResult;
-      if (context === "top" && key.value === "type" && prefix[index] === "\"") {
-        value = captureString((captured) => { topLevelType = captured; });
+      if (context === "top" && key.value === "type" && prefix[index] === '"') {
+        value = captureString((captured) => {
+          topLevelType = captured;
+        });
       } else if (context === "top" && key.value === "message" && prefix[index] === "{") {
         messageObjectSeen = true;
         value = scanObject(index, depth + 1, "message");
-      } else if (context === "message" && key.value === "role" && prefix[index] === "\"") {
+      } else if (context === "message" && key.value === "role" && prefix[index] === '"') {
         value = captureString((captured) => {
           if (captured === "user" || captured === "assistant" || captured === "toolResult") role = captured;
         });
-      } else if (context === "message" && key.value === "toolName" && prefix[index] === "\"") {
-        value = captureString((captured) => { if (captured.length <= 120) toolName = captured; });
+      } else if (context === "message" && key.value === "toolName" && prefix[index] === '"') {
+        value = captureString((captured) => {
+          if (captured.length <= 120) toolName = captured;
+        });
       } else {
         value = scanValue(index, depth + 1, "other");
       }
@@ -217,12 +230,13 @@ export function readSessionMessages(path: string): TranscriptMessage[] {
       const length = end - start;
       if (length === 0) return;
       const prefixPart = buffer.subarray(start, Math.min(end, start + SESSION_ENTRY_PREFIX_BYTES));
-      recordPrefix = prefixPart.length >= SESSION_ENTRY_PREFIX_BYTES
-        ? Buffer.from(prefixPart)
-        : Buffer.concat(
-          [prefixPart, recordPrefix.subarray(0, SESSION_ENTRY_PREFIX_BYTES - prefixPart.length)],
-          Math.min(SESSION_ENTRY_PREFIX_BYTES, prefixPart.length + recordPrefix.length),
-        );
+      recordPrefix =
+        prefixPart.length >= SESSION_ENTRY_PREFIX_BYTES
+          ? Buffer.from(prefixPart)
+          : Buffer.concat(
+              [prefixPart, recordPrefix.subarray(0, SESSION_ENTRY_PREFIX_BYTES - prefixPart.length)],
+              Math.min(SESSION_ENTRY_PREFIX_BYTES, prefixPart.length + recordPrefix.length),
+            );
       if (recordOversized) return;
       if (recordBytes + length > SESSION_ENTRY_MAX_BYTES) {
         recordParts = [];
@@ -248,8 +262,9 @@ export function readSessionMessages(path: string): TranscriptMessage[] {
         const prefix = recordPrefix.toString("utf8");
         const classification = oversizedMessageEntry(prefix);
         if (classification === "non-message") return;
-        const omission = classification
-          ?? (prefix.trimStart().startsWith("{") ? { type: "oversized_message", unproven: true } as const : undefined);
+        const omission =
+          classification ??
+          (prefix.trimStart().startsWith("{") ? ({ type: "oversized_message", unproven: true } as const) : undefined);
         if (omission) {
           newestEntries.push(omission);
           messageEntries += 1;
@@ -266,9 +281,10 @@ export function readSessionMessages(path: string): TranscriptMessage[] {
         return;
       }
       materializedBytes += recordBytes;
-      const line = recordParts.length === 1
-        ? recordParts[0]!.toString("utf8")
-        : Buffer.concat(recordParts.reverse(), recordBytes).toString("utf8");
+      const line =
+        recordParts.length === 1
+          ? recordParts[0]!.toString("utf8")
+          : Buffer.concat(recordParts.reverse(), recordBytes).toString("utf8");
       if (!line.trim()) return;
       try {
         const entry: unknown = JSON.parse(line);

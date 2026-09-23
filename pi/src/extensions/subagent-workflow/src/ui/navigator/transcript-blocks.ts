@@ -1,7 +1,14 @@
 /** Project child messages into readable blocks while retaining their turn and tool-call identity. */
 import type { SubagentResult } from "../../types.js";
 import { isRecord } from "../../util.js";
-import { boundedJsonPreview, sanitizeTerminalText, sanitizeTerminalTextTailChunks, TerminalTextSanitizer, UNTRUSTED_FIELD_MAX, type SanitizedTerminalTail } from "../sanitize.js";
+import {
+  boundedJsonPreview,
+  sanitizeTerminalText,
+  sanitizeTerminalTextTailChunks,
+  TerminalTextSanitizer,
+  UNTRUSTED_FIELD_MAX,
+  type SanitizedTerminalTail,
+} from "../sanitize.js";
 import { FOLLOW_UP_PROMPT_PREFIX, type TranscriptMessage } from "./transcript.js";
 
 /** Only a persisted terminal result can identify final output, including validated JSON. */
@@ -36,7 +43,8 @@ export type TranscriptBlock = TextBlock | ToolBlock;
 function* textChunks(content: unknown): Iterable<string> {
   if (typeof content === "string") yield content;
   else if (Array.isArray(content)) {
-    for (const part of content) if (isRecord(part) && part.type === "text" && typeof part.text === "string") yield part.text;
+    for (const part of content)
+      if (isRecord(part) && part.type === "text" && typeof part.text === "string") yield part.text;
   }
 }
 
@@ -72,17 +80,24 @@ export function buildTranscriptBlocks(
     if (message.role === "assistant") {
       lastAssistant = index;
       if (Array.isArray(message.content)) {
-        for (const part of message.content) if (isRecord(part) && part.type === "toolCall" && typeof part.id === "string") calls.add(part.id);
+        for (const part of message.content)
+          if (isRecord(part) && part.type === "toolCall" && typeof part.id === "string") calls.add(part.id);
       }
     }
   }
 
-  const hasOmissionsAfterAssistant = messages.slice(lastAssistant + 1).some((message) => message.role === "omission" || message.omitted);
+  const hasOmissionsAfterAssistant = messages
+    .slice(lastAssistant + 1)
+    .some((message) => message.role === "omission" || message.omitted);
   const completed = outcome?.status === "completed";
   const structured = completed && Object.hasOwn(outcome, "structured");
   const lastMessage = messages[lastAssistant];
-  const finalMessageMatches = completed && !structured && !!outcome.text && lastMessage
-    && [...textChunks(lastMessage.content)].join("\n") === outcome.text;
+  const finalMessageMatches =
+    completed &&
+    !structured &&
+    !!outcome.text &&
+    lastMessage &&
+    [...textChunks(lastMessage.content)].join("\n") === outcome.text;
   const blocks: TranscriptBlock[] = [];
   const identities = new Map<string, number>();
 
@@ -97,15 +112,21 @@ export function buildTranscriptBlocks(
     }
     if (message.role === "user") {
       const body = textBody(message.content);
-      if (body.text.startsWith(FOLLOW_UP_PROMPT_PREFIX.trim())) body.text = body.text.slice(FOLLOW_UP_PROMPT_PREFIX.trim().length).trimStart();
+      if (body.text.startsWith(FOLLOW_UP_PROMPT_PREFIX.trim()))
+        body.text = body.text.slice(FOLLOW_UP_PROMPT_PREFIX.trim().length).trimStart();
       blocks.push({ id, kind: "task", body });
       continue;
     }
     if (message.role === "toolResult") {
       if (message.toolCallId && calls.has(message.toolCallId)) continue;
       blocks.push({
-        id, kind: "tool", name: sanitizeTerminalText(message.toolName ?? "tool"), target: "Call not loaded",
-        result: textBody(message.content), status: toolStatus(message), missingCall: true,
+        id,
+        kind: "tool",
+        name: sanitizeTerminalText(message.toolName ?? "tool"),
+        target: "Call not loaded",
+        result: textBody(message.content),
+        status: toolStatus(message),
+        missingCall: true,
       });
       continue;
     }
@@ -136,14 +157,21 @@ export function buildTranscriptBlocks(
           target: sanitizeTerminalText(typeof target === "string" ? target : boundedJsonPreview(part.arguments)),
           arguments: jsonBody(part.arguments),
           result: result ? textBody(result.content) : undefined,
-          status: result ? toolStatus(result) : live && index === lastAssistant && !hasOmissionsAfterAssistant ? "waiting" : "unavailable",
+          status: result
+            ? toolStatus(result)
+            : live && index === lastAssistant && !hasOmissionsAfterAssistant
+              ? "waiting"
+              : "unavailable",
         });
       }
     }
   }
   if (completed && (structured || outcome.text)) {
     blocks.push({
-      id: "final-result", kind: "output", final: true, structured,
+      id: "final-result",
+      kind: "output",
+      final: true,
+      structured,
       body: structured ? jsonBody(outcome.structured) : textBody(outcome.text),
     });
   }

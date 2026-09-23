@@ -5,12 +5,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { isRecord } from "../util.js";
 import { replaceAtomicFile } from "./atomic-file.js";
-import {
-  acquireSqliteLock,
-  probeSqliteLock,
-  SqliteLockBusyError,
-  type SqliteLockHandle,
-} from "./sqlite-lock.js";
+import { acquireSqliteLock, probeSqliteLock, SqliteLockBusyError, type SqliteLockHandle } from "./sqlite-lock.js";
 
 interface RunOwnerRecord {
   pid: number;
@@ -28,9 +23,11 @@ const OWNER_DATABASE_FILE = "owner.sqlite";
 
 export class RunOwnershipConflictError extends Error {
   constructor(readonly owner?: RunOwnerRecord) {
-    super(owner
-      ? `Run is active in another owner (pid ${owner.pid} on ${owner.host}, started at ${owner.startedAt})`
-      : "Run is active in another owner");
+    super(
+      owner
+        ? `Run is active in another owner (pid ${owner.pid} on ${owner.host}, started at ${owner.startedAt})`
+        : "Run is active in another owner",
+    );
     this.name = "RunOwnershipConflictError";
   }
 }
@@ -112,12 +109,12 @@ export function runOwnerIsLive(runDir: string): boolean {
 
 function readOwner(runDir: string): RunOwnerRecord | undefined {
   const value = readOwnerMetadata(runDir) as Partial<RunOwnerRecord> | undefined;
-  return value !== undefined
-    && Number.isSafeInteger(value.pid)
-    && (value.pid as number) > 0
-    && typeof value.host === "string"
-    && typeof value.startedAt === "string"
-    ? value as RunOwnerRecord
+  return value !== undefined &&
+    Number.isSafeInteger(value.pid) &&
+    (value.pid as number) > 0 &&
+    typeof value.host === "string" &&
+    typeof value.startedAt === "string"
+    ? (value as RunOwnerRecord)
     : undefined;
 }
 

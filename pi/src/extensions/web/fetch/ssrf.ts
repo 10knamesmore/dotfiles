@@ -50,17 +50,16 @@ export async function validatePublicUrl(rawUrl: string | URL, signal: AbortSigna
 }
 
 function normalizeHostname(hostname: string): string {
-  return hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  return hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
 }
 
 function assertPublicAddress(address: string): void {
   const normalized = normalizeHostname(address);
   const version = net.isIP(normalized);
-  const blocked = version === 4
-    ? isBlockedIPv4(normalized)
-    : version === 6
-      ? isBlockedIPv6(normalized)
-      : true;
+  const blocked = version === 4 ? isBlockedIPv4(normalized) : version === 6 ? isBlockedIPv6(normalized) : true;
   if (blocked) {
     throw new WebError("invalid_input", "Local and private network targets are not supported.");
   }
@@ -74,19 +73,21 @@ function isBlockedIPv4(address: string): boolean {
   const a = parts[0]!;
   const b = parts[1]!;
   const c = parts[2]!;
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 0 && c === 0)
-    || (a === 192 && b === 0 && c === 2)
-    || (a === 192 && b === 168)
-    || (a === 198 && (b === 18 || b === 19))
-    || (a === 198 && b === 51 && c === 100)
-    || (a === 203 && b === 0 && c === 113)
-    || a >= 224;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    a >= 224
+  );
 }
 
 function isBlockedIPv6(address: string): boolean {
@@ -105,8 +106,7 @@ function isBlockedIPv6(address: string): boolean {
   const isCompatible = groups.slice(0, 6).every((group) => group === 0);
   if (isMapped || isCompatible) return isBlockedIPv4(groupsToIPv4(groups));
 
-  const isNat64 = first === 0x0064 && groups[1] === 0xff9b
-    && groups.slice(2, 6).every((group) => group === 0);
+  const isNat64 = first === 0x0064 && groups[1] === 0xff9b && groups.slice(2, 6).every((group) => group === 0);
   if (isNat64) return isBlockedIPv4(groupsToIPv4(groups));
 
   const isSixToFour = first === 0x2002;
@@ -125,7 +125,10 @@ function parseIPv6(input: string): number[] | null {
   let address = input;
   if (address.includes(".")) {
     const lastColon = address.lastIndexOf(":");
-    const octets = address.slice(lastColon + 1).split(".").map(Number);
+    const octets = address
+      .slice(lastColon + 1)
+      .split(".")
+      .map(Number);
     if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
       return null;
     }

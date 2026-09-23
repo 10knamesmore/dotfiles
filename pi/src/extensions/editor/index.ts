@@ -18,25 +18,40 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     let readTodoStatus: (() => string | undefined) | undefined;
     let readWorkflowUsage: (() => string | undefined) | undefined;
     const api: PromptEditorApi = {
-      useAgentNavigation: (contribution) => { navigation = contribution; },
-      useStatus: (contribution) => { readStatus = contribution; },
-      useTodoStatus: (contribution) => { readTodoStatus = contribution; },
-      useWorkflowUsage: (contribution) => { readWorkflowUsage = contribution; },
+      useAgentNavigation: (contribution) => {
+        navigation = contribution;
+      },
+      useStatus: (contribution) => {
+        readStatus = contribution;
+      },
+      useTodoStatus: (contribution) => {
+        readTodoStatus = contribution;
+      },
+      useWorkflowUsage: (contribution) => {
+        readWorkflowUsage = contribution;
+      },
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
-    installedFactory = (tui, theme, keybindings) => new PromptEditor(
-      tui, theme, keybindings,
-      () => navigation,
-      () => readStatus?.(),
-      () => currentContext,
-      () => readTodoStatus?.(),
-      () => readWorkflowUsage?.(),
-    );
+    installedFactory = (tui, theme, keybindings) =>
+      new PromptEditor(
+        tui,
+        theme,
+        keybindings,
+        () => navigation,
+        () => readStatus?.(),
+        () => currentContext,
+        () => readTodoStatus?.(),
+        () => readWorkflowUsage?.(),
+      );
     ctx.ui.setEditorComponent(installedFactory);
   });
 
-  pi.on("model_select", (_event, ctx) => { currentContext = ctx; });
-  pi.on("thinking_level_select", (_event, ctx) => { currentContext = ctx; });
+  pi.on("model_select", (_event, ctx) => {
+    currentContext = ctx;
+  });
+  pi.on("thinking_level_select", (_event, ctx) => {
+    currentContext = ctx;
+  });
   pi.on("session_shutdown", (_event, ctx) => {
     if (installedFactory && ctx.ui.getEditorComponent() === installedFactory) ctx.ui.setEditorComponent(undefined);
     installedFactory = undefined;

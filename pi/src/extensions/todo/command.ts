@@ -3,11 +3,7 @@ import { TodoPresentation } from "./presentation.js";
 import { TodoSessionStore } from "./session-store.js";
 
 /** Register `/todo` as a toggle for the persistent todo display. */
-export function registerTodoCommand(
-  pi: ExtensionAPI,
-  store: TodoSessionStore,
-  presentation: TodoPresentation,
-): void {
+export function registerTodoCommand(pi: ExtensionAPI, store: TodoSessionStore, presentation: TodoPresentation): void {
   pi.registerCommand("todo", {
     description: "Toggle the persistent session todo display",
     handler: async (_rawArgs, ctx) => {
@@ -15,10 +11,7 @@ export function registerTodoCommand(
       if (result.warning) {
         ctx.ui.notify(result.warning, "warning");
       } else {
-        ctx.ui.notify(
-          result.enabled ? "Todo display enabled." : "Todo display disabled.",
-          "info",
-        );
+        ctx.ui.notify(result.enabled ? "Todo display enabled." : "Todo display disabled.", "info");
       }
     },
   });

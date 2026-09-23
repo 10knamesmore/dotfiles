@@ -1,12 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  type NotificationFailureKind,
-  sendSystemNotification,
-} from "./backend.js";
-import {
-  createSettledNotificationMessage,
-  sanitizeSingleLine,
-} from "./message.js";
+import { type NotificationFailureKind, sendSystemNotification } from "./backend.js";
+import { createSettledNotificationMessage, sanitizeSingleLine } from "./message.js";
 
 /** Marker written only into subprocesses launched by the vendored workflow runtime. */
 const SUBAGENT_CHILD_MARKER = "PI_SUBAGENT_SHIM_SPEC";
@@ -22,21 +16,14 @@ export function registerSettledNotification(pi: ExtensionAPI): void {
     armed = ctx.mode === "tui";
   });
   pi.on("agent_settled", (_event, ctx) => {
-    if (
-      !armed ||
-      ctx.mode !== "tui" ||
-      !ctx.isIdle() ||
-      ctx.hasPendingMessages()
-    )
-      return;
+    if (!armed || ctx.mode !== "tui" || !ctx.isIdle() || ctx.hasPendingMessages()) return;
     armed = false;
     const message = createSettledNotificationMessage(ctx.cwd);
 
     // Delivery owns a bounded child-process lifetime; Pi must not await the OS notification service.
     void sendSystemNotification(message).then(
       (delivery) => {
-        if (delivery.status === "failed")
-          reportOnce(delivery.kind, delivery.reason);
+        if (delivery.status === "failed") reportOnce(delivery.kind, delivery.reason);
       },
       (error: unknown) => reportOnce("unexpected", errorMessage(error)),
     );

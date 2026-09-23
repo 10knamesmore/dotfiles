@@ -19,9 +19,7 @@ export function registerTitlebar(pi: ExtensionAPI): void {
   function render(): void {
     if (context?.mode !== "tui") return;
     const title = titleContext(context);
-    context.ui.setTitle(activity.kind === "ready"
-      ? baseTitle(title)
-      : busyTitle(activity, frameIndex, title));
+    context.ui.setTitle(activity.kind === "ready" ? baseTitle(title) : busyTitle(activity, frameIndex, title));
   }
 
   function updateActivity(next: EditorActivity): void {

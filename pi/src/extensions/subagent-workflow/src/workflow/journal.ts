@@ -42,7 +42,11 @@ export interface WorkflowJournal {
 }
 
 export class JournalUnreadableError extends Error {
-  constructor(readonly path: string, readonly lineNumber: number, reason: string) {
+  constructor(
+    readonly path: string,
+    readonly lineNumber: number,
+    reason: string,
+  ) {
     super(`Cannot resume workflow: journal ${path} line ${lineNumber} ${reason}. Re-run the workflow fresh.`);
     this.name = "JournalUnreadableError";
   }
@@ -77,7 +81,11 @@ export function readJournal(path: string): WorkflowJournal {
       journal.entries.set(journalCallKey(value.call), value);
       continue;
     }
-    throw new JournalUnreadableError(path, index + 1, "is unreadable because the entry does not match the current format");
+    throw new JournalUnreadableError(
+      path,
+      index + 1,
+      "is unreadable because the entry does not match the current format",
+    );
   }
   return journal;
 }
@@ -127,29 +135,37 @@ function isWorkflowCallIdentity(value: unknown): value is WorkflowCallIdentity {
   return call.scope.every((segment) => {
     if (!isRecord(segment)) return false;
     const item = segment as Partial<WorkflowCallScopeSegment>;
-    return Number.isSafeInteger(item.operation) && item.operation! >= 0
-      && Number.isSafeInteger(item.branch) && item.branch! >= 0
-      && (item.kind === "parallel" || item.kind === "pipeline");
+    return (
+      Number.isSafeInteger(item.operation) &&
+      item.operation! >= 0 &&
+      Number.isSafeInteger(item.branch) &&
+      item.branch! >= 0 &&
+      (item.kind === "parallel" || item.kind === "pipeline")
+    );
   });
 }
 
 function isJournalEntry(value: unknown): value is JournalEntry {
   if (!isRecord(value)) return false;
-  return isWorkflowCallIdentity(value.call)
-    && typeof value.hash === "string"
-    && isCallFingerprint(value.fingerprint)
-    && "result" in value
-    && typeof value.childId === "string";
+  return (
+    isWorkflowCallIdentity(value.call) &&
+    typeof value.hash === "string" &&
+    isCallFingerprint(value.fingerprint) &&
+    "result" in value &&
+    typeof value.childId === "string"
+  );
 }
 
 export function isCallFingerprint(value: unknown): value is CallFingerprint {
   if (!isRecord(value)) return false;
   const fingerprint = value as Partial<CallFingerprint>;
-  return typeof fingerprint.provider === "string"
-    && typeof fingerprint.modelId === "string"
-    && typeof fingerprint.thinkingLevel === "string"
-    && typeof fingerprint.cwd === "string"
-    && isStringArray(fingerprint.extensionTools);
+  return (
+    typeof fingerprint.provider === "string" &&
+    typeof fingerprint.modelId === "string" &&
+    typeof fingerprint.thinkingLevel === "string" &&
+    typeof fingerprint.cwd === "string" &&
+    isStringArray(fingerprint.extensionTools)
+  );
 }
 
 /**
@@ -166,7 +182,10 @@ export function describeFingerprintDrift(persisted: CallFingerprint, current: Ca
   }
   const lists = ["extensionTools"] as const;
   for (const field of lists) {
-    if (persisted[field].length !== current[field].length || persisted[field].some((item, index) => item !== current[field][index])) {
+    if (
+      persisted[field].length !== current[field].length ||
+      persisted[field].some((item, index) => item !== current[field][index])
+    ) {
       drift.push(`${field} was ${JSON.stringify(persisted[field])} and is now ${JSON.stringify(current[field])}`);
     }
   }
@@ -182,5 +201,8 @@ function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   const object = value as Record<string, unknown>;
-  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(",")}}`;
+  return `{${Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
+    .join(",")}}`;
 }

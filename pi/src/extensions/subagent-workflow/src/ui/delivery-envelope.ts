@@ -23,9 +23,12 @@ export interface DeliveryEnvelopeSections {
 }
 
 function boundedLines(lines: readonly string[] | undefined): string[] {
-  return lines?.flatMap((value) => value.split("\n"))
-    .filter((line) => line.length > 0)
-    .map((line) => line.length <= ENVELOPE_LINE_MAX ? line : `${line.slice(0, ENVELOPE_LINE_MAX - 3)}...`) ?? [];
+  return (
+    lines
+      ?.flatMap((value) => value.split("\n"))
+      .filter((line) => line.length > 0)
+      .map((line) => (line.length <= ENVELOPE_LINE_MAX ? line : `${line.slice(0, ENVELOPE_LINE_MAX - 3)}...`)) ?? []
+  );
 }
 
 function boundedSlice(value: string, length: number): string {
@@ -146,9 +149,8 @@ export function buildDeliveryEnvelope(sections: DeliveryEnvelopeSections, budget
     return [...admittedRecovery, ...admittedArtifacts, ...markers].join("\n");
   }
 
-  const linesFor = (section: typeof optional[number]["section"]): string[] => selected
-    .filter((entry) => entry.section === section)
-    .map((entry) => entry.line);
+  const linesFor = (section: (typeof optional)[number]["section"]): string[] =>
+    selected.filter((entry) => entry.section === section).map((entry) => entry.line);
   return [
     ...linesFor("header"),
     ...linesFor("failures"),

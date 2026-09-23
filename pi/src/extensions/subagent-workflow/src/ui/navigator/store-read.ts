@@ -18,13 +18,7 @@ import {
 import { encodeCwd } from "../../store/run-store.js";
 import { readRunSnapshot, type RunSnapshot } from "../../store/run-snapshot.js";
 
-export type {
-  ChildRow,
-  RunDetail,
-  RunRecordFile,
-  RunStatusFile,
-  RunSummary,
-} from "../../store/run-projection.js";
+export type { ChildRow, RunDetail, RunRecordFile, RunStatusFile, RunSummary } from "../../store/run-projection.js";
 import type { RunDetail, RunSummary } from "../../store/run-projection.js";
 
 export interface ReadOptions {
@@ -300,9 +294,11 @@ function fileSignature(path: string): string {
 }
 
 function sameFileSignatures(left: RelevantFileSignatures, right: RelevantFileSignatures): boolean {
-  return left.run === right.run
-    && left.status === right.status
-    && left.events === right.events
-    && left.script === right.script
-    && left.generationPending === right.generationPending;
+  return (
+    left.run === right.run &&
+    left.status === right.status &&
+    left.events === right.events &&
+    left.script === right.script &&
+    left.generationPending === right.generationPending
+  );
 }

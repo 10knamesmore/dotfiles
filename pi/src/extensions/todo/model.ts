@@ -1,10 +1,5 @@
 /** Status of one task in the parent session todo list. */
-export type TodoStatus =
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "abandoned"
-  | "blocked";
+export type TodoStatus = "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
 
 /** One task whose content is its stable, human-facing identifier. */
 export interface TodoItem {
@@ -48,40 +43,25 @@ function isTodoStatus(value: unknown): value is TodoStatus {
  *
  * Stored identifiers are single-line strings with no terminal control characters.
  */
-export function normalizeTodoIdentifier(
-  value: string,
-  label: "phase" | "task",
-): string {
+export function normalizeTodoIdentifier(value: string, label: "phase" | "task"): string {
   const normalized = value.trim();
-  if (!normalized)
-    throw new Error(`${label === "phase" ? "Phase" : "Task"} cannot be empty.`);
+  if (!normalized) throw new Error(`${label === "phase" ? "Phase" : "Task"} cannot be empty.`);
   if (CONTROL_CHARACTER.test(normalized)) {
-    throw new Error(
-      `${label === "phase" ? "Phase" : "Task"} must be one line and contain no control characters.`,
-    );
+    throw new Error(`${label === "phase" ? "Phase" : "Task"} must be one line and contain no control characters.`);
   }
-  if (
-    label === "task" &&
-    (/<!--\s*blocker:/iu.test(normalized) || normalized.includes("-->"))
-  ) {
-    throw new Error(
-      `Task ${JSON.stringify(normalized)} cannot contain the blocker annotation delimiter.`,
-    );
+  if (label === "task" && (/<!--\s*blocker:/iu.test(normalized) || normalized.includes("-->"))) {
+    throw new Error(`Task ${JSON.stringify(normalized)} cannot contain the blocker annotation delimiter.`);
   }
   return normalized;
 }
 
 /** Normalize an optional blocker note to a terminal-safe single line. */
-export function normalizeBlockerReason(
-  value: string | undefined,
-): string | undefined {
+export function normalizeBlockerReason(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const normalized = value.replace(/\s+/gu, " ").trim();
   if (!normalized) return undefined;
   if (CONTROL_CHARACTER.test(normalized)) {
-    throw new Error(
-      "Blocker reason must contain no terminal control characters.",
-    );
+    throw new Error("Blocker reason must contain no terminal control characters.");
   }
   if (normalized.includes("<!--") || normalized.includes("-->")) {
     throw new Error("Blocker reason cannot contain HTML comment delimiters.");
@@ -116,11 +96,7 @@ export function parseTodoPhases(value: unknown): TodoPhase[] | undefined {
   let activeTasks = 0;
 
   for (const rawPhase of value) {
-    if (
-      !isRecord(rawPhase) ||
-      typeof rawPhase.name !== "string" ||
-      !Array.isArray(rawPhase.tasks)
-    ) {
+    if (!isRecord(rawPhase) || typeof rawPhase.name !== "string" || !Array.isArray(rawPhase.tasks)) {
       return undefined;
     }
     let phaseName: string;
@@ -129,17 +105,12 @@ export function parseTodoPhases(value: unknown): TodoPhase[] | undefined {
     } catch {
       return undefined;
     }
-    if (phaseName !== rawPhase.name || phaseNames.has(phaseName))
-      return undefined;
+    if (phaseName !== rawPhase.name || phaseNames.has(phaseName)) return undefined;
     phaseNames.add(phaseName);
 
     const tasks: TodoItem[] = [];
     for (const rawTask of rawPhase.tasks) {
-      if (
-        !isRecord(rawTask) ||
-        typeof rawTask.content !== "string" ||
-        !isTodoStatus(rawTask.status)
-      ) {
+      if (!isRecord(rawTask) || typeof rawTask.content !== "string" || !isTodoStatus(rawTask.status)) {
         return undefined;
       }
       let content: string;
@@ -148,32 +119,22 @@ export function parseTodoPhases(value: unknown): TodoPhase[] | undefined {
       } catch {
         return undefined;
       }
-      if (content !== rawTask.content || taskContents.has(content))
-        return undefined;
+      if (content !== rawTask.content || taskContents.has(content)) return undefined;
       taskContents.add(content);
 
       if (rawTask.status === "in_progress") activeTasks += 1;
       if (activeTasks > 1) return undefined;
 
       if (rawTask.status === "blocked") {
-        if (
-          rawTask.blocker !== undefined &&
-          typeof rawTask.blocker !== "string"
-        )
-          return undefined;
+        if (rawTask.blocker !== undefined && typeof rawTask.blocker !== "string") return undefined;
         let blocker: string | undefined;
         try {
           blocker = normalizeBlockerReason(rawTask.blocker);
         } catch {
           return undefined;
         }
-        if (blocker !== rawTask.blocker && rawTask.blocker !== undefined)
-          return undefined;
-        tasks.push(
-          blocker === undefined
-            ? { content, status: "blocked" }
-            : { content, status: "blocked", blocker },
-        );
+        if (blocker !== rawTask.blocker && rawTask.blocker !== undefined) return undefined;
+        tasks.push(blocker === undefined ? { content, status: "blocked" } : { content, status: "blocked", blocker });
         continue;
       }
 
@@ -183,12 +144,7 @@ export function parseTodoPhases(value: unknown): TodoPhase[] | undefined {
     phases.push({ name: phaseName, tasks });
   }
 
-  if (
-    activeTasks === 0 &&
-    phases.some((phase) =>
-      phase.tasks.some((task) => task.status === "pending"),
-    )
-  ) {
+  if (activeTasks === 0 && phases.some((phase) => phase.tasks.some((task) => task.status === "pending"))) {
     return undefined;
   }
   return phases;
@@ -205,9 +161,7 @@ export function normalizeActiveTask(phases: TodoPhase[]): void {
 }
 
 /** Return the task currently selected for work, if any. */
-export function activeTodoTask(
-  phases: readonly TodoPhase[],
-): TodoItem | undefined {
+export function activeTodoTask(phases: readonly TodoPhase[]): TodoItem | undefined {
   for (const phase of phases) {
     const active = phase.tasks.find((task) => task.status === "in_progress");
     if (active) return active;

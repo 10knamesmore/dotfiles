@@ -155,8 +155,9 @@ export async function executeWorkflowBody(
       const deadlineMs = receivedFirstHeartbeat ? synchronousTimeoutMs : startupTimeoutMs;
       const progressAt = receivedFirstHeartbeat ? lastHeartbeatAt : workerStartedAt;
       if (receivedFirstHeartbeat && now - progressAt < deadlineMs) {
-        const overdue = [...outstandingAgentRequests.entries()]
-          .filter(([, request]) => !request.warned && now - request.startedAt >= synchronousTimeoutMs);
+        const overdue = [...outstandingAgentRequests.entries()].filter(
+          ([, request]) => !request.warned && now - request.startedAt >= synchronousTimeoutMs,
+        );
         if (overdue.length > 0) {
           for (const [, request] of overdue) request.warned = true;
           let activeAgents: readonly string[] = [];
@@ -165,11 +166,14 @@ export async function executeWorkflowBody(
           } catch {
             // Diagnostics must never interfere with the child they observe.
           }
-          const context = activeAgents.length > 0
-            ? ` Active children: ${activeAgents.join(", ")}.`
-            : ` Outstanding host agent request ids: ${overdue.map(([id]) => id).join(", ")}.`;
+          const context =
+            activeAgents.length > 0
+              ? ` Active children: ${activeAgents.join(", ")}.`
+              : ` Outstanding host agent request ids: ${overdue.map(([id]) => id).join(", ")}.`;
           try {
-            api.diagnostic?.(`Child/tool work is still running after ${synchronousTimeoutMs}ms while the workflow worker remains responsive.${context} Waiting for child completion or the configured agent timeout.`);
+            api.diagnostic?.(
+              `Child/tool work is still running after ${synchronousTimeoutMs}ms while the workflow worker remains responsive.${context} Waiting for child completion or the configured agent timeout.`,
+            );
           } catch {
             // Diagnostics must never interfere with the child they observe.
           }
@@ -196,11 +200,12 @@ export async function executeWorkflowBody(
         } catch {
           // Diagnostics must never mask the watchdog failure they describe.
         }
-        const context = activeAgents.length > 0
-          ? ` Active children: ${activeAgents.join(", ")}.`
-          : outstandingAgentRequests.size > 0
-            ? ` Outstanding host agent request ids: ${[...outstandingAgentRequests.keys()].sort((a, b) => a - b).join(", ")}.`
-            : "";
+        const context =
+          activeAgents.length > 0
+            ? ` Active children: ${activeAgents.join(", ")}.`
+            : outstandingAgentRequests.size > 0
+              ? ` Outstanding host agent request ids: ${[...outstandingAgentRequests.keys()].sort((a, b) => a - b).join(", ")}.`
+              : "";
         const message = receivedFirstHeartbeat
           ? `Workflow worker failed a direct liveness challenge after ${synchronousTimeoutMs}ms of uninterrupted synchronous execution.${context}`
           : `Workflow worker failed its startup liveness challenge after ${startupTimeoutMs}ms.${context}`;
@@ -234,8 +239,9 @@ export async function executeWorkflowBody(
           return;
         case "agent":
           outstandingAgentRequests.set(message.id, { startedAt: performance.now(), warned: false });
-          void answerAgentRequest(worker, message, api, post, fail)
-            .finally(() => outstandingAgentRequests.delete(message.id));
+          void answerAgentRequest(worker, message, api, post, fail).finally(() =>
+            outstandingAgentRequests.delete(message.id),
+          );
           return;
         case "result":
           try {
@@ -271,9 +277,8 @@ async function answerAgentRequest(
 ): Promise<void> {
   try {
     const prompt = JSON.parse(request.promptJson) as string;
-    const agentOptions = request.optionsJson === undefined
-      ? undefined
-      : JSON.parse(request.optionsJson) as Record<string, unknown>;
+    const agentOptions =
+      request.optionsJson === undefined ? undefined : (JSON.parse(request.optionsJson) as Record<string, unknown>);
     const result = await api.agent(prompt, agentOptions, request.call);
     const resultJson = JSON.stringify(result);
     post({ type: "agent-result", id: request.id, resultJson });
@@ -347,7 +352,9 @@ async function runWorkflowWorker(data: WorkflowWorkerData): Promise<void> {
     agent: (prompt, options) => {
       const scope = requireExecutionScope(scopes);
       if (scope.agentInFlight || scope.activeBranchGroups > 0) {
-        throw new Error("Overlapping agent() calls or branch groups in the same workflow scope are unavailable. Await the current operation and use parallel() or pipeline() for concurrency");
+        throw new Error(
+          "Overlapping agent() calls or branch groups in the same workflow scope are unavailable. Await the current operation and use parallel() or pipeline() for concurrency",
+        );
       }
       scope.agentInFlight = true;
       try {
@@ -376,7 +383,9 @@ async function runWorkflowWorker(data: WorkflowWorkerData): Promise<void> {
     phase: (title) => {
       const scope = requireExecutionScope(scopes);
       if (scope.path.length > 0 || !scopeIsQuiescent(scope)) {
-        throw new Error("phase() is only available at an idle workflow root. Use agent opts.phase inside parallel() or pipeline() branches");
+        throw new Error(
+          "phase() is only available at an idle workflow root. Use agent opts.phase inside parallel() or pipeline() branches",
+        );
       }
       port.postMessage({ type: "phase", titleJson: serializeVmValue(title, "phase title") } satisfies WorkerRequest);
     },
@@ -386,7 +395,9 @@ async function runWorkflowWorker(data: WorkflowWorkerData): Promise<void> {
     beginBranchGroup: () => {
       const scope = requireExecutionScope(scopes);
       if (!scopeIsQuiescent(scope)) {
-        throw new Error("Overlapping parallel() or pipeline() groups and agent() calls in the same workflow scope are unavailable. Await the current operation first");
+        throw new Error(
+          "Overlapping parallel() or pipeline() groups and agent() calls in the same workflow scope are unavailable. Await the current operation first",
+        );
       }
       scope.activeBranchGroups += 1;
       return scope.nextOperation++;
@@ -418,10 +429,7 @@ async function runWorkflowWorker(data: WorkflowWorkerData): Promise<void> {
     agentInFlight: false,
   };
   try {
-    result = await scopes.run(
-      rootScope,
-      () => runInConstrainedContext(data, bridge),
-    );
+    result = await scopes.run(rootScope, () => runInConstrainedContext(data, bridge));
   } catch (error) {
     workflowFailed = true;
     workflowError = error;

@@ -22,14 +22,14 @@ export interface SandboxHostBridge {
 }
 
 /** Build and run the constrained realm. Worker lifecycle stays in vm.ts. */
-export async function runInConstrainedContext(
-  data: WorkflowSandboxInput,
-  bridge: SandboxHostBridge,
-): Promise<unknown> {
-  const context = vm.createContext({}, {
-    name: `workflow:${data.name}`,
-    codeGeneration: { strings: false, wasm: false },
-  });
+export async function runInConstrainedContext(data: WorkflowSandboxInput, bridge: SandboxHostBridge): Promise<unknown> {
+  const context = vm.createContext(
+    {},
+    {
+      name: `workflow:${data.name}`,
+      codeGeneration: { strings: false, wasm: false },
+    },
+  );
 
   // This is the only worker-realm value placed in the context. The bootstrap
   // captures it in a lexical closure and deletes the global before workflow

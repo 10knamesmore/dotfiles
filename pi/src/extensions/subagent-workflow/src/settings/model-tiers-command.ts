@@ -2,7 +2,13 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 import { reportDiagnostic } from "../diagnostics.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 import { errorMessage } from "../util.js";
-import { MODEL_TIERS, getPersonalConfigPath, readPersonalConfig, updatePersonalConfig, type ModelTiers } from "../../../../config/index.js";
+import {
+  MODEL_TIERS,
+  getPersonalConfigPath,
+  readPersonalConfig,
+  updatePersonalConfig,
+  type ModelTiers,
+} from "../../../../config/index.js";
 
 export function registerModelTiersCommand(pi: ExtensionAPI): void {
   pi.registerCommand("model-tiers", {
@@ -38,15 +44,21 @@ export function registerModelTiersCommand(pi: ExtensionAPI): void {
           return;
         }
         if (models.length === 0) {
-          ctx.ui.notify("Pi 当前没有可用模型。请先配置供应商或登录，再运行 /model-tiers；已有绑定仍可清除。", "warning");
+          ctx.ui.notify(
+            "Pi 当前没有可用模型。请先配置供应商或登录，再运行 /model-tiers；已有绑定仍可清除。",
+            "warning",
+          );
         }
         const providers = [...new Set(models.map((model) => model.provider))].sort();
-        const providerOptions = providers.map((provider) => ({ provider, label: `供应商：${sanitizeTerminalText(provider)}` }));
+        const providerOptions = providers.map((provider) => ({
+          provider,
+          label: `供应商：${sanitizeTerminalText(provider)}`,
+        }));
         const clearBinding = "清除绑定";
-        const providerChoice = await ctx.ui.select(
-          `${selectedTier}：选择供应商或清除绑定`,
-          [...providerOptions.map((option) => option.label), clearBinding],
-        );
+        const providerChoice = await ctx.ui.select(`${selectedTier}：选择供应商或清除绑定`, [
+          ...providerOptions.map((option) => option.label),
+          clearBinding,
+        ]);
         if (providerChoice === undefined) return;
 
         let reference: string | undefined;
@@ -75,7 +87,9 @@ export function registerModelTiersCommand(pi: ExtensionAPI): void {
           reportFailure(ctx, "write", path, error);
           return;
         }
-        reportDiagnostic(`[subagent-workflow] model tier saved: path=${path} tier=${selectedTier} model=${reference ?? "<unconfigured>"}`);
+        reportDiagnostic(
+          `[subagent-workflow] model tier saved: path=${path} tier=${selectedTier} model=${reference ?? "<unconfigured>"}`,
+        );
         ctx.ui.notify(
           reference === undefined
             ? `已清除 ${selectedTier} 的模型绑定。`

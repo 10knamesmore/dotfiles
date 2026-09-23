@@ -22,7 +22,8 @@ export class PageCache {
   async save(page: FetchedPage): Promise<CachedPage> {
     const cached: CachedPage = { ...page, responseId: randomUUID(), fetchedAt: Date.now() };
     const text = JSON.stringify(cached);
-    if (Buffer.byteLength(text) > MAX_CACHE_BYTES) throw new WebError("too_large", "Extracted page exceeds the cache size limit.");
+    if (Buffer.byteLength(text) > MAX_CACHE_BYTES)
+      throw new WebError("too_large", "Extracted page exceeds the cache size limit.");
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const path = join(this.directory, `${cached.responseId}.json`);
     const temporary = `${path}.tmp`;
@@ -42,7 +43,8 @@ export class PageCache {
     let data: unknown;
     try {
       const metadata = await stat(path);
-      if (metadata.size > MAX_CACHE_BYTES) throw new WebError("cache_miss", "Cached content is unavailable; fetch the URL again.");
+      if (metadata.size > MAX_CACHE_BYTES)
+        throw new WebError("cache_miss", "Cached content is unavailable; fetch the URL again.");
       data = JSON.parse(await readFile(path, "utf8"));
     } catch (error) {
       if (error instanceof WebError) throw error;
@@ -60,26 +62,36 @@ export class PageCache {
   }
 
   private async prune(keepId: string): Promise<void> {
-    const entries = await Promise.all((await readdir(this.directory))
-      .filter(name => name.endsWith(".json") && RESPONSE_ID.test(name.slice(0, -5)))
-      .map(async name => {
-        const path = join(this.directory, name);
-        try {
-          const metadata = await stat(path);
-          return { path, name, bytes: metadata.size, created: metadata.mtimeMs };
-        } catch (error) {
-          // Other Pi processes can evict a page between the directory listing and stat.
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-          throw error;
-        }
-      }));
-    const sorted = entries.filter(entry => entry !== undefined).sort((a, b) =>
-      Number(b.name === `${keepId}.json`) - Number(a.name === `${keepId}.json`) || b.created - a.created);
+    const entries = await Promise.all(
+      (await readdir(this.directory))
+        .filter((name) => name.endsWith(".json") && RESPONSE_ID.test(name.slice(0, -5)))
+        .map(async (name) => {
+          const path = join(this.directory, name);
+          try {
+            const metadata = await stat(path);
+            return { path, name, bytes: metadata.size, created: metadata.mtimeMs };
+          } catch (error) {
+            // Other Pi processes can evict a page between the directory listing and stat.
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+            throw error;
+          }
+        }),
+    );
+    const sorted = entries
+      .filter((entry) => entry !== undefined)
+      .sort(
+        (a, b) => Number(b.name === `${keepId}.json`) - Number(a.name === `${keepId}.json`) || b.created - a.created,
+      );
     let bytes = 0;
     let count = 0;
     for (const entry of sorted) {
       const keep = entry.name === `${keepId}.json`;
-      if (!keep && (Date.now() - entry.created >= CACHE_TTL_MS || count >= MAX_CACHE_ENTRIES || bytes + entry.bytes > MAX_CACHE_BYTES)) {
+      if (
+        !keep &&
+        (Date.now() - entry.created >= CACHE_TTL_MS ||
+          count >= MAX_CACHE_ENTRIES ||
+          bytes + entry.bytes > MAX_CACHE_BYTES)
+      ) {
         await rm(entry.path, { force: true });
       } else {
         count += 1;
@@ -92,6 +104,13 @@ export class PageCache {
 function isCachedPage(value: unknown): value is CachedPage {
   if (!value || typeof value !== "object") return false;
   const page = value as Partial<CachedPage>;
-  return typeof page.responseId === "string" && typeof page.fetchedAt === "number" && Number.isFinite(page.fetchedAt)
-    && typeof page.url === "string" && typeof page.title === "string" && typeof page.contentType === "string" && typeof page.content === "string";
+  return (
+    typeof page.responseId === "string" &&
+    typeof page.fetchedAt === "number" &&
+    Number.isFinite(page.fetchedAt) &&
+    typeof page.url === "string" &&
+    typeof page.title === "string" &&
+    typeof page.contentType === "string" &&
+    typeof page.content === "string"
+  );
 }

@@ -48,11 +48,15 @@ export function parseWorkflowScript(script: string): ParsedWorkflow {
   if (exports.length === 0) throw new Error("Workflow meta is missing: expected `export const meta = {...}` at line 1");
   if (exports.length > 1) throw at(exports[1]!, "Workflow meta may only be declared once");
   const statement = exports[0]!;
-  const unsupportedModule = statements.find((item) => (item.type === "ImportDeclaration" || item.type.startsWith("Export")) && item !== statement);
-  if (unsupportedModule) throw at(unsupportedModule, "Workflow scripts may not import or export anything except literal meta");
+  const unsupportedModule = statements.find(
+    (item) => (item.type === "ImportDeclaration" || item.type.startsWith("Export")) && item !== statement,
+  );
+  if (unsupportedModule)
+    throw at(unsupportedModule, "Workflow scripts may not import or export anything except literal meta");
   const declaration = statement.declaration as Node;
   const declarations = declaration.declarations as Node[];
-  if (declaration.kind !== "const" || declarations.length !== 1) throw at(statement, "Workflow meta must be `export const meta = {...}`");
+  if (declaration.kind !== "const" || declarations.length !== 1)
+    throw at(statement, "Workflow meta must be `export const meta = {...}`");
   const initializer = declarations[0]!.init as Node | undefined;
   if (!initializer) throw at(statement, "Workflow meta must be a literal object");
   let value: unknown;
@@ -80,7 +84,9 @@ function isMetaExport(node: Node): boolean {
   if (node.type !== "ExportNamedDeclaration") return false;
   const declaration = node.declaration as Node | undefined;
   if (declaration?.type !== "VariableDeclaration") return false;
-  return (declaration.declarations as Node[]).some((item) => (item.id as Node | undefined)?.type === "Identifier" && (item.id as Node).name === "meta");
+  return (declaration.declarations as Node[]).some(
+    (item) => (item.id as Node | undefined)?.type === "Identifier" && (item.id as Node).name === "meta",
+  );
 }
 
 function literalValue(node: Node, path: string): unknown {
@@ -98,8 +104,10 @@ function literalValue(node: Node, path: string): unknown {
       throw new Error(`${path} must contain plain, non-computed properties only`);
     }
     const keyNode = property.key as Node;
-    const key = keyNode.type === "Identifier" ? String(keyNode.name) : keyNode.type === "Literal" ? String(keyNode.value) : "";
-    if (!key || ["__proto__", "constructor", "prototype"].includes(key)) throw new Error(`${path} contains an invalid key`);
+    const key =
+      keyNode.type === "Identifier" ? String(keyNode.name) : keyNode.type === "Literal" ? String(keyNode.value) : "";
+    if (!key || ["__proto__", "constructor", "prototype"].includes(key))
+      throw new Error(`${path} contains an invalid key`);
     result[key] = literalValue(property.value as Node, `${path}.${key}`);
   }
   return result;
@@ -111,21 +119,25 @@ function validateMeta(value: unknown, node: Node): asserts value is WorkflowMeta
   const allowed = new Set(["name", "description", "phases"]);
   const extra = Object.keys(meta).find((key) => !allowed.has(key));
   if (extra) throw at(node, `Workflow meta has unknown property "${extra}"`);
-  if (typeof meta.name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(meta.name)) throw at(node, "Workflow meta.name must be a kebab-case string");
+  if (typeof meta.name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(meta.name))
+    throw at(node, "Workflow meta.name must be a kebab-case string");
   if (typeof meta.description !== "string") throw at(node, "Workflow meta.description must be a string");
   if (meta.phases !== undefined) {
     if (!Array.isArray(meta.phases)) throw at(node, "Workflow meta.phases must be an array");
     for (const phase of meta.phases) {
       if (!isRecord(phase)) throw at(node, "Each workflow phase must be an object");
       const item = phase;
-      if (typeof item.title !== "string" || (item.detail !== undefined && typeof item.detail !== "string")) throw at(node, "Each workflow phase needs a string title and optional string detail");
-      if (Object.keys(item).some((key) => key !== "title" && key !== "detail")) throw at(node, "Workflow phases only support title and detail");
+      if (typeof item.title !== "string" || (item.detail !== undefined && typeof item.detail !== "string"))
+        throw at(node, "Each workflow phase needs a string title and optional string detail");
+      if (Object.keys(item).some((key) => key !== "title" && key !== "detail"))
+        throw at(node, "Workflow phases only support title and detail");
     }
   }
 }
 
 function inspectProgram(node: Node, literalModels: Set<string>): void {
-  if (node.type === "ImportExpression") throw at(node, "Dynamic import is unavailable in workflows because execution must be deterministic");
+  if (node.type === "ImportExpression")
+    throw at(node, "Dynamic import is unavailable in workflows because execution must be deterministic");
   collectLiteralModel(node, literalModels);
   for (const value of Object.values(node)) {
     if (Array.isArray(value)) {

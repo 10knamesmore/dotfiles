@@ -58,12 +58,16 @@ export function safeDetails(details: unknown): SubagentDetails | undefined {
   if (!isRecord(details) || !Array.isArray(details.children)) return undefined;
   const child = details.children[0];
   if (!isRecord(child)) return undefined;
-  return { children: [{
-    id: text(child.id, ""),
-    label: text(child.label, ""),
-    modelId: text(child.modelId, ""),
-    thinking: typeof child.thinking === "string" ? child.thinking : undefined,
-  }] };
+  return {
+    children: [
+      {
+        id: text(child.id, ""),
+        label: text(child.label, ""),
+        modelId: text(child.modelId, ""),
+        thinking: typeof child.thinking === "string" ? child.thinking : undefined,
+      },
+    ],
+  };
 }
 
 /** The single child's launch receipt, also persisted with the tool result. */
@@ -98,16 +102,21 @@ export function callHeaderLine(label: string, theme: ThemeLike): string {
 
 /** Single-line call header component shown above the rows. */
 export function renderCallHeader(label: string, theme: ThemeLike): Component {
-  return linesComponent((width) => [truncateToWidth(callHeaderLine(label, theme), Math.max(1, width))], "subagent call header");
+  return linesComponent(
+    (width) => [truncateToWidth(callHeaderLine(label, theme), Math.max(1, width))],
+    "subagent call header",
+  );
 }
 
 /** Component rendering rows straight from the result's snapshot. */
 class SubagentRowsComponent implements Component {
   private details: SubagentDetails | undefined;
   private fallback: string[] = [];
-  private readonly draw = guardedLines("subagent rows", (width) => this.details
-    ? renderRows(this.details, this.theme, width)
-    : this.fallback.map((line) => truncateToWidth(line, Math.max(1, width))));
+  private readonly draw = guardedLines("subagent rows", (width) =>
+    this.details
+      ? renderRows(this.details, this.theme, width)
+      : this.fallback.map((line) => truncateToWidth(line, Math.max(1, width))),
+  );
   constructor(private readonly theme: ThemeLike) {}
   /** Stores the normalized snapshot; `details` is untrusted here. */
   set(details: unknown, fallback: string[]): void {
@@ -133,11 +142,11 @@ export function renderSubagentResult(
   theme: ThemeLike,
   lastComponent: Component | undefined,
 ): Component {
-  const textParts = (result.content ?? [])
-    .flatMap((part) => part.type === "text" && typeof part.text === "string" ? [part.text] : []);
-  const fallback = textParts.length === 0
-    ? []
-    : sanitizeTerminalTextChunks(textParts, UNTRUSTED_FIELD_MAX, true).split("\n");
+  const textParts = (result.content ?? []).flatMap((part) =>
+    part.type === "text" && typeof part.text === "string" ? [part.text] : [],
+  );
+  const fallback =
+    textParts.length === 0 ? [] : sanitizeTerminalTextChunks(textParts, UNTRUSTED_FIELD_MAX, true).split("\n");
   const component = lastComponent instanceof SubagentRowsComponent ? lastComponent : new SubagentRowsComponent(theme);
   component.set(result.details, fallback);
   return component;
@@ -156,11 +165,13 @@ export function initialDetails(
   display: { modelId?: string; thinking?: ThinkingLevel },
 ): SubagentDetails {
   return {
-    children: [{
-      id: handle.id,
-      label: sanitizeTerminalText(childLabel(spec)),
-      modelId: sanitizeTerminalText(shortModel(display.modelId)),
-      thinking: display.thinking,
-    }],
+    children: [
+      {
+        id: handle.id,
+        label: sanitizeTerminalText(childLabel(spec)),
+        modelId: sanitizeTerminalText(shortModel(display.modelId)),
+        thinking: display.thinking,
+      },
+    ],
   };
 }

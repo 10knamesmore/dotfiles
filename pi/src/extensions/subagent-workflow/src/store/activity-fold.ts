@@ -13,8 +13,7 @@ export interface RunActivityFold {
 }
 
 export type ActivityFoldEvent =
-  | { type: "child"; id: string; label: string }
-  | { type: "activity"; id: string; description: string };
+  { type: "child"; id: string; label: string } | { type: "activity"; id: string; description: string };
 
 export function createActivityFold(complete = true): RunActivityFold {
   return { children: new Map(), complete };
@@ -36,9 +35,11 @@ export function foldActivity(state: RunActivityFold, event: ActivityFoldEvent): 
 
 export function activityFoldFromSnapshot(snapshot: RunSnapshot): RunActivityFold {
   const fold = createActivityFold(snapshot.diagnostics.length === 0);
-  const record = snapshot.record as {
-    children?: Array<{ id?: string; spec?: { label?: string }; resolved?: { label?: string } }>;
-  } | undefined;
+  const record = snapshot.record as
+    | {
+        children?: Array<{ id?: string; spec?: { label?: string }; resolved?: { label?: string } }>;
+      }
+    | undefined;
   for (const child of record?.children ?? []) {
     if (typeof child.id !== "string") continue;
     foldActivity(fold, { type: "child", id: child.id, label: child.resolved?.label ?? child.spec?.label ?? child.id });
@@ -54,6 +55,8 @@ export function activityFoldFromSnapshot(snapshot: RunSnapshot): RunActivityFold
 export function cloneActivityFold(state: RunActivityFold): RunActivityFold {
   return {
     complete: state.complete,
-    children: new Map([...state.children].map(([id, child]) => [id, { label: child.label, tools: { ...child.tools } }])),
+    children: new Map(
+      [...state.children].map(([id, child]) => [id, { label: child.label, tools: { ...child.tools } }]),
+    ),
   };
 }

@@ -62,7 +62,9 @@ export function parseModel(value: string, registry: ExtensionContext["modelRegis
     // Stay strict (multiple providers can expose same-named models), but make
     // the most common authoring mistake - a bare model id - self-healing by
     // naming the qualified id when it is unambiguous.
-    throw new Error(`Invalid resolved model ${JSON.stringify(value)}. Expected "provider/model-id"${suggestQualified(value, registry)}.`);
+    throw new Error(
+      `Invalid resolved model ${JSON.stringify(value)}. Expected "provider/model-id"${suggestQualified(value, registry)}.`,
+    );
   }
   return [value.slice(0, slash), value.slice(slash + 1)];
 }
@@ -83,17 +85,34 @@ export function unknownModelError(value: string, registry: ExtensionContext["mod
     return error instanceof Error ? error.message : String(error);
   }
   if (registry.find(provider, id)) return undefined;
-  const tokens = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/u).filter(Boolean).sort().join("\u0000");
+  const tokens = (name: string) =>
+    name
+      .toLowerCase()
+      .split(/[^a-z0-9]+/u)
+      .filter(Boolean)
+      .sort()
+      .join("\u0000");
   const target = tokens(id);
-  const suggestions = [...new Set(registry.getAll()
-    .filter((model) => model.id === id || tokens(model.id) === target)
-    .map((model) => `"${model.provider}/${model.id}"`))];
-  const hint = suggestions.length > 0 ? ` Did you mean ${suggestions.join(" or ")}?` : " Use a provider/model-id pair from the model list.";
+  const suggestions = [
+    ...new Set(
+      registry
+        .getAll()
+        .filter((model) => model.id === id || tokens(model.id) === target)
+        .map((model) => `"${model.provider}/${model.id}"`),
+    ),
+  ];
+  const hint =
+    suggestions.length > 0
+      ? ` Did you mean ${suggestions.join(" or ")}?`
+      : " Use a provider/model-id pair from the model list.";
   return `Model not found: ${value}.${hint}`;
 }
 
 function suggestQualified(bareId: string, registry: ExtensionContext["modelRegistry"]): string {
-  const matches = registry.getAll().filter((model) => model.id === bareId).map((model) => `"${model.provider}/${model.id}"`);
+  const matches = registry
+    .getAll()
+    .filter((model) => model.id === bareId)
+    .map((model) => `"${model.provider}/${model.id}"`);
   if (matches.length === 1) return `, e.g. ${matches[0]}`;
   if (matches.length > 1) return ` (matches: ${matches.join(", ")})`;
   return "";
@@ -105,7 +124,11 @@ function suggestQualified(bareId: string, registry: ExtensionContext["modelRegis
  * function: the run record, the UI receipt, and the workflow fingerprint must
  * show the effective level rather than the requested one.
  */
-export function resolveModel(spec: SubagentSpec, ctx: Pick<ParentExtensionContext, "model" | "modelRegistry">, inheritedThinking: ThinkingLevel): { model: NonNullable<ExtensionContext["model"]>; thinking: ThinkingLevel } {
+export function resolveModel(
+  spec: SubagentSpec,
+  ctx: Pick<ParentExtensionContext, "model" | "modelRegistry">,
+  inheritedThinking: ThinkingLevel,
+): { model: NonNullable<ExtensionContext["model"]>; thinking: ThinkingLevel } {
   const requested = spec.thinkingLevel ?? inheritedThinking;
   // Only an OMITTED model inherits; an empty string is an authoring error and
   // must fail loudly like any other invalid reference.
@@ -141,7 +164,9 @@ export async function loadChildExtensionEnvironment(cwd: string): Promise<ChildE
   const settingsManager = SettingsManager.create(cwd, getAgentDir());
   const extensionTools = new Set<string>();
   const resourceLoader = new DefaultResourceLoader({
-    cwd, agentDir: getAgentDir(), settingsManager,
+    cwd,
+    agentDir: getAgentDir(),
+    settingsManager,
     extensionsOverride: (base) => {
       for (const extension of base.extensions) {
         for (const name of extension.tools.keys()) extensionTools.add(name);

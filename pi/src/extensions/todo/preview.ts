@@ -6,10 +6,7 @@ import { isClosedTodo, type TodoItem, type TodoPhase } from "./model.js";
  * The returned set is rendered in canonical phase/task order; priority only
  * determines which rows survive the cap.
  */
-export function selectTodoPreview(
-  phases: readonly TodoPhase[],
-  limit: number,
-): Set<TodoItem> {
+export function selectTodoPreview(phases: readonly TodoPhase[], limit: number): Set<TodoItem> {
   const tasks = phases.flatMap((phase) => phase.tasks);
   const selected = new Set<TodoItem>();
   const groups = [

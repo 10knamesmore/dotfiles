@@ -18,7 +18,17 @@ export type PythonEnvironment = Static<typeof Environment>;
 
 /** Use the same uv project and interpreter selection for inspection and persistent execution. */
 export function pythonWorkerArguments(...args: string[]): string[] {
-  return ["run", "--project", PROJECT_DIRECTORY, "--locked", "--", "python", "-u", join(PROJECT_DIRECTORY, "worker.py"), ...args];
+  return [
+    "run",
+    "--project",
+    PROJECT_DIRECTORY,
+    "--locked",
+    "--",
+    "python",
+    "-u",
+    join(PROJECT_DIRECTORY, "worker.py"),
+    ...args,
+  ];
 }
 
 export function isPythonEnvironment(value: unknown): value is PythonEnvironment {
@@ -26,8 +36,16 @@ export function isPythonEnvironment(value: unknown): value is PythonEnvironment 
 }
 
 /** Prepare the locked uv environment and inspect it without opening a persistent namespace. */
-export async function inspectPythonEnvironment(exec: ExtensionAPI["exec"], cwd: string, signal: AbortSignal): Promise<PythonEnvironment> {
-  const result = await exec("uv", pythonWorkerArguments("--describe-environment"), { cwd, signal, timeout: STARTUP_TIMEOUT_MS });
+export async function inspectPythonEnvironment(
+  exec: ExtensionAPI["exec"],
+  cwd: string,
+  signal: AbortSignal,
+): Promise<PythonEnvironment> {
+  const result = await exec("uv", pythonWorkerArguments("--describe-environment"), {
+    cwd,
+    signal,
+    timeout: STARTUP_TIMEOUT_MS,
+  });
   if (result.killed || result.code !== 0) {
     throw new Error(result.stderr.trim() || "Python environment inspection did not complete.");
   }
@@ -38,6 +56,6 @@ export async function inspectPythonEnvironment(exec: ExtensionAPI["exec"], cwd: 
 
 export function describePythonEnvironment(environment?: PythonEnvironment): string {
   if (!environment) return "Python version and installed third-party package versions: unavailable.";
-  const packages = environment.packages.map(pkg => `${pkg.name}==${pkg.version}`).join(", ");
+  const packages = environment.packages.map((pkg) => `${pkg.name}==${pkg.version}`).join(", ");
   return `Python version: ${environment.version}\nInstalled third-party packages (distribution names): ${packages || "none"}`;
 }

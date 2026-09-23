@@ -8,9 +8,15 @@ export class Semaphore {
     this.limit = capacity;
   }
 
-  get capacity(): number { return this.limit; }
-  get running(): number { return this.active; }
-  get pending(): number { return this.queue.length; }
+  get capacity(): number {
+    return this.limit;
+  }
+  get running(): number {
+    return this.active;
+  }
+  get pending(): number {
+    return this.queue.length;
+  }
 
   /**
    * Change the admission ceiling without disturbing active work. Increasing

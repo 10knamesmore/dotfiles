@@ -50,7 +50,12 @@ interface LaunchedWorkflow {
  * Approve (throws on deny), start the run, and append the run-started marker.
  * Delivery and live observation are the caller's choice after this resolves.
  */
-export async function launchWorkflow(pi: ExtensionAPI, parent: ParentContext, input: WorkflowLaunchInput, approval: WorkflowApproval): Promise<LaunchedWorkflow> {
+export async function launchWorkflow(
+  pi: ExtensionAPI,
+  parent: ParentContext,
+  input: WorkflowLaunchInput,
+  approval: WorkflowApproval,
+): Promise<LaunchedWorkflow> {
   const approvedPlan = await approveLaunch(input.plan, approval.ctx, approval.policy);
   const { workflow, args } = approvedPlan;
   const modelTiers = readPersonalConfig()["model-tier"];
@@ -90,40 +95,46 @@ export function workflowStartedMarker(started: StartedWorkflow, autoApproved: bo
 }
 
 /** Wire background delivery and wait for the host's consumed-message acknowledgement. */
-export function deliverWorkflowInBackground(pi: ExtensionAPI, execution: Promise<WorkflowRunResult>, sessionId: string): void {
-  void execution.then(
-    (result) => {
-      recordWorkflowCompleted(pi, result);
-      const message = formatWorkflowDelivery(result);
-      try {
-        queueAcknowledgedDelivery(pi, {
-          sessionId,
-          message,
-          targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
-        });
-      } finally {
-        subagentRunner.releaseRunActivity(result.runId);
-      }
-    },
-    (error) => {
-      const message = formatWorkflowFailure(error);
-      if (error instanceof WorkflowRunError && error.generation !== undefined) {
+export function deliverWorkflowInBackground(
+  pi: ExtensionAPI,
+  execution: Promise<WorkflowRunResult>,
+  sessionId: string,
+): void {
+  void execution
+    .then(
+      (result) => {
+        recordWorkflowCompleted(pi, result);
+        const message = formatWorkflowDelivery(result);
         try {
           queueAcknowledgedDelivery(pi, {
             sessionId,
             message,
-            targets: [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }],
+            targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
           });
         } finally {
-          subagentRunner.releaseRunActivity(error.runId);
+          subagentRunner.releaseRunActivity(result.runId);
         }
-      } else {
-        pi.sendUserMessage(message, { deliverAs: "steer" });
-      }
-    },
-  ).catch((error) => {
-    reportDiagnostic(`[subagent-workflow] workflow delivery failed: ${safeDeliveryValue(errorMessage(error))}`);
-  });
+      },
+      (error) => {
+        const message = formatWorkflowFailure(error);
+        if (error instanceof WorkflowRunError && error.generation !== undefined) {
+          try {
+            queueAcknowledgedDelivery(pi, {
+              sessionId,
+              message,
+              targets: [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }],
+            });
+          } finally {
+            subagentRunner.releaseRunActivity(error.runId);
+          }
+        } else {
+          pi.sendUserMessage(message, { deliverAs: "steer" });
+        }
+      },
+    )
+    .catch((error) => {
+      reportDiagnostic(`[subagent-workflow] workflow delivery failed: ${safeDeliveryValue(errorMessage(error))}`);
+    });
 }
 
 export function formatWorkflowFailure(error: unknown): string {
@@ -154,9 +165,11 @@ export function formatWorkflowFailure(error: unknown): string {
       ...(aborted ? ["The workflow was intentionally stopped. Do not resume it unless the user explicitly asks."] : []),
     ],
     failures: aborted ? failures : [`Error: ${message}`, ...failures],
-    recovery: aborted ? [] : [
-      `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(scriptPath)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
-    ],
+    recovery: aborted
+      ? []
+      : [
+          `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(scriptPath)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
+        ],
     warnings: error.persistenceWarning ? [`Warning: ${safeDeliveryValue(error.persistenceWarning)}`] : [],
     artifacts: [`Run artifacts: ${runDir}`, ...(activity.artifact ? [activity.artifact] : [])],
     toolActivity: activity.text,
@@ -186,9 +199,14 @@ export function completeWorkflowInline(pi: ExtensionAPI, result: WorkflowRunResu
 export function completeWorkflowFailureInline(error: unknown, sessionId: string): Error {
   try {
     const message = formatWorkflowFailure(error);
-    if (error instanceof WorkflowRunError && error.generation !== undefined
-      && !writeDeliveryMarker(error.runDir, sessionId, workflowDeliveryIdentity(error.generation))) {
-      return new Error(`Workflow run ${error.runId} changed generation before inline failure delivery could be recorded`);
+    if (
+      error instanceof WorkflowRunError &&
+      error.generation !== undefined &&
+      !writeDeliveryMarker(error.runDir, sessionId, workflowDeliveryIdentity(error.generation))
+    ) {
+      return new Error(
+        `Workflow run ${error.runId} changed generation before inline failure delivery could be recorded`,
+      );
     }
     return new Error(message);
   } finally {
@@ -212,21 +230,31 @@ function workflowDeliveryIdentity(generation: number | undefined): RunDeliveryId
   return { generation };
 }
 
-function validateLiteralModels(models: readonly string[], tiers: Readonly<ModelTiers>, registry: ParentContext["ctx"]["modelRegistry"]): string | undefined {
-  const problems = [...new Set(models.flatMap((value) => {
-    try {
-      resolveTierModel(value, tiers, registry);
-      return [];
-    } catch (error) {
-      return [errorMessage(error)];
-    }
-  }))];
+function validateLiteralModels(
+  models: readonly string[],
+  tiers: Readonly<ModelTiers>,
+  registry: ParentContext["ctx"]["modelRegistry"],
+): string | undefined {
+  const problems = [
+    ...new Set(
+      models.flatMap((value) => {
+        try {
+          resolveTierModel(value, tiers, registry);
+          return [];
+        } catch (error) {
+          return [errorMessage(error)];
+        }
+      }),
+    ),
+  ];
   if (problems.length === 0) return undefined;
   return `Workflow was not launched; fix the script's model values first. ${problems.join(" ")}`;
 }
 
 /** Group identical child failures so 13 copies of one bad model read as one line. */
-export function groupFailedChildren(failedChildren: WorkflowRunResult["failedChildren"]): Array<{ count: number; error: string; labels: string[] }> {
+export function groupFailedChildren(
+  failedChildren: WorkflowRunResult["failedChildren"],
+): Array<{ count: number; error: string; labels: string[] }> {
   const groups = new Map<string, { count: number; error: string; labels: string[] }>();
   for (const child of failedChildren) {
     const error = child.error ?? "Unknown error";
@@ -306,7 +334,9 @@ export function summarizeActivityFold(fold: RunActivityFold): ChildToolActivityS
   const groups = new Map<string, ChildToolActivityGroup>();
   for (const [id, child] of fold.children) {
     const label = safeDeliveryValue(child.label).slice(0, TOOL_ACTIVITY_LABEL_MAX);
-    const key = JSON.stringify(Object.entries(child.tools).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0));
+    const key = JSON.stringify(
+      Object.entries(child.tools).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)),
+    );
     const group = groups.get(key) ?? { count: 0, examples: [], tools: child.tools };
     group.count += 1;
     // The id is the identity: labels are author-chosen and freely collide,
@@ -319,7 +349,13 @@ export function summarizeActivityFold(fold: RunActivityFold): ChildToolActivityS
   const omittedGroups = ordered.slice(TOOL_ACTIVITY_GROUP_CAP);
   const omittedChildren = omittedGroups.reduce((sum, group) => sum + group.count, 0);
   const omittedToolCalls = omittedGroups.reduce((sum, group) => sum + groupToolCalls(group), 0);
-  return { groups: kept, totalChildren: fold.children.size, omittedChildren, omittedToolCalls, complete: fold.complete };
+  return {
+    groups: kept,
+    totalChildren: fold.children.size,
+    omittedChildren,
+    omittedToolCalls,
+    complete: fold.complete,
+  };
 }
 
 /**
@@ -338,7 +374,10 @@ export function formatToolActivity(
   const header = `Tool activity${incomplete}:`;
   const entries = summary.groups.map((group) => {
     const members = `${group.examples.map((example) => `${example.label} [${example.id}]`).join(", ")}${group.count > group.examples.length ? ", ..." : ""}`;
-    const tools = Object.entries(group.tools).map(([tool, count]) => `${tool} x${count}`).join(", ") || "no tool calls";
+    const tools =
+      Object.entries(group.tools)
+        .map(([tool, count]) => `${tool} x${count}`)
+        .join(", ") || "no tool calls";
     const text = group.count === 1 ? `${members}: ${tools}` : `${group.count} children (${members}): ${tools} each`;
     return { group, lines: chunkDeliveryText(text).split("\n") };
   });
@@ -351,11 +390,16 @@ export function formatToolActivity(
   }
 
   const omittedEntries = entries.slice(shown.length);
-  let omittedToolCalls = summary.omittedToolCalls + omittedEntries.reduce((sum, entry) => sum + groupToolCalls(entry.group), 0);
+  let omittedToolCalls =
+    summary.omittedToolCalls + omittedEntries.reduce((sum, entry) => sum + groupToolCalls(entry.group), 0);
   let omittedChildren = summary.omittedChildren + omittedEntries.reduce((sum, entry) => sum + entry.group.count, 0);
-  const marker = () => `[+${omittedToolCalls} more tool calls across ${omittedChildren} more children; full activity in ${eventsPath}]`;
-  while (omittedChildren > 0 && shown.length > 0
-    && [header, ...shown.flatMap((item) => item.lines), marker()].join("\n").length + 1 > limit) {
+  const marker = () =>
+    `[+${omittedToolCalls} more tool calls across ${omittedChildren} more children; full activity in ${eventsPath}]`;
+  while (
+    omittedChildren > 0 &&
+    shown.length > 0 &&
+    [header, ...shown.flatMap((item) => item.lines), marker()].join("\n").length + 1 > limit
+  ) {
     const removed = shown.pop()!;
     omittedToolCalls += groupToolCalls(removed.group);
     omittedChildren += removed.group.count;
@@ -384,16 +428,21 @@ function formatWorkflowActivity(runId: string, runDir: string): { text: string; 
 
 function workflowStatus(result: WorkflowRunResult): string {
   const failedCount = result.failedChildren.length;
-  return failedCount === 0 ? "completed" : `completed with ${failedCount} failed child${failedCount === 1 ? "" : "ren"}`;
+  return failedCount === 0
+    ? "completed"
+    : `completed with ${failedCount} failed child${failedCount === 1 ? "" : "ren"}`;
 }
 
 type ResumeChildStatus = "completed" | "failed";
 
 function terminalChildEvent(value: unknown): { id: string; status: ResumeChildStatus } | undefined {
   if (!isRecord(value) || typeof value.id !== "string") return undefined;
-  const status = value.type === "status"
-    ? value.status
-    : value.type === "result" && isRecord(value.result) ? value.result.status : undefined;
+  const status =
+    value.type === "status"
+      ? value.status
+      : value.type === "result" && isRecord(value.result)
+        ? value.result.status
+        : undefined;
   return status === "completed" || status === "failed" ? { id: value.id, status } : undefined;
 }
 
@@ -404,7 +453,8 @@ function resumeChildLabels(record: unknown): Map<string, string> {
     if (!isRecord(value) || typeof value.id !== "string") continue;
     const resolved = isRecord(value.resolved) ? value.resolved : undefined;
     const spec = isRecord(value.spec) ? value.spec : undefined;
-    const label = typeof resolved?.label === "string" ? resolved.label : typeof spec?.label === "string" ? spec.label : value.id;
+    const label =
+      typeof resolved?.label === "string" ? resolved.label : typeof spec?.label === "string" ? spec.label : value.id;
     labels.set(value.id, label);
   }
   return labels;
@@ -439,7 +489,12 @@ function formatResumeSummary(result: WorkflowRunResult): string[] {
       .map(([id, status]) => ({ id, label: labels.get(id) ?? id, status }))
       .sort((left, right) => left.id.localeCompare(right.id));
     if (outcomes.length === 0) return [...prefix, "No child reached a terminal status in this resume."];
-    return [...prefix, ...outcomes.map((child) => `Child ${safeDeliveryValue(child.id)} (${safeDeliveryValue(child.label)}): ${child.status}`)];
+    return [
+      ...prefix,
+      ...outcomes.map(
+        (child) => `Child ${safeDeliveryValue(child.id)} (${safeDeliveryValue(child.label)}): ${child.status}`,
+      ),
+    ];
   } catch {
     return [...prefix, `Unavailable; inspect ${safeDeliveryValue(result.runDir)}/events.jsonl`];
   }
@@ -464,9 +519,12 @@ function formatWorkflowEnvelope(result: WorkflowRunResult): string {
       `Phases: ${stringifyDeliveryJson(result.meta.phases ?? [])}`,
     ],
     failures: formatGroupedFailures(result.failedChildren),
-    recovery: failedCount === 0 ? [] : [
-      `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(`${runDir}/script.js`)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
-    ],
+    recovery:
+      failedCount === 0
+        ? []
+        : [
+            `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(`${runDir}/script.js`)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
+          ],
     warnings: result.persistenceWarning ? [`Warning: ${safeDeliveryValue(result.persistenceWarning)}`] : [],
     artifacts: [
       ...(resumeSummary.length === 0 ? [`Result artifact: ${artifact}`] : []),

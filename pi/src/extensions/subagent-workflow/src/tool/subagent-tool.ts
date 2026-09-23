@@ -1,6 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { getAgentDir, type ExtensionAPI, type AgentToolResult, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import {
+  getAgentDir,
+  type ExtensionAPI,
+  type AgentToolResult,
+  type ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import {
   PublicSubagentOptionFields,
@@ -11,13 +16,16 @@ import {
 import { isModelTier, readPersonalConfig } from "../../../../config/index.js";
 import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, ThinkingLevel } from "../types.js";
-import { resolveModel, submittedSpec, unknownModelError, type ChildSpawnSpec, type ParentContext, type ResolvedFollowUpSpec } from "../runner/child.js";
-import { runOwnerIsLive } from "../store/lease.js";
 import {
-  queueAcknowledgedDelivery,
-  writeDeliveryMarker,
-  type RunDeliveryIdentity,
-} from "../store/delivery-marker.js";
+  resolveModel,
+  submittedSpec,
+  unknownModelError,
+  type ChildSpawnSpec,
+  type ParentContext,
+  type ResolvedFollowUpSpec,
+} from "../runner/child.js";
+import { runOwnerIsLive } from "../store/lease.js";
+import { queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
 import { encodeCwd, sumUsage } from "../store/run-store.js";
 import { jsonObject, readRunSnapshot } from "../store/run-snapshot.js";
 import { hasSessionClosedMarker } from "../store/session-closed-marker.js";
@@ -30,22 +38,29 @@ import type { SubagentStatusWidget } from "../ui/status-widget.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { bindAbort, childLabel, errorMessage } from "../util.js";
 
-export const SubagentToolParameters = Type.Object({
-  prompt: Type.Optional(SubagentPromptSchema),
-  ...PublicSubagentOptionFields,
-  model: Type.Optional(PublicSubagentOptionFields.model),
-  followUp: Type.Optional(Type.Object({
-    id: Type.String({ minLength: 1 }),
-    prompt: Type.String({ minLength: 1 }),
-  }, { additionalProperties: false })),
-}, { additionalProperties: false });
+export const SubagentToolParameters = Type.Object(
+  {
+    prompt: Type.Optional(SubagentPromptSchema),
+    ...PublicSubagentOptionFields,
+    model: Type.Optional(PublicSubagentOptionFields.model),
+    followUp: Type.Optional(
+      Type.Object(
+        {
+          id: Type.String({ minLength: 1 }),
+          prompt: Type.String({ minLength: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
 export type SubagentToolInput = Static<typeof SubagentToolParameters>;
 
 const OPTION_FIELDS = Object.keys(PublicSubagentOptionFields) as Array<keyof typeof PublicSubagentOptionFields>;
 
 export type ValidatedSubagentInput =
-  | { type: "spawn"; spec: TierSubagentSpec }
-  | { type: "followUp"; id: string; prompt: string; label?: string };
+  { type: "spawn"; spec: TierSubagentSpec } | { type: "followUp"; id: string; prompt: string; label?: string };
 
 /**
  * Top-level fields a follow-up may not set.
@@ -66,7 +81,9 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
   if (followUp) {
     const stray = FOLLOW_UP_CONFIG_FIELDS.find((field) => params[field] !== undefined);
     if (stray) {
-      throw new Error(`With followUp, ${stray} is invalid at the top level: a follow-up resumes the original child's session and inherits its configuration. Only label may be set, to name the new turn.`);
+      throw new Error(
+        `With followUp, ${stray} is invalid at the top level: a follow-up resumes the original child's session and inherits its configuration. Only label may be set, to name the new turn.`,
+      );
     }
     if (!params.followUp!.prompt.trim()) throw new Error("Subagent prompt must not be empty");
     return { type: "followUp", id: params.followUp!.id, prompt: params.followUp!.prompt, label: params.label };
@@ -77,8 +94,13 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
   return {
     type: "spawn",
     spec: {
-      prompt: params.prompt!, model: params.model, thinkingLevel: params.thinkingLevel as ThinkingLevel | undefined,
-      tools: params.tools, excludeTools: params.excludeTools, schema: params.schema, cwd: params.cwd,
+      prompt: params.prompt!,
+      model: params.model,
+      thinkingLevel: params.thinkingLevel as ThinkingLevel | undefined,
+      tools: params.tools,
+      excludeTools: params.excludeTools,
+      schema: params.schema,
+      cwd: params.cwd,
       label: params.label,
     },
   };
@@ -156,19 +178,25 @@ export function resolveFollowUpSpec(
     throw new Error(`No child ${JSON.stringify(id)} was found in persisted runs for ${cwd}`);
   }
   if (!qualified && candidates.length > 1) {
-    throw new Error(`Child id ${JSON.stringify(id)} is ambiguous; use one of: ${candidates.map(candidateName).join(", ")}`);
+    throw new Error(
+      `Child id ${JSON.stringify(id)} is ambiguous; use one of: ${candidates.map(candidateName).join(", ")}`,
+    );
   }
   const candidate = candidates[0]!;
   if (candidate.generationPending) {
     throw new Error(`Cannot follow up ${candidateName(candidate)}: source run is quarantined by generation.pending`);
   }
   if (!isTerminalStatus(candidate.status)) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: child is not terminal (status: ${String(candidate.status ?? "missing")})`);
+    throw new Error(
+      `Cannot follow up ${candidateName(candidate)}: child is not terminal (status: ${String(candidate.status ?? "missing")})`,
+    );
   }
   const submitted = jsonObject(candidate.child.spec);
   const resolved = jsonObject(candidate.child.resolved);
   if (!submitted || !resolved) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted child spec or resolved configuration is missing`);
+    throw new Error(
+      `Cannot follow up ${candidateName(candidate)}: persisted child spec or resolved configuration is missing`,
+    );
   }
   const sessionFile = candidate.child.sessionFile;
   if (typeof sessionFile !== "string" || !sessionFile) {
@@ -181,7 +209,9 @@ export function resolveFollowUpSpec(
     throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted sessionFile is missing`);
   }
   if (!hasSessionClosedMarker(candidate.runDir, candidate.childId)) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: source session closure is not confirmed; wait for child shutdown to finish and retry`);
+    throw new Error(
+      `Cannot follow up ${candidateName(candidate)}: source session closure is not confirmed; wait for child shutdown to finish and retry`,
+    );
   }
   const provider = requiredString(resolved.provider, candidate, "resolved provider");
   const modelId = requiredString(resolved.modelId, candidate, "resolved modelId");
@@ -190,9 +220,8 @@ export function resolveFollowUpSpec(
     throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted thinkingLevel is invalid`);
   }
   const inheritedTools = optionalStringArray(submitted.tools, candidate, "tools");
-  const tools = submitted.schema === undefined
-    ? inheritedTools
-    : inheritedTools?.filter((tool) => tool !== "report_result");
+  const tools =
+    submitted.schema === undefined ? inheritedTools : inheritedTools?.filter((tool) => tool !== "report_result");
   const excludeTools = optionalStringArray(submitted.excludeTools, candidate, "excludeTools");
   const submittedCwd = optionalString(submitted.cwd, candidate, "cwd");
   const label = optionalString(submitted.label, candidate, "label");
@@ -218,8 +247,7 @@ function parseQualifiedFollowUpId(id: string): { runId: string; childId: string 
 
 function recordHasChild(value: unknown, childId: string): boolean {
   const children = jsonObject(value)?.children;
-  return Array.isArray(children)
-    && children.some((child) => jsonObject(child)?.id === childId);
+  return Array.isArray(children) && children.some((child) => jsonObject(child)?.id === childId);
 }
 
 function candidateName(candidate: Pick<FollowUpCandidate, "runId" | "childId">): string {
@@ -234,7 +262,10 @@ function isTerminalStatus(value: unknown): value is Extract<SubagentStatus, "com
   return value === "completed" || value === "failed" || value === "aborted";
 }
 
-function terminalStatusFromEvents(events: readonly unknown[], childId: string): Extract<SubagentStatus, "completed" | "failed" | "aborted"> | undefined {
+function terminalStatusFromEvents(
+  events: readonly unknown[],
+  childId: string,
+): Extract<SubagentStatus, "completed" | "failed" | "aborted"> | undefined {
   let terminal: Extract<SubagentStatus, "completed" | "failed" | "aborted"> | undefined;
   for (const value of events) {
     const event = jsonObject(value);
@@ -247,8 +278,15 @@ function terminalStatusFromEvents(events: readonly unknown[], childId: string): 
 }
 
 function isThinkingLevel(value: unknown): value is ThinkingLevel {
-  return value === "off" || value === "minimal" || value === "low" || value === "medium"
-    || value === "high" || value === "xhigh" || value === "max";
+  return (
+    value === "off" ||
+    value === "minimal" ||
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "xhigh" ||
+    value === "max"
+  );
 }
 
 function requiredString(value: unknown, candidate: FollowUpCandidate, field: string): string {
@@ -280,22 +318,33 @@ type FollowUpResolver = (id: string, prompt: string, cwd: string) => ResolvedFol
  * the turn being run. A blank label is ignored rather than blanking the row.
  */
 export function withFollowUpLabel(resolved: ResolvedFollowUpSpec, label: string | undefined): ResolvedFollowUpSpec {
-  return label === undefined || label.trim() === ""
-    ? resolved
-    : { ...resolved, spec: { ...resolved.spec, label } };
+  return label === undefined || label.trim() === "" ? resolved : { ...resolved, spec: { ...resolved.spec, label } };
 }
 
-export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?: SubagentStatusWidget,
-  runner: SubagentRunner = subagentRunner, resolveFollowUp: FollowUpResolver = resolveFollowUpSpec): void {
+export function registerSubagentTool(
+  pi: ExtensionAPI,
+  selfPath: string,
+  widget?: SubagentStatusWidget,
+  runner: SubagentRunner = subagentRunner,
+  resolveFollowUp: FollowUpResolver = resolveFollowUpSpec,
+): void {
   const tool: ToolDefinition<typeof SubagentToolParameters, SubagentDetails | undefined> = {
-    name: "subagent", label: "Subagent", parameters: SubagentToolParameters,
-    description: "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'max', 'high', or 'mid'; use the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, and cwd, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
+    name: "subagent",
+    label: "Subagent",
+    parameters: SubagentToolParameters,
+    description:
+      "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'max', 'high', or 'mid'; use the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, and cwd, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
-      try { input = validateSubagentInput(params); } catch (error) { throw new Error(errorMessage(error)); }
-      const spawnSpec: ChildSpawnSpec = input.type === "followUp"
-        ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.cwd), input.label)
-        : resolveTierSpec(input.spec, readPersonalConfig()["model-tier"], ctx.modelRegistry);
+      try {
+        input = validateSubagentInput(params);
+      } catch (error) {
+        throw new Error(errorMessage(error));
+      }
+      const spawnSpec: ChildSpawnSpec =
+        input.type === "followUp"
+          ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.cwd), input.label)
+          : resolveTierSpec(input.spec, readPersonalConfig()["model-tier"], ctx.modelRegistry);
       const spec = submittedSpec(spawnSpec);
       // A child doomed by an unknown model fails fast with a suggestion instead
       // of spawning.
@@ -311,7 +360,9 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
       try {
         const resolved = resolveModel(spec, ctx, parent.thinkingLevel);
         display = { modelId: `${resolved.model.provider}/${resolved.model.id}`, thinking: resolved.thinking };
-      } catch { /* the child will fail (or not) on its own terms */ }
+      } catch {
+        /* the child will fail (or not) on its own terms */
+      }
       const handle = runner.spawnRun(spawnSpec, parent);
       const { runId, runDir } = handle;
       appendEntrySafely(pi, "subagent-workflow:run-started", {
@@ -333,11 +384,14 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
         // ends, which disposes the child - there is no later turn to steer a
         // result into. Waiting inline is the only way the work can complete.
         // Only this waiting call binds the turn's abort signal.
-        const unbindAbort = bindAbort(signal, () => { void handle.abort(); });
+        const unbindAbort = bindAbort(signal, () => {
+          void handle.abort();
+        });
         try {
           const result = await handle.result;
           return fenceDirectlyDeliveredRun(pi, runner, handle, result, sessionId, (degraded) =>
-            detailedResult(formatDelivery(runId, runDir, result, degraded), undefined));
+            detailedResult(formatDelivery(runId, runDir, result, degraded), undefined),
+          );
         } finally {
           unbindAbort();
         }
@@ -345,11 +399,13 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
       // Background children deliberately outlive the spawning turn, so nothing
       // binds this turn's abort signal: a later Esc must not kill promised
       // work. Stop a run from /agents instead.
-      void handle.result.then((result) => {
-        queueCompletedRun(pi, runner, handle, result, sessionId);
-      }).catch((error) => {
-        reportDiagnostic(`[subagent-workflow] background delivery failed: ${errorMessage(error)}`);
-      });
+      void handle.result
+        .then((result) => {
+          queueCompletedRun(pi, runner, handle, result, sessionId);
+        })
+        .catch((error) => {
+          reportDiagnostic(`[subagent-workflow] background delivery failed: ${errorMessage(error)}`);
+        });
       return detailedResult(
         JSON.stringify({ id: handle.id, runId, runDir, status: handle.status, label: spec.label }),
         initialDetails(spec, handle, display),
@@ -360,7 +416,7 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
       // id is the fallback and stays visible in the run record either way.
       const label = args.followUp
         ? `follow-up · ${args.label ?? args.followUp.id}`
-        : args.label ?? (args.prompt ? childLabel({ prompt: args.prompt }) : "Subagent");
+        : (args.label ?? (args.prompt ? childLabel({ prompt: args.prompt }) : "Subagent"));
       return renderCallHeader(label, theme);
     },
     renderResult(result, _options, theme, context) {
@@ -393,13 +449,19 @@ export function formatDelivery(runId: string, runDir: string, result: SubagentRe
       `Status: ${delivered.status}`,
       `Child ${delivered.id} (${delivered.resolved.label}): ${delivered.status}`,
     ],
-    failures: delivered.status === "failed"
-      ? [`Failed child ${delivered.id} (${delivered.resolved.label}): ${delivered.error ?? "Unknown error"}`]
-      : delivered.status === "aborted" ? [`Aborted child ${delivered.id} (${delivered.resolved.label})`] : [],
+    failures:
+      delivered.status === "failed"
+        ? [`Failed child ${delivered.id} (${delivered.resolved.label}): ${delivered.error ?? "Unknown error"}`]
+        : delivered.status === "aborted"
+          ? [`Aborted child ${delivered.id} (${delivered.resolved.label})`]
+          : [],
     recovery: delivered.status === "failed" ? ["Recovery: respawn the child with the same prompt and options."] : [],
-    warnings: degraded ? [`Warning: run persistence degraded (${safeDeliveryValue(degraded)}); the run directory may be incomplete`] : [],
+    warnings: degraded
+      ? [`Warning: run persistence degraded (${safeDeliveryValue(degraded)}); the run directory may be incomplete`]
+      : [],
     artifacts: [`Run record: ${runRecord}`],
-    auxiliaryArtifacts: delivered.sessionFile === undefined ? [] : [`Child ${delivered.id} session: ${delivered.sessionFile}`],
+    auxiliaryArtifacts:
+      delivered.sessionFile === undefined ? [] : [`Child ${delivered.id} session: ${delivered.sessionFile}`],
     resultPreview: chunkDeliveryText(stringifyDeliveryJson({ type: "subagent_results", results: [delivered] })),
     truncationMarker: degraded
       ? `[truncated - result may be incomplete at ${eventsRecord}; run persistence degraded]`
@@ -413,8 +475,14 @@ export function formatDelivery(runId: string, runDir: string, result: SubagentRe
  * result is never redelivered to the model. `deliver` runs between the two
  * so an inline delivery can still surface a degraded-persistence warning.
  */
-export function fenceDirectlyDeliveredRun<T>(pi: ExtensionAPI, runner: SubagentRunner, handle: SubagentHandle,
-  result: SubagentResult, sessionId: string, deliver: (degraded: string | undefined) => T): T {
+export function fenceDirectlyDeliveredRun<T>(
+  pi: ExtensionAPI,
+  runner: SubagentRunner,
+  handle: SubagentHandle,
+  result: SubagentResult,
+  sessionId: string,
+  deliver: (degraded: string | undefined) => T,
+): T {
   const { runId, runDir } = handle;
   recordCompletedRun(pi, handle, result);
   const identity = resultDeliveryIdentity(runId, result);
@@ -425,8 +493,13 @@ export function fenceDirectlyDeliveredRun<T>(pi: ExtensionAPI, runner: SubagentR
   return delivered;
 }
 
-function queueCompletedRun(pi: ExtensionAPI, runner: SubagentRunner, handle: SubagentHandle,
-  result: SubagentResult, sessionId: string): void {
+function queueCompletedRun(
+  pi: ExtensionAPI,
+  runner: SubagentRunner,
+  handle: SubagentHandle,
+  result: SubagentResult,
+  sessionId: string,
+): void {
   const { runId, runDir } = handle;
   recordCompletedRun(pi, handle, result);
   queueAcknowledgedDelivery(pi, {

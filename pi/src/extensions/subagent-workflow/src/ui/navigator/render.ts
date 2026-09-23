@@ -9,7 +9,17 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { clamp, countStatuses, formatDuration, formatTokenUsage, hasTokenUsage, modelEffort, padStart, statusGlyph, type ThemeLike } from "../format.js";
+import {
+  clamp,
+  countStatuses,
+  formatDuration,
+  formatTokenUsage,
+  hasTokenUsage,
+  modelEffort,
+  padStart,
+  statusGlyph,
+  type ThemeLike,
+} from "../format.js";
 import { sumUsage } from "../../store/run-store.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import type { FilterMode } from "./controls.js";
@@ -51,7 +61,14 @@ function selector(selected: boolean): string {
 }
 
 /** Level 1: the run list. `cursor` indexes `rows`; output is at most `maxLines` tall. */
-export function renderRunList(rows: RunSummary[], cursor: number, theme: ThemeLike, width: number, now: number, maxLines: number): string[] {
+export function renderRunList(
+  rows: RunSummary[],
+  cursor: number,
+  theme: ThemeLike,
+  width: number,
+  now: number,
+  maxLines: number,
+): string[] {
   const cap = Math.max(20, width);
   const active = rows.filter((row) => row.status === "running" || row.status === "pending").length;
   const header = `${theme.bold("Agents")} ${theme.fg("dim", `· ${rows.length} run${rows.length === 1 ? "" : "s"}${active > 0 ? ` · ${active} active` : ""}`)}`;
@@ -74,13 +91,20 @@ export function renderRunList(rows: RunSummary[], cursor: number, theme: ThemeLi
 
 function renderRunRow(row: RunSummary, selected: boolean, theme: ThemeLike, now: number): string {
   const mark = selector(selected);
-  if (row.corrupt) return theme.fg("dim", `${mark}· ${sanitizeTerminalText(row.label)} ${sanitizeTerminalText(row.runId)}`);
-  const unhealthyCompletion = row.kind === "workflow" && row.status === "completed" && (row.failed > 0 || row.aborted > 0);
+  if (row.corrupt)
+    return theme.fg("dim", `${mark}· ${sanitizeTerminalText(row.label)} ${sanitizeTerminalText(row.runId)}`);
+  const unhealthyCompletion =
+    row.kind === "workflow" && row.status === "completed" && (row.failed > 0 || row.aborted > 0);
   const glyph = unhealthyCompletion ? theme.fg("warning", "⚠") : statusGlyph(row.status, theme, now, false);
   const safeLabel = sanitizeTerminalText(row.label);
   const label = selected ? theme.fg("accent", theme.bold(safeLabel)) : theme.bold(safeLabel);
   const outcome = unhealthyCompletion
-    ? ["completed", `${row.completed} ok`, row.failed > 0 ? `${row.failed} failed` : "", row.aborted > 0 ? `${row.aborted} aborted` : ""]
+    ? [
+        "completed",
+        `${row.completed} ok`,
+        row.failed > 0 ? `${row.failed} failed` : "",
+        row.aborted > 0 ? `${row.aborted} aborted` : "",
+      ]
     : [`${row.done}/${row.total}`];
   const meta = [...outcome, hasTokenUsage(row.usage) ? formatTokenUsage(row.usage) : "", formatAge(now - row.createdAt)]
     .filter(Boolean)
@@ -119,7 +143,10 @@ export function pageRunDetail(
     return { cursor: next, row: next };
   }
   const layout = buildWorkflowLayout(detail, order);
-  const selectedRow = Math.max(0, layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor));
+  const selectedRow = Math.max(
+    0,
+    layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor),
+  );
   const anchor = currentRow === undefined ? selectedRow : clamp(currentRow, 0, Math.max(0, layout.length - 1));
   const targetRow = clamp(anchor + delta * Math.max(1, pageRows), 0, Math.max(0, layout.length - 1));
   let best = cursor;
@@ -128,7 +155,7 @@ export function pageRunDetail(
     const row = layout[index]!;
     if (row.kind !== "child") continue;
     const distance = Math.abs(index - targetRow);
-    if (distance < bestDistance || (distance === bestDistance && ((delta >= 0) === (index > targetRow)))) {
+    if (distance < bestDistance || (distance === bestDistance && delta >= 0 === index > targetRow)) {
       best = row.childIndex;
       bestDistance = distance;
     }
@@ -161,9 +188,8 @@ export function renderRunDetail(
   }
   const rowCap = Math.max(1, maxLines - lines.length - 2);
   const cursorRow = body.findIndex((row) => row.childIndex === cursor);
-  const activeRow = focusRow === undefined
-    ? (cursorRow < 0 ? 0 : cursorRow)
-    : clamp(focusRow, 0, Math.max(0, body.length - 1));
+  const activeRow =
+    focusRow === undefined ? (cursorRow < 0 ? 0 : cursorRow) : clamp(focusRow, 0, Math.max(0, body.length - 1));
   const window = scrollWindow(body.length, activeRow, rowCap);
   if (window.moreAbove) lines.push(theme.fg("dim", "  ↑ more"));
   for (let i = 0; i < window.count; i += 1) lines.push(body[window.start + i]!.text);
@@ -171,34 +197,60 @@ export function renderRunDetail(
   return lines;
 }
 
-function renderDetailHeader(detail: RunDetail, shown: number, filter: FilterMode, theme: ThemeLike, cap: number): string[] {
+function renderDetailHeader(
+  detail: RunDetail,
+  shown: number,
+  filter: FilterMode,
+  theme: ThemeLike,
+  cap: number,
+): string[] {
   const total = detail.children.length;
   const usage = sumUsage(detail.children.map((child) => child.usage));
   const counts = countStatuses(detail.children.map((child) => child.status));
   const filterNote = filter === "all" ? "" : ` · filter: ${filter} (${shown})`;
   const title = `${theme.bold(sanitizeTerminalText(detail.label))} ${theme.fg("dim", `· ${detail.kind} · ${sanitizeTerminalText(detail.runId)}`)}`;
-  const health = detail.kind === "workflow" && detail.status === "completed" && (counts.failed > 0 || counts.aborted > 0)
-    ? `completed · ${counts.completed} ok${counts.failed > 0 ? ` · ${counts.failed} failed` : ""}${counts.aborted > 0 ? ` · ${counts.aborted} aborted` : ""}`
-    : `${counts.done}/${total} done · ${detail.status}`;
+  const health =
+    detail.kind === "workflow" && detail.status === "completed" && (counts.failed > 0 || counts.aborted > 0)
+      ? `completed · ${counts.completed} ok${counts.failed > 0 ? ` · ${counts.failed} failed` : ""}${counts.aborted > 0 ? ` · ${counts.aborted} aborted` : ""}`
+      : `${counts.done}/${total} done · ${detail.status}`;
   const stats = theme.fg("dim", `${health} · ${formatTokenUsage(usage)}${filterNote}`);
   return [truncateToWidth(title, cap), truncateToWidth(stats, cap)];
 }
 
-function buildDetailBody(detail: RunDetail, order: ChildRow[], cursor: number, theme: ThemeLike, cap: number, now: number): DisplayRow[] {
+function buildDetailBody(
+  detail: RunDetail,
+  order: ChildRow[],
+  cursor: number,
+  theme: ThemeLike,
+  cap: number,
+  now: number,
+): DisplayRow[] {
   if (detail.kind !== "workflow") {
-    return order.map((child, index) => ({ text: truncateToWidth(renderChildRow(child, index === cursor, theme, now), cap), childIndex: index }));
+    return order.map((child, index) => ({
+      text: truncateToWidth(renderChildRow(child, index === cursor, theme, now), cap),
+      childIndex: index,
+    }));
   }
   return buildWorkflowBody(detail, order, cursor, theme, cap, now);
 }
 
-function buildWorkflowBody(detail: RunDetail, order: ChildRow[], cursor: number, theme: ThemeLike, cap: number, now: number): DisplayRow[] {
+function buildWorkflowBody(
+  detail: RunDetail,
+  order: ChildRow[],
+  cursor: number,
+  theme: ThemeLike,
+  cap: number,
+  now: number,
+): DisplayRow[] {
   return buildWorkflowLayout(detail, order).map((row): DisplayRow => {
     if (row.kind === "phase") {
       const heading = `${row.hasAgents ? "▸" : "▹"} ${sanitizeTerminalText(row.text)}`;
       return { text: truncateToWidth(theme.fg(row.hasAgents ? "accent" : "dim", heading), cap) };
     }
     if (row.kind === "log") {
-      return { text: truncateToWidth(theme.fg("dim", `${" ".repeat(row.indent)}▪ ${sanitizeTerminalText(row.text)}`), cap) };
+      return {
+        text: truncateToWidth(theme.fg("dim", `${" ".repeat(row.indent)}▪ ${sanitizeTerminalText(row.text)}`), cap),
+      };
     }
     return {
       text: truncateToWidth(`  ${renderChildRow(row.child, row.childIndex === cursor, theme, now)}`, cap),
@@ -241,7 +293,11 @@ function buildWorkflowLayout(detail: RunDetail, order: ChildRow[]): WorkflowLayo
     if (line.kind === "log") rows.push({ kind: "log", text: line.text, indent: 2 });
   }
   for (const title of visibleTitles) {
-    rows.push({ kind: "phase", text: title, hasAgents: title === noPhase ? groups.has(title) : startedPhases.has(title) });
+    rows.push({
+      kind: "phase",
+      text: title,
+      hasAgents: title === noPhase ? groups.has(title) : startedPhases.has(title),
+    });
     for (const line of narratorFor(detail, title)) rows.push({ kind: "log", text: line, indent: 4 });
     for (const child of groups.get(title) ?? []) {
       const index = indexOf.get(child) ?? -1;
@@ -268,7 +324,18 @@ function renderChildRow(child: ChildRow, selected: boolean, theme: ThemeLike, no
   const styledLabel = selected ? theme.fg("accent", theme.bold(label)) : label;
   const cells = [`${selector(selected)}${glyph} ${styledLabel}`];
   // modelEffort already fits MODEL_MAX; truncateToWidth pads it to a fixed column.
-  if (child.model) cells.push(theme.fg("dim", truncateToWidth(sanitizeTerminalText(modelEffort(child.model, child.thinking, MODEL_MAX)), MODEL_MAX, "…", true)));
+  if (child.model)
+    cells.push(
+      theme.fg(
+        "dim",
+        truncateToWidth(
+          sanitizeTerminalText(modelEffort(child.model, child.thinking, MODEL_MAX)),
+          MODEL_MAX,
+          "…",
+          true,
+        ),
+      ),
+    );
   // Elapsed and token usage are right-aligned in fixed columns so the
   // trailing activity/result text starts at the same column on every row.
   const elapsed = child.startedAt !== undefined ? formatDuration((child.endedAt ?? now) - child.startedAt) : "";
@@ -276,7 +343,10 @@ function renderChildRow(child: ChildRow, selected: boolean, theme: ThemeLike, no
   cells.push(theme.fg("dim", padStart(formatTokenUsage(child.usage), USAGE_WIDTH)));
   const trailing = child.error
     ? theme.fg("error", sanitizeTerminalText(child.error))
-    : theme.fg("dim", sanitizeTerminalText(child.status === "running" ? child.activity ?? "" : child.resultLine ?? ""));
+    : theme.fg(
+        "dim",
+        sanitizeTerminalText(child.status === "running" ? (child.activity ?? "") : (child.resultLine ?? "")),
+      );
   const head = cells.join("  ");
   return trailing.trim() ? `${head}  ${trailing}` : head;
 }

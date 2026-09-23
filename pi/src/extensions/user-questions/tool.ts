@@ -1,8 +1,4 @@
-import type {
-  AgentToolResult,
-  ExtensionAPI,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
   Editor,
   type EditorTheme,
@@ -16,10 +12,7 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import {
-  compactQuestionDisplay,
-  sanitizeQuestionDisplay,
-} from "./display.js";
+import { compactQuestionDisplay, sanitizeQuestionDisplay } from "./display.js";
 import {
   AskUserQuestionsParameters,
   type AskUserQuestionsParams,
@@ -58,10 +51,7 @@ interface RenderOption {
   isOther: boolean;
 }
 
-function toolResult(
-  text: string,
-  details: AskUserQuestionsDetails,
-): AgentToolResult<AskUserQuestionsDetails> {
+function toolResult(text: string, details: AskUserQuestionsDetails): AgentToolResult<AskUserQuestionsDetails> {
   return {
     content: [{ type: "text", text }],
     details,
@@ -70,9 +60,7 @@ function toolResult(
 
 function answerText(answer: UserQuestionAnswer): string {
   const value =
-    answer.source === "option" && answer.label !== undefined
-      ? `${answer.label} (${answer.value})`
-      : answer.value;
+    answer.source === "option" && answer.label !== undefined ? `${answer.label} (${answer.value})` : answer.value;
   return `${answer.id}: ${sanitizeQuestionDisplay(value)}`;
 }
 
@@ -81,9 +69,7 @@ function answersText(answers: readonly UserQuestionAnswer[]): string {
     .flatMap((answer) => {
       const lines = [answerText(answer)];
       if (answer.note !== undefined) {
-        lines.push(
-          `${answer.id} note: ${sanitizeQuestionDisplay(answer.note)}`,
-        );
+        lines.push(`${answer.id} note: ${sanitizeQuestionDisplay(answer.note)}`);
       }
       return lines;
     })
@@ -107,10 +93,7 @@ function questionTitle(question: UserQuestion, index: number, total: number): st
 }
 
 function optionLabel(option: UserQuestionOption, index: number): string {
-  const description =
-    option.description === undefined
-      ? ""
-      : ` — ${sanitizeQuestionDisplay(option.description)}`;
+  const description = option.description === undefined ? "" : ` — ${sanitizeQuestionDisplay(option.description)}`;
   return `${index + 1}. ${sanitizeQuestionDisplay(option.label)}${description}`;
 }
 
@@ -180,8 +163,7 @@ class UserQuestionsComponent implements Component, Focusable {
     const renderWidth = Math.max(1, width);
     const lines: string[] = [];
     const currentQuestion = this.currentQuestion();
-    const options =
-      currentQuestion === undefined ? [] : this.renderOptions(currentQuestion);
+    const options = currentQuestion === undefined ? [] : this.renderOptions(currentQuestion);
 
     const addWrapped = (text: string): void => {
       lines.push(...wrapTextWithAnsi(text, renderWidth));
@@ -205,13 +187,7 @@ class UserQuestionsComponent implements Component, Focusable {
     if (currentQuestion === undefined) {
       this.renderSubmit(lines, addWrappedWithPrefix);
     } else {
-      this.renderQuestion(
-        lines,
-        renderWidth,
-        currentQuestion,
-        options,
-        addWrappedWithPrefix,
-      );
+      this.renderQuestion(lines, renderWidth, currentQuestion, options, addWrappedWithPrefix);
     }
 
     lines.push("");
@@ -383,9 +359,7 @@ class UserQuestionsComponent implements Component, Focusable {
       const otherIndex = options.findIndex((option) => option.isOther);
       return otherIndex === -1 ? 0 : otherIndex;
     }
-    const optionIndex = options.findIndex(
-      (option) => option.option?.value === answer.value,
-    );
+    const optionIndex = options.findIndex((option) => option.option?.value === answer.value);
     return optionIndex === -1 ? 0 : optionIndex;
   }
 
@@ -396,10 +370,7 @@ class UserQuestionsComponent implements Component, Focusable {
       return;
     }
     const options = this.renderOptions(question);
-    this.optionIndex = Math.min(
-      this.answerIndex(question, options),
-      Math.max(0, options.length - 1),
-    );
+    this.optionIndex = Math.min(this.answerIndex(question, options), Math.max(0, options.length - 1));
   }
 
   private navigate(delta: number): void {
@@ -446,10 +417,7 @@ class UserQuestionsComponent implements Component, Focusable {
     this.refresh();
   }
 
-  private saveInputAndNavigate(
-    delta: number,
-    value = this.editor.getText(),
-  ): void {
+  private saveInputAndNavigate(delta: number, value = this.editor.getText()): void {
     const question = this.currentQuestion();
     if (question === undefined) throw new Error("Cannot save input outside a question.");
     this.answers.set(question.id, {
@@ -496,10 +464,7 @@ class UserQuestionsComponent implements Component, Focusable {
     this.tui.requestRender();
   }
 
-  private renderNavigation(
-    lines: string[],
-    addWrappedWithPrefix: (prefix: string, text: string) => void,
-  ): void {
+  private renderNavigation(lines: string[], addWrappedWithPrefix: (prefix: string, text: string) => void): void {
     const tabs = this.questions.map((question, index) => {
       const active = index === this.currentIndex;
       const answered = this.answers.has(question.id);
@@ -527,17 +492,8 @@ class UserQuestionsComponent implements Component, Focusable {
     options: readonly RenderOption[],
     addWrappedWithPrefix: (prefix: string, text: string) => void,
   ): void {
-    addWrappedWithPrefix(
-      " ",
-      this.theme.fg(
-        "muted",
-        `Question ${this.currentIndex + 1}/${this.questions.length}`,
-      ),
-    );
-    addWrappedWithPrefix(
-      " ",
-      this.theme.fg("text", sanitizeQuestionDisplay(question.question)),
-    );
+    addWrappedWithPrefix(" ", this.theme.fg("muted", `Question ${this.currentIndex + 1}/${this.questions.length}`));
+    addWrappedWithPrefix(" ", this.theme.fg("text", sanitizeQuestionDisplay(question.question)));
     lines.push("");
 
     if (this.inputMode) {
@@ -546,25 +502,13 @@ class UserQuestionsComponent implements Component, Focusable {
         const prefix = selected ? this.theme.fg("accent", "> ") : "  ";
         addWrappedWithPrefix(prefix, this.theme.fg(selected ? "accent" : "text", option.label));
         if (option.option?.description !== undefined) {
-          addWrappedWithPrefix(
-            "     ",
-            this.theme.fg(
-              "muted",
-              sanitizeQuestionDisplay(option.option.description),
-            ),
-          );
+          addWrappedWithPrefix("     ", this.theme.fg("muted", sanitizeQuestionDisplay(option.option.description)));
         }
       }
       if (options.length > 0) lines.push("");
       addWrappedWithPrefix(" ", this.theme.fg("muted", "Your answer:"));
-      if (
-        question.placeholder !== undefined &&
-        this.editor.getText().length === 0
-      ) {
-        addWrappedWithPrefix(
-          " ",
-          this.theme.fg("dim", sanitizeQuestionDisplay(question.placeholder)),
-        );
+      if (question.placeholder !== undefined && this.editor.getText().length === 0) {
+        addWrappedWithPrefix(" ", this.theme.fg("dim", sanitizeQuestionDisplay(question.placeholder)));
       }
       for (const line of this.editor.render(Math.max(1, renderWidth - 2))) {
         lines.push(` ${line}`);
@@ -574,10 +518,7 @@ class UserQuestionsComponent implements Component, Focusable {
 
     if (options.length === 0) {
       const answer = this.answers.get(question.id);
-      const value =
-        answer === undefined || answer.value.length === 0
-          ? "(no answer)"
-          : answer.value;
+      const value = answer === undefined || answer.value.length === 0 ? "(no answer)" : answer.value;
       addWrappedWithPrefix(" ", this.theme.fg("muted", "Answer: "));
       addWrappedWithPrefix(" ", this.theme.fg("text", sanitizeQuestionDisplay(value)));
       this.renderNoteSection(question, renderWidth, lines, addWrappedWithPrefix);
@@ -597,15 +538,9 @@ class UserQuestionsComponent implements Component, Focusable {
       if (option.isOther && answer?.source === "custom") {
         label = `${label}: ${sanitizeQuestionDisplay(answer.value)}`;
       }
-      addWrappedWithPrefix(
-        prefix,
-        this.theme.fg(selected ? "accent" : "text", label) + suffix,
-      );
+      addWrappedWithPrefix(prefix, this.theme.fg(selected ? "accent" : "text", label) + suffix);
       if (option.option?.description !== undefined) {
-        addWrappedWithPrefix(
-          "     ",
-          this.theme.fg("muted", sanitizeQuestionDisplay(option.option.description)),
-        );
+        addWrappedWithPrefix("     ", this.theme.fg("muted", sanitizeQuestionDisplay(option.option.description)));
       }
     }
     this.renderNoteSection(question, renderWidth, lines, addWrappedWithPrefix);
@@ -628,17 +563,11 @@ class UserQuestionsComponent implements Component, Focusable {
     const note = this.notes.get(question.id);
     if (note !== undefined) {
       lines.push("");
-      addWrappedWithPrefix(
-        " ",
-        this.theme.fg("dim", `Note: ${sanitizeQuestionDisplay(note)}`),
-      );
+      addWrappedWithPrefix(" ", this.theme.fg("dim", `Note: ${sanitizeQuestionDisplay(note)}`));
     }
   }
 
-  private renderSubmit(
-    lines: string[],
-    addWrappedWithPrefix: (prefix: string, text: string) => void,
-  ): void {
+  private renderSubmit(lines: string[], addWrappedWithPrefix: (prefix: string, text: string) => void): void {
     addWrappedWithPrefix(" ", this.theme.fg("accent", this.theme.bold("Ready to submit")));
     lines.push("");
     for (const question of this.questions) {
@@ -647,16 +576,10 @@ class UserQuestionsComponent implements Component, Focusable {
         answer === undefined || answer.value.length === 0
           ? this.theme.fg("dim", "(unanswered)")
           : this.theme.fg("text", sanitizeQuestionDisplay(answer.value));
-      addWrappedWithPrefix(
-        " ",
-        `${this.theme.fg("muted", `${sanitizeQuestionDisplay(question.id)}: `)}${value}`,
-      );
+      addWrappedWithPrefix(" ", `${this.theme.fg("muted", `${sanitizeQuestionDisplay(question.id)}: `)}${value}`);
       const note = this.notes.get(question.id);
       if (note !== undefined) {
-        addWrappedWithPrefix(
-          " ",
-          this.theme.fg("dim", `note: ${sanitizeQuestionDisplay(note)}`),
-        );
+        addWrappedWithPrefix(" ", this.theme.fg("dim", `note: ${sanitizeQuestionDisplay(note)}`));
       }
     }
     lines.push("");
@@ -710,21 +633,17 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
         });
       }
       if (ctx.mode !== "tui") {
-        return toolResult(
-          "Error: User questions require the interactive TUI",
-          { questions: params.questions, answers: [], cancelled: true },
-        );
+        return toolResult("Error: User questions require the interactive TUI", {
+          questions: params.questions,
+          answers: [],
+          cancelled: true,
+        });
       }
       if (signal?.aborted) throw new Error("User questions were cancelled.");
 
       const interaction = await ctx.ui.custom<UserQuestionInteractionResult | null>(
         (tui, theme, _keybindings, done) => {
-          const component = new UserQuestionsComponent(
-            tui,
-            theme,
-            params.questions,
-            done,
-          );
+          const component = new UserQuestionsComponent(tui, theme, params.questions, done);
           signal?.addEventListener("abort", () => component.cancel(), {
             once: true,
           });
@@ -749,23 +668,14 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
         count === 1 && firstQuestion !== undefined
           ? compactQuestionDisplay(firstQuestion.question)
           : `${count} questions`;
-      return new Text(
-        theme.fg("toolTitle", theme.bold("ask_user_questions ")) +
-          theme.fg("muted", summary),
-        0,
-        0,
-      );
+      return new Text(theme.fg("toolTitle", theme.bold("ask_user_questions ")) + theme.fg("muted", summary), 0, 0);
     },
 
     renderResult(result, _options, theme) {
       const details = result.details;
       if (details === undefined) {
         const first = result.content[0];
-        return new Text(
-          first?.type === "text" ? sanitizeQuestionDisplay(first.text) : "",
-          0,
-          0,
-        );
+        return new Text(first?.type === "text" ? sanitizeQuestionDisplay(first.text) : "", 0, 0);
       }
       if (details.cancelled) {
         return new Text(theme.fg("warning", "Cancelled"), 0, 0);
@@ -773,9 +683,7 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
       return new Text(
         details.answers
           .map((answer) => {
-            const base =
-              theme.fg("success", "✓ ") +
-              theme.fg("accent", answerText(answer));
+            const base = theme.fg("success", "✓ ") + theme.fg("accent", answerText(answer));
             return answer.note === undefined
               ? base
               : `${base}\n  ${theme.fg("muted", `note: ${sanitizeQuestionDisplay(answer.note)}`)}`;

@@ -26,8 +26,7 @@ export function registerSessionTodo(pi: ExtensionAPI): void {
   const restore = (ctx: Parameters<TodoSessionStore["restore"]>[0]): void => {
     const restoreWarning = store.restore(ctx);
     const presentationWarning = presentation.refresh(ctx, store.snapshot());
-    if (restoreWarning && presentationWarning)
-      ctx.ui.notify(`${restoreWarning} ${presentationWarning}`, "warning");
+    if (restoreWarning && presentationWarning) ctx.ui.notify(`${restoreWarning} ${presentationWarning}`, "warning");
     else {
       const warning = restoreWarning ?? presentationWarning;
       if (warning) ctx.ui.notify(warning, "warning");

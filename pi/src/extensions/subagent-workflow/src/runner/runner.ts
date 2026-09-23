@@ -2,9 +2,25 @@ import { randomUUID } from "node:crypto";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, ThinkingLevel, UsageSummary } from "../types.js";
+import type {
+  FollowUpReference,
+  ResolvedSpec,
+  SubagentEvent,
+  SubagentHandle,
+  SubagentResult,
+  SubagentSpec,
+  SubagentStatus,
+  ThinkingLevel,
+  UsageSummary,
+} from "../types.js";
 import { cloneActivityFold, type RunActivityFold } from "../store/activity-fold.js";
-import { cloneRunProjection, foldRunProjection as foldProjection, projectRunSnapshot, type RunProjection, type RunProjectionEvent } from "../store/run-projection.js";
+import {
+  cloneRunProjection,
+  foldRunProjection as foldProjection,
+  projectRunSnapshot,
+  type RunProjection,
+  type RunProjectionEvent,
+} from "../store/run-projection.js";
 import { readRunSnapshot, type RunSnapshot } from "../store/run-snapshot.js";
 import { EMPTY_USAGE, RunStore } from "../store/run-store.js";
 import { writeSessionClosedMarker } from "../store/session-closed-marker.js";
@@ -21,7 +37,9 @@ import { Semaphore } from "./semaphore.js";
 // respect the process-wide concurrency limit.
 const SEMAPHORE_KEY = "__piSubagentWorkflowSemaphore__";
 const globalScope = globalThis as unknown as Record<string, Semaphore | undefined>;
-const globalSemaphore: Semaphore = globalScope[SEMAPHORE_KEY] ??= new Semaphore(Math.max(1, Math.min(16, cpus().length - 2)));
+const globalSemaphore: Semaphore = (globalScope[SEMAPHORE_KEY] ??= new Semaphore(
+  Math.max(1, Math.min(16, cpus().length - 2)),
+));
 
 interface SpawnRunOptions {
   runId?: string;
@@ -88,13 +106,23 @@ class Handle implements SubagentHandle {
   pendingInitialAdmission?: AbortController;
   /** Initial admission, construction, prompt, and cleanup task. */
   private startup?: Promise<void>;
-  constructor(readonly id: string, spawnSpec: ChildSpawnSpec, readonly runId: string, readonly runDir: string,
-    readonly generation: number, private store: RunStore, private runner: SubagentRunner, readonly parent: ParentContext) {
+  constructor(
+    readonly id: string,
+    spawnSpec: ChildSpawnSpec,
+    readonly runId: string,
+    readonly runDir: string,
+    readonly generation: number,
+    private store: RunStore,
+    private runner: SubagentRunner,
+    readonly parent: ParentContext,
+  ) {
     this.spec = submittedSpec(spawnSpec);
     const followUp = followUpSpawn(spawnSpec);
     this.forkSessionFile = followUp?.forkSessionFile;
     this.followUpOf = followUp?.followUpOf;
-    this.result = new Promise((resolve) => { this.resolveResult = resolve; });
+    this.result = new Promise((resolve) => {
+      this.resolveResult = resolve;
+    });
   }
   emit(event: SubagentEvent): void {
     this.store.recordEvent(event);
@@ -116,7 +144,10 @@ class Handle implements SubagentHandle {
       }
     }
   }
-  setStatus(status: SubagentStatus): void { this.status = status; this.emit({ type: "status", id: this.id, status }); }
+  setStatus(status: SubagentStatus): void {
+    this.status = status;
+    this.emit({ type: "status", id: this.id, status });
+  }
   finish(result: SubagentResult): void {
     if (this.terminal) return;
     this.terminal = result;
@@ -128,22 +159,41 @@ class Handle implements SubagentHandle {
     this.resolveResult(result);
     this.runner.childFinished(this.runId);
   }
-  async steer(text: string): Promise<void> { if (this.session) return this.session.steer(text); this.steering.push(text); }
-  async flushSteering(): Promise<void> { for (const text of this.steering.splice(0)) await this.session?.steer(text); }
-  get isTerminal(): boolean { return this.terminal !== undefined; }
+  async steer(text: string): Promise<void> {
+    if (this.session) return this.session.steer(text);
+    this.steering.push(text);
+  }
+  async flushSteering(): Promise<void> {
+    for (const text of this.steering.splice(0)) await this.session?.steer(text);
+  }
+  get isTerminal(): boolean {
+    return this.terminal !== undefined;
+  }
   /** Whether the handle is doing live work right now. */
-  get isLive(): boolean { return this.status === "pending" || this.status === "running"; }
-  get isDisposingSession(): boolean { return this.sessionDisposal !== undefined; }
-  get wasExternallyCancelled(): boolean { return this.externalCancellationRequested; }
-  markExternalCancellation(): void { this.externalCancellationRequested = true; }
+  get isLive(): boolean {
+    return this.status === "pending" || this.status === "running";
+  }
+  get isDisposingSession(): boolean {
+    return this.sessionDisposal !== undefined;
+  }
+  get wasExternallyCancelled(): boolean {
+    return this.externalCancellationRequested;
+  }
+  markExternalCancellation(): void {
+    this.externalCancellationRequested = true;
+  }
   abort(): Promise<void> {
     this.markExternalCancellation();
     if (this.aborting) return this.aborting;
     const aborting = this.abortOnce();
     this.aborting = aborting;
     void aborting.then(
-      () => { if (this.aborting === aborting) this.aborting = undefined; },
-      () => { if (this.aborting === aborting) this.aborting = undefined; },
+      () => {
+        if (this.aborting === aborting) this.aborting = undefined;
+      },
+      () => {
+        if (this.aborting === aborting) this.aborting = undefined;
+      },
     );
     return aborting;
   }
@@ -171,7 +221,10 @@ class Handle implements SubagentHandle {
         this.runner.waitForSettleGrace().then(() => true),
       ]);
       if (graceElapsed) {
-        this.runner.abandonChild(this, `Child did not settle within ${SETTLE_GRACE_MS / 1_000}s of abort; terminated after the grace period`);
+        this.runner.abandonChild(
+          this,
+          `Child did not settle within ${SETTLE_GRACE_MS / 1_000}s of abort; terminated after the grace period`,
+        );
       }
       return;
     }
@@ -208,7 +261,9 @@ class Handle implements SubagentHandle {
   async waitForStartup(): Promise<void> {
     if (!this.startupDetached) await this.startup;
   }
-  detachStartup(): void { this.startupDetached = true; }
+  detachStartup(): void {
+    this.startupDetached = true;
+  }
   async waitForConstructionAbort(): Promise<void> {
     await this.constructionAbort?.catch(() => undefined);
   }
@@ -251,23 +306,32 @@ class Handle implements SubagentHandle {
       if (this.sessionDisposal === disposal) this.sessionDisposal = undefined;
     }
   }
-  subscribe(listener: (event: SubagentEvent) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  subscribe(listener: (event: SubagentEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
 }
 
 export class SubagentRunner {
   private handles = new Map<string, Handle>();
   private stores = new Map<string, RunStore>();
-  private projections = new Map<string, {
-    projection: RunProjection;
-    retainAfterDelivery: boolean;
-    ownsRun: () => boolean;
-  }>();
-  private runControllers = new Map<string, {
-    controller: AbortController;
-    parentSessionId: string;
-    execution: Promise<unknown>;
-    isExpectedStop: (error: unknown) => boolean;
-  }>();
+  private projections = new Map<
+    string,
+    {
+      projection: RunProjection;
+      retainAfterDelivery: boolean;
+      ownsRun: () => boolean;
+    }
+  >();
+  private runControllers = new Map<
+    string,
+    {
+      controller: AbortController;
+      parentSessionId: string;
+      execution: Promise<unknown>;
+      isExpectedStop: (error: unknown) => boolean;
+    }
+  >();
   private childCounter = 0;
   private finalizedRuns = new Set<string>();
   private deliveredRuns = new Set<string>();
@@ -284,14 +348,17 @@ export class SubagentRunner {
   private readonly semaphore = globalSemaphore;
 
   /** Apply a process-wide admission limit. Existing agents are never cancelled. */
-  setMaxConcurrentAgents(capacity: number): void { this.semaphore.resize(capacity); }
+  setMaxConcurrentAgents(capacity: number): void {
+    this.semaphore.resize(capacity);
+  }
 
   /**
    * Set the wall timeout for newly admitted child prompts. Zero disables
    * timeouts for later admissions. Active prompts keep their original timeout.
    */
   setAgentTimeoutMinutes(minutes: number): void {
-    if (!Number.isFinite(minutes) || minutes < 0) throw new Error("Agent timeout minutes must be a non-negative number");
+    if (!Number.isFinite(minutes) || minutes < 0)
+      throw new Error("Agent timeout minutes must be a non-negative number");
     this.agentTimeoutMinutes = minutes;
   }
 
@@ -321,7 +388,9 @@ export class SubagentRunner {
   }
 
   /** @internal Handle-to-runner grace timer handoff. */
-  waitForSettleGrace(): Promise<void> { return defaultDelay(SETTLE_GRACE_MS); }
+  waitForSettleGrace(): Promise<void> {
+    return defaultDelay(SETTLE_GRACE_MS);
+  }
 
   /** @internal Settle a child whose RPC process ignored cancellation, then terminate it. */
   abandonChild(handle: Handle, reason: string): void {
@@ -331,7 +400,9 @@ export class SubagentRunner {
     handle.releaseAdmission?.();
     handle.clearEventSubscription();
     void handle.disposeSession().catch((error: unknown) => {
-      reportDiagnostic(`[subagent-workflow] abandoned child ${handle.id} session disposal failed: ${errorMessage(error)}`);
+      reportDiagnostic(
+        `[subagent-workflow] abandoned child ${handle.id} session disposal failed: ${errorMessage(error)}`,
+      );
     });
     reportDiagnostic(`[subagent-workflow] child ${handle.id} was abandoned after the grace period: ${reason}`);
   }
@@ -342,23 +413,30 @@ export class SubagentRunner {
       await handle.waitForStartup();
       await handle.disposeSession();
     })();
-    const graceElapsed = await Promise.race([
-      disposal.then(() => false),
-      this.waitForSettleGrace().then(() => true),
-    ]);
+    const graceElapsed = await Promise.race([disposal.then(() => false), this.waitForSettleGrace().then(() => true)]);
     if (!graceElapsed) return;
     handle.detachStartup();
     void disposal.catch((error: unknown) => {
       reportDiagnostic(`[subagent-workflow] child ${handle.id} late disposal failed: ${errorMessage(error)}`);
     });
-    reportDiagnostic(`[subagent-workflow] child ${handle.id} disposal did not settle within ${SETTLE_GRACE_MS / 1_000}s; continuing shutdown`);
+    reportDiagnostic(
+      `[subagent-workflow] child ${handle.id} disposal did not settle within ${SETTLE_GRACE_MS / 1_000}s; continuing shutdown`,
+    );
   }
 
   spawnRun(spec: ChildSpawnSpec, parent: ParentContext, options: SpawnRunOptions = {}): SubagentHandle {
     const runId = options.runId ?? `run-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
     const existingStore = this.stores.get(runId);
-    const store = options.store ?? existingStore
-      ?? new RunStore(runId, parent.ctx.cwd, parent.ctx.sessionManager.getSessionId(), parent.ctx.sessionManager.getSessionFile(), { directDelivery: options.directDelivery });
+    const store =
+      options.store ??
+      existingStore ??
+      new RunStore(
+        runId,
+        parent.ctx.cwd,
+        parent.ctx.sessionManager.getSessionId(),
+        parent.ctx.sessionManager.getSessionFile(),
+        { directDelivery: options.directDelivery },
+      );
     const ownsUnregisteredStore = options.store === undefined && existingStore === undefined;
     const identity = store.deliveryIdentity;
     if (identity.generation < 1) {
@@ -409,9 +487,13 @@ export class SubagentRunner {
     return handle;
   }
 
-  get(id: string): SubagentHandle | undefined { return this.handles.get(id); }
+  get(id: string): SubagentHandle | undefined {
+    return this.handles.get(id);
+  }
   /** Live handles belonging to a run, for the navigator's live overlay. */
-  runHandles(runId: string): SubagentHandle[] { return [...this.handles.values()].filter((handle) => handle.runId === runId); }
+  runHandles(runId: string): SubagentHandle[] {
+    return [...this.handles.values()].filter((handle) => handle.runId === runId);
+  }
   /** Seed a workflow projection from durable history before live execution resumes. */
   adoptRunProjection(runId: string, store: RunStore, snapshot: RunSnapshot, workflowLabel: string): void {
     this.projections.set(runId, {
@@ -436,7 +518,9 @@ export class SubagentRunner {
     return projection ? cloneActivityFold(projection.activity) : undefined;
   }
   /** Release a retained workflow projection after its result has been delivered. */
-  releaseRunActivity(runId: string): void { this.projections.delete(runId); }
+  releaseRunActivity(runId: string): void {
+    this.projections.delete(runId);
+  }
   /** Run ids with a live child or an active workflow controller in this process. */
   liveRunIds(): string[] {
     const ids = new Set(this.runControllers.keys());
@@ -444,7 +528,9 @@ export class SubagentRunner {
     return [...ids];
   }
   /** The RPC-backed session for a live child, for transcript following. Undefined once disposed. */
-  liveSession(childId: string): ChildSession | undefined { return this.handles.get(childId)?.session; }
+  liveSession(childId: string): ChildSession | undefined {
+    return this.handles.get(childId)?.session;
+  }
   childFinished(runId: string): void {
     const runHandles = [...this.handles.values()].filter((handle) => handle.runId === runId);
     if (runHandles.length > 0 && runHandles.every((handle) => handle.isTerminal)) {
@@ -475,14 +561,29 @@ export class SubagentRunner {
     return store?.persistenceDegraded;
   }
   abortedResult(handle: Handle): SubagentResult {
-    return { id: handle.id, generation: handle.generation, status: "aborted", ...sessionFileFrom(handle.session), text: "", usage: usageFrom(handle.session), resolved: this.fallbackResolved(handle) };
+    return {
+      id: handle.id,
+      generation: handle.generation,
+      status: "aborted",
+      ...sessionFileFrom(handle.session),
+      text: "",
+      usage: usageFrom(handle.session),
+      resolved: this.fallbackResolved(handle),
+    };
   }
   /** A workflow run registers a controller so a run-level stop cancels its loop, not just its current children. */
-  registerRunController(runId: string, controller: AbortController, parentSessionId: string, execution: Promise<unknown>,
-    isExpectedStop: (error: unknown) => boolean = () => false): void {
+  registerRunController(
+    runId: string,
+    controller: AbortController,
+    parentSessionId: string,
+    execution: Promise<unknown>,
+    isExpectedStop: (error: unknown) => boolean = () => false,
+  ): void {
     this.runControllers.set(runId, { controller, parentSessionId, execution, isExpectedStop });
   }
-  unregisterRunController(runId: string): void { this.runControllers.delete(runId); }
+  unregisterRunController(runId: string): void {
+    this.runControllers.delete(runId);
+  }
   /** Stop an entire run and wait for its workflow teardown or direct children. */
   async stopRun(runId: string): Promise<void> {
     const registered = this.runControllers.get(runId);
@@ -508,17 +609,21 @@ export class SubagentRunner {
     for (const { controller, parentSessionId: owner, execution, isExpectedStop } of this.runControllers.values()) {
       if (owner !== parentSessionId) continue;
       controller.abort();
-      executions.push(execution.catch((error: unknown) => {
-        if (isExpectedStop(error)) return;
-        throw error;
-      }));
+      executions.push(
+        execution.catch((error: unknown) => {
+          if (isExpectedStop(error)) return;
+          throw error;
+        }),
+      );
     }
     const tasks = [
       ...executions,
-      ...[...this.handles.values()].filter((handle) => handle.parent.ctx.sessionManager.getSessionId() === parentSessionId).map(async (handle) => {
-        await handle.dispose();
-        await this.retire(handle);
-      }),
+      ...[...this.handles.values()]
+        .filter((handle) => handle.parent.ctx.sessionManager.getSessionId() === parentSessionId)
+        .map(async (handle) => {
+          await handle.dispose();
+          await this.retire(handle);
+        }),
     ];
     const results = await Promise.allSettled(tasks);
     const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
@@ -581,15 +686,17 @@ export class SubagentRunner {
         await disposeSessionAndRetire();
         return;
       }
-      handle.resolved = child.resolved; handle.schemaCapture = child.schemaCapture;
+      handle.resolved = child.resolved;
+      handle.schemaCapture = child.schemaCapture;
       store.resolveChild(handle.id, child.resolved, child.session.sessionFile);
       const projection = this.projections.get(handle.runId)?.projection;
-      if (projection) foldProjection(projection, {
-        type: "resolved",
-        id: handle.id,
-        resolved: child.resolved,
-        sessionFile: child.session.sessionFile,
-      });
+      if (projection)
+        foldProjection(projection, {
+          type: "resolved",
+          id: handle.id,
+          resolved: child.resolved,
+          sessionFile: child.session.sessionFile,
+        });
       this.subscribe(handle);
       await handle.flushSteering();
       if (handle.isTerminal) {
@@ -606,7 +713,11 @@ export class SubagentRunner {
         return result;
       })();
       handle.inFlightPrompt = runAndFinish;
-      try { await runAndFinish; } finally { handle.inFlightPrompt = undefined; }
+      try {
+        await runAndFinish;
+      } finally {
+        handle.inFlightPrompt = undefined;
+      }
     } catch (error) {
       handle.finish(this.failure(handle, error));
       await disposeSessionAndRetire();
@@ -634,14 +745,16 @@ export class SubagentRunner {
       // particular, a timeout has already fired and cannot bound a second
       // prompt, so repair here would defeat the configured wall limit.
       if (message?.stopReason === "aborted") return this.resultFor(handle, "aborted", message);
-      if (message?.stopReason === "error") return this.failure(handle, message.errorMessage ?? "Child model request failed", message);
+      if (message?.stopReason === "error")
+        return this.failure(handle, message.errorMessage ?? "Child model request failed", message);
       if (capture) {
         await session.prompt(STRUCTURED_REPAIR_PROMPT);
         message = this.extractLatestAssistant(session);
         if (handle.wasExternallyCancelled) return this.resultFor(handle, "aborted", message);
         if (capture.called) return { ...this.resultFor(handle, "completed", message), structured: capture.value };
         if (message?.stopReason === "aborted") return this.resultFor(handle, "aborted", message);
-        if (message?.stopReason === "error") return this.failure(handle, message.errorMessage ?? "Child model request failed", message);
+        if (message?.stopReason === "error")
+          return this.failure(handle, message.errorMessage ?? "Child model request failed", message);
         return this.failure(handle, "Child did not call report_result after one repair attempt", message);
       }
       return this.resultFor(handle, "completed", message);
@@ -651,14 +764,20 @@ export class SubagentRunner {
         return this.resultFor(handle, "aborted", message);
       }
       return this.failure(handle, error);
-    } finally { clearTimeout(); }
+    } finally {
+      clearTimeout();
+    }
   }
 
   private subscribe(handle: Handle): void {
     const session = handle.session;
     const unsubscribe = session?.subscribe((event) => {
       if (event.type === "tool_execution_start") {
-        const activityEvent = { type: "activity" as const, id: handle.id, description: summarizeCall(event.toolName, event.args) };
+        const activityEvent = {
+          type: "activity" as const,
+          id: handle.id,
+          description: summarizeCall(event.toolName, event.args),
+        };
         handle.emit(activityEvent);
       }
       if (event.type === "turn_end" && event.message.role === "assistant") {
@@ -673,15 +792,41 @@ export class SubagentRunner {
     return message;
   }
   private resultFor(handle: Handle, status: "completed" | "aborted", message?: AssistantMessage): SubagentResult {
-    return { id: handle.id, generation: handle.generation, status, ...sessionFileFrom(handle.session), text: assistantText(message), usage: usageFrom(handle.session), resolved: handle.resolved! };
+    return {
+      id: handle.id,
+      generation: handle.generation,
+      status,
+      ...sessionFileFrom(handle.session),
+      text: assistantText(message),
+      usage: usageFrom(handle.session),
+      resolved: handle.resolved!,
+    };
   }
   private failure(handle: Handle, error: unknown, message?: AssistantMessage): SubagentResult {
     const fallback = this.fallbackResolved(handle);
     const extracted = message ?? (handle.session ? this.extractLatestAssistant(handle.session) : undefined);
-    return { id: handle.id, generation: handle.generation, status: "failed", ...sessionFileFrom(handle.session), text: assistantText(extracted), error: errorMessage(error), usage: usageFrom(handle.session), resolved: fallback };
+    return {
+      id: handle.id,
+      generation: handle.generation,
+      status: "failed",
+      ...sessionFileFrom(handle.session),
+      text: assistantText(extracted),
+      error: errorMessage(error),
+      usage: usageFrom(handle.session),
+      resolved: fallback,
+    };
   }
   private fallbackResolved(handle: Handle): ResolvedSpec {
-    return handle.resolved ?? { provider: "unknown", modelId: "unknown", thinkingLevel: "off", tools: [], cwd: handle.spec.cwd ?? handle.parent.ctx.cwd, label: handle.spec.label ?? "Subagent" };
+    return (
+      handle.resolved ?? {
+        provider: "unknown",
+        modelId: "unknown",
+        thinkingLevel: "off",
+        tools: [],
+        cwd: handle.spec.cwd ?? handle.parent.ctx.cwd,
+        label: handle.spec.label ?? "Subagent",
+      }
+    );
   }
   private trackPromptTimeout(handle: Handle, session: ChildSession, agentTimeoutMinutes: number): () => void {
     if (agentTimeoutMinutes === 0) return () => {};
@@ -691,12 +836,17 @@ export class SubagentRunner {
       void session.abort().catch((error: unknown) => {
         reportDiagnostic(`[subagent-workflow] timed-out child abort failed: ${errorMessage(error)}`);
       });
-      void this.waitForSettleGrace().then(() => {
-        if (cancelled || handle.isTerminal) return;
-        this.abandonChild(handle, `Child timed out and did not settle within ${SETTLE_GRACE_MS / 1_000}s grace; terminated`);
-      }).catch((error: unknown) => {
-        reportDiagnostic(`[subagent-workflow] timed-out child grace wait failed: ${errorMessage(error)}`);
-      });
+      void this.waitForSettleGrace()
+        .then(() => {
+          if (cancelled || handle.isTerminal) return;
+          this.abandonChild(
+            handle,
+            `Child timed out and did not settle within ${SETTLE_GRACE_MS / 1_000}s grace; terminated`,
+          );
+        })
+        .catch((error: unknown) => {
+          reportDiagnostic(`[subagent-workflow] timed-out child grace wait failed: ${errorMessage(error)}`);
+        });
     }, agentTimeoutMinutes * 60_000);
     timer.unref?.();
     return () => {
@@ -742,7 +892,14 @@ function spawnDisplaySpec(spec: ChildSpawnSpec, parent: ParentContext): Pick<Spa
   }
 }
 
-function assistantText(message?: AssistantMessage): string { return message?.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? ""; }
+function assistantText(message?: AssistantMessage): string {
+  return (
+    message?.content
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("\n") ?? ""
+  );
+}
 function usageFrom(session?: ChildSession): UsageSummary {
   if (!session) return EMPTY_USAGE();
   return { ...session.usage };
@@ -759,4 +916,4 @@ function summarizeCall(name: string, args: unknown): string {
 // changing runner code so the process picks up the new implementation.
 const RUNNER_KEY = "__piSubagentWorkflowRunner__";
 const runnerScope = globalThis as unknown as Record<string, SubagentRunner | undefined>;
-export const subagentRunner: SubagentRunner = runnerScope[RUNNER_KEY] ??= new SubagentRunner();
+export const subagentRunner: SubagentRunner = (runnerScope[RUNNER_KEY] ??= new SubagentRunner());

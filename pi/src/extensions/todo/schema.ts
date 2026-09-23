@@ -3,24 +3,12 @@ import { type Static, Type } from "typebox";
 import { readPersonalConfig } from "../../config/index.js";
 
 /** Operation names accepted by the model-facing todo tool. */
-export const TODO_OPERATIONS = [
-  "init",
-  "start",
-  "done",
-  "drop",
-  "block",
-  "unblock",
-  "append",
-  "rm",
-  "view",
-] as const;
+export const TODO_OPERATIONS = ["init", "start", "done", "drop", "block", "unblock", "append", "rm", "view"] as const;
 
 const TodoInitPhaseParameters = Type.Object(
   {
     phase: Type.String({ description: "Unique human-readable phase name" }),
-    items: Type.Array(
-      Type.String({ description: "Unique human-readable task content" }),
-    ),
+    items: Type.Array(Type.String({ description: "Unique human-readable task content" })),
   },
   { additionalProperties: false },
 );
@@ -36,12 +24,8 @@ export const TodoParameters = Type.Object(
         description: "Complete phased list for init",
       }),
     ),
-    task: Type.Optional(
-      Type.String({ description: "Exact task content identifying one task" }),
-    ),
-    phase: Type.Optional(
-      Type.String({ description: "Exact phase name identifying one phase" }),
-    ),
+    task: Type.Optional(Type.String({ description: "Exact task content identifying one task" })),
+    phase: Type.Optional(Type.String({ description: "Exact phase name identifying one phase" })),
     items: Type.Optional(
       Type.Array(
         Type.String({
@@ -49,9 +33,7 @@ export const TodoParameters = Type.Object(
         }),
       ),
     ),
-    reason: Type.Optional(
-      Type.String({ description: "Optional single-line blocker reason" }),
-    ),
+    reason: Type.Optional(Type.String({ description: "Optional single-line blocker reason" })),
   },
   { additionalProperties: false },
 );

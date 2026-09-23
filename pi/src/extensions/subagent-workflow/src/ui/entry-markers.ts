@@ -38,7 +38,9 @@ export function appendEntrySafely(pi: ExtensionAPI, type: string, data: unknown)
   try {
     pi.appendEntry(type, data);
   } catch (error) {
-    reportDiagnostic(`[subagent-workflow] parent transcript marker failed: ${sanitizeTerminalText(errorMessage(error))}`);
+    reportDiagnostic(
+      `[subagent-workflow] parent transcript marker failed: ${sanitizeTerminalText(errorMessage(error))}`,
+    );
   }
 }
 
@@ -49,7 +51,9 @@ export function appendEntrySafely(pi: ExtensionAPI, type: string, data: unknown)
  * arrays are checked rather than assumed.
  */
 function textList(value: unknown): string[] | undefined {
-  return Array.isArray(value) ? value.map((item) => sanitizeTerminalText(typeof item === "string" ? item : String(item))) : undefined;
+  return Array.isArray(value)
+    ? value.map((item) => sanitizeTerminalText(typeof item === "string" ? item : String(item)))
+    : undefined;
 }
 
 export function renderRunStarted(data: RunStartedData, theme: ThemeLike, width: number): string[] {
@@ -58,7 +62,8 @@ export function renderRunStarted(data: RunStartedData, theme: ThemeLike, width: 
   if (!labelList) {
     // Phase titles are workflow-authored; sanitize before they hit the terminal.
     const phases = (Array.isArray(data.phases) ? data.phases : [])
-      .map((phase) => sanitizeTerminalText(phase?.title ?? "")).join(" → ");
+      .map((phase) => sanitizeTerminalText(phase?.title ?? ""))
+      .join(" → ");
     const text = `▸ workflow run ${data.runId} started${phases ? `: ${phases}` : ""}`;
     return [truncateToWidth(theme.fg("dim", text), cap)];
   }
@@ -94,10 +99,16 @@ export function renderRunCompleted(data: RunCompletedData, theme: ThemeLike, wid
 export function registerEntryMarkers(pi: ExtensionAPI): void {
   pi.registerEntryRenderer<RunStartedData>("subagent-workflow:run-started", (entry, _options, theme: Theme) => {
     if (!entry.data) return undefined;
-    return linesComponent((width) => renderRunStarted(entry.data as RunStartedData, theme, width), "run-started marker");
+    return linesComponent(
+      (width) => renderRunStarted(entry.data as RunStartedData, theme, width),
+      "run-started marker",
+    );
   });
   pi.registerEntryRenderer<RunCompletedData>("subagent-workflow:run-completed", (entry, _options, theme: Theme) => {
     if (!entry.data) return undefined;
-    return linesComponent((width) => renderRunCompleted(entry.data as RunCompletedData, theme, width), "run-completed marker");
+    return linesComponent(
+      (width) => renderRunCompleted(entry.data as RunCompletedData, theme, width),
+      "run-completed marker",
+    );
   });
 }

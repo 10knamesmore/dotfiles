@@ -15,27 +15,18 @@ function findPhase(phases: TodoPhase[], rawName: string): TodoPhase {
   return phase;
 }
 
-function findTask(
-  phases: TodoPhase[],
-  rawContent: string,
-): { phase: TodoPhase; task: TodoItem } {
+function findTask(phases: TodoPhase[], rawContent: string): { phase: TodoPhase; task: TodoItem } {
   const content = normalizeTodoIdentifier(rawContent, "task");
   for (const phase of phases) {
     const task = phase.tasks.find((candidate) => candidate.content === content);
     if (task) return { phase, task };
   }
-  throw new Error(
-    `Task ${JSON.stringify(content)} not found. Tasks are referenced by their exact content.`,
-  );
+  throw new Error(`Task ${JSON.stringify(content)} not found. Tasks are referenced by their exact content.`);
 }
 
-function assertNoFields(
-  params: TodoParams,
-  fields: ReadonlyArray<keyof TodoParams>,
-): void {
+function assertNoFields(params: TodoParams, fields: ReadonlyArray<keyof TodoParams>): void {
   for (const field of fields) {
-    if (params[field] !== undefined)
-      throw new Error(`${params.op} does not accept ${field}.`);
+    if (params[field] !== undefined) throw new Error(`${params.op} does not accept ${field}.`);
   }
 }
 
@@ -52,12 +43,10 @@ function assertUniqueState(phases: readonly TodoPhase[]): void {
   const phaseNames = new Set<string>();
   const taskContents = new Set<string>();
   for (const phase of phases) {
-    if (phaseNames.has(phase.name))
-      throw new Error(`Duplicate phase ${JSON.stringify(phase.name)}.`);
+    if (phaseNames.has(phase.name)) throw new Error(`Duplicate phase ${JSON.stringify(phase.name)}.`);
     phaseNames.add(phase.name);
     for (const task of phase.tasks) {
-      if (taskContents.has(task.content))
-        throw new Error(`Duplicate task ${JSON.stringify(task.content)}.`);
+      if (taskContents.has(task.content)) throw new Error(`Duplicate task ${JSON.stringify(task.content)}.`);
       taskContents.add(task.content);
     }
   }
@@ -77,9 +66,7 @@ function initialize(params: TodoParams): TodoPhase[] {
     if (params.list.length === 0) throw new Error("init list cannot be empty.");
     phases = params.list.map((entry) => {
       if (entry.items.length === 0)
-        throw new Error(
-          `Phase ${JSON.stringify(entry.phase)} must contain at least one task.`,
-        );
+        throw new Error(`Phase ${JSON.stringify(entry.phase)} must contain at least one task.`);
       return {
         name: normalizeTodoIdentifier(entry.phase, "phase"),
         tasks: entry.items.map((item) => ({
@@ -89,8 +76,7 @@ function initialize(params: TodoParams): TodoPhase[] {
       };
     });
   } else if (params.items !== undefined) {
-    if (params.items.length === 0)
-      throw new Error("init items cannot be empty.");
+    if (params.items.length === 0) throw new Error("init items cannot be empty.");
     phases = [
       {
         name: normalizeTodoIdentifier(params.phase ?? "Tasks", "phase"),
@@ -110,8 +96,7 @@ function initialize(params: TodoParams): TodoPhase[] {
 function targetTasks(phases: TodoPhase[], params: TodoParams): TodoItem[] {
   assertSingleTarget(params, false);
   if (params.task !== undefined) return [findTask(phases, params.task).task];
-  if (params.phase !== undefined)
-    return [...findPhase(phases, params.phase).tasks];
+  if (params.phase !== undefined) return [...findPhase(phases, params.phase).tasks];
   return phases.flatMap((phase) => phase.tasks);
 }
 
@@ -121,22 +106,15 @@ function clearBlocker(task: TodoItem): void {
 
 function append(phases: TodoPhase[], params: TodoParams): void {
   assertNoFields(params, ["list", "task", "reason"]);
-  if (params.phase === undefined)
-    throw new Error("append requires a phase name.");
-  if (params.items === undefined || params.items.length === 0)
-    throw new Error("append requires at least one task.");
+  if (params.phase === undefined) throw new Error("append requires a phase name.");
+  if (params.items === undefined || params.items.length === 0) throw new Error("append requires at least one task.");
 
   const phaseName = normalizeTodoIdentifier(params.phase, "phase");
-  const contents = params.items.map((item) =>
-    normalizeTodoIdentifier(item, "task"),
-  );
-  const existing = new Set(
-    phases.flatMap((phase) => phase.tasks.map((task) => task.content)),
-  );
+  const contents = params.items.map((item) => normalizeTodoIdentifier(item, "task"));
+  const existing = new Set(phases.flatMap((phase) => phase.tasks.map((task) => task.content)));
   const batch = new Set<string>();
   for (const content of contents) {
-    if (existing.has(content) || batch.has(content))
-      throw new Error(`Task ${JSON.stringify(content)} already exists.`);
+    if (existing.has(content) || batch.has(content)) throw new Error(`Task ${JSON.stringify(content)} already exists.`);
     batch.add(content);
   }
 
@@ -145,8 +123,7 @@ function append(phases: TodoPhase[], params: TodoParams): void {
     phase = { name: phaseName, tasks: [] };
     phases.push(phase);
   }
-  for (const content of contents)
-    phase.tasks.push({ content, status: "pending" });
+  for (const content of contents) phase.tasks.push({ content, status: "pending" });
 }
 
 function remove(phases: TodoPhase[], params: TodoParams): void {
@@ -169,12 +146,8 @@ function remove(phases: TodoPhase[], params: TodoParams): void {
  *
  * Any validation error is thrown before the caller swaps or persists state.
  */
-export function applyTodoMutation(
-  current: readonly TodoPhase[],
-  params: TodoParams,
-): TodoPhase[] {
-  if (params.op === "view")
-    throw new Error("view is read-only and cannot be applied as a mutation.");
+export function applyTodoMutation(current: readonly TodoPhase[], params: TodoParams): TodoPhase[] {
+  if (params.op === "view") throw new Error("view is read-only and cannot be applied as a mutation.");
   if (params.op === "init") {
     const initialized = initialize(params);
     normalizeActiveTask(initialized);
@@ -189,8 +162,7 @@ export function applyTodoMutation(
       const target = findTask(next, params.task).task;
       for (const phase of next) {
         for (const task of phase.tasks) {
-          if (task.status === "in_progress" && task !== target)
-            task.status = "pending";
+          if (task.status === "in_progress" && task !== target) task.status = "pending";
         }
       }
       target.status = "in_progress";
@@ -211,8 +183,7 @@ export function applyTodoMutation(
       assertSingleTarget(params, true);
       const blocker = normalizeBlockerReason(params.reason);
       for (const task of targetTasks(next, params)) {
-        if (task.status === "completed" || task.status === "abandoned")
-          continue;
+        if (task.status === "completed" || task.status === "abandoned") continue;
         task.status = "blocked";
         if (blocker === undefined) clearBlocker(task);
         else task.blocker = blocker;

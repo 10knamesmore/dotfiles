@@ -2,7 +2,15 @@ import { statSync } from "node:fs";
 import { EMPTY_USAGE, deriveRunStatus, sumUsage } from "./run-store.js";
 import { activityFoldFromSnapshot, cloneActivityFold, foldActivity, type RunActivityFold } from "./activity-fold.js";
 import type { FrozenJson, RunSnapshot } from "./run-snapshot.js";
-import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentResult, SubagentSpec, SubagentStatus, UsageSummary } from "../types.js";
+import type {
+  FollowUpReference,
+  ResolvedSpec,
+  SubagentEvent,
+  SubagentResult,
+  SubagentSpec,
+  SubagentStatus,
+  UsageSummary,
+} from "../types.js";
 import { childLabel, countStatuses, firstLine, shortModel } from "../ui/format.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 
@@ -78,7 +86,13 @@ export interface RunRecordFile {
   runId?: string;
   kind?: string;
   createdAt?: string;
-  children?: Array<{ id?: string; spec?: SubagentSpec; resolved?: ResolvedSpec; sessionFile?: string; followUpOf?: FollowUpReference }>;
+  children?: Array<{
+    id?: string;
+    spec?: SubagentSpec;
+    resolved?: ResolvedSpec;
+    sessionFile?: string;
+    followUpOf?: FollowUpReference;
+  }>;
   phases?: Array<{ title?: string }>;
 }
 
@@ -139,7 +153,18 @@ export function corruptRunSummary(runDir: string, runId: string, label = "unread
 }
 
 export function corruptRunDetail(runId: string, runDir: string, label = "unreadable run"): RunDetail {
-  return { runId, runDir, kind: "subagent", label, status: "failed", phases: [], children: [], narrator: [], hasScript: false, corrupt: true };
+  return {
+    runId,
+    runDir,
+    kind: "subagent",
+    label,
+    status: "failed",
+    phases: [],
+    children: [],
+    narrator: [],
+    hasScript: false,
+    corrupt: true,
+  };
 }
 
 export function snapshotSaysLive(snapshot: RunSnapshot): boolean {
@@ -165,7 +190,11 @@ export function projectRunSnapshotSummary(
 }
 
 /** Tolerantly fold one immutable persisted snapshot into the navigator's full projection. */
-export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options: SnapshotProjectionOptions = {}): RunProjection {
+export function projectRunSnapshot(
+  snapshot: RunSnapshot,
+  runId: string,
+  options: SnapshotProjectionOptions = {},
+): RunProjection {
   const { runDir } = snapshot;
   if (snapshot.generationPending) return corruptProjection(runDir, runId, QUARANTINED_LABEL);
   const run = snapshot.record as RunRecordFile | undefined;
@@ -206,9 +235,9 @@ export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options
       status: built.summary.status,
       phases: Array.isArray(run.phases)
         ? run.phases.flatMap((phase) => {
-          const title = optionalString(phase?.title);
-          return title ? [{ title }] : [];
-        })
+            const title = optionalString(phase?.title);
+            return title ? [{ title }] : [];
+          })
         : [],
       children,
       narrator: eventState.narrator,
@@ -217,9 +246,14 @@ export function projectRunSnapshot(snapshot: RunSnapshot, runId: string, options
     },
     activity: activityFoldFromSnapshot(snapshot),
     priorGenerationNarration: eventState.priorGenerationNarration,
-    terminalStatuses: new Map(built.children
-      .filter((child): child is SummaryChildState & { terminalStatus: SubagentStatus } => child.terminalStatus !== undefined)
-      .map((child) => [child.id, child.terminalStatus])),
+    terminalStatuses: new Map(
+      built.children
+        .filter(
+          (child): child is SummaryChildState & { terminalStatus: SubagentStatus } =>
+            child.terminalStatus !== undefined,
+        )
+        .map((child) => [child.id, child.terminalStatus]),
+    ),
   };
   return options.ownerWasDead ? reconcileDeadOwnerProjection(projection) : projection;
 }
@@ -291,7 +325,7 @@ function reconcileDeadOwnerSummary(source: RunSummary, sourceChildren: readonly 
   if (summary.corrupt || !isLiveStatus(summary.status)) return summary;
   const children = sourceChildren.map((child) => ({
     ...child,
-    status: isLiveStatus(child.status) ? child.terminalStatus ?? "aborted" : child.status,
+    status: isLiveStatus(child.status) ? (child.terminalStatus ?? "aborted") : child.status,
   }));
   refreshSummary(summary, children);
   if (summary.kind === "workflow" || children.length === 0) summary.status = "aborted";
@@ -365,7 +399,8 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
     return;
   }
   if (event.type === "phase") {
-    if (!projection.detail.phases.some((phase) => phase.title === event.title)) projection.detail.phases.push({ title: event.title });
+    if (!projection.detail.phases.some((phase) => phase.title === event.title))
+      projection.detail.phases.push({ title: event.title });
     projection.detail.narrator.push({ timestamp, kind: "phase", text: event.title });
     return;
   }
@@ -465,7 +500,8 @@ function labelForRun(
   snapshot: RunSnapshot,
   options: SnapshotProjectionOptions,
 ): string {
-  if (kind === "workflow") return options.workflowLabel ?? workflowName(snapshot, options.describeWorkflow) ?? "workflow";
+  if (kind === "workflow")
+    return options.workflowLabel ?? workflowName(snapshot, options.describeWorkflow) ?? "workflow";
   const child = children[0];
   return child ? persistedChildLabel(child, "subagent") : "subagent";
 }
@@ -482,7 +518,10 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function workflowName(snapshot: RunSnapshot, describeWorkflow: SnapshotProjectionOptions["describeWorkflow"]): string | undefined {
+function workflowName(
+  snapshot: RunSnapshot,
+  describeWorkflow: SnapshotProjectionOptions["describeWorkflow"],
+): string | undefined {
   if (!describeWorkflow) return undefined;
   try {
     if (!snapshot.scriptPresent || snapshot.script === undefined) return undefined;
@@ -542,7 +581,9 @@ function scanEvents(events: readonly FrozenJson[]): EventProjection {
       narrator.push({
         timestamp,
         kind: "log",
-        text: sanitizeTerminalText(`resume refused: ${typeof event.error === "string" ? firstLine(event.error) : "environment changed"}`),
+        text: sanitizeTerminalText(
+          `resume refused: ${typeof event.error === "string" ? firstLine(event.error) : "environment changed"}`,
+        ),
       });
       continue;
     }

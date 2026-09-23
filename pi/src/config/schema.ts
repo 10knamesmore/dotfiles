@@ -2,19 +2,22 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
 export const MODEL_TIERS = ["max", "high", "mid"] as const;
-export type ModelTier = typeof MODEL_TIERS[number];
+export type ModelTier = (typeof MODEL_TIERS)[number];
 export type ModelTiers = Partial<Record<ModelTier, string>>;
 
 export function isModelTier(value: unknown): value is ModelTier {
   return MODEL_TIERS.some((tier) => tier === value);
 }
 
-const WorkflowSettingsSchema = Type.Object({
-  maxConcurrentAgents: Type.Optional(Type.Union([Type.Literal("auto"), Type.Integer({ minimum: 1, maximum: 64 })])),
-  workflowApproval: Type.Optional(Type.Union([Type.Literal("always-prompt"), Type.Literal("auto")])),
-  agentTimeoutMinutes: Type.Optional(Type.Integer({ minimum: 0, maximum: 240 })),
-  showStatusWidget: Type.Optional(Type.Boolean()),
-}, { additionalProperties: false });
+const WorkflowSettingsSchema = Type.Object(
+  {
+    maxConcurrentAgents: Type.Optional(Type.Union([Type.Literal("auto"), Type.Integer({ minimum: 1, maximum: 64 })])),
+    workflowApproval: Type.Optional(Type.Union([Type.Literal("always-prompt"), Type.Literal("auto")])),
+    agentTimeoutMinutes: Type.Optional(Type.Integer({ minimum: 0, maximum: 240 })),
+    showStatusWidget: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
 
 export type WorkflowSettings = Required<Static<typeof WorkflowSettingsSchema>>;
 
@@ -25,24 +28,35 @@ const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> = {
   showStatusWidget: true,
 };
 
-const WebSettingsSchema = Type.Object({
-  searchProvider: Type.Optional(Type.Union([Type.Literal("exa"), Type.Literal("codex")])),
-  codexModel: Type.Optional(Type.String({ minLength: 1, pattern: "^\\S+$" })),
-}, { additionalProperties: false });
+const WebSettingsSchema = Type.Object(
+  {
+    searchProvider: Type.Optional(Type.Union([Type.Literal("exa"), Type.Literal("codex")])),
+    codexModel: Type.Optional(Type.String({ minLength: 1, pattern: "^\\S+$" })),
+  },
+  { additionalProperties: false },
+);
 
 export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "exa" | "codex" };
 
 const ModelReferenceSchema = Type.String({ pattern: "^[^/\]+/\\S+$" });
-const PersonalConfigSchema = Type.Object({
-  language: Type.Optional(Type.String({ minLength: 1 })),
-  "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
-  web: Type.Optional(WebSettingsSchema),
-  "model-tier": Type.Optional(Type.Object({
-    max: Type.Optional(ModelReferenceSchema),
-    high: Type.Optional(ModelReferenceSchema),
-    mid: Type.Optional(ModelReferenceSchema),
-  }, { additionalProperties: false })),
-}, { additionalProperties: true });
+const PersonalConfigSchema = Type.Object(
+  {
+    language: Type.Optional(Type.String({ minLength: 1 })),
+    "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
+    web: Type.Optional(WebSettingsSchema),
+    "model-tier": Type.Optional(
+      Type.Object(
+        {
+          max: Type.Optional(ModelReferenceSchema),
+          high: Type.Optional(ModelReferenceSchema),
+          mid: Type.Optional(ModelReferenceSchema),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: true },
+);
 
 /** Personal extension settings with defaults applied; other fields survive updates. */
 export interface PersonalConfig {

@@ -1,8 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  SessionBeforeTreeEvent,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, SessionBeforeTreeEvent } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessageEvent, Usage } from "@earendil-works/pi-ai";
 import { performance } from "node:perf_hooks";
 import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi, type EditorStatus } from "../editor/api.js";
@@ -158,14 +154,10 @@ class FooterRuntime {
    * its abort signal. A later user/agent/compaction operation also clears stale
    * state when navigation failed before Pi could emit either event.
    */
-  public treeNavigationStarted(
-    event: SessionBeforeTreeEvent,
-    ctx: ExtensionContext,
-  ): void {
+  public treeNavigationStarted(event: SessionBeforeTreeEvent, ctx: ExtensionContext): void {
     this.updateContext(ctx);
     this.treeSummaryProviderActive =
-      event.preparation.userWantsSummary &&
-      event.preparation.entriesToSummarize.length > 0;
+      event.preparation.userWantsSummary && event.preparation.entriesToSummarize.length > 0;
     if (!this.treeSummaryProviderActive) return;
     this.modelResponse.finishRequest();
     this.updateSpinner();
@@ -326,14 +318,16 @@ class FooterRuntime {
     const previous = this.lastPublishedActivity;
     if (previous?.kind === next.kind) {
       if (next.kind !== "tool") return;
-      if (previous.kind === "tool" && previous.toolName === next.toolName && previous.toolCount === next.toolCount) return;
+      if (previous.kind === "tool" && previous.toolName === next.toolName && previous.toolCount === next.toolCount)
+        return;
     }
     this.lastPublishedActivity = next;
     this.onActivityChanged(next);
   }
 
   private updateSpinner(): void {
-    const active = this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.promptRun.isRunning();
+    const active =
+      this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.promptRun.isRunning();
     if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
       this.spinnerFrame = 0;
       this.spinnerTimer = setInterval(() => {
@@ -360,9 +354,7 @@ export function registerFooter(pi: ExtensionAPI): void {
     (requested as PromptEditorApi).useStatus(() => runtime.editorStatus());
   });
   pi.on("session_start", (_event, ctx) => runtime.startSession(ctx));
-  pi.on("session_before_tree", (event, ctx) =>
-    runtime.treeNavigationStarted(event, ctx),
-  );
+  pi.on("session_before_tree", (event, ctx) => runtime.treeNavigationStarted(event, ctx));
   pi.on("session_tree", (event, ctx) => {
     runtime.treeNavigationEnded(ctx);
     runtime.usageRecorded(event.summaryEntry?.usage, "parent");
@@ -373,9 +365,7 @@ export function registerFooter(pi: ExtensionAPI): void {
     runtime.usageRecorded(event.compactionEntry.usage, "parent");
   });
   pi.on("session_compact_failed", (_event, ctx) => runtime.compactionEnded(ctx));
-  pi.on("before_provider_request", (_event, ctx) =>
-    runtime.providerRequestStarted(ctx),
-  );
+  pi.on("before_provider_request", (_event, ctx) => runtime.providerRequestStarted(ctx));
   pi.on("message_update", (event) => runtime.modelResponseUpdated(event.assistantMessageEvent));
   pi.on("message_end", (event, ctx) => {
     if (event.message.role === "assistant") {
@@ -384,8 +374,7 @@ export function registerFooter(pi: ExtensionAPI): void {
       runtime.hitRateRecorded(event.message.usage);
     } else {
       runtime.contextChanged(ctx);
-      if (event.message.role === "toolResult")
-        runtime.usageRecorded(event.message.usage, "tool");
+      if (event.message.role === "toolResult") runtime.usageRecorded(event.message.usage, "tool");
     }
   });
   pi.on("agent_start", () => runtime.agentStarted());
@@ -413,9 +402,7 @@ export function registerFooter(pi: ExtensionAPI): void {
     runtime.nextUserOperation(ctx);
   });
   pi.on("input", (_event, ctx) => runtime.nextUserOperation(ctx));
-  pi.on("tool_execution_end", (_event, ctx) =>
-    runtime.repositoryMayHaveChanged(ctx),
-  );
+  pi.on("tool_execution_end", (_event, ctx) => runtime.repositoryMayHaveChanged(ctx));
   pi.on("user_bash", (_event, ctx) => runtime.repositoryMayHaveChanged(ctx));
   pi.on("session_shutdown", (_event, ctx) => runtime.shutdown(ctx));
 }

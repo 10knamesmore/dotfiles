@@ -45,7 +45,11 @@ export function buildApprovalSummary(plan: LaunchPlan): string {
   return lines.join("\n");
 }
 
-export async function approveLaunch(plan: LaunchPlan, ctx: ApprovalContext, policy: WorkflowApprovalPolicy): Promise<LaunchPlan> {
+export async function approveLaunch(
+  plan: LaunchPlan,
+  ctx: ApprovalContext,
+  policy: WorkflowApprovalPolicy,
+): Promise<LaunchPlan> {
   // Headless (json/print) and rpc auto-approve; the dialog is TUI-only.
   if (ctx.mode !== "tui") return plan;
   if (policy === "auto") return plan;
@@ -83,6 +87,8 @@ export async function approveLaunch(plan: LaunchPlan, ctx: ApprovalContext, poli
         continue;
       }
     }
-    throw new Error(`Workflow "${plan.workflow.meta.name}" launch was rejected by the user. Do not retry unless the user explicitly asks to run it.`);
+    throw new Error(
+      `Workflow "${plan.workflow.meta.name}" launch was rejected by the user. Do not retry unless the user explicitly asks to run it.`,
+    );
   }
 }

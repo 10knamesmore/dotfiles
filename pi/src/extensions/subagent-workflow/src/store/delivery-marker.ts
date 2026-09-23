@@ -55,11 +55,14 @@ export function readRunDeliveryIdentity(runDir: string): RunDeliveryIdentity | u
 export function readDeliveryMarker(runDir: string): DeliveryMarker | undefined {
   try {
     const value: unknown = JSON.parse(readFileSync(join(runDir, DELIVERED_FILE), "utf8"));
-    if (!isRecord(value)
-      || typeof value.sessionId !== "string"
-      || typeof value.catchUp !== "boolean"
-      || !Number.isSafeInteger(value.generation)
-      || (value.generation as number) < 0) return undefined;
+    if (
+      !isRecord(value) ||
+      typeof value.sessionId !== "string" ||
+      typeof value.catchUp !== "boolean" ||
+      !Number.isSafeInteger(value.generation) ||
+      (value.generation as number) < 0
+    )
+      return undefined;
     return value as unknown as DeliveryMarker;
   } catch {
     return undefined;
@@ -105,15 +108,19 @@ export function publishClaimedDelivery(claim: ClaimedDeliveryTarget, sessionId: 
   if (existing?.generation === claim.identity.generation) return true;
   if (existing && existing.generation > claim.identity.generation) return false;
 
-  replaceAtomicFile(join(claim.runDir, DELIVERED_FILE), markerText({
-    sessionId,
-    catchUp,
-    generation: claim.identity.generation,
-  }), {
-    mode: 0o600,
-    fsync: true,
-    syncParentDirectory: true,
-  });
+  replaceAtomicFile(
+    join(claim.runDir, DELIVERED_FILE),
+    markerText({
+      sessionId,
+      catchUp,
+      generation: claim.identity.generation,
+    }),
+    {
+      mode: 0o600,
+      fsync: true,
+      syncParentDirectory: true,
+    },
+  );
   return true;
 }
 
@@ -149,16 +156,19 @@ function publishAcknowledgedTarget(target: DeliveryTarget, sessionId: string, ca
     // acknowledged delivery: without a marker the next catch-up would
     // redeliver a message the model already consumed.
     deferPublication(target, sessionId, catchUp);
-    reportDiagnostic(`[subagent-workflow] delivery acknowledgement failed for ${target.runDir}: ${errorMessage(error)}`);
+    reportDiagnostic(
+      `[subagent-workflow] delivery acknowledgement failed for ${target.runDir}: ${errorMessage(error)}`,
+    );
   } finally {
     if (claim !== "conflict") claim?.ownership.release();
   }
 }
 
 function deferPublication(target: DeliveryTarget, sessionId: string, catchUp: boolean): void {
-  const duplicate = deferredPublications.some((deferred) =>
-    deferred.target.runDir === target.runDir
-    && deferred.target.identity.generation === target.identity.generation);
+  const duplicate = deferredPublications.some(
+    (deferred) =>
+      deferred.target.runDir === target.runDir && deferred.target.identity.generation === target.identity.generation,
+  );
   if (!duplicate) deferredPublications.push({ target, sessionId, catchUp });
 }
 
@@ -177,7 +187,9 @@ export function retryDeferredPublications(): void {
       // publishAcknowledgedTarget re-parks its own failures; this guards the
       // probe so one damaged run cannot drop the rest of the batch.
       deferPublication(deferred.target, deferred.sessionId, deferred.catchUp);
-      reportDiagnostic(`[subagent-workflow] deferred delivery retry failed for ${deferred.target.runDir}: ${errorMessage(error)}`);
+      reportDiagnostic(
+        `[subagent-workflow] deferred delivery retry failed for ${deferred.target.runDir}: ${errorMessage(error)}`,
+      );
     }
   }
 }

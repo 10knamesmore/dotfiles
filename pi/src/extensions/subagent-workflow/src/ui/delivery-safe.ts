@@ -20,7 +20,9 @@ function collapseConsecutiveLines(value: string): CollapsedLine[] {
 }
 
 function displayCollapsedLine(line: CollapsedLine): string {
-  return line.count === 1 ? line.text : `${line.text}${line.text.length === 0 ? "" : " "}(repeated ${line.count} times)`;
+  return line.count === 1
+    ? line.text
+    : `${line.text}${line.text.length === 0 ? "" : " "}(repeated ${line.count} times)`;
 }
 
 function failureOmissionNote(lines: readonly CollapsedLine[]): string {
@@ -80,6 +82,8 @@ export function chunkDeliveryText(value: string, maxLineLength = 500): string {
 export function stringifyDeliveryJson(value: unknown): string {
   const json = JSON.stringify(value);
   if (json === undefined) return "null";
-  return json.replace(new RegExp("[\\u007f-\\u009f]", "g"), (control) =>
-    `\\u${control.charCodeAt(0).toString(16).padStart(4, "0")}`);
+  return json.replace(
+    new RegExp("[\\u007f-\\u009f]", "g"),
+    (control) => `\\u${control.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
 }

@@ -18,7 +18,13 @@ import {
   type RunDeliveryIdentity,
 } from "../src/store/delivery-marker.js";
 import { runOwnerIsLive } from "../src/store/lease.js";
-import { isLiveStatus, projectRunSnapshot, reconcileDeadOwnerProjection, snapshotSaysLive, type RunProjection } from "../src/store/run-projection.js";
+import {
+  isLiveStatus,
+  projectRunSnapshot,
+  reconcileDeadOwnerProjection,
+  snapshotSaysLive,
+  type RunProjection,
+} from "../src/store/run-projection.js";
 import { encodeCwd, persistReconciledProjection } from "../src/store/run-store.js";
 import { jsonObject, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
 import { readPersonalConfig } from "../../../config/index.js";
@@ -64,21 +70,25 @@ function createNavigatorFollowUp(
         selfPath: extensionPath,
       };
       const sessionId = ctx.sessionManager.getSessionId();
-      const childDisplay = preflightSubprocessChild(resolved.spec, parent, { forkSessionFile: resolved.forkSessionFile });
+      const childDisplay = preflightSubprocessChild(resolved.spec, parent, {
+        forkSessionFile: resolved.forkSessionFile,
+      });
       // directDelivery rides inside run.json, written before any child starts:
       // a crash at any later point leaves a run catch-up already knows to skip.
       const handle = runner.spawnRun(resolved, parent, { directDelivery: true });
       // spawnRun has persisted and started the child, so the run is committed
       // and nothing below may throw back to the caller: a thrown send() would
       // report a started run as a failed message and invite a duplicate spawn.
-      void handle.result.then((result: SubagentResult) => {
-        fenceDirectlyDeliveredRun(pi, runner, handle, result, sessionId, (degraded) => degraded);
-        // The reply is model-fenced (directDelivery), so this notify is the
-        // only signal a user who left the navigator gets that it arrived.
-        ctx.ui.notify(`Reply from ${safeDeliveryValue(result.resolved.label)} ready - see /agents`, "info");
-      }).catch((error) => {
-        reportDiagnostic(`[subagent-workflow] navigator follow-up completion failed: ${errorMessage(error)}`);
-      });
+      void handle.result
+        .then((result: SubagentResult) => {
+          fenceDirectlyDeliveredRun(pi, runner, handle, result, sessionId, (degraded) => degraded);
+          // The reply is model-fenced (directDelivery), so this notify is the
+          // only signal a user who left the navigator gets that it arrived.
+          ctx.ui.notify(`Reply from ${safeDeliveryValue(result.resolved.label)} ready - see /agents`, "info");
+        })
+        .catch((error) => {
+          reportDiagnostic(`[subagent-workflow] navigator follow-up completion failed: ${errorMessage(error)}`);
+        });
       try {
         widget.track(handle.runId, handle, ctx, {
           model: `${childDisplay.model.provider}/${childDisplay.model.id}`,
@@ -167,18 +177,23 @@ function claimCatchUpRuns(
       const parent = jsonObject(record?.parent);
       const currentIdentity = parseRunDeliveryIdentity(record);
       const evaluation = evaluateCatchUpRun(snapshot, candidate.runId);
-      if (snapshot.generationPending
-        || parent?.sessionId !== sessionId
-        || !currentIdentity
-        || currentIdentity.generation !== identity.generation
-        || deliveryMarkerMatches(candidate.runDir, identity)
-        || !evaluation) continue;
+      if (
+        snapshot.generationPending ||
+        parent?.sessionId !== sessionId ||
+        !currentIdentity ||
+        currentIdentity.generation !== identity.generation ||
+        deliveryMarkerMatches(candidate.runDir, identity) ||
+        !evaluation
+      )
+        continue;
       const { liveProjection, projection, ownerWasDead, status, interruptedChildIds } = evaluation;
       if (ownerWasDead) {
         try {
           persistReconciledProjection(snapshot, projection, identity.generation, interruptedChildIds);
         } catch (error) {
-          reportDiagnostic(`[subagent-workflow] catch-up reconcile failed for ${candidate.runDir}: ${errorMessage(error)}`);
+          reportDiagnostic(
+            `[subagent-workflow] catch-up reconcile failed for ${candidate.runDir}: ${errorMessage(error)}`,
+          );
           continue;
         }
       }
@@ -194,22 +209,24 @@ function claimCatchUpRuns(
 
 export function formatCatchUpMessage(runs: readonly CatchUpRun[]): string {
   const shown = runs.slice(0, CATCH_UP_RUN_CAP);
-  const lines = shown.map((run) => [
-    run.runId,
-    run.label,
-    `${run.status}: ${run.reason}`,
-    run.lastActivityAt === undefined ? "last activity unknown" : `last activity ${new Date(run.lastActivityAt).toISOString()}`,
-    `${run.recommendedAction} ${run.runDir}`,
-  ].map(safeDeliveryValue).join(" | "));
+  const lines = shown.map((run) =>
+    [
+      run.runId,
+      run.label,
+      `${run.status}: ${run.reason}`,
+      run.lastActivityAt === undefined
+        ? "last activity unknown"
+        : `last activity ${new Date(run.lastActivityAt).toISOString()}`,
+      `${run.recommendedAction} ${run.runDir}`,
+    ]
+      .map(safeDeliveryValue)
+      .join(" | "),
+  );
   if (runs.length > shown.length) lines.push(`and ${runs.length - shown.length} more; see /agents`);
   return `Recovered background run deliveries:\n${lines.map((line) => `- ${line}`).join("\n")}`;
 }
 
-export function catchUpUndeliveredRuns(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  runsRoot?: string,
-): CatchUpRun[] {
+export function catchUpUndeliveredRuns(pi: ExtensionAPI, ctx: ExtensionContext, runsRoot?: string): CatchUpRun[] {
   // Settle acknowledged-but-conflicted publications first so a delivery that
   // was consumed in a previous session cannot be re-queued as undelivered.
   retryDeferredPublications();
@@ -268,9 +285,9 @@ function catchUpDetails(
 function projectionInterruptedChildIds(liveProjection: RunProjection, projection: RunProjection): string[] {
   const reconciledStatuses = new Map(projection.detail.children.map((child) => [child.id, child.status]));
   return liveProjection.detail.children.flatMap((child) => {
-    return isLiveStatus(child.status)
-      && !liveProjection.terminalStatuses.has(child.id)
-      && reconciledStatuses.get(child.id) === "aborted"
+    return isLiveStatus(child.status) &&
+      !liveProjection.terminalStatuses.has(child.id) &&
+      reconciledStatuses.get(child.id) === "aborted"
       ? [child.id]
       : [];
   });
@@ -309,7 +326,10 @@ function persistedRunLabel(record: Record<string, unknown> | undefined): string 
 
 function userMessageText(content: string | Array<{ type: string; text?: string }>): string {
   if (typeof content === "string") return content;
-  return content.filter((part) => part.type === "text").map((part) => part.text ?? "").join("");
+  return content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("");
 }
 
 export default function subagentWorkflow(pi: ExtensionAPI): void {

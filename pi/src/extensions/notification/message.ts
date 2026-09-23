@@ -12,12 +12,8 @@ export interface SettledNotificationMessage {
 }
 
 /** Build a bounded, single-line notification for a settled Pi session. */
-export function createSettledNotificationMessage(
-  cwd: string,
-): SettledNotificationMessage {
-  const project =
-    truncate(sanitizeSingleLine(basename(cwd)), MAX_PROJECT_CHARACTERS) ||
-    "workspace";
+export function createSettledNotificationMessage(cwd: string): SettledNotificationMessage {
+  const project = truncate(sanitizeSingleLine(basename(cwd)), MAX_PROJECT_CHARACTERS) || "workspace";
   return {
     title: `Pi · ${project}`,
     body: "已完成，等待输入",
@@ -27,10 +23,7 @@ export function createSettledNotificationMessage(
 /** Remove terminal controls and directional formatting from visible text. */
 export function sanitizeSingleLine(value: string): string {
   return value
-    .replace(
-      /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g,
-      " ",
-    )
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

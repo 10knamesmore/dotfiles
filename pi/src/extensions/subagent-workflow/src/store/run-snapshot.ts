@@ -4,7 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { errorMessage, isRecord } from "../util.js";
 
-export type FrozenJson = null | boolean | number | string | readonly FrozenJson[] | { readonly [key: string]: FrozenJson };
+export type FrozenJson =
+  null | boolean | number | string | readonly FrozenJson[] | { readonly [key: string]: FrozenJson };
 
 interface RunSnapshotDiagnostic {
   readonly file: string;
@@ -76,7 +77,9 @@ export function readRunSnapshot(runDir: string): RunSnapshot {
   }
   const pendingAfter = existsSync(join(runDir, "generation.pending"));
 
-  const frozenDiagnostics = Object.freeze([...recordDiagnostics, ...diagnostics].map((diagnostic) => Object.freeze(diagnostic)));
+  const frozenDiagnostics = Object.freeze(
+    [...recordDiagnostics, ...diagnostics].map((diagnostic) => Object.freeze(diagnostic)),
+  );
   return Object.freeze({
     runDir,
     record: record.value,
@@ -94,20 +97,12 @@ export function readRunSnapshot(runDir: string): RunSnapshot {
   });
 }
 
-function readJsonFile(
-  runDir: string,
-  file: string,
-  diagnostics: RunSnapshotDiagnostic[],
-): ParsedFile {
+function readJsonFile(runDir: string, file: string, diagnostics: RunSnapshotDiagnostic[]): ParsedFile {
   const text = readRequiredText(runDir, file, diagnostics);
   return parseJsonFile(text, file, diagnostics);
 }
 
-function parseJsonFile(
-  text: string | undefined,
-  file: string,
-  diagnostics: RunSnapshotDiagnostic[],
-): ParsedFile {
+function parseJsonFile(text: string | undefined, file: string, diagnostics: RunSnapshotDiagnostic[]): ParsedFile {
   if (text === undefined) return { value: undefined, text };
   try {
     return { value: freezeJson(JSON.parse(text)), text };
@@ -117,11 +112,7 @@ function parseJsonFile(
   }
 }
 
-function readRequiredText(
-  runDir: string,
-  file: string,
-  diagnostics: RunSnapshotDiagnostic[],
-): string | undefined {
+function readRequiredText(runDir: string, file: string, diagnostics: RunSnapshotDiagnostic[]): string | undefined {
   try {
     return readFileSync(join(runDir, file), "utf8");
   } catch (error) {

@@ -4,7 +4,13 @@ import { Input, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { SubagentStatus, UsageSummary } from "../../types.js";
 import { formatTokenUsage, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
-import { blockCanCollapse, blockIsExpanded, buildTranscriptBlocks, type TranscriptBlock, type TranscriptResult } from "./transcript-blocks.js";
+import {
+  blockCanCollapse,
+  blockIsExpanded,
+  buildTranscriptBlocks,
+  type TranscriptBlock,
+  type TranscriptResult,
+} from "./transcript-blocks.js";
 import { renderTranscript, type TranscriptLayout } from "./transcript-render.js";
 import type { TranscriptMessage } from "./transcript.js";
 
@@ -58,7 +64,8 @@ export class AgentView {
   private expanded = new Map<string, boolean>();
   private selectedId: string | undefined;
   private outputOnly = false;
-  private fullContentPosition: { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string } | undefined;
+  private fullContentPosition:
+    { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string } | undefined;
 
   constructor(private readonly deps: AgentViewDeps) {
     this.unsubscribe = deps.subscribe?.(() => {
@@ -67,15 +74,28 @@ export class AgentView {
     });
   }
 
-  dispose(): void { this.unsubscribe?.(); this.unsubscribe = undefined; }
+  dispose(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+  }
 
   /** Keep fold choices and scroll anchors when a new event or theme invalidates the rendered rows. */
-  invalidate(): void { this.transcriptCache = undefined; }
+  invalidate(): void {
+    this.transcriptCache = undefined;
+  }
 
-  get canSteer(): boolean { return !!this.deps.onSteer && this.deps.live() && this.isActive(); }
-  get canMessage(): boolean { return !!this.deps.onMessage && !this.deps.live() && !!this.deps.canMessage?.(); }
-  get canStop(): boolean { return !!this.deps.onStop && this.deps.live() && this.isActive(); }
-  get isStopArmed(): boolean { return this.stopArmed; }
+  get canSteer(): boolean {
+    return !!this.deps.onSteer && this.deps.live() && this.isActive();
+  }
+  get canMessage(): boolean {
+    return !!this.deps.onMessage && !this.deps.live() && !!this.deps.canMessage?.();
+  }
+  get canStop(): boolean {
+    return !!this.deps.onStop && this.deps.live() && this.isActive();
+  }
+  get isStopArmed(): boolean {
+    return this.stopArmed;
+  }
 
   private isActive(): boolean {
     const status = this.deps.header().status;
@@ -99,8 +119,10 @@ export class AgentView {
     }
     if (keyId === "x") {
       if (!this.canStop) return false;
-      if (this.stopArmed) { this.stopArmed = false; this.deps.onStop?.(); }
-      else this.stopArmed = true;
+      if (this.stopArmed) {
+        this.stopArmed = false;
+        this.deps.onStop?.();
+      } else this.stopArmed = true;
       this.deps.tui.requestRender();
       return true;
     }
@@ -128,8 +150,15 @@ export class AgentView {
     const resultKey = result ? JSON.stringify(result) : "";
     const live = this.deps.live();
     const cached = this.transcriptCache;
-    if (cached && cached.messages === messages && cached.resultKey === resultKey && cached.live === live
-      && cached.theme === this.lastTheme && cached.width === this.lastWidth) return cached;
+    if (
+      cached &&
+      cached.messages === messages &&
+      cached.resultKey === resultKey &&
+      cached.live === live &&
+      cached.theme === this.lastTheme &&
+      cached.width === this.lastWidth
+    )
+      return cached;
 
     const previous = this.lastLayout;
     const anchor = !this.autoScroll ? previous?.blocks.find((block) => block.end > this.scrollOffset) : undefined;
@@ -138,13 +167,27 @@ export class AgentView {
     const present = new Set(blocks.map((block) => block.id));
     for (const id of this.expanded.keys()) if (!present.has(id)) this.expanded.delete(id);
     if (this.selectedId && !present.has(this.selectedId)) this.selectedId = undefined;
-    const layout = renderTranscript(blocks, { expanded: this.expanded, selectedId: this.selectedId, outputOnly: this.outputOnly }, this.lastWidth, this.lastTheme, getMarkdownTheme());
+    const layout = renderTranscript(
+      blocks,
+      { expanded: this.expanded, selectedId: this.selectedId, outputOnly: this.outputOnly },
+      this.lastWidth,
+      this.lastTheme,
+      getMarkdownTheme(),
+    );
     if (anchor) {
       const next = layout.blocks.find((block) => block.id === anchor.id);
       if (next) this.scrollOffset = Math.max(0, next.start + Math.min(offsetInBlock, next.end - next.start - 1));
     }
     this.lastLayout = layout;
-    return this.transcriptCache = { messages, resultKey, live, theme: this.lastTheme, width: this.lastWidth, blocks, layout };
+    return (this.transcriptCache = {
+      messages,
+      resultKey,
+      live,
+      theme: this.lastTheme,
+      width: this.lastWidth,
+      blocks,
+      layout,
+    });
   }
 
   private selectBlock(delta: number): void {
@@ -152,7 +195,9 @@ export class AgentView {
     if (layout.blocks.length === 0) return;
     let index = layout.blocks.findIndex((block) => block.id === this.selectedId);
     if (index < 0) {
-      const visible = layout.blocks.filter((block) => block.end > this.scrollOffset && block.start < this.scrollOffset + this.lastViewport);
+      const visible = layout.blocks.filter(
+        (block) => block.end > this.scrollOffset && block.start < this.scrollOffset + this.lastViewport,
+      );
       const target = delta > 0 ? visible[0] : visible.at(-1);
       index = target ? layout.blocks.indexOf(target) : delta > 0 ? 0 : layout.blocks.length - 1;
     } else index = Math.max(0, Math.min(layout.blocks.length - 1, index + delta));
@@ -164,7 +209,8 @@ export class AgentView {
     if (!block) return;
     this.selectedId = block.id;
     this.autoScroll = false;
-    if (block.start < this.scrollOffset || block.start >= this.scrollOffset + this.lastViewport) this.scrollOffset = block.start;
+    if (block.start < this.scrollOffset || block.start >= this.scrollOffset + this.lastViewport)
+      this.scrollOffset = block.start;
     // An explicit focus move owns the viewport; do not re-anchor to the old block on the next render.
     this.lastLayout = undefined;
     this.invalidate();
@@ -193,8 +239,11 @@ export class AgentView {
     if (!this.outputOnly) {
       const anchor = this.currentTranscript().layout.blocks.find((block) => block.end > this.scrollOffset);
       this.fullContentPosition = {
-        blockId: anchor?.id, offset: anchor ? this.scrollOffset - anchor.start : 0,
-        scroll: this.scrollOffset, follow: this.autoScroll, selectedId: this.selectedId,
+        blockId: anchor?.id,
+        offset: anchor ? this.scrollOffset - anchor.start : 0,
+        scroll: this.scrollOffset,
+        follow: this.autoScroll,
+        selectedId: this.selectedId,
       };
       this.outputOnly = true;
       this.selectedId = undefined;
@@ -210,7 +259,9 @@ export class AgentView {
     if (saved) {
       this.autoScroll = saved.follow;
       const anchor = layout.blocks.find((block) => block.id === saved.blockId);
-      this.scrollOffset = anchor ? Math.max(0, anchor.start + Math.min(saved.offset, anchor.end - anchor.start - 1)) : saved.scroll;
+      this.scrollOffset = anchor
+        ? Math.max(0, anchor.start + Math.min(saved.offset, anchor.end - anchor.start - 1))
+        : saved.scroll;
     }
   }
 
@@ -227,9 +278,15 @@ export class AgentView {
   private scroll(keyId: string | undefined): boolean {
     const max = Math.max(0, this.currentTranscript().layout.lines.length - this.lastViewport);
     switch (keyId) {
-      case "pageup": this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport); this.autoScroll = false; return true;
-      case "pagedown": this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport); break;
-      default: return false;
+      case "pageup":
+        this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport);
+        this.autoScroll = false;
+        return true;
+      case "pagedown":
+        this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport);
+        break;
+      default:
+        return false;
     }
     this.autoScroll = this.scrollOffset >= max;
     return true;
@@ -249,7 +306,10 @@ export class AgentView {
       } else this.deps.onSteerUnavailable?.();
       this.deps.tui.requestRender();
     };
-    input.onEscape = () => { this.composer = undefined; this.deps.tui.requestRender(); };
+    input.onEscape = () => {
+      this.composer = undefined;
+      this.deps.tui.requestRender();
+    };
     this.composer = { input, kind };
     this.deps.tui.requestRender();
   }
@@ -267,13 +327,15 @@ export class AgentView {
     const model = sanitizeTerminalText(head.model ? modelEffort(head.model, head.thinking, 28) : "?");
     const title = `${glyph} ${theme.bold(label)} ${theme.fg("dim", `· ${model} · ${head.status} · ${formatTokenUsage(head.usage)}`)}`;
     const mode = this.outputOnly ? "Output only" : "All content";
-    const filterHint = this.outputOnly ? `${mode} [f] · failed tools remain visible` : `${mode} [f] · t thinking · o tool details`;
+    const filterHint = this.outputOnly
+      ? `${mode} [f] · failed tools remain visible`
+      : `${mode} [f] · t thinking · o tool details`;
     const lines = [title, theme.fg("muted", filterHint), theme.fg("dim", "─".repeat(cap))];
     const { layout } = this.currentTranscript();
     const max = Math.max(0, layout.lines.length - viewport);
     this.scrollOffset = this.autoScroll ? max : Math.min(this.scrollOffset, max);
     for (let index = 0; index < viewport; index += 1) lines.push(layout.lines[this.scrollOffset + index] ?? "");
-    const position = this.autoScroll ? this.isActive() ? "Following latest" : "End of transcript" : "Reading history";
+    const position = this.autoScroll ? (this.isActive() ? "Following latest" : "End of transcript") : "Reading history";
     lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · Space fold`));
     if (this.composer) {
       const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;

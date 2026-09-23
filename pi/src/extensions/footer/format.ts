@@ -1,9 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import {
-  stripTerminalSequences,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { palette, separator } from "./palette.js";
 
 /** Remove terminal control sequences and normalize untrusted text to one display line. */
@@ -24,13 +20,9 @@ export function formatFooterCwd(cwd: string, home: string | undefined): string {
   const relativeToHome = relative(resolvedHome, resolvedCwd);
   const insideHome =
     relativeToHome === "" ||
-    (relativeToHome !== ".." &&
-      !relativeToHome.startsWith(`..${sep}`) &&
-      !isAbsolute(relativeToHome));
+    (relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
   if (!insideHome) return cleanCwd;
-  return relativeToHome === ""
-    ? "~"
-    : `~${sep}${sanitizeFooterText(relativeToHome)}`;
+  return relativeToHome === "" ? "~" : `~${sep}${sanitizeFooterText(relativeToHome)}`;
 }
 
 /**
@@ -41,8 +33,7 @@ export function formatTokens(count: number, fractionDigits: number = 1): string 
   if (count < 1_000) return Math.round(count).toString();
   if (count < 10_000) return `${(count / 1_000).toFixed(fractionDigits)}k`;
   if (count < 1_000_000) return `${(count / 1_000).toFixed(fractionDigits - 1)}k`;
-  if (count < 10_000_000)
-    return `${(count / 1_000_000).toFixed(fractionDigits)}M`;
+  if (count < 10_000_000) return `${(count / 1_000_000).toFixed(fractionDigits)}M`;
   return `${(count / 1_000_000).toFixed(fractionDigits - 1)}M`;
 }
 
@@ -77,10 +68,7 @@ export function fitByDropping(
 ): string {
   if (width <= 0) return "";
   const visible = parts.map(() => true);
-  const render = (): string =>
-    parts
-      .filter((part, index) => visible[index] && part.length > 0)
-      .join(delimiter);
+  const render = (): string => parts.filter((part, index) => visible[index] && part.length > 0).join(delimiter);
   let line = render();
   for (const index of dropOrder) {
     if (visibleWidth(line) <= width) break;

@@ -3,7 +3,14 @@ import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parsePersonalConfig, type PersonalConfig } from "./schema.js";
 
-export { MODEL_TIERS, isModelTier, type ModelTier, type ModelTiers, type PersonalConfig, type WorkflowSettings } from "./schema.js";
+export {
+  MODEL_TIERS,
+  isModelTier,
+  type ModelTier,
+  type ModelTiers,
+  type PersonalConfig,
+  type WorkflowSettings,
+} from "./schema.js";
 
 /** One user-global file for personal extensions; Pi's native settings stay in settings.json. */
 export function getPersonalConfigPath(): string {

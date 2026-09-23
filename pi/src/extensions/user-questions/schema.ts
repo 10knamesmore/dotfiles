@@ -5,9 +5,7 @@ const UserQuestionOptionSchema = Type.Object(
   {
     value: Type.String({ description: "Value returned when this option is selected" }),
     label: Type.String({ description: "Text shown to the user" }),
-    description: Type.Optional(
-      Type.String({ description: "Additional context shown with the option" }),
-    ),
+    description: Type.Optional(Type.String({ description: "Additional context shown with the option" })),
   },
   { additionalProperties: false },
 );
@@ -18,8 +16,7 @@ const UserQuestionSchema = Type.Object(
     question: Type.String({ description: "Question text shown to the user" }),
     options: Type.Optional(
       Type.Array(UserQuestionOptionSchema, {
-        description:
-          "Options for this question; omit or leave empty for a free-text question",
+        description: "Options for this question; omit or leave empty for a free-text question",
       }),
     ),
     allowOther: Type.Optional(
@@ -30,8 +27,7 @@ const UserQuestionSchema = Type.Object(
     ),
     placeholder: Type.Optional(
       Type.String({
-        description:
-          "Hint text shown while the free-text answer is empty; never part of the answer",
+        description: "Hint text shown while the free-text answer is empty; never part of the answer",
       }),
     ),
   },

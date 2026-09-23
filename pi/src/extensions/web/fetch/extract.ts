@@ -95,7 +95,8 @@ async function fetchFollowingRedirects(url: string, signal: AbortSignal): Promis
       redirect: "manual",
       signal,
       headers: {
-        accept: "text/html,application/xhtml+xml,text/plain,text/markdown,application/json,application/xml,text/xml;q=0.9,*/*;q=0.1",
+        accept:
+          "text/html,application/xhtml+xml,text/plain,text/markdown,application/json,application/xml,text/xml;q=0.9,*/*;q=0.1",
         "user-agent": "dotfiles-pi-webfetch/1.0",
       },
     });
@@ -145,12 +146,8 @@ async function extractHtml(html: string, url: URL): Promise<{ title: string; con
     type ReadabilityDocument = ConstructorParameters<typeof Readability>[0];
     const article = new Readability(document as unknown as ReadabilityDocument).parse();
     const turndown = await getTurndown();
-    const readableMarkdown = typeof article?.content === "string"
-      ? turndown.turndown(article.content).trim()
-      : "";
-    const fallbackMarkdown = readableMarkdown
-      ? ""
-      : turndown.turndown(fallbackHtml).trim();
+    const readableMarkdown = typeof article?.content === "string" ? turndown.turndown(article.content).trim() : "";
+    const fallbackMarkdown = readableMarkdown ? "" : turndown.turndown(fallbackHtml).trim();
     const content = readableMarkdown || fallbackMarkdown;
 
     if (!content) {
@@ -181,15 +178,20 @@ function normalizedContentType(response: Response): string {
 }
 
 function isSupportedContentType(contentType: string): boolean {
-  return HTML_TYPES.has(contentType)
-    || PASSTHROUGH_TYPES.has(contentType)
-    || contentType.endsWith("+json")
-    || contentType.endsWith("+xml");
+  return (
+    HTML_TYPES.has(contentType) ||
+    PASSTHROUGH_TYPES.has(contentType) ||
+    contentType.endsWith("+json") ||
+    contentType.endsWith("+xml")
+  );
 }
 
 function extractTextTitle(text: string, url: URL): string {
   if (isMarkdownType(text)) {
-    const heading = text.match(/^#{1,2}\s+(.+)$/m)?.[1]?.replace(/[*_`]+/g, "").trim();
+    const heading = text
+      .match(/^#{1,2}\s+(.+)$/m)?.[1]
+      ?.replace(/[*_`]+/g, "")
+      .trim();
     if (heading) return heading;
   }
   return fallbackTitle(url);

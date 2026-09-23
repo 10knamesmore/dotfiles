@@ -8,7 +8,13 @@ import { randomUUID } from "node:crypto";
 import { accessSync, constants, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { childLabel } from "../../util.js";
-import { missingExplicitTools, resolveModel, SUBAGENT_FRAMING, type ConstructedChild, type ParentContext } from "../child.js";
+import {
+  missingExplicitTools,
+  resolveModel,
+  SUBAGENT_FRAMING,
+  type ConstructedChild,
+  type ParentContext,
+} from "../child.js";
 import type { SchemaCapture } from "../schema-tool.js";
 import type { SubagentSpec } from "../../types.js";
 import { buildChildArgs } from "./child-args.js";
@@ -41,11 +47,16 @@ function validateLaunchArtifact(path: string, label: string): void {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`${label} ${JSON.stringify(path)} is not a readable regular file: ${detail}`, { cause: error });
   }
-  if (!isFile) throw new Error(`${label} ${JSON.stringify(path)} is not a readable regular file: path is not a regular file`);
+  if (!isFile)
+    throw new Error(`${label} ${JSON.stringify(path)} is not a readable regular file: path is not a regular file`);
 }
 
 /** Side-effect-free checks that must pass before any launch artifact is written. */
-export function preflightSubprocessChild(spec: SubagentSpec, parent: ParentContext, options: { forkSessionFile?: string } = {}) {
+export function preflightSubprocessChild(
+  spec: SubagentSpec,
+  parent: ParentContext,
+  options: { forkSessionFile?: string } = {},
+) {
   const cwd = spec.cwd ?? parent.ctx.cwd;
   let isDirectory: boolean;
   try {
@@ -55,13 +66,15 @@ export function preflightSubprocessChild(spec: SubagentSpec, parent: ParentConte
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Child cwd ${JSON.stringify(cwd)} is not usable as a spawn cwd: ${detail}`, { cause: error });
   }
-  if (!isDirectory) throw new Error(`Child cwd ${JSON.stringify(cwd)} is not usable as a spawn cwd: path is not a directory`);
+  if (!isDirectory)
+    throw new Error(`Child cwd ${JSON.stringify(cwd)} is not usable as a spawn cwd: path is not a directory`);
 
   const { model, thinking } = resolveModel(spec, parent.ctx, parent.thinkingLevel);
   const tools = spec.schema && spec.tools ? [...new Set([...spec.tools, "report_result"])] : spec.tools;
   const excludeTools = spec.schema ? spec.excludeTools?.filter((name) => name !== "report_result") : spec.excludeTools;
   for (const name of [...(tools ?? []), ...(excludeTools ?? [])]) {
-    if (name.includes(",")) throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
+    if (name.includes(","))
+      throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
   }
   const shimPath = join(dirname(parent.selfPath), "child-shim.ts");
   const childPiEntry = resolveChildPiEntry();
@@ -117,17 +130,20 @@ export async function spawnSubprocessChild(
   // The spec file must outlive the CHILD, not just construction: pi re-runs
   // extension factories on session reload, and the shim re-reads its spec
   // then. Tie cleanup to process exit; rm never throws into the child's fate.
-  void rpc.exited.then(() => {
-    rmSync(specPath, { force: true });
-    rmSync(toolReportPath, { force: true });
-  }).catch(() => undefined);
+  void rpc.exited
+    .then(() => {
+      rmSync(specPath, { force: true });
+      rmSync(toolReportPath, { force: true });
+    })
+    .catch(() => undefined);
 
   try {
     // A headless child has no person to answer extension UI; cancel instead
     // of letting a third-party extension block the child forever.
     rpc.onEvent((event) => {
       if (event.type !== "extension_ui_request" || typeof event.id !== "string") return;
-      if (ANSWER_REQUIRED_UI_METHODS.has(event.method as string)) rpc.send({ type: "extension_ui_response", id: event.id, cancelled: true });
+      if (ANSWER_REQUIRED_UI_METHODS.has(event.method as string))
+        rpc.send({ type: "extension_ui_response", id: event.id, cancelled: true });
     });
 
     const report = await awaitToolReport(rpc, toolReportPath);
@@ -142,9 +158,9 @@ export async function spawnSubprocessChild(
     const missing = missingExplicitTools(spec.tools, report.activeTools);
     if (missing.length > 0) {
       throw new Error(
-        `Missing explicitly requested tools: ${missing.join(", ")}. No active tool by that name resolved for the child at ${cwd}: `
-        + `the providing extension may not be installed there, may be detached from children, or the name may be misspelled or in excludeTools. `
-        + `Active tools: ${report.activeTools.join(", ") || "none"}.`,
+        `Missing explicitly requested tools: ${missing.join(", ")}. No active tool by that name resolved for the child at ${cwd}: ` +
+          `the providing extension may not be installed there, may be detached from children, or the name may be misspelled or in excludeTools. ` +
+          `Active tools: ${report.activeTools.join(", ") || "none"}.`,
       );
     }
     const session = await RpcChildSession.start(rpc);
@@ -180,10 +196,11 @@ function wireSchemaCapture(session: RpcChildSession, capture: SchemaCapture): vo
   capture.terminate = () => {
     void session.abort().catch(() => undefined);
   };
-  type CallState =
-    | { state: "active"; toolName: string; args: unknown }
-    | { state: "terminal"; toolName: string };
-  interface Candidate { id: string; value: unknown }
+  type CallState = { state: "active"; toolName: string; args: unknown } | { state: "terminal"; toolName: string };
+  interface Candidate {
+    id: string;
+    value: unknown;
+  }
   const calls = new Map<string, CallState>();
   let candidate: Candidate | undefined;
   let published = false;
@@ -216,11 +233,11 @@ function wireSchemaCapture(session: RpcChildSession, capture: SchemaCapture): vo
       const state = candidate && calls.get(candidate.id);
       const hasActiveCall = [...calls.values()].some((call) => call.state === "active");
       if (
-        !attemptPoisoned
-        && !hasActiveCall
-        && candidate
-        && state?.state === "terminal"
-        && state.toolName === "report_result"
+        !attemptPoisoned &&
+        !hasActiveCall &&
+        candidate &&
+        state?.state === "terminal" &&
+        state.toolName === "report_result"
       ) {
         capture.called = true;
         capture.value = candidate.value;
@@ -257,12 +274,18 @@ function wireSchemaCapture(session: RpcChildSession, capture: SchemaCapture): vo
 async function awaitToolReport(rpc: ChildRpc, path: string): Promise<ShimToolReport> {
   const deadline = Date.now() + TOOL_REPORT_TIMEOUT_MS;
   let exited = false;
-  rpc.onExit(() => { exited = true; });
+  rpc.onExit(() => {
+    exited = true;
+  });
   for (;;) {
     const report = await readToolReport(path);
     if (report) return report;
-    if (exited) throw new Error(`Child pi process exited before reporting its toolset. Stderr: ${rpc.stderrTail() || "(empty)"}`);
-    if (Date.now() > deadline) throw new Error(`Child pi process did not report its toolset within ${TOOL_REPORT_TIMEOUT_MS / 1_000}s. Stderr: ${rpc.stderrTail() || "(empty)"}`);
+    if (exited)
+      throw new Error(`Child pi process exited before reporting its toolset. Stderr: ${rpc.stderrTail() || "(empty)"}`);
+    if (Date.now() > deadline)
+      throw new Error(
+        `Child pi process did not report its toolset within ${TOOL_REPORT_TIMEOUT_MS / 1_000}s. Stderr: ${rpc.stderrTail() || "(empty)"}`,
+      );
     await new Promise((resolve) => setTimeout(resolve, TOOL_REPORT_POLL_MS));
   }
 }

@@ -1,21 +1,8 @@
 import { homedir, hostname, userInfo } from "node:os";
-import type {
-  ExtensionContext,
-  ReadonlyFooterDataProvider,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ReadonlyFooterDataProvider } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import {
-  fitByDropping,
-  formatDuration,
-  formatFooterCwd,
-  formatTokens,
-  sanitizeFooterText,
-} from "./format.js";
-import type {
-  GitDiffStat,
-  GitFileStatus,
-  GitStatusSnapshot,
-} from "./git-status.js";
+import { fitByDropping, formatDuration, formatFooterCwd, formatTokens, sanitizeFooterText } from "./format.js";
+import type { GitDiffStat, GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
 import {
   type RecentHitRateTracker,
@@ -170,11 +157,7 @@ function formatGitTracking(snapshot: GitStatusSnapshot): string {
 }
 
 /** One staged/unstaged group: file count plus text line totals. */
-function formatGitDiffStat(
-  label: string,
-  stat: GitDiffStat,
-  labelColor: (text: string) => string,
-): string {
+function formatGitDiffStat(label: string, stat: GitDiffStat, labelColor: (text: string) => string): string {
   if (stat.files === 0) {
     return "";
   }
@@ -189,15 +172,11 @@ function formatGitDiffStat(
 
 /** Conflicts stay separate from the staged/unstaged diff totals. */
 function formatGitConflicts(files: GitFileStatus): string {
-  return files.conflicted > 0
-    ? palette.red(`conflicts ${files.conflicted}`)
-    : "";
+  return files.conflicted > 0 ? palette.red(`conflicts ${files.conflicted}`) : "";
 }
 
 function formatGitUntracked(files: GitFileStatus): string {
-  return files.untracked > 0
-    ? palette.overlay2(`untracked ${files.untracked}`)
-    : "";
+  return files.untracked > 0 ? palette.overlay2(`untracked ${files.untracked}`) : "";
 }
 
 function formatGitStash(files: GitFileStatus): string {
@@ -206,12 +185,7 @@ function formatGitStash(files: GitFileStatus): string {
 
 /** True when no tracked, untracked, or unmerged change is present. */
 function gitIsClean(files: GitFileStatus): boolean {
-  return (
-    files.staged.files === 0 &&
-    files.unstaged.files === 0 &&
-    files.untracked === 0 &&
-    files.conflicted === 0
-  );
+  return files.staged.files === 0 && files.unstaged.files === 0 && files.untracked === 0 && files.conflicted === 0;
 }
 
 function renderFirstLine(options: FirstLineRenderOptions): string {
@@ -223,9 +197,7 @@ function renderFirstLine(options: FirstLineRenderOptions): string {
     palette.red(host),
     palette.overlay2("]"),
   ].join("");
-  const cwd = palette.peach(
-    formatFooterCwd(ctx.sessionManager.getCwd(), homedir()),
-  );
+  const cwd = palette.peach(formatFooterCwd(ctx.sessionManager.getCwd(), homedir()));
 
   const parts = [identity, cwd];
 
@@ -236,9 +208,7 @@ function renderFirstLine(options: FirstLineRenderOptions): string {
       formatGitOperation(git),
       formatGitConflicts(git.files),
       gitSegment(formatGitDiffStat("staged", git.files.staged, palette.green)),
-      gitSegment(
-        formatGitDiffStat("unstaged", git.files.unstaged, palette.sky),
-      ),
+      gitSegment(formatGitDiffStat("unstaged", git.files.unstaged, palette.sky)),
       gitSegment(formatGitUntracked(git.files)),
       gitSegment(formatGitStash(git.files)),
       gitSegment(gitIsClean(git.files) ? palette.green("clean") : ""),
@@ -293,10 +263,7 @@ function formatToolUsage(snapshot: ToolUsageSnapshot): string {
       return `${cleanName}:${count}`;
     })
     .join(" ");
-  const parts = [
-    palette.overlay2("tools"),
-    palette.peach(String(snapshot.total)),
-  ];
+  const parts = [palette.overlay2("tools"), palette.peach(String(snapshot.total))];
 
   if (top) {
     parts.push(palette.sky(top));
@@ -310,10 +277,7 @@ function formatToolUsage(snapshot: ToolUsageSnapshot): string {
 }
 
 function formatTurns(snapshot: { turns: number; agents: number; recentAgentMilliseconds?: number }): string {
-  const turnSummary = [
-    palette.overlay2("turns"),
-    palette.lavender(String(snapshot.turns)),
-  ].join(" ");
+  const turnSummary = [palette.overlay2("turns"), palette.lavender(String(snapshot.turns))].join(" ");
 
   if (snapshot.agents === 0) {
     return turnSummary;
@@ -357,9 +321,7 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
   ];
 
   if (usage.cacheRead > 0) {
-    totalsParts.push(
-      palette.green(`cached:${formatTokens(usage.cacheRead, 2)}`),
-    );
+    totalsParts.push(palette.green(`cached:${formatTokens(usage.cacheRead, 2)}`));
   }
 
   if (hitRate) {
@@ -367,9 +329,7 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
   }
 
   const totals = totalsParts.join(" ");
-  const cost = usage.parentCostUsd > 0
-    ? palette.peach(`$${usage.parentCostUsd.toFixed(3)}`)
-    : "";
+  const cost = usage.parentCostUsd > 0 ? palette.peach(`$${usage.parentCostUsd.toFixed(3)}`) : "";
 
   return fitByDropping([formatContext(ctx), totals, cost], [1], width, separator);
 }
@@ -382,14 +342,11 @@ function statusPriority(key: string): number {
   return 2;
 }
 
-function formatExtensionStatuses(
-  footerData: ReadonlyFooterDataProvider,
-): string {
+function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
     .filter(([key]) => key !== "todo" && key !== "subagent-workflow:usage")
     .sort(([leftKey], [rightKey]) => {
-      const priorityDifference =
-        statusPriority(leftKey) - statusPriority(rightKey);
+      const priorityDifference = statusPriority(leftKey) - statusPriority(rightKey);
 
       if (priorityDifference !== 0) {
         return priorityDifference;
@@ -430,13 +387,7 @@ function formatPromptRun(run: PromptRunSnapshot | undefined): string {
 }
 
 function renderThirdLine(options: ThirdLineRenderOptions): string {
-  const {
-    width,
-    footerData,
-    tools,
-    turns,
-    promptRun,
-  } = options;
+  const { width, footerData, tools, turns, promptRun } = options;
   const toolUsage = formatToolUsage(tools.snapshot(4));
   const turnCount = formatTurns(turns.snapshot());
   const statuses = formatExtensionStatuses(footerData);

@@ -42,7 +42,8 @@ const bashSchema = Type.Object({
   command: Type.String({ description: "Shell command to execute" }),
   timeout: Type.Optional(
     Type.Number({
-      description: "Timeout in seconds (optional, no default timeout). A background command is killed after this many seconds.",
+      description:
+        "Timeout in seconds (optional, no default timeout). A background command is killed after this many seconds.",
     }),
   ),
   background: Type.Optional(
@@ -220,7 +221,9 @@ function killProcessGroup(pid: number): void {
  */
 function readShellToolSettings(ctx: ExtensionContext): ShellToolSettings {
   const globalSettings = readSettingsFile(join(getAgentDir(), "settings.json"));
-  const projectSettings = ctx.isProjectTrusted() ? readSettingsFile(join(ctx.cwd, CONFIG_DIR_NAME, "settings.json")) : {};
+  const projectSettings = ctx.isProjectTrusted()
+    ? readSettingsFile(join(ctx.cwd, CONFIG_DIR_NAME, "settings.json"))
+    : {};
   const shellPath = projectSettings.shellPath ?? globalSettings.shellPath;
   return {
     shellPath: shellPath === undefined ? undefined : expandHome(shellPath),

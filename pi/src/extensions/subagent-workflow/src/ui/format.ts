@@ -55,8 +55,7 @@ export function statusColor(status: SubagentStatus): string {
 export function statusGlyph(status: SubagentStatus, theme: ThemeLike, now: number, animate: boolean): string {
   const color = statusColor(status);
   if (status === "running") return theme.fg(color, animate ? spinnerFrame(now) : "◆");
-  const glyph =
-    status === "completed" ? "✓" : status === "failed" ? "✗" : status === "aborted" ? "⊘" : "·";
+  const glyph = status === "completed" ? "✓" : status === "failed" ? "✗" : status === "aborted" ? "⊘" : "·";
   return theme.fg(color, glyph);
 }
 
@@ -125,7 +124,12 @@ function truncate(text: string, max: number): string {
 
 /** First non-empty line of result text, collapsed and trimmed. */
 export function firstLine(text: string): string {
-  return text.split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
+  return (
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? ""
+  );
 }
 
 /** Counts of children by lifecycle bucket, for header and widget summaries. */

@@ -7,12 +7,18 @@ import type { Readable, Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail } from "@earendil-works/pi-coding-agent";
 import { logPythonEvent } from "./diagnostics.js";
-import { isPythonEnvironment, pythonWorkerArguments, STARTUP_TIMEOUT_MS, type PythonEnvironment } from "./environment.js";
+import {
+  isPythonEnvironment,
+  pythonWorkerArguments,
+  STARTUP_TIMEOUT_MS,
+  type PythonEnvironment,
+} from "./environment.js";
 
 const INTERRUPT_GRACE_MS = 1_000;
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 
-export type PythonOutcome = "completed" | "python_error" | "interrupted" | "timed_out" | "process_exited" | "startup_error" | "output_error";
+export type PythonOutcome =
+  "completed" | "python_error" | "interrupted" | "timed_out" | "process_exited" | "startup_error" | "output_error";
 
 /** Execution metadata used for UI status and the model's state-loss notice. */
 export interface PythonToolDetails {
@@ -146,8 +152,10 @@ export class PythonSession {
       durationMs: Date.now() - started,
       environmentAvailable: this.available,
       output: { truncated, path: outputPath },
-      diagnosticsPath: outcome === "startup_error" || outcome === "process_exited" || outcome === "output_error"
-        ? (worker ?? this.worker)?.logPath : undefined,
+      diagnosticsPath:
+        outcome === "startup_error" || outcome === "process_exited" || outcome === "output_error"
+          ? (worker ?? this.worker)?.logPath
+          : undefined,
     };
     this.log({ phase: "execute_end", callId, outcome, durationMs: details.durationMs });
     return { output, details };
@@ -186,11 +194,25 @@ export class PythonSession {
     let resolveReady!: (info: WorkerInfo) => void;
     let rejectReady!: (error: Error) => void;
     let resolveExited!: () => void;
-    const ready = new Promise<WorkerInfo>((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
-    const exited = new Promise<void>((resolve) => { resolveExited = resolve; });
+    const ready = new Promise<WorkerInfo>((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+    const exited = new Promise<void>((resolve) => {
+      resolveExited = resolve;
+    });
     const worker: WorkerProcess = {
-      launcher, requests: launcher.stdio[3] as Writable, events: launcher.stdio[4] as Readable,
-      ready, resolveReady, rejectReady, exited, resolveExited, stopping: false, ended: false, logPath,
+      launcher,
+      requests: launcher.stdio[3] as Writable,
+      events: launcher.stdio[4] as Readable,
+      ready,
+      resolveReady,
+      rejectReady,
+      exited,
+      resolveExited,
+      stopping: false,
+      ended: false,
+      logPath,
     };
     this.worker = worker;
     const decoder = new StringDecoder("utf8");
@@ -251,15 +273,23 @@ export class PythonSession {
   }
 
   private submit(
-    worker: WorkerProcess, code: string, timeoutSeconds: number, callId: string, outputPath: string,
-    signal?: AbortSignal, onStarted?: () => void,
+    worker: WorkerProcess,
+    code: string,
+    timeoutSeconds: number,
+    callId: string,
+    outputPath: string,
+    signal?: AbortSignal,
+    onStarted?: () => void,
   ): Promise<PythonOutcome> {
     if (signal?.aborted || this.disposed) return Promise.resolve("interrupted");
     if (worker.ended || worker.stopping) return Promise.resolve("process_exited");
     return new Promise((resolve) => {
       const abort = (): void => this.interrupt(worker, "interrupted");
       const pending: PendingExecution = {
-        callId, started: false, timeoutSeconds, onStarted,
+        callId,
+        started: false,
+        timeoutSeconds,
+        onStarted,
         finish: (outcome) => {
           if (worker.pending !== pending) return;
           worker.pending = undefined;
@@ -283,11 +313,17 @@ export class PythonSession {
       worker.info = message;
       this.onEnvironmentReady(message.environment);
       worker.resolveReady(message);
-      this.log({ phase: "ready", pid: message.pid, interpreter: { executable: message.environment.executable, version: message.environment.version }, packageCount: message.environment.packages.length });
+      this.log({
+        phase: "ready",
+        pid: message.pid,
+        interpreter: { executable: message.environment.executable, version: message.environment.version },
+        packageCount: message.environment.packages.length,
+      });
       return;
     }
     const pending = worker.pending;
-    if (!pending || pending.callId !== message.callId) throw new Error("Python returned an unexpected call identifier.");
+    if (!pending || pending.callId !== message.callId)
+      throw new Error("Python returned an unexpected call identifier.");
     if (message.type === "started") {
       if (pending.started) throw new Error("Python started a call twice.");
       pending.started = true;
@@ -358,10 +394,18 @@ function parseMessage(line: string): WorkerMessage {
   const value: unknown = JSON.parse(line);
   if (!value || typeof value !== "object") throw new Error("Invalid Python control message.");
   const message = value as Record<string, unknown>;
-  if (message.type === "ready" && Number.isSafeInteger(message.pid) && (message.pid as number) > 0
-    && isPythonEnvironment(message.environment)) return message as unknown as WorkerMessage;
-  if (typeof message.callId === "string" && (message.type === "started"
-    || (message.type === "completed" && ["completed", "python_error", "interrupted"].includes(String(message.outcome))))) {
+  if (
+    message.type === "ready" &&
+    Number.isSafeInteger(message.pid) &&
+    (message.pid as number) > 0 &&
+    isPythonEnvironment(message.environment)
+  )
+    return message as unknown as WorkerMessage;
+  if (
+    typeof message.callId === "string" &&
+    (message.type === "started" ||
+      (message.type === "completed" && ["completed", "python_error", "interrupted"].includes(String(message.outcome))))
+  ) {
     return message as unknown as WorkerMessage;
   }
   throw new Error("Invalid Python control message.");
@@ -380,7 +424,8 @@ async function readOutput(path: string): Promise<{ text: string; truncated: bool
       while (start < bytesRead && (buffer[start]! & 0xc0) === 0x80) start++;
     }
     const preview = truncateTail(buffer.subarray(start, bytesRead).toString("utf8"), {
-      maxBytes: DEFAULT_MAX_BYTES, maxLines: DEFAULT_MAX_LINES,
+      maxBytes: DEFAULT_MAX_BYTES,
+      maxLines: DEFAULT_MAX_LINES,
     });
     return { text: preview.content, truncated: size > length || preview.truncated };
   } finally {

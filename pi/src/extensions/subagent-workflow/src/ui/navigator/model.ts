@@ -10,7 +10,15 @@
 import { join } from "node:path";
 import type { FilterMode, Level } from "./controls.js";
 import { orderedChildren } from "./controls.js";
-import { listRunSummaries, readRunDetail, runsDirFor, type ChildRow, type ReadOptions, type RunDetail, type RunSummary } from "./store-read.js";
+import {
+  listRunSummaries,
+  readRunDetail,
+  runsDirFor,
+  type ChildRow,
+  type ReadOptions,
+  type RunDetail,
+  type RunSummary,
+} from "./store-read.js";
 
 export class NavigatorModel {
   constructor(
@@ -77,7 +85,7 @@ export class NavigatorState {
   move(delta: number, count: number): void {
     if (count <= 0) return;
     const frame = this.top();
-    frame.cursor = ((frame.cursor + delta) % count + count) % count;
+    frame.cursor = (((frame.cursor + delta) % count) + count) % count;
   }
 
   /** Move by one viewport without wrapping at the ends. */
@@ -158,7 +166,10 @@ export class NavigatorState {
   /** Replace any drilled run or agent context with another run's detail view. */
   switchRun(runId: string): void {
     const runsCursor = this.stack[0]?.cursor ?? 0;
-    this.stack = [{ level: "runs", cursor: runsCursor }, { level: "run", cursor: 0 }];
+    this.stack = [
+      { level: "runs", cursor: runsCursor },
+      { level: "run", cursor: 0 },
+    ];
     this.runId = runId;
     this.selectedRunId = runId;
     this.selectedChildId = undefined;

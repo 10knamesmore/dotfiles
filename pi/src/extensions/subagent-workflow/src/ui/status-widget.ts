@@ -109,9 +109,7 @@ function modelDisplay(model: string | undefined, thinking: ThinkingLevel | undef
 
 function resolvedModelDisplay(handle: SubagentHandle): string | undefined {
   const resolved = handle.resolved;
-  return resolved
-    ? modelDisplay(`${resolved.provider}/${resolved.modelId}`, resolved.thinkingLevel)
-    : undefined;
+  return resolved ? modelDisplay(`${resolved.provider}/${resolved.modelId}`, resolved.thinkingLevel) : undefined;
 }
 
 function runModelDisplay(run: TrackedRun): string | undefined {
@@ -141,7 +139,12 @@ function summaryParts(runs: WidgetRunView[]): string[] {
 }
 
 /** Build the widget lines from active run views. Pure and unit tested. */
-export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width: number, maxRows = FALLBACK_ROW_CAP): string[] {
+export function renderWidgetLines(
+  runs: WidgetRunView[],
+  theme: ThemeLike,
+  width: number,
+  maxRows = FALLBACK_ROW_CAP,
+): string[] {
   if (runs.length === 0) return [];
   // Never exceed the host-supplied width: pi-tui kills the process on any
   // over-wide line, so there is no minimum layout width worth crashing for.
@@ -176,8 +179,20 @@ export function renderWidgetLines(runs: WidgetRunView[], theme: ThemeLike, width
  * characters that previously made this file register as binary to grep.
  */
 function widgetSignature(runs: WidgetRunView[]): string {
-  return JSON.stringify(runs.map((run) =>
-    [run.kind, run.label, run.phase ?? "", run.model ?? "", run.counts.done, run.counts.total, run.counts.running, run.counts.failed, formatTokenUsage(run.usage), run.selected === true]));
+  return JSON.stringify(
+    runs.map((run) => [
+      run.kind,
+      run.label,
+      run.phase ?? "",
+      run.model ?? "",
+      run.counts.done,
+      run.counts.total,
+      run.counts.running,
+      run.counts.failed,
+      formatTokenUsage(run.usage),
+      run.selected === true,
+    ]),
+  );
 }
 
 export class SubagentStatusWidget {
@@ -249,8 +264,12 @@ export class SubagentStatusWidget {
   }
 
   /** Register a spawned run for live display. No-op without dialog-capable UI. */
-  track(runId: string, handle: SubagentHandle, ctx: WidgetCtx,
-    display: { model?: string; thinking?: ThinkingLevel } = {}): void {
+  track(
+    runId: string,
+    handle: SubagentHandle,
+    ctx: WidgetCtx,
+    display: { model?: string; thinking?: ThinkingLevel } = {},
+  ): void {
     if (!ctx.hasUI) return;
     this.setCtx(ctx);
     const usage = new Map<string, UsageSummary>();
@@ -284,8 +303,16 @@ export class SubagentStatusWidget {
     this.selectedRunId = undefined;
     this.lastSignature = undefined;
     if (this.ctx) {
-      try { this.ctx.ui.setWidget(WIDGET_KEY, undefined); } catch (error) { this.logFailure(error); }
-      try { this.ctx.ui.setStatus(STATUS_KEY, undefined); } catch (error) { this.logFailure(error); }
+      try {
+        this.ctx.ui.setWidget(WIDGET_KEY, undefined);
+      } catch (error) {
+        this.logFailure(error);
+      }
+      try {
+        this.ctx.ui.setStatus(STATUS_KEY, undefined);
+      } catch (error) {
+        this.logFailure(error);
+      }
     }
     this.registered = false;
     this.tui = undefined;
@@ -446,12 +473,11 @@ export class SubagentStatusWidget {
         (tui, theme) => {
           this.tui = tui;
           return {
-            render: (width: number) => this.paint(renderWidgetLines(
-              this.views(),
-              theme,
-              Math.max(1, width),
-              statusWidgetRowCap(tui.terminal?.rows),
-            ), tui),
+            render: (width: number) =>
+              this.paint(
+                renderWidgetLines(this.views(), theme, Math.max(1, width), statusWidgetRowCap(tui.terminal?.rows)),
+                tui,
+              ),
             invalidate: () => {
               this.registered = false;
               this.tui = undefined;
@@ -483,9 +509,10 @@ export class SubagentStatusWidget {
    * mounted, on the safe path.
    */
   private paint(lines: string[], tui: Pick<TUI, "hasOverlay">): string[] {
-    const held = tui.hasOverlay() && lines.length < this.painted
-      ? [...lines, ...Array.from({ length: this.painted - lines.length }, () => "")]
-      : lines;
+    const held =
+      tui.hasOverlay() && lines.length < this.painted
+        ? [...lines, ...Array.from({ length: this.painted - lines.length }, () => "")]
+        : lines;
     this.painted = held.length;
     return held;
   }
@@ -527,8 +554,16 @@ export class SubagentStatusWidget {
       this.tui = undefined;
       this.painted = 0;
       this.lastStatus = undefined;
-      try { this.ctx?.ui.setWidget(WIDGET_KEY, undefined); } catch { /* host UI already failed */ }
-      try { this.ctx?.ui.setStatus(STATUS_KEY, undefined); } catch { /* host UI already failed */ }
+      try {
+        this.ctx?.ui.setWidget(WIDGET_KEY, undefined);
+      } catch {
+        /* host UI already failed */
+      }
+      try {
+        this.ctx?.ui.setStatus(STATUS_KEY, undefined);
+      } catch {
+        /* host UI already failed */
+      }
       this.logFailure(error);
     }
   }

@@ -31,17 +31,25 @@ export function buildChildArgs(config: ChildProcessConfig): string[] {
   for (const name of [...(config.tools ?? []), ...(config.excludeTools ?? [])]) {
     // pi's --tools/--exclude-tools split on commas, so a comma inside one
     // name would silently request different tools than the author wrote.
-    if (name.includes(",")) throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
+    if (name.includes(","))
+      throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
   }
   const excludeTools = [...new Set([...(config.excludeTools ?? []), ...RECURSION_GUARD_TOOLS])];
   const args = [
-    "--mode", "rpc",
-    "--provider", config.provider,
-    "--model", config.modelId,
-    "--thinking", config.thinkingLevel,
-    "--session-dir", config.sessionDir,
-    "--append-system-prompt", config.appendSystemPrompt,
-    "--exclude-tools", excludeTools.join(","),
+    "--mode",
+    "rpc",
+    "--provider",
+    config.provider,
+    "--model",
+    config.modelId,
+    "--thinking",
+    config.thinkingLevel,
+    "--session-dir",
+    config.sessionDir,
+    "--append-system-prompt",
+    config.appendSystemPrompt,
+    "--exclude-tools",
+    excludeTools.join(","),
   ];
   // Emit --tools whenever an allowlist was given, even empty: pi parses
   // --tools "" as a zero-tool allowlist (matching in-process tools: []).

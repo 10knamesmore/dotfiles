@@ -25,9 +25,7 @@ export interface TodoToolDetails {
 }
 
 function errorMessage(error: unknown): string {
-  return sanitizeTodoDisplayLine(
-    error instanceof Error ? error.message : String(error),
-  );
+  return sanitizeTodoDisplayLine(error instanceof Error ? error.message : String(error));
 }
 
 function taskTree(phases: readonly TodoPhase[], expanded: boolean): string {
@@ -51,16 +49,12 @@ function taskTree(phases: readonly TodoPhase[], expanded: boolean): string {
               : task.status === "blocked"
                 ? "!"
                 : "○";
-      const reason =
-        task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
+      const reason = task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
       phaseLines.push(`  ${marker} ${task.content}${reason}`);
     }
     if (phaseLines.length > 0 || expanded) {
       const closed = phase.tasks.filter(isClosedTodo).length;
-      lines.push(
-        `${phase.name} (${closed}/${phase.tasks.length}):`,
-        ...phaseLines,
-      );
+      lines.push(`${phase.name} (${closed}/${phase.tasks.length}):`, ...phaseLines);
     }
   }
   if (hidden > 0) lines.push(`… ${hidden} more`);
@@ -68,18 +62,13 @@ function taskTree(phases: readonly TodoPhase[], expanded: boolean): string {
 }
 
 /** Register the parent-owned model-facing todo tool. */
-export function registerTodoTool(
-  pi: ExtensionAPI,
-  store: TodoSessionStore,
-  presentation: TodoPresentation,
-): void {
+export function registerTodoTool(pi: ExtensionAPI, store: TodoSessionStore, presentation: TodoPresentation): void {
   pi.registerTool<typeof TodoParameters, TodoToolDetails>({
     name: "todo",
     label: "Todo",
     description:
       "Apply one atomic operation to the parent session's phased todo list. init replaces the list; start selects one task; done and drop target a task, phase, or all tasks; rm removes one task, clears one phase, or clears all tasks; block and unblock require one task or phase; append adds tasks to a phase; view is read-only. Task content and phase names are stable exact identifiers. After each mutation, the first pending task becomes active when no task is active. Use view if an identifier is unknown.",
-    promptSnippet:
-      "Track multi-step work as a parent-session phase and task list",
+    promptSnippet: "Track multi-step work as a parent-session phase and task list",
     promptGuidelines: [
       "Use todo for multi-step work and keep every introduced task and phase string stable for later operations. make sure update todos once a task was done to help user keep in pace",
       "After a successful todo mutation, continue the real work in the same turn instead of spending a turn only updating progress.",
@@ -112,8 +101,7 @@ export function registerTodoTool(
         content: [
           {
             type: "text",
-            text:
-              uiWarning === undefined ? summary : `${summary}\n${uiWarning}`,
+            text: uiWarning === undefined ? summary : `${summary}\n${uiWarning}`,
           },
         ],
         details,
@@ -121,30 +109,18 @@ export function registerTodoTool(
     },
 
     renderCall(args, theme) {
-      const op =
-        typeof args.op === "string" ? sanitizeTodoDisplayLine(args.op) : "…";
+      const op = typeof args.op === "string" ? sanitizeTodoDisplayLine(args.op) : "…";
       let target = "";
-      if (typeof args.task === "string")
-        target = ` ${JSON.stringify(sanitizeTodoDisplayLine(args.task))}`;
-      else if (typeof args.phase === "string")
-        target = ` ${JSON.stringify(sanitizeTodoDisplayLine(args.phase))}`;
-      return new Text(
-        theme.fg("toolTitle", theme.bold("todo ")) +
-          theme.fg("muted", `${op}${target}`),
-        0,
-        0,
-      );
+      if (typeof args.task === "string") target = ` ${JSON.stringify(sanitizeTodoDisplayLine(args.task))}`;
+      else if (typeof args.phase === "string") target = ` ${JSON.stringify(sanitizeTodoDisplayLine(args.phase))}`;
+      return new Text(theme.fg("toolTitle", theme.bold("todo ")) + theme.fg("muted", `${op}${target}`), 0, 0);
     },
 
     renderResult(result, { expanded }, theme) {
       const phases = parseTodoPhases(result.details?.phases);
       if (phases === undefined) {
         const first = result.content[0];
-        return new Text(
-          first?.type === "text" ? sanitizeTodoDisplayText(first.text) : "",
-          0,
-          0,
-        );
+        return new Text(first?.type === "text" ? sanitizeTodoDisplayText(first.text) : "", 0, 0);
       }
       const tree = taskTree(phases, expanded);
       const rawWarning: unknown = result.details?.uiWarning;
@@ -153,11 +129,7 @@ export function registerTodoTool(
           ? `\n${theme.fg("warning", sanitizeTodoDisplayLine(rawWarning))}`
           : "";
       const title = result.details?.op === "view" ? "Todo" : "✓ Todo updated";
-      return new Text(
-        `${theme.fg("success", title)}${tree ? `\n${tree}` : ""}${warning}`,
-        0,
-        0,
-      );
+      return new Text(`${theme.fg("success", title)}${tree ? `\n${tree}` : ""}${warning}`, 0, 0);
     },
   });
 }

@@ -50,8 +50,7 @@ export function orderedChildren(detail: RunDetail, filter: FilterMode): ChildRow
   // Alphabetical by label (id tiebreak) so the list is stable while a run
   // executes: start-time ordering floated queued children (no startedAt)
   // above running ones and reshuffled rows as workers launched.
-  const alphabetical = (a: ChildRow, b: ChildRow): number =>
-    a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+  const alphabetical = (a: ChildRow, b: ChildRow): number => a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
   if (detail.kind !== "workflow") return [...filtered].sort(alphabetical);
   const order = detail.phases.map((phase) => phase.title);
   const rank = (child: ChildRow): number => {

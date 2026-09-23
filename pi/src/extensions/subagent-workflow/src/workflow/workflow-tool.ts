@@ -8,28 +8,51 @@ import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { linesComponent } from "../ui/component.js";
 import type { LaunchPlan, WorkflowApprovalPolicy } from "./approval.js";
-import { completeWorkflowFailureInline, completeWorkflowInline, deliverWorkflowInBackground, launchWorkflow, type StartedWorkflow } from "./launch.js";
+import {
+  completeWorkflowFailureInline,
+  completeWorkflowInline,
+  deliverWorkflowInBackground,
+  launchWorkflow,
+  type StartedWorkflow,
+} from "./launch.js";
 import { normalizeArgs, readAbsoluteScript, type WorkflowRunResult } from "./workflow-runner.js";
 import { parseWorkflowScript } from "./parser.js";
 
-const WorkflowToolParameters = Type.Object({
-  script: Type.Optional(Type.String({
-    description: "Inline workflow module source. Provide exactly one of script or scriptPath, including when resuming.",
-  })),
-  scriptPath: Type.Optional(Type.String({
-    description: "Absolute path to a workflow module. Provide exactly one of script or scriptPath, including when resuming.",
-  })),
-  args: Type.Optional(Type.Unknown({
-    description: "JSON-serializable deterministic input exposed as deep-frozen args. On resume, omit to reuse persisted args; an explicit value overrides them.",
-  })),
-  resumeRunId: Type.Optional(Type.String({
-    description: "Existing workflow run id to resume with the supplied script or scriptPath; matching successful agent calls replay.",
-  })),
-  rerunChildIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), {
-    minItems: 1,
-    description: "Resume-only child ids explicitly authorized to rerun after execution-environment drift.",
-  })),
-}, { additionalProperties: false });
+const WorkflowToolParameters = Type.Object(
+  {
+    script: Type.Optional(
+      Type.String({
+        description:
+          "Inline workflow module source. Provide exactly one of script or scriptPath, including when resuming.",
+      }),
+    ),
+    scriptPath: Type.Optional(
+      Type.String({
+        description:
+          "Absolute path to a workflow module. Provide exactly one of script or scriptPath, including when resuming.",
+      }),
+    ),
+    args: Type.Optional(
+      Type.Unknown({
+        description:
+          "JSON-serializable deterministic input exposed as deep-frozen args. On resume, omit to reuse persisted args; an explicit value overrides them.",
+      }),
+    ),
+    resumeRunId: Type.Optional(
+      Type.String({
+        description:
+          "Existing workflow run id to resume with the supplied script or scriptPath; matching successful agent calls replay.",
+      }),
+    ),
+    rerunChildIds: Type.Optional(
+      Type.Array(Type.String({ minLength: 1 }), {
+        minItems: 1,
+        description: "Resume-only child ids explicitly authorized to rerun after execution-environment drift.",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 type WorkflowToolInput = Static<typeof WorkflowToolParameters>;
 
@@ -90,7 +113,13 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
     label: "Workflow",
     description: DESCRIPTION,
     parameters: WorkflowToolParameters,
-    async execute(_toolCallId, params, signal, onUpdate, ctx): Promise<AgentToolResult<WorkflowToolDetails | undefined>> {
+    async execute(
+      _toolCallId,
+      params,
+      signal,
+      onUpdate,
+      ctx,
+    ): Promise<AgentToolResult<WorkflowToolDetails | undefined>> {
       const { script } = resolveScriptSource(params);
       const parsed = parseWorkflowScript(script);
       // Undefined means "reuse persisted args" on resume. Converting it to
@@ -115,10 +144,13 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
           plan,
           resumeRunId: params.resumeRunId,
           rerunChildIds: params.rerunChildIds,
-          ...(headless ? {
-            signal,
-            onLog: (message: string) => onUpdate?.({ content: [{ type: "text", text: message }], details: undefined }),
-          } : {}),
+          ...(headless
+            ? {
+                signal,
+                onLog: (message: string) =>
+                  onUpdate?.({ content: [{ type: "text", text: message }], details: undefined }),
+              }
+            : {}),
         },
         { ctx, policy: services.approvalPolicy },
       );
@@ -141,14 +173,24 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
       // it - stop it from /agents instead.
       deliverWorkflowInBackground(pi, execution, sessionId);
       return {
-        content: [{ type: "text", text: JSON.stringify({ runId: started.runId, runDir: started.runDir, phases: started.phases, status: "running" }) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              runId: started.runId,
+              runDir: started.runDir,
+              phases: started.phases,
+              status: "running",
+            }),
+          },
+        ],
         details: { status: "running", runId: started.runId, runDir: started.runDir, phases: started.phases },
       };
     },
     renderResult(result, _options, theme) {
       const textParts = (result.content ?? []).filter((part) => part.type === "text").map((part) => part.text);
       const lines = isWorkflowDetails(result.details)
-        ? workflowSummaryLines(result.details).map((line, index) => index === 0 ? line : theme.fg("dim", line))
+        ? workflowSummaryLines(result.details).map((line, index) => (index === 0 ? line : theme.fg("dim", line)))
         : textParts.length === 0
           ? []
           : sanitizeTerminalTextChunks(textParts, UNTRUSTED_FIELD_MAX, true).split("\n");
@@ -162,12 +204,11 @@ export function normalizeWorkflowToolArgs(args: unknown): unknown {
   return args === undefined ? undefined : normalizeArgs(args);
 }
 
-export function resolveScriptSource(
-  params: WorkflowToolInput,
-): { script: string } {
+export function resolveScriptSource(params: WorkflowToolInput): { script: string } {
   const hasScript = params.script !== undefined;
   const hasPath = params.scriptPath !== undefined;
-  if (hasScript === hasPath) throw new Error("Provide exactly one of workflow script or scriptPath; resumeRunId does not replace the script");
+  if (hasScript === hasPath)
+    throw new Error("Provide exactly one of workflow script or scriptPath; resumeRunId does not replace the script");
   if (hasPath) return { script: readAbsoluteScript(params.scriptPath!) };
   return { script: params.script! };
 }

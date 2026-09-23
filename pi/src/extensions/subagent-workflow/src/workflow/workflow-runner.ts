@@ -50,9 +50,15 @@ export interface WorkflowRunResult {
 }
 
 export class WorkflowRunError extends Error {
-  constructor(message: string, readonly runId: string, readonly runDir: string, readonly persistenceWarning?: string,
-    readonly failedChildren: SubagentResult[] = [], readonly generation?: number,
-    readonly status: "failed" | "aborted" = "failed") {
+  constructor(
+    message: string,
+    readonly runId: string,
+    readonly runDir: string,
+    readonly persistenceWarning?: string,
+    readonly failedChildren: SubagentResult[] = [],
+    readonly generation?: number,
+    readonly status: "failed" | "aborted" = "failed",
+  ) {
     super(message);
     this.name = "WorkflowRunError";
   }
@@ -78,7 +84,8 @@ export function startParsedWorkflow(
   if (!input.resumeRunId || input.args !== undefined) validateWorkflowArgs(normalizedInputArgs);
   const runner = subagentRunner;
   const root = join(getAgentDir(), "subagent-workflow", "runs");
-  const runId = input.resumeRunId ?? `workflow-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  const runId =
+    input.resumeRunId ?? `workflow-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
   // RunStore guards ownership at the OS level. Keep this session check for the
   // more actionable stop-from-/agents error before touching the run directory.
   if (input.resumeRunId && runner.isRunActive(runId)) {
@@ -89,14 +96,20 @@ export function startParsedWorkflow(
   // A run-owned controller lets navigator stop cancel live children and keep
   // the workflow loop from starting more work.
   const runController = new AbortController();
-  const store = new RunStore(runId, parent.ctx.cwd, parent.ctx.sessionManager.getSessionId(), parent.ctx.sessionManager.getSessionFile(), {
-    rootDir: root,
-    kind: "workflow",
-    phases: workflow.meta.phases,
-    ...(!existingRunDir ? { maxAgentsPerWorkflow: WORKFLOW_AGENT_CAP } : {}),
-    existingRunDir,
-    existingSnapshot,
-  });
+  const store = new RunStore(
+    runId,
+    parent.ctx.cwd,
+    parent.ctx.sessionManager.getSessionId(),
+    parent.ctx.sessionManager.getSessionFile(),
+    {
+      rootDir: root,
+      kind: "workflow",
+      phases: workflow.meta.phases,
+      ...(!existingRunDir ? { maxAgentsPerWorkflow: WORKFLOW_AGENT_CAP } : {}),
+      existingRunDir,
+      existingSnapshot,
+    },
+  );
   // Deliberately uncached: the comparison contract is "what would this call
   // resolve to NOW", and a per-call disk scan (milliseconds) is noise next to
   // a live model call while never serving a stale environment to a later
@@ -161,7 +174,9 @@ export function startParsedWorkflow(
       const journaled = new Set([...journal.entries.values()].map((entry) => entry.childId));
       const unknown = [...rerunAuthorized].filter((id) => !journaled.has(id));
       if (unknown.length > 0) {
-        throw new Error(`Cannot resume workflow ${runId}: rerunChildIds ${JSON.stringify(unknown)} match no journaled call; journaled childIds: ${[...journaled].sort().join(", ") || "none"}`);
+        throw new Error(
+          `Cannot resume workflow ${runId}: rerunChildIds ${JSON.stringify(unknown)} match no journaled call; journaled childIds: ${[...journaled].sort().join(", ") || "none"}`,
+        );
       }
     }
     const persistedStatus = (store.resumeSnapshot?.status as { status?: unknown } | undefined)?.status;
@@ -186,9 +201,8 @@ export function startParsedWorkflow(
   }
   let currentPhase = workflow.meta.phases?.[0]?.title;
   const failedChildren: Array<{ key: string; result: SubagentResult }> = [];
-  const orderedFailedChildren = (): SubagentResult[] => [...failedChildren]
-    .sort((left, right) => compareCodeUnits(left.key, right.key))
-    .map((entry) => entry.result);
+  const orderedFailedChildren = (): SubagentResult[] =>
+    [...failedChildren].sort((left, right) => compareCodeUnits(left.key, right.key)).map((entry) => entry.result);
   const liveHandles = new Set<SubagentHandle>();
   const activeAgentActivity = new Map<string, { label?: string; description: string; updatedAt: number }>();
   // A run-owned controller so a navigator "stop run" cancels the whole loop -
@@ -196,19 +210,22 @@ export function startParsedWorkflow(
   // turn's Esc) is folded in. The runner registers it under the run id.
   const abortSignal = runController.signal;
   let abortingChildren: Promise<void> | undefined;
-  const abortLiveChildren = (): Promise<void> => abortingChildren ??= (async () => {
-    const handles = [...liveHandles];
-    await Promise.allSettled(handles.map(async (handle) => {
-      try {
-        await handle.abort();
-      } finally {
-        await handle.result;
-      }
-    }));
-    // Let agent() continuations remove their handles and durably append any
-    // result that won the race with cancellation before ownership is released.
-    await Promise.resolve();
-  })();
+  const abortLiveChildren = (): Promise<void> =>
+    (abortingChildren ??= (async () => {
+      const handles = [...liveHandles];
+      await Promise.allSettled(
+        handles.map(async (handle) => {
+          try {
+            await handle.abort();
+          } finally {
+            await handle.result;
+          }
+        }),
+      );
+      // Let agent() continuations remove their handles and durably append any
+      // result that won the race with cancellation before ownership is released.
+      await Promise.resolve();
+    })());
   const onAbort = () => {
     void abortLiveChildren();
   };
@@ -221,23 +238,26 @@ export function startParsedWorkflow(
   } catch (error) {
     // Setup failures must not strand any listener or SQLite ownership acquired
     // before the main execution guard begins.
-    try { unbindExternalAbort(); } catch {}
-    try { unbindAbort(); } catch {}
+    try {
+      unbindExternalAbort();
+    } catch {}
+    try {
+      unbindAbort();
+    } catch {}
     store.releaseOwnership();
     throw error;
   }
   const api: WorkflowVmApi = {
     args,
     signal: abortSignal,
-    describeActiveAgents: () => [...activeAgentActivity.entries()]
-      .sort(([left], [right]) => compareCodeUnits(left, right))
-      .map(([id, activity]) => {
-        const ageSeconds = Math.max(0, Math.round((Date.now() - activity.updatedAt) / 100) / 10);
-        const detail = `last activity ${ageSeconds}s ago: ${sanitizeTerminalText(activity.description)}`;
-        return activity.label
-          ? `${id} (${sanitizeTerminalText(activity.label)}; ${detail})`
-          : `${id} (${detail})`;
-      }),
+    describeActiveAgents: () =>
+      [...activeAgentActivity.entries()]
+        .sort(([left], [right]) => compareCodeUnits(left, right))
+        .map(([id, activity]) => {
+          const ageSeconds = Math.max(0, Math.round((Date.now() - activity.updatedAt) / 100) / 10);
+          const detail = `last activity ${ageSeconds}s ago: ${sanitizeTerminalText(activity.description)}`;
+          return activity.label ? `${id} (${sanitizeTerminalText(activity.label)}; ${detail})` : `${id} (${detail})`;
+        }),
     phase: (title: string) => {
       if (typeof title !== "string") throw new TypeError("phase(title) requires a string");
       currentPhase = title;
@@ -261,7 +281,8 @@ export function startParsedWorkflow(
     },
     agent: async (prompt: string, suppliedOptions: unknown, call: WorkflowCallIdentity) => {
       if (abortSignal.aborted) throw new WorkflowAbortedError();
-      if (typeof prompt !== "string" || !prompt.trim()) throw new TypeError("agent(prompt, opts) requires a non-empty prompt string");
+      if (typeof prompt !== "string" || !prompt.trim())
+        throw new TypeError("agent(prompt, opts) requires a non-empty prompt string");
       // Validate the VM-origin value before it can affect call identity, replay,
       // or spawning. This is the same runtime contract used by the direct tool.
       const rawOptions = validateWorkflowAgentOptions(suppliedOptions);
@@ -375,7 +396,15 @@ export function startParsedWorkflow(
       // The body can return normally even after a stop if the aborted child was
       // its last call; record the run as aborted, not completed, in that case.
       if (abortSignal.aborted) {
-        throw new WorkflowRunError("Workflow stopped", runId, store.runDir, persistenceWarningFor(store), [], generation, "aborted");
+        throw new WorkflowRunError(
+          "Workflow stopped",
+          runId,
+          store.runDir,
+          persistenceWarningFor(store),
+          [],
+          generation,
+          "aborted",
+        );
       }
       // Normalize the VM-realm return value to a plain JSON value BEFORE marking
       // the run completed. A cyclic object, function, Proxy, or throwing toJSON()
@@ -391,9 +420,25 @@ export function startParsedWorkflow(
       runner.foldRunProjection?.(runId, { type: "workflow_status", status: "completed" });
       // A stop can race the final body-level check and completion commit.
       if (abortSignal.aborted) {
-        throw new WorkflowRunError("Workflow stopped", runId, store.runDir, persistenceWarningFor(store), [], generation, "aborted");
+        throw new WorkflowRunError(
+          "Workflow stopped",
+          runId,
+          store.runDir,
+          persistenceWarningFor(store),
+          [],
+          generation,
+          "aborted",
+        );
       }
-      return { runId, runDir: store.runDir, generation, meta: workflow.meta, result, failedChildren: orderedFailedChildren(), persistenceWarning: persistenceWarningFor(store) };
+      return {
+        runId,
+        runDir: store.runDir,
+        generation,
+        meta: workflow.meta,
+        result,
+        failedChildren: orderedFailedChildren(),
+        persistenceWarning: persistenceWarningFor(store),
+      };
     } catch (error) {
       // Worker watchdog failures and host callback errors can terminate execution
       // while an agent request is still outstanding. Keep ownership until those
@@ -403,14 +448,25 @@ export function startParsedWorkflow(
       // terminal run: the refused generation keeps the prior result.json and
       // reinstates the prior status, so declining to authorize a rerun costs
       // nothing. Once anything spawned or invalidated, the failure is real.
-      const refusedIntact = replayRefused && !generationMutated && priorTerminalStatus !== undefined && canonicalInputsUnchanged;
+      const refusedIntact =
+        replayRefused && !generationMutated && priorTerminalStatus !== undefined && canonicalInputsUnchanged;
       if (!resultWritten && !refusedIntact) {
-        try { store.writeWorkflowResult(undefined); } catch {}
+        try {
+          store.writeWorkflowResult(undefined);
+        } catch {}
       }
       if (error instanceof WorkflowAbortedError || abortSignal.aborted) {
         store.workflowFinished("aborted", "Workflow stopped");
         runner.foldRunProjection?.(runId, { type: "workflow_status", status: "aborted" });
-        throw new WorkflowRunError("Workflow stopped", runId, store.runDir, persistenceWarningFor(store), [], generation, "aborted");
+        throw new WorkflowRunError(
+          "Workflow stopped",
+          runId,
+          store.runDir,
+          persistenceWarningFor(store),
+          [],
+          generation,
+          "aborted",
+        );
       }
       const message = errorMessage(error);
       if (refusedIntact) {
@@ -424,7 +480,14 @@ export function startParsedWorkflow(
       // Carry the failed children: a script error like "cannot read properties
       // of null" is usually CAUSED by a failed agent() resolving to null, and
       // the child's own error is the actionable part.
-      throw new WorkflowRunError(message, runId, store.runDir, persistenceWarningFor(store), orderedFailedChildren(), generation);
+      throw new WorkflowRunError(
+        message,
+        runId,
+        store.runDir,
+        persistenceWarningFor(store),
+        orderedFailedChildren(),
+        generation,
+      );
     } finally {
       // Execution settlement releases in-memory runner resources. Durable parent
       // delivery is tracked separately through message acknowledgement.
@@ -444,8 +507,12 @@ export function startParsedWorkflow(
     );
   } catch (error) {
     runController.abort();
-    try { unbindExternalAbort(); } catch {}
-    try { unbindAbort(); } catch {}
+    try {
+      unbindExternalAbort();
+    } catch {}
+    try {
+      unbindAbort();
+    } catch {}
     store.releaseOwnership();
     runner.releaseRunActivity?.(runId);
     void execution.catch(() => undefined);
@@ -456,8 +523,13 @@ export function startParsedWorkflow(
 
 function validateRerunChildIds(rerunChildIds: readonly string[] | undefined, resumeRunId: string | undefined): void {
   if (rerunChildIds === undefined) return;
-  if (!resumeRunId) throw new TypeError("rerunChildIds authorizes re-execution of persisted journal entries and requires resumeRunId");
-  if (!Array.isArray(rerunChildIds) || rerunChildIds.length === 0 || !rerunChildIds.every((id) => typeof id === "string" && id.trim().length > 0)) {
+  if (!resumeRunId)
+    throw new TypeError("rerunChildIds authorizes re-execution of persisted journal entries and requires resumeRunId");
+  if (
+    !Array.isArray(rerunChildIds) ||
+    rerunChildIds.length === 0 ||
+    !rerunChildIds.every((id) => typeof id === "string" && id.trim().length > 0)
+  ) {
     throw new TypeError("rerunChildIds must be a non-empty array of persisted childId strings");
   }
 }
@@ -492,10 +564,7 @@ function validateWorkflowArgs(args: unknown): void {
   }
 }
 
-function invalidateJournalTail(
-  journal: WorkflowJournal,
-  miss: WorkflowCallIdentity,
-): JournalEntry[] {
+function invalidateJournalTail(journal: WorkflowJournal, miss: WorkflowCallIdentity): JournalEntry[] {
   const invalidated: JournalEntry[] = [];
   for (const [key, entry] of journal.entries) {
     if (!isInCausalTail(entry.call, miss)) continue;
@@ -506,13 +575,14 @@ function invalidateJournalTail(
 }
 
 function sortedJournalEntries(journal: WorkflowJournal): JournalEntry[] {
-  return [...journal.entries.entries()].sort(([left], [right]) => compareCodeUnits(left, right)).map(([, entry]) => entry);
+  return [...journal.entries.entries()]
+    .sort(([left], [right]) => compareCodeUnits(left, right))
+    .map(([, entry]) => entry);
 }
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
-
 
 function readPersistedArgs(runDir: string): unknown {
   const path = join(runDir, "args.json");
@@ -527,7 +597,9 @@ function readPersistedArgs(runDir: string): unknown {
 /** A one-line warning when any run write failed; the resume contract is then not guaranteed. */
 function persistenceWarningFor(store: RunStore): string | undefined {
   const reason = store.persistenceDegraded;
-  return reason ? `Run persistence degraded (${reason}); the on-disk journal may be incomplete and resuming this run may re-execute completed agents` : undefined;
+  return reason
+    ? `Run persistence degraded (${reason}); the on-disk journal may be incomplete and resuming this run may re-execute completed agents`
+    : undefined;
 }
 
 /** Force the workflow's return value to a plain JSON value; throws if it cannot serialize. */

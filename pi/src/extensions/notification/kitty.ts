@@ -8,19 +8,14 @@ export function isDirectKittyTerminal(
   environment: NodeJS.ProcessEnv = process.env,
   output: NodeJS.WriteStream = process.stdout,
 ): boolean {
-  if (output.isTTY !== true || environment.KITTY_WINDOW_ID === undefined)
-    return false;
+  if (output.isTTY !== true || environment.KITTY_WINDOW_ID === undefined) return false;
   return (
-    environment.TMUX === undefined &&
-    environment.ZELLIJ === undefined &&
-    environment.ZELLIJ_SESSION_NAME === undefined
+    environment.TMUX === undefined && environment.ZELLIJ === undefined && environment.ZELLIJ_SESSION_NAME === undefined
   );
 }
 
 /** Encode title and body as OSC 99 Base64 payloads with no user-controlled metadata. */
-export function encodeKittyNotification(
-  message: SettledNotificationMessage,
-): string {
+export function encodeKittyNotification(message: SettledNotificationMessage): string {
   const id = `pi-${process.pid}-settled`;
   const title = Buffer.from(message.title, "utf8").toString("base64");
   const body = Buffer.from(message.body, "utf8").toString("base64");
@@ -31,9 +26,7 @@ export function encodeKittyNotification(
 }
 
 /** Write one complete Kitty notification and resolve after stdout accepts it. */
-export function sendKittyNotification(
-  message: SettledNotificationMessage,
-): Promise<void> {
+export function sendKittyNotification(message: SettledNotificationMessage): Promise<void> {
   const payload = encodeKittyNotification(message);
   return new Promise((resolve, reject) => {
     try {

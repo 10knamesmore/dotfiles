@@ -1,31 +1,60 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeSync } from "node:fs";
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  rmSync,
+  statSync,
+  writeSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import type { FollowUpReference, ResolvedSpec, SubagentEvent, SubagentSpec, SubagentStatus, UsageSummary, WorkflowPhase } from "../types.js";
+import type {
+  FollowUpReference,
+  ResolvedSpec,
+  SubagentEvent,
+  SubagentSpec,
+  SubagentStatus,
+  UsageSummary,
+  WorkflowPhase,
+} from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
-import { commitAtomicFile, discardAtomicFile, replaceAtomicFile, stageAtomicFile, syncDirectoryDurably } from "./atomic-file.js";
 import {
-  DELIVERED_FILE,
-  parseRunDeliveryIdentity,
-  type RunDeliveryIdentity,
-} from "./delivery-marker.js";
-import {
-  acquireRunOwnership,
-  RunOwnershipConflictError,
-  type RunOwnership,
-} from "./lease.js";
+  commitAtomicFile,
+  discardAtomicFile,
+  replaceAtomicFile,
+  stageAtomicFile,
+  syncDirectoryDurably,
+} from "./atomic-file.js";
+import { DELIVERED_FILE, parseRunDeliveryIdentity, type RunDeliveryIdentity } from "./delivery-marker.js";
+import { acquireRunOwnership, RunOwnershipConflictError, type RunOwnership } from "./lease.js";
 import type { RunProjection } from "./run-projection.js";
 import { readRunSnapshot, type FrozenJson, type RunSnapshot } from "./run-snapshot.js";
 
-export const EMPTY_USAGE = (): UsageSummary => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 });
+export const EMPTY_USAGE = (): UsageSummary => ({
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  cost: 0,
+  turns: 0,
+});
 
 export function sumUsage(usages: Iterable<UsageSummary>): UsageSummary {
   const total = EMPTY_USAGE();
   for (const usage of usages) {
-    total.input += usage.input; total.output += usage.output; total.cacheRead += usage.cacheRead;
-    total.cacheWrite += usage.cacheWrite; total.cost += usage.cost; total.turns += usage.turns;
+    total.input += usage.input;
+    total.output += usage.output;
+    total.cacheRead += usage.cacheRead;
+    total.cacheWrite += usage.cacheWrite;
+    total.cost += usage.cost;
+    total.turns += usage.turns;
   }
   return total;
 }
@@ -41,13 +70,19 @@ export function persistReconciledProjection(
   const status: unknown = structuredClone(snapshot.status);
   if (!projectedStatus || !isRecord(status)) throw new Error("run status is not reconcilable");
   const persistedChildren = isRecord(status.children) ? status.children : {};
-  status.children = Object.fromEntries(projection.detail.children.map((child) => {
-    const persisted = persistedChildren[child.id];
-    return [child.id, {
-      status: isTerminalStatus(child.status) ? child.status : "aborted",
-      usage: isRecord(persisted) && isUsageSummary(persisted.usage) ? structuredClone(persisted.usage) : EMPTY_USAGE(),
-    }];
-  }));
+  status.children = Object.fromEntries(
+    projection.detail.children.map((child) => {
+      const persisted = persistedChildren[child.id];
+      return [
+        child.id,
+        {
+          status: isTerminalStatus(child.status) ? child.status : "aborted",
+          usage:
+            isRecord(persisted) && isUsageSummary(persisted.usage) ? structuredClone(persisted.usage) : EMPTY_USAGE(),
+        },
+      ];
+    }),
+  );
   status.status = projectedStatus;
 
   const hasCrashEvent = snapshot.events.some((value) => {
@@ -63,11 +98,15 @@ export function persistReconciledProjection(
       status: projectedStatus,
       interruptedChildIds,
     };
-    replaceAtomicFile(join(snapshot.runDir, "events.jsonl"), `${snapshot.rawEvents}${separator}${JSON.stringify(event)}\n`, {
-      mode: 0o600,
-      fsync: true,
-      syncParentDirectory: true,
-    });
+    replaceAtomicFile(
+      join(snapshot.runDir, "events.jsonl"),
+      `${snapshot.rawEvents}${separator}${JSON.stringify(event)}\n`,
+      {
+        mode: 0o600,
+        fsync: true,
+        syncParentDirectory: true,
+      },
+    );
   }
   replaceAtomicFile(join(snapshot.runDir, "status.json"), `${JSON.stringify(status, null, 2)}\n`, {
     mode: 0o600,
@@ -126,8 +165,13 @@ export class RunStoreOwnershipError extends Error {
 }
 
 export class GenerationPendingError extends Error {
-  constructor(readonly runId: string, readonly runDir: string) {
-    super(`Cannot resume run ${runId}: ${GENERATION_PENDING_FILE} was left by a previous generation commit that crashed, so the run is inconsistent and cannot be resumed. Re-run the workflow fresh; delete the run directory to clean it up: ${runDir}`);
+  constructor(
+    readonly runId: string,
+    readonly runDir: string,
+  ) {
+    super(
+      `Cannot resume run ${runId}: ${GENERATION_PENDING_FILE} was left by a previous generation commit that crashed, so the run is inconsistent and cannot be resumed. Re-run the workflow fresh; delete the run directory to clean it up: ${runDir}`,
+    );
     this.name = "GenerationPendingError";
   }
 }
@@ -160,7 +204,13 @@ export class RunStore {
   private writesClosed = false;
   private degradedReason?: string;
 
-  constructor(runId: string, parentCwd: string, parentSessionId: string, parentSessionFile?: string, options: RunStoreOptions = {}) {
+  constructor(
+    runId: string,
+    parentCwd: string,
+    parentSessionId: string,
+    parentSessionFile?: string,
+    options: RunStoreOptions = {},
+  ) {
     this.runId = runId;
     const root = options.rootDir ?? join(getAgentDir(), "subagent-workflow", "runs");
     this.runDir = options.existingRunDir ?? join(root, encodeCwd(parentCwd), runId);
@@ -183,7 +233,12 @@ export class RunStore {
         this.record = cloneFrozenJson(record as unknown as FrozenJson) as unknown as RunRecord;
         this.status = cloneFrozenJson(status as unknown as FrozenJson) as unknown as RunStatus;
         let resumed: { event: FrozenJson; line: string } | undefined;
-        this.writeOwned(() => { resumed = this.appendLifecycle("resumed"); }, { ownershipRequired: true });
+        this.writeOwned(
+          () => {
+            resumed = this.appendLifecycle("resumed");
+          },
+          { ownershipRequired: true },
+        );
         this.openedSnapshot = withAppendedEvent(currentSnapshot, resumed!);
       } catch (error) {
         this.releaseOwnership();
@@ -272,15 +327,19 @@ export class RunStore {
 
   addChild(id: string, spec: SubagentSpec, followUpOf?: FollowUpReference): void {
     if (!isSafeChildId(id)) throw new TypeError("Child id must be a non-empty safe object key");
-    if (this.record.children.some((child) => child.id === id)) throw new TypeError(`Child id ${JSON.stringify(id)} already exists in this run`);
-    this.writeOwned(() => {
-      this.record.children.push({ id, spec, ...(followUpOf ? { followUpOf } : {}) });
-      this.status.children[id] = { status: "pending", usage: EMPTY_USAGE() };
-      if (this.record.kind === "subagent") this.status.status = "pending";
-      this.writeJson("run.json", this.record);
-      this.writeJson("status.json", this.status);
-      this.appendLifecycle("child_added", { id });
-    }, { ownershipRequired: true });
+    if (this.record.children.some((child) => child.id === id))
+      throw new TypeError(`Child id ${JSON.stringify(id)} already exists in this run`);
+    this.writeOwned(
+      () => {
+        this.record.children.push({ id, spec, ...(followUpOf ? { followUpOf } : {}) });
+        this.status.children[id] = { status: "pending", usage: EMPTY_USAGE() };
+        if (this.record.kind === "subagent") this.status.status = "pending";
+        this.writeJson("run.json", this.record);
+        this.writeJson("status.json", this.status);
+        this.appendLifecycle("child_added", { id });
+      },
+      { ownershipRequired: true },
+    );
   }
 
   /**
@@ -294,162 +353,180 @@ export class RunStore {
     inputs: { args?: { value: unknown }; rerunChildIds?: readonly string[] } = {},
     options: { requireExistingScript?: boolean } = {},
   ): void {
-    this.writeOwned(() => {
-      if (this.record.kind !== "workflow") throw new Error(`Run ${this.runId} is not a workflow`);
+    this.writeOwned(
+      () => {
+        if (this.record.kind !== "workflow") throw new Error(`Run ${this.runId} is not a workflow`);
 
-      // Read and serialize every source before replacing any canonical file.
-      const scriptPath = join(this.runDir, "script.js");
-      const originalScript = this.readOptionalText(scriptPath);
-      if (options.requireExistingScript && originalScript === undefined) {
-        throw new Error(`Cannot resume: workflow run directory does not contain script.js: ${this.runDir}`);
-      }
-      const runPath = join(this.runDir, "run.json");
-      const statusPath = join(this.runDir, "status.json");
-      const eventsPath = join(this.runDir, "events.jsonl");
-      let originalRun: string;
-      let originalEvents: string;
-      const persistedEvents = this.openedSnapshot?.events ?? [];
-      if (this.openedSnapshot) {
-        originalRun = this.openedSnapshot.rawRecord ?? readFileSync(runPath, "utf8");
-        originalEvents = this.openedSnapshot.rawEvents ?? readFileSync(eventsPath, "utf8");
-        this.openedSnapshot = undefined;
-      } else {
-        originalRun = readFileSync(runPath, "utf8");
-        originalEvents = readFileSync(eventsPath, "utf8");
-      }
+        // Read and serialize every source before replacing any canonical file.
+        const scriptPath = join(this.runDir, "script.js");
+        const originalScript = this.readOptionalText(scriptPath);
+        if (options.requireExistingScript && originalScript === undefined) {
+          throw new Error(`Cannot resume: workflow run directory does not contain script.js: ${this.runDir}`);
+        }
+        const runPath = join(this.runDir, "run.json");
+        const statusPath = join(this.runDir, "status.json");
+        const eventsPath = join(this.runDir, "events.jsonl");
+        let originalRun: string;
+        let originalEvents: string;
+        const persistedEvents = this.openedSnapshot?.events ?? [];
+        if (this.openedSnapshot) {
+          originalRun = this.openedSnapshot.rawRecord ?? readFileSync(runPath, "utf8");
+          originalEvents = this.openedSnapshot.rawEvents ?? readFileSync(eventsPath, "utf8");
+          this.openedSnapshot = undefined;
+        } else {
+          originalRun = readFileSync(runPath, "utf8");
+          originalEvents = readFileSync(eventsPath, "utf8");
+        }
 
-      const nextGeneration = this.record.delivery.generation + 1;
-      const nextRecord: RunRecord = {
-        ...this.record,
-        delivery: {
+        const nextGeneration = this.record.delivery.generation + 1;
+        const nextRecord: RunRecord = {
+          ...this.record,
+          delivery: {
+            generation: nextGeneration,
+          },
+        };
+        const reconciledPhases = reconcileResumePhases(phases, this.record.phases, this.record.children);
+        if (reconciledPhases === undefined) delete nextRecord.phases;
+        else nextRecord.phases = reconciledPhases;
+        // A resumed process cannot own children that belonged to the previous
+        // process. Preserve their usage and history, but terminalize inherited
+        // live states in the same generation commit that publishes "running".
+        // Clone every child so a failed staging operation cannot mutate the
+        // pre-commit in-memory status through a shared nested object.
+        const inheritedLiveChildren: string[] = [];
+        const nextChildren: RunStatus["children"] = Object.fromEntries(
+          Object.entries(this.status.children).map(([id, child]) => {
+            return [
+              id,
+              {
+                ...child,
+                usage: { ...child.usage },
+              },
+            ];
+          }),
+        );
+        // Events can be newer than status.json, but the append itself is not a
+        // durability barrier. They may promote a live child to terminal and add
+        // cumulative usage, never regress already-terminal durable state.
+        reconcilePersistedChildState(nextChildren, persistedEvents);
+        // addChild() publishes run.json before status.json. A process crash in
+        // that window leaves a durable child with no status entry. Treat that
+        // record-only child as an inherited aborted attempt instead of letting
+        // readers default it to pending forever.
+        for (const child of this.record.children) {
+          if (Object.hasOwn(nextChildren, child.id)) continue;
+          inheritedLiveChildren.push(child.id);
+          nextChildren[child.id] = { status: "aborted", usage: EMPTY_USAGE() };
+        }
+        for (const [id, child] of Object.entries(nextChildren)) {
+          if (child.status !== "pending" && child.status !== "running") continue;
+          inheritedLiveChildren.push(id);
+          child.status = "aborted";
+        }
+        const nextStatus: RunStatus = { status: "running", children: nextChildren };
+        const startedAt = new Date().toISOString();
+        // Rerun authorizations are recorded on the generation they applied to,
+        // so a post-hoc reader can tell an authorized re-execution from replay.
+        const reconciliationEvents = inheritedLiveChildren
+          .map((id) =>
+            JSON.stringify({
+              timestamp: startedAt,
+              type: "status",
+              id,
+              status: "aborted",
+              reason: "superseded by workflow resume",
+            }),
+          )
+          .join("\n");
+        const startedEvent = `${reconciliationEvents ? `${reconciliationEvents}\n` : ""}${JSON.stringify({
+          timestamp: startedAt,
+          type: "workflow_started",
           generation: nextGeneration,
-        },
-      };
-      const reconciledPhases = reconcileResumePhases(phases, this.record.phases, this.record.children);
-      if (reconciledPhases === undefined) delete nextRecord.phases;
-      else nextRecord.phases = reconciledPhases;
-      // A resumed process cannot own children that belonged to the previous
-      // process. Preserve their usage and history, but terminalize inherited
-      // live states in the same generation commit that publishes "running".
-      // Clone every child so a failed staging operation cannot mutate the
-      // pre-commit in-memory status through a shared nested object.
-      const inheritedLiveChildren: string[] = [];
-      const nextChildren: RunStatus["children"] = Object.fromEntries(Object.entries(this.status.children).map(([id, child]) => {
-        return [id, {
-          ...child,
-          usage: { ...child.usage },
-        }];
-      }));
-      // Events can be newer than status.json, but the append itself is not a
-      // durability barrier. They may promote a live child to terminal and add
-      // cumulative usage, never regress already-terminal durable state.
-      reconcilePersistedChildState(nextChildren, persistedEvents);
-      // addChild() publishes run.json before status.json. A process crash in
-      // that window leaves a durable child with no status entry. Treat that
-      // record-only child as an inherited aborted attempt instead of letting
-      // readers default it to pending forever.
-      for (const child of this.record.children) {
-        if (Object.hasOwn(nextChildren, child.id)) continue;
-        inheritedLiveChildren.push(child.id);
-        nextChildren[child.id] = { status: "aborted", usage: EMPTY_USAGE() };
-      }
-      for (const [id, child] of Object.entries(nextChildren)) {
-        if (child.status !== "pending" && child.status !== "running") continue;
-        inheritedLiveChildren.push(id);
-        child.status = "aborted";
-      }
-      const nextStatus: RunStatus = { status: "running", children: nextChildren };
-      const startedAt = new Date().toISOString();
-      // Rerun authorizations are recorded on the generation they applied to,
-      // so a post-hoc reader can tell an authorized re-execution from replay.
-      const reconciliationEvents = inheritedLiveChildren.map((id) => JSON.stringify({
-        timestamp: startedAt,
-        type: "status",
-        id,
-        status: "aborted",
-        reason: "superseded by workflow resume",
-      })).join("\n");
-      const startedEvent = `${reconciliationEvents ? `${reconciliationEvents}\n` : ""}${JSON.stringify({
-        timestamp: startedAt,
-        type: "workflow_started",
-        generation: nextGeneration,
-        ...(inputs.rerunChildIds?.length ? { rerunChildIds: [...inputs.rerunChildIds] } : {}),
-      })}\n`;
+          ...(inputs.rerunChildIds?.length ? { rerunChildIds: [...inputs.rerunChildIds] } : {}),
+        })}\n`;
 
-      type FileChange = { path: string; content: string };
-      const changes: FileChange[] = [
-        // Commit running first so a crash cannot expose a new script as a
-        // completed generation.
-        { path: statusPath, content: this.jsonText(nextStatus) },
-      ];
-      if (originalScript !== script) changes.push({ path: scriptPath, content: script });
-      const nextRun = this.jsonText(nextRecord);
-      if (nextRun !== originalRun) changes.push({ path: runPath, content: nextRun });
-      if (inputs.args) {
-        const path = join(this.runDir, "args.json");
-        changes.push({ path, content: this.jsonText(inputs.args.value) });
-      }
-      changes.push({ path: eventsPath, content: `${originalEvents}${jsonlSeparator(originalEvents)}${startedEvent}` });
-      originalEvents = "";
-
-      let archivePath: string | undefined;
-      if (originalScript !== undefined && originalScript !== script) {
-        let generation = 1;
-        while (existsSync(join(this.runDir, `script.resumed-${generation}.js`))) generation += 1;
-        archivePath = join(this.runDir, `script.resumed-${generation}.js`);
-      }
-
-      type StagedChange = FileChange & { temporary?: string };
-      const staged: StagedChange[] = changes.map((change) => ({ ...change }));
-      let archiveTemporary: string | undefined;
-
-      // Once this intent is visible, every failed stage or rename quarantines
-      // the run instead of attempting a fallible multi-file rollback.
-      const markerPath = join(this.runDir, GENERATION_PENDING_FILE);
-      const markerTemporary = stageAtomicFile(markerPath, this.jsonText({ startedAt, reason: "generation-commit" }), {
-        mode: 0o600,
-        fsync: true,
-      });
-      commitAtomicFile(markerTemporary, markerPath);
-      this.syncRunDirectory();
-      try {
-        for (const change of staged) {
-          change.temporary = this.stageFile(change.path, change.content, { durable: true });
+        type FileChange = { path: string; content: string };
+        const changes: FileChange[] = [
+          // Commit running first so a crash cannot expose a new script as a
+          // completed generation.
+          { path: statusPath, content: this.jsonText(nextStatus) },
+        ];
+        if (originalScript !== script) changes.push({ path: scriptPath, content: script });
+        const nextRun = this.jsonText(nextRecord);
+        if (nextRun !== originalRun) changes.push({ path: runPath, content: nextRun });
+        if (inputs.args) {
+          const path = join(this.runDir, "args.json");
+          changes.push({ path, content: this.jsonText(inputs.args.value) });
         }
-        if (archivePath && originalScript !== undefined) {
-          archiveTemporary = this.stageFile(archivePath, originalScript, { durable: true });
-          this.replaceStagedFile(archiveTemporary, archivePath);
-          archiveTemporary = undefined;
+        changes.push({
+          path: eventsPath,
+          content: `${originalEvents}${jsonlSeparator(originalEvents)}${startedEvent}`,
+        });
+        originalEvents = "";
+
+        let archivePath: string | undefined;
+        if (originalScript !== undefined && originalScript !== script) {
+          let generation = 1;
+          while (existsSync(join(this.runDir, `script.resumed-${generation}.js`))) generation += 1;
+          archivePath = join(this.runDir, `script.resumed-${generation}.js`);
         }
-        for (const change of staged) {
-          this.replaceStagedFile(change.temporary!, change.path);
-          change.temporary = undefined;
-        }
-        // The prior generation's delivery marker must disappear in the same
-        // publication transaction. While generation.pending remains durable,
-        // readers cannot mistake the new running state for delivered work.
-        rmSync(join(this.runDir, DELIVERED_FILE), { force: true });
-        // First make every canonical rename and marker removal durable while
-        // the quarantine marker is still durable. Only then publish the
-        // generation by removing the marker and syncing that removal.
+
+        type StagedChange = FileChange & { temporary?: string };
+        const staged: StagedChange[] = changes.map((change) => ({ ...change }));
+        let archiveTemporary: string | undefined;
+
+        // Once this intent is visible, every failed stage or rename quarantines
+        // the run instead of attempting a fallible multi-file rollback.
+        const markerPath = join(this.runDir, GENERATION_PENDING_FILE);
+        const markerTemporary = stageAtomicFile(markerPath, this.jsonText({ startedAt, reason: "generation-commit" }), {
+          mode: 0o600,
+          fsync: true,
+        });
+        commitAtomicFile(markerTemporary, markerPath);
         this.syncRunDirectory();
-        rmSync(markerPath);
-        this.syncRunDirectory();
-        this.record = nextRecord;
-        this.status = nextStatus;
-      } finally {
-        for (const change of staged) {
-          if (change.temporary) discardAtomicFile(change.temporary);
+        try {
+          for (const change of staged) {
+            change.temporary = this.stageFile(change.path, change.content, { durable: true });
+          }
+          if (archivePath && originalScript !== undefined) {
+            archiveTemporary = this.stageFile(archivePath, originalScript, { durable: true });
+            this.replaceStagedFile(archiveTemporary, archivePath);
+            archiveTemporary = undefined;
+          }
+          for (const change of staged) {
+            this.replaceStagedFile(change.temporary!, change.path);
+            change.temporary = undefined;
+          }
+          // The prior generation's delivery marker must disappear in the same
+          // publication transaction. While generation.pending remains durable,
+          // readers cannot mistake the new running state for delivered work.
+          rmSync(join(this.runDir, DELIVERED_FILE), { force: true });
+          // First make every canonical rename and marker removal durable while
+          // the quarantine marker is still durable. Only then publish the
+          // generation by removing the marker and syncing that removal.
+          this.syncRunDirectory();
+          rmSync(markerPath);
+          this.syncRunDirectory();
+          this.record = nextRecord;
+          this.status = nextStatus;
+        } finally {
+          for (const change of staged) {
+            if (change.temporary) discardAtomicFile(change.temporary);
+          }
+          if (archiveTemporary) discardAtomicFile(archiveTemporary);
         }
-        if (archiveTemporary) discardAtomicFile(archiveTemporary);
-      }
-    }, { ownershipRequired: true });
+      },
+      { ownershipRequired: true },
+    );
   }
 
   appendJournal(value: unknown): void {
-    this.writeOwned(() => {
-      this.appendDurableJsonl(join(this.runDir, "journal.jsonl"), value);
-    }, { ownershipRequired: true });
+    this.writeOwned(
+      () => {
+        this.appendDurableJsonl(join(this.runDir, "journal.jsonl"), value);
+      },
+      { ownershipRequired: true },
+    );
   }
 
   /**
@@ -457,14 +534,17 @@ export class RunStore {
    * during resume must never splice this generation with stale dependent calls.
    */
   rewriteJournal(entries: unknown[]): void {
-    this.writeOwned(() => {
-      const path = join(this.runDir, "journal.jsonl");
-      replaceAtomicFile(path, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""), {
-        mode: 0o600,
-        fsync: true,
-        syncParentDirectory: true,
-      });
-    }, { ownershipRequired: true });
+    this.writeOwned(
+      () => {
+        const path = join(this.runDir, "journal.jsonl");
+        replaceAtomicFile(path, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""), {
+          mode: 0o600,
+          fsync: true,
+          syncParentDirectory: true,
+        });
+      },
+      { ownershipRequired: true },
+    );
   }
 
   recordLog(message: string): void {
@@ -491,10 +571,13 @@ export class RunStore {
    * stale process cannot create or remove the winning generation's result.
    */
   writeWorkflowResult(result: unknown): void {
-    this.writeOwned(() => {
-      if (result === undefined) rmSync(join(this.runDir, "result.json"), { force: true });
-      else this.writeJson("result.json", result, { durable: true });
-    }, { ownershipRequired: true });
+    this.writeOwned(
+      () => {
+        if (result === undefined) rmSync(join(this.runDir, "result.json"), { force: true });
+        else this.writeJson("result.json", result, { durable: true });
+      },
+      { ownershipRequired: true },
+    );
   }
 
   workflowFinished(status: "completed" | "failed" | "aborted", error?: string): void {
@@ -538,16 +621,23 @@ export class RunStore {
 
   recordEvent(event: SubagentEvent): void {
     if (this.writesClosed) return;
-    const runWasTerminal = this.record.kind === "subagent"
-      && this.status.status !== "running"
-      && this.status.status !== "pending";
+    const runWasTerminal =
+      this.record.kind === "subagent" && this.status.status !== "running" && this.status.status !== "pending";
     // Result already carries final usage. Ignore delayed activity/usage/status
     // events after completion. A terminal subagent run never reopens.
     if (runWasTerminal) return;
-    const eventStatus = event.type === "result" ? event.result.status : event.type === "status" ? event.status : undefined;
-    const projectedStatuses = Object.entries(this.status.children).map(([id, child]) => id === event.id && eventStatus ? eventStatus : child.status);
+    const eventStatus =
+      event.type === "result" ? event.result.status : event.type === "status" ? event.status : undefined;
+    const projectedStatuses = Object.entries(this.status.children).map(([id, child]) =>
+      id === event.id && eventStatus ? eventStatus : child.status,
+    );
     let releaseAfterWrite = false;
-    if (this.record.kind === "subagent" && eventStatus !== undefined && eventStatus !== "running" && eventStatus !== "pending") {
+    if (
+      this.record.kind === "subagent" &&
+      eventStatus !== undefined &&
+      eventStatus !== "running" &&
+      eventStatus !== "pending"
+    ) {
       const projectedStatus = deriveRunStatus(projectedStatuses);
       releaseAfterWrite = projectedStatus !== "running" && projectedStatus !== "pending";
     }
@@ -572,14 +662,17 @@ export class RunStore {
   private ensureOwnership(): void {
     if (this.writesClosed) throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
     if (this.runOwnership) return;
-    if (this.ownershipAttempted) throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
+    if (this.ownershipAttempted)
+      throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
     this.ownershipAttempted = true;
     try {
       this.runOwnership = acquireRunOwnership(this.runDir);
     } catch (error) {
       if (error instanceof RunOwnershipConflictError) {
         const detail = error.owner ? ` (pid ${error.owner.pid} on ${error.owner.host})` : "";
-        throw new RunStoreOwnershipError(`Run ${this.runId} is active in another process${detail}; wait for it to finish or stop it there first`);
+        throw new RunStoreOwnershipError(
+          `Run ${this.runId} is active in another process${detail}; wait for it to finish or stop it there first`,
+        );
       }
       throw error;
     }
@@ -617,16 +710,15 @@ export class RunStore {
    * Persist only while this store owns the run. Critical workflow mutations
    * throw on failure; ordinary child event writes fail closed and degrade.
    */
-  private writeOwned(
-    write: () => void,
-    options: { ownershipRequired?: boolean } = {},
-  ): boolean {
+  private writeOwned(write: () => void, options: { ownershipRequired?: boolean } = {}): boolean {
     if (this.writesClosed) {
-      if (options.ownershipRequired) throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
+      if (options.ownershipRequired)
+        throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
       return false;
     }
     if (!this.runOwnership) {
-      if (options.ownershipRequired) throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
+      if (options.ownershipRequired)
+        throw new RunStoreOwnershipError(`Run ${this.runId} is closed and can no longer be written`);
       return false;
     }
     try {
@@ -735,8 +827,9 @@ export class RunStore {
 
   private requiredSnapshotValue<T>(snapshot: RunSnapshot, name: string, value: FrozenJson | undefined): T {
     if (value !== undefined) return value as unknown as T;
-    const reason = snapshot.diagnostics.find((diagnostic) => diagnostic.file === name && diagnostic.line === undefined)?.problem
-      ?? `ENOENT: no such file or directory, open '${join(this.runDir, name)}'`;
+    const reason =
+      snapshot.diagnostics.find((diagnostic) => diagnostic.file === name && diagnostic.line === undefined)?.problem ??
+      `ENOENT: no such file or directory, open '${join(this.runDir, name)}'`;
     throw new Error(`Cannot resume run ${this.runId}: invalid ${name}: ${reason}`);
   }
 
@@ -744,21 +837,28 @@ export class RunStore {
     const policy = record.workflowPolicy as unknown;
     if (policy === undefined && record.kind !== "workflow") return;
     if (!isRecord(policy) || !("maxAgentsPerWorkflow" in policy)) {
-      throw new Error(`Cannot resume run ${this.runId}: invalid run.json workflowPolicy; expected maxAgentsPerWorkflow`);
+      throw new Error(
+        `Cannot resume run ${this.runId}: invalid run.json workflowPolicy; expected maxAgentsPerWorkflow`,
+      );
     }
     const value = policy.maxAgentsPerWorkflow;
     if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 1_000) {
-      throw new Error(`Cannot resume run ${this.runId}: invalid run.json workflowPolicy.maxAgentsPerWorkflow; expected an integer from 1 to 1000`);
+      throw new Error(
+        `Cannot resume run ${this.runId}: invalid run.json workflowPolicy.maxAgentsPerWorkflow; expected an integer from 1 to 1000`,
+      );
     }
   }
 
   private validateResumeRecord(record: RunRecord): void {
-    if (!isRecord(record)
-      || record.runId !== this.runId
-      || !Array.isArray(record.children)
-      || !record.children.every((child) => isRecord(child)
-        && isSafeChildId(child.id) && isRecord(child.spec))) {
-      throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json: expected matching runId and children array of {id, spec}`);
+    if (
+      !isRecord(record) ||
+      record.runId !== this.runId ||
+      !Array.isArray(record.children) ||
+      !record.children.every((child) => isRecord(child) && isSafeChildId(child.id) && isRecord(child.spec))
+    ) {
+      throw new TypeError(
+        `Cannot resume run ${this.runId}: invalid run.json: expected matching runId and children array of {id, spec}`,
+      );
     }
     if (!parseRunDeliveryIdentity(record)) {
       throw new TypeError(`Cannot resume run ${this.runId}: invalid run.json delivery generation`);
@@ -770,13 +870,17 @@ export class RunStore {
   }
 
   private validateResumeStatus(status: RunStatus): void {
-    if (!isRecord(status)
-      || !isSubagentStatus(status.status)
-      || !isRecord(status.children)
-      || !Object.values(status.children).every((child) => isRecord(child)
-        && isSubagentStatus(child.status)
-        && isUsageSummary(child.usage))) {
-      throw new TypeError(`Cannot resume run ${this.runId}: invalid status.json: expected valid run and child status with cumulative usage`);
+    if (
+      !isRecord(status) ||
+      !isSubagentStatus(status.status) ||
+      !isRecord(status.children) ||
+      !Object.values(status.children).every(
+        (child) => isRecord(child) && isSubagentStatus(child.status) && isUsageSummary(child.usage),
+      )
+    ) {
+      throw new TypeError(
+        `Cannot resume run ${this.runId}: invalid status.json: expected valid run and child status with cumulative usage`,
+      );
     }
   }
 
@@ -788,9 +892,13 @@ export class RunStore {
     const recordIds = new Set(record.children.map((child) => child.id));
     const unrecordedStatusId = Object.keys(status.children).find((id) => !recordIds.has(id));
     if (unrecordedStatusId !== undefined) {
-      throw new Error(`Cannot resume run ${this.runId}: status.json references child ${JSON.stringify(unrecordedStatusId)} missing from run.json`);
+      throw new Error(
+        `Cannot resume run ${this.runId}: status.json references child ${JSON.stringify(unrecordedStatusId)} missing from run.json`,
+      );
     }
-    const diagnostic = snapshot.diagnostics.find(({ file }) => file === "run.json" || file === "status.json" || file === "events.jsonl");
+    const diagnostic = snapshot.diagnostics.find(
+      ({ file }) => file === "run.json" || file === "status.json" || file === "events.jsonl",
+    );
     if (diagnostic) {
       const line = diagnostic.line === undefined ? "" : ` line ${diagnostic.line}`;
       throw new Error(`Cannot resume run ${this.runId}: invalid ${diagnostic.file}${line}: ${diagnostic.problem}`);
@@ -798,7 +906,6 @@ export class RunStore {
     validatePersistedEvents(this.runId, snapshot.events);
     return { record, status };
   }
-
 }
 
 function jsonlSeparator(contents: string): string {
@@ -824,10 +931,7 @@ function jsonlFileSeparator(path: string): string {
   }
 }
 
-function withAppendedEvent(
-  snapshot: RunSnapshot,
-  appended: { event: FrozenJson; line: string },
-): RunSnapshot {
+function withAppendedEvent(snapshot: RunSnapshot, appended: { event: FrozenJson; line: string }): RunSnapshot {
   return Object.freeze({
     ...snapshot,
     events: snapshot.rawEvents === undefined ? snapshot.events : Object.freeze([...snapshot.events, appended.event]),
@@ -844,9 +948,8 @@ function cloneFrozenJson(value: FrozenJson): FrozenJson {
   while (pending.length > 0) {
     const { source, target } = pending.pop()!;
     for (const [key, item] of Object.entries(source)) {
-      const cloned: FrozenJson | object = item !== null && typeof item === "object"
-        ? (Array.isArray(item) ? [] : {})
-        : item;
+      const cloned: FrozenJson | object =
+        item !== null && typeof item === "object" ? (Array.isArray(item) ? [] : {}) : item;
       Object.defineProperty(target, key, { value: cloned, enumerable: true, writable: true, configurable: true });
       if (item !== null && typeof item === "object") pending.push({ source: item, target: cloned as object });
     }
@@ -854,13 +957,12 @@ function cloneFrozenJson(value: FrozenJson): FrozenJson {
   return root as FrozenJson;
 }
 
-function reconcilePersistedChildState(
-  children: RunStatus["children"],
-  events: readonly FrozenJson[],
-): void {
-  const promotable = new Set(Object.entries(children)
-    .filter(([, child]) => child.status === "pending" || child.status === "running")
-    .map(([id]) => id));
+function reconcilePersistedChildState(children: RunStatus["children"], events: readonly FrozenJson[]): void {
+  const promotable = new Set(
+    Object.entries(children)
+      .filter(([, child]) => child.status === "pending" || child.status === "running")
+      .map(([id]) => id),
+  );
   for (const value of events) {
     if (!isRecord(value) || typeof value.id !== "string") continue;
     const child = children[value.id];
@@ -886,9 +988,12 @@ function isSafeChildId(value: unknown): value is string {
 }
 
 function isUsageSummary(value: unknown): value is UsageSummary {
-  return isRecord(value)
-    && [value.input, value.output, value.cacheRead, value.cacheWrite, value.cost, value.turns]
-      .every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0);
+  return (
+    isRecord(value) &&
+    [value.input, value.output, value.cacheRead, value.cacheWrite, value.cost, value.turns].every(
+      (item) => typeof item === "number" && Number.isFinite(item) && item >= 0,
+    )
+  );
 }
 
 function maxUsage(left: UsageSummary, right: UsageSummary): UsageSummary {
@@ -914,7 +1019,9 @@ function validatePersistedEvents(runId: string, events: readonly FrozenJson[]): 
     if (!isSubagentStatus(status)) continue;
     const terminal = terminalByChild.get(event.id);
     if (terminal !== undefined && status !== terminal) {
-      throw new TypeError(`Cannot resume run ${runId}: contradictory lifecycle for child ${JSON.stringify(event.id)} in events.jsonl event ${index + 1}`);
+      throw new TypeError(
+        `Cannot resume run ${runId}: contradictory lifecycle for child ${JSON.stringify(event.id)} in events.jsonl event ${index + 1}`,
+      );
     }
     if (isTerminalStatus(status)) terminalByChild.set(event.id, status);
   }
@@ -926,11 +1033,13 @@ function isValidPersistedEvent(event: FrozenJson): boolean {
   if (event.type === "activity") return isSafeChildId(event.id) && typeof event.description === "string";
   if (event.type === "usage") return isSafeChildId(event.id) && isUsageSummary(event.usage);
   if (event.type !== "result") return true;
-  return isSafeChildId(event.id)
-    && isRecord(event.result)
-    && event.result.id === event.id
-    && isTerminalStatus(event.result.status)
-    && isUsageSummary(event.result.usage);
+  return (
+    isSafeChildId(event.id) &&
+    isRecord(event.result) &&
+    event.result.id === event.id &&
+    isTerminalStatus(event.result.status) &&
+    isUsageSummary(event.result.usage)
+  );
 }
 
 function isCanonicalTimestamp(value: unknown): value is string {
@@ -959,9 +1068,7 @@ function reconcileResumePhases(
   const phases = (declared ?? []).map((phase) => ({ ...phase }));
   const seen = new Set(phases.map((phase) => phase.title));
   const referenced = new Set(
-    children
-      .map((child) => child.spec.phase)
-      .filter((phase): phase is string => typeof phase === "string"),
+    children.map((child) => child.spec.phase).filter((phase): phase is string => typeof phase === "string"),
   );
 
   for (const phase of previous ?? []) {

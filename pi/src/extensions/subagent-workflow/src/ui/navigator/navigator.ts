@@ -24,13 +24,23 @@ import { formatTokenUsage, hasTokenUsage, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import { suppressInlineImages } from "../suppress-inline-images.js";
 import { AgentView } from "./agent-view.js";
-import { cycleFilter, footerHint, keyToAction, orderedChildren, runActionAvailability, type RunActionAvailability } from "./controls.js";
+import {
+  cycleFilter,
+  footerHint,
+  keyToAction,
+  orderedChildren,
+  runActionAvailability,
+  type RunActionAvailability,
+} from "./controls.js";
 import { NavigatorModel, NavigatorState } from "./model.js";
 import { pageRunDetail, renderRunDetail, renderRunList } from "./render.js";
 import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
 import { readSessionMessages, type TranscriptMessage } from "./transcript.js";
 
-export type NavigatorOpenContext = Pick<ExtensionContext, "cwd" | "hasUI" | "ui" | "sessionManager" | "modelRegistry" | "model">;
+export type NavigatorOpenContext = Pick<
+  ExtensionContext,
+  "cwd" | "hasUI" | "ui" | "sessionManager" | "modelRegistry" | "model"
+>;
 
 /** Optional run/child to open directly from an external input selection. */
 export interface NavigatorOpenTarget {
@@ -50,7 +60,10 @@ interface NavigatorServices {
 }
 
 /** Register `/agents` and its `/workflows` alias, returning their shared open path. */
-export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices): (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget) => Promise<void> {
+export function registerNavigator(
+  pi: ExtensionAPI,
+  services: NavigatorServices,
+): (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget) => Promise<void> {
   let isOpen = false;
   const open = async (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> => {
     if (!ctx.hasUI) return runNavigator(services, ctx, target);
@@ -63,16 +76,24 @@ export function registerNavigator(pi: ExtensionAPI, services: NavigatorServices)
     }
   };
   const command = (_args: string, ctx: ExtensionCommandContext) => open(ctx);
-  pi.registerCommand("agents", { description: "Browse subagent and workflow runs (live and history)", handler: command });
-  pi.registerCommand("workflows", { description: "Browse workflow and subagent runs (alias of /agents)", handler: command });
+  pi.registerCommand("agents", {
+    description: "Browse subagent and workflow runs (live and history)",
+    handler: command,
+  });
+  pi.registerCommand("workflows", {
+    description: "Browse workflow and subagent runs (alias of /agents)",
+    handler: command,
+  });
   return open;
 }
 
-async function runNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> {
-  const model = new NavigatorModel(
-    ctx.cwd,
-    { describeWorkflow: services.describeWorkflow },
-    (id) => subagentRunner.liveRunIds().includes(id),
+async function runNavigator(
+  services: NavigatorServices,
+  ctx: NavigatorOpenContext,
+  target?: NavigatorOpenTarget,
+): Promise<void> {
+  const model = new NavigatorModel(ctx.cwd, { describeWorkflow: services.describeWorkflow }, (id) =>
+    subagentRunner.liveRunIds().includes(id),
   );
   if (!ctx.hasUI) {
     console.log(formatPlainSummary(model.runs()));
@@ -89,15 +110,23 @@ export function formatPlainSummary(runs: RunSummary[]): string {
       continue;
     }
     const usage = hasTokenUsage(run.usage) ? ` · ${formatTokenUsage(run.usage)}` : "";
-    const health = run.kind === "workflow" && run.status === "completed" && (run.failed > 0 || run.aborted > 0)
-      ? `${run.completed} ok${run.failed > 0 ? ` · ${run.failed} failed` : ""}${run.aborted > 0 ? ` · ${run.aborted} aborted` : ""}`
-      : `${run.done}/${run.total}`;
-    lines.push(`  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${usage} · ${sanitizeTerminalText(run.runId)}]`);
+    const health =
+      run.kind === "workflow" && run.status === "completed" && (run.failed > 0 || run.aborted > 0)
+        ? `${run.completed} ok${run.failed > 0 ? ` · ${run.failed} failed` : ""}${run.aborted > 0 ? ` · ${run.aborted} aborted` : ""}`
+        : `${run.done}/${run.total}`;
+    lines.push(
+      `  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${usage} · ${sanitizeTerminalText(run.runId)}]`,
+    );
   }
   return lines.join("\n");
 }
 
-function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, model: NavigatorModel, target?: NavigatorOpenTarget): Promise<void> {
+function openNavigator(
+  services: NavigatorServices,
+  ctx: NavigatorOpenContext,
+  model: NavigatorModel,
+  target?: NavigatorOpenTarget,
+): Promise<void> {
   const state = new NavigatorState();
   const runner = subagentRunner;
   if (target) {
@@ -156,31 +185,47 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
         if (state.runId && state.childId) {
           const sourceRunId = state.runId;
           const sourceChildId = state.childId;
-          agentView = buildAgentView(runner, tui, model, sourceRunId, sourceChildId, reportError, services.followUp ? {
-            onMessage: (text) => {
-              let target: { runId: string; childId: string };
-              try {
-                target = services.followUp!.send(sourceRunId, sourceChildId, text, ctx);
-              } catch (error) {
-                reportError(`Could not message agent ${sanitizeTerminalText(sourceChildId)}: ${sanitizeTerminalText(errorMessage(error))}`);
-                return false;
-              }
+          agentView = buildAgentView(
+            runner,
+            tui,
+            model,
+            sourceRunId,
+            sourceChildId,
+            reportError,
+            services.followUp
+              ? {
+                  onMessage: (text) => {
+                    let target: { runId: string; childId: string };
+                    try {
+                      target = services.followUp!.send(sourceRunId, sourceChildId, text, ctx);
+                    } catch (error) {
+                      reportError(
+                        `Could not message agent ${sanitizeTerminalText(sourceChildId)}: ${sanitizeTerminalText(errorMessage(error))}`,
+                      );
+                      return false;
+                    }
 
-              try {
-                state.filter = "all";
-                const children = orderedChildren(model.detail(target.runId), state.filter);
-                const childIndex = children.findIndex((child) => child.id === target.childId);
-                if (childIndex < 0) throw new Error(`spawned child ${target.childId} is missing from run ${target.runId}`);
-                state.switchRun(target.runId);
-                state.setChildCursor(childIndex, children);
-                if (state.drill(model) !== "agent") throw new Error(`spawned child ${target.childId} could not be opened`);
-                openAgentView();
-              } catch (error) {
-                reportError(`Follow-up run ${sanitizeTerminalText(target.runId)} was started, but could not be opened: ${sanitizeTerminalText(errorMessage(error))}`);
-              }
-              return true;
-            },
-          } : undefined);
+                    try {
+                      state.filter = "all";
+                      const children = orderedChildren(model.detail(target.runId), state.filter);
+                      const childIndex = children.findIndex((child) => child.id === target.childId);
+                      if (childIndex < 0)
+                        throw new Error(`spawned child ${target.childId} is missing from run ${target.runId}`);
+                      state.switchRun(target.runId);
+                      state.setChildCursor(childIndex, children);
+                      if (state.drill(model) !== "agent")
+                        throw new Error(`spawned child ${target.childId} could not be opened`);
+                      openAgentView();
+                    } catch (error) {
+                      reportError(
+                        `Follow-up run ${sanitizeTerminalText(target.runId)} was started, but could not be opened: ${sanitizeTerminalText(errorMessage(error))}`,
+                      );
+                    }
+                    return true;
+                  },
+                }
+              : undefined,
+          );
         }
       };
       if (state.level === "agent") openAgentView();
@@ -200,14 +245,16 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
 
       const currentCount = (): number => {
         if (state.level === "runs") return model.runs().length;
-        if (state.level === "run" && state.runId) return orderedChildren(model.detail(state.runId), state.filter).length;
+        if (state.level === "run" && state.runId)
+          return orderedChildren(model.detail(state.runId), state.filter).length;
         return 0;
       };
 
-      const actionsFor = (detail: RunDetail): RunActionAvailability => runActionAvailability(
-        runner.liveRunIds().includes(detail.runId),
-        runner.runHandles(detail.runId).map((handle) => handle.status),
-      );
+      const actionsFor = (detail: RunDetail): RunActionAvailability =>
+        runActionAvailability(
+          runner.liveRunIds().includes(detail.runId),
+          runner.runHandles(detail.runId).map((handle) => handle.status),
+        );
 
       const stopRun = async () => {
         const runId = state.currentRunId(model.runs());
@@ -263,7 +310,14 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
               const detail = model.detail(state.runId);
               const children = orderedChildren(detail, state.filter);
               state.reconcileChildren(children);
-              const page = pageRunDetail(detail, state.cursor, state.filter, action.delta, navigationPageSize(tui), state.scroll);
+              const page = pageRunDetail(
+                detail,
+                state.cursor,
+                state.filter,
+                action.delta,
+                navigationPageSize(tui),
+                state.scroll,
+              );
               state.setChildCursor(page.cursor, children);
               state.scroll = page.row;
             } else state.pageMove(action.delta, currentCount(), navigationPageSize(tui));
@@ -279,7 +333,8 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
             return finish();
           case "filter":
             state.filter = cycleFilter(state.filter);
-            if (state.level === "run" && state.runId) state.reconcileChildren(orderedChildren(model.detail(state.runId), state.filter));
+            if (state.level === "run" && state.runId)
+              state.reconcileChildren(orderedChildren(model.detail(state.runId), state.filter));
             else state.clampCursor(currentCount());
             state.scroll = undefined;
             break;
@@ -323,7 +378,9 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
           return boxLines(content.lines, content.footer, inner, maxTotal, theme);
         },
         handleInput: act,
-        invalidate: () => { agentView?.invalidate(); },
+        invalidate: () => {
+          agentView?.invalidate();
+        },
         dispose: () => cleanup(),
       };
 
@@ -354,16 +411,20 @@ function renderContent(
   if (state.level === "agent" && agentView) {
     return {
       lines: agentView.render(inner, budget, theme),
-      footer: footerHint({
-        level: "agent",
-        canSteer: agentView.canSteer,
-        canMessage: agentView.canMessage,
-        canStop: agentView.canStop,
-        stopArmed: agentView.isStopArmed,
-      }, theme),
-      hasSpinner: !!state.runId
-        && !!state.childId
-        && model.detail(state.runId).children.find((child) => child.id === state.childId)?.status === "running",
+      footer: footerHint(
+        {
+          level: "agent",
+          canSteer: agentView.canSteer,
+          canMessage: agentView.canMessage,
+          canStop: agentView.canStop,
+          stopArmed: agentView.isStopArmed,
+        },
+        theme,
+      ),
+      hasSpinner:
+        !!state.runId &&
+        !!state.childId &&
+        model.detail(state.runId).children.find((child) => child.id === state.childId)?.status === "running",
     };
   }
   if (state.level === "run" && state.runId) {
@@ -374,12 +435,15 @@ function renderContent(
     state.reconcileChildren(orderedChildren(detail, state.filter));
     return {
       lines: renderRunDetail(detail, state.cursor, state.filter, theme, inner, now, budget, state.scroll),
-      footer: footerHint({
-        level: "run",
-        filter: state.filter,
-        ...actions,
-        stopArmed: actions.canStop && stopArmedRunId === detail.runId,
-      }, theme),
+      footer: footerHint(
+        {
+          level: "run",
+          filter: state.filter,
+          ...actions,
+          stopArmed: actions.canStop && stopArmedRunId === detail.runId,
+        },
+        theme,
+      ),
       hasSpinner: detail.children.some((child) => child.status === "running"),
     };
   }
@@ -388,11 +452,14 @@ function renderContent(
   const actions = selectedRunId ? actionsFor(model.detail(selectedRunId)) : { canStop: false };
   return {
     lines: renderRunList(runs, state.cursor, theme, inner, now, budget),
-    footer: footerHint({
-      level: "runs",
-      ...actions,
-      stopArmed: actions.canStop && stopArmedRunId === selectedRunId,
-    }, theme),
+    footer: footerHint(
+      {
+        level: "runs",
+        ...actions,
+        stopArmed: actions.canStop && stopArmedRunId === selectedRunId,
+      },
+      theme,
+    ),
     hasSpinner: runs.some((run) => run.status === "running"),
   };
 }
@@ -430,7 +497,8 @@ function isNewerAssistant(current: TranscriptMessage, persisted: TranscriptMessa
   if (!persisted) return true;
   const currentResponseId = typeof current.responseId === "string" ? current.responseId : undefined;
   const persistedResponseId = typeof persisted.responseId === "string" ? persisted.responseId : undefined;
-  if (currentResponseId !== undefined && persistedResponseId !== undefined) return currentResponseId !== persistedResponseId;
+  if (currentResponseId !== undefined && persistedResponseId !== undefined)
+    return currentResponseId !== persistedResponseId;
   if (typeof current.timestamp !== "number") return false;
   if (typeof persisted.timestamp === "number" && current.timestamp < persisted.timestamp) return false;
   if (typeof persisted.timestamp !== "number" || current.timestamp > persisted.timestamp) return true;
@@ -477,13 +545,21 @@ export function buildAgentView(
     if (!burstValid) {
       burstChild = model.detail(runId).children.find((row) => row.id === childId);
       burstValid = true;
-      queueMicrotask(() => { burstValid = false; });
+      queueMicrotask(() => {
+        burstValid = false;
+      });
     }
     return burstChild;
   };
   const header = () => {
     const row = child();
-    return { label: row?.label ?? childId, model: row?.model ?? "", thinking: row?.thinking, status: row?.status ?? "pending", usage: row?.usage ?? EMPTY_USAGE() };
+    return {
+      label: row?.label ?? childId,
+      model: row?.model ?? "",
+      thinking: row?.thinking,
+      status: row?.status ?? "pending",
+      usage: row?.usage ?? EMPTY_USAGE(),
+    };
   };
 
   // A queued or constructing child has a durable row before it has a session.
@@ -512,11 +588,19 @@ export function buildAgentView(
   let liveAssistant: TranscriptMessage | undefined;
   let liveMessageSequence = 0;
   const persistedViewIds = new Map<string, string>();
-  const withCurrentAssistant = (persisted: TranscriptMessage[], live: ChildSession | undefined): TranscriptMessage[] => {
+  const withCurrentAssistant = (
+    persisted: TranscriptMessage[],
+    live: ChildSession | undefined,
+  ): TranscriptMessage[] => {
     const current = live?.currentAssistant;
     if (persisted === combinedPersisted && current === combinedCurrent && combinedMessages) return combinedMessages;
     const latest = lastAssistant(persisted);
-    if (liveAssistant?.viewId && latest?.entryId && sameAssistantResponse(liveAssistant, latest) && !isNewerAssistant(liveAssistant, latest)) {
+    if (
+      liveAssistant?.viewId &&
+      latest?.entryId &&
+      sameAssistantResponse(liveAssistant, latest) &&
+      !isNewerAssistant(liveAssistant, latest)
+    ) {
       persistedViewIds.set(latest.entryId, liveAssistant.viewId);
       liveAssistant = undefined;
     }
@@ -530,8 +614,10 @@ export function buildAgentView(
       return viewId ? { ...message, viewId } : message;
     });
     if (current && isNewerAssistant(current, latest)) {
-      const viewId = liveAssistant && sameAssistantResponse(liveAssistant, current)
-        ? liveAssistant.viewId : `live-assistant-${++liveMessageSequence}`;
+      const viewId =
+        liveAssistant && sameAssistantResponse(liveAssistant, current)
+          ? liveAssistant.viewId
+          : `live-assistant-${++liveMessageSequence}`;
       liveAssistant = { ...current, viewId };
       combinedMessages.push(liveAssistant);
     }
@@ -575,7 +661,9 @@ export function buildAgentView(
     const handle = runner.get(childId);
     if (!handle) return;
     void invoke(handle).catch((error: unknown) => {
-      reportError(`Could not ${action} agent ${sanitizeTerminalText(childId)}: ${sanitizeTerminalText(errorMessage(error))}`);
+      reportError(
+        `Could not ${action} agent ${sanitizeTerminalText(childId)}: ${sanitizeTerminalText(errorMessage(error))}`,
+      );
     });
   };
 
@@ -609,7 +697,13 @@ export function buildAgentView(
 const BORDER = "muted";
 
 /** Wrap content in a stable-height titled box, padded to `inner` width. */
-export function boxLines(content: string[], footer: string, inner: number, totalRows: number, theme: ThemeLike): string[] {
+export function boxLines(
+  content: string[],
+  footer: string,
+  inner: number,
+  totalRows: number,
+  theme: ThemeLike,
+): string[] {
   const border = (text: string) => theme.fg(BORDER, text);
   const pad = (line: string) => `${border("│")} ${truncateToWidth(line, inner, "", true)} ${border("│")}`;
   const top = border(`╭─${theme.fg("dim", " agents ")}${"─".repeat(Math.max(0, inner - 7))}╮`);

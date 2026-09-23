@@ -11,7 +11,10 @@ Start with mid unless the child's concrete reasoning requirements justify high o
 Model tier and thinkingLevel are independent: mid with thinkingLevel: "max" is valid. Omit thinkingLevel to inherit the parent's current level; do not lower it merely because you chose mid.
 Unconfigured or unavailable tiers cannot run. Do not change the user's bindings or silently substitute another tier to bypass an error; ask the user to configure them with /model-tiers. Follow-ups preserve the original child's actual model.`;
 
-export function modelTierGuidance(tiers: Readonly<ModelTiers>, registry: Pick<ExtensionContext["modelRegistry"], "getAvailable">): string {
+export function modelTierGuidance(
+  tiers: Readonly<ModelTiers>,
+  registry: Pick<ExtensionContext["modelRegistry"], "getAvailable">,
+): string {
   const available = new Set(registry.getAvailable().map((model) => `${model.provider}/${model.id}`));
   const mappings = MODEL_TIERS.map((tier) => {
     const model = tiers[tier];

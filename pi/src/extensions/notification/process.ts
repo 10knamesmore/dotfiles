@@ -6,9 +6,7 @@ import { delimiter, isAbsolute, join } from "node:path";
 const PROCESS_TIMEOUT_MS = 5_000;
 
 /** Locate an executable through absolute PATH entries without invoking a shell. */
-export async function findExecutable(
-  name: string,
-): Promise<string | undefined> {
+export async function findExecutable(name: string): Promise<string | undefined> {
   for (const directory of (process.env.PATH ?? "").split(delimiter)) {
     if (!isAbsolute(directory)) continue;
     const candidate = join(directory, name);
@@ -21,10 +19,7 @@ export async function findExecutable(
 }
 
 /** Run a bounded notification command with fixed argv semantics and no shell. */
-export function runNotificationProcess(
-  command: string,
-  args: readonly string[],
-): Promise<void> {
+export function runNotificationProcess(command: string, args: readonly string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       shell: false,
@@ -47,21 +42,14 @@ export function runNotificationProcess(
       try {
         child.kill("SIGKILL");
       } finally {
-        finish(
-          new Error(`notification process exceeded ${PROCESS_TIMEOUT_MS}ms`),
-        );
+        finish(new Error(`notification process exceeded ${PROCESS_TIMEOUT_MS}ms`));
       }
     }, PROCESS_TIMEOUT_MS);
     timeout.unref();
     child.on("error", (error: Error) => finish(error));
     child.on("close", (code, signal) => {
       if (code === 0) finish();
-      else
-        finish(
-          new Error(
-            `notification process exited with code=${String(code)} signal=${String(signal)}`,
-          ),
-        );
+      else finish(new Error(`notification process exited with code=${String(code)} signal=${String(signal)}`));
     });
   });
 }

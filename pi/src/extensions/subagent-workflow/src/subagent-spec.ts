@@ -17,8 +17,7 @@ const THINKING_LEVEL_OVERRIDES = ["medium", "xhigh", "max"] as const;
  * persisted level, so the rest of pi's vocabulary still reaches children.
  */
 const ThinkingLevelSchema = StringEnum(THINKING_LEVEL_OVERRIDES, {
-  description:
-    "Child reasoning level. Omit to inherit the parent conversation's current level.",
+  description: "Child reasoning level. Omit to inherit the parent conversation's current level.",
 });
 
 export const SubagentPromptSchema = Type.String({
@@ -42,14 +41,12 @@ export const PublicSubagentOptionFields = {
   ),
   excludeTools: Type.Optional(
     Type.Array(Type.String(), {
-      description:
-        "Tool-name denylist. Normally omit unless deliberately removing child capabilities.",
+      description: "Tool-name denylist. Normally omit unless deliberately removing child capabilities.",
     }),
   ),
   schema: Type.Optional(
     Type.Record(Type.String(), Type.Unknown(), {
-      description:
-        "JSON Schema requiring validated structured output through the child's report_result tool.",
+      description: "JSON Schema requiring validated structured output through the child's report_result tool.",
     }),
   ),
   cwd: Type.Optional(
@@ -76,20 +73,14 @@ const WorkflowAgentOptionsSchema = Type.Object(
 
 type WorkflowAgentOptions = Omit<TierSubagentSpec, "prompt">;
 
-export function validateWorkflowAgentOptions(
-  value: unknown,
-): WorkflowAgentOptions {
+export function validateWorkflowAgentOptions(value: unknown): WorkflowAgentOptions {
   const options = value === undefined ? {} : value;
   assertSchemaValue(WorkflowAgentOptionsSchema, options, "agent() options");
   return options as Static<typeof WorkflowAgentOptionsSchema>;
 }
 
 /** Throw a stable, field-addressed error for a TypeBox runtime contract. */
-export function assertSchemaValue(
-  schema: TSchema,
-  value: unknown,
-  label: string,
-): void {
+export function assertSchemaValue(schema: TSchema, value: unknown, label: string): void {
   for (const error of Value.Errors(schema, value)) {
     const details = error as typeof error & {
       keyword?: string;
@@ -97,17 +88,12 @@ export function assertSchemaValue(
       params?: { additionalProperties?: string[]; allowedValue?: unknown };
     };
     const unknownField = details.params?.additionalProperties?.[0];
-    const escapedUnknownField = unknownField
-      ?.replaceAll("~", "~0")
-      .replaceAll("/", "~1");
+    const escapedUnknownField = unknownField?.replaceAll("~", "~0").replaceAll("/", "~1");
     const path =
       escapedUnknownField === undefined
         ? (details.instancePath ?? "")
         : `${details.instancePath ?? ""}/${escapedUnknownField}`;
-    const expected =
-      details.keyword === "const"
-        ? `; expected ${JSON.stringify(details.params?.allowedValue)}`
-        : "";
+    const expected = details.keyword === "const" ? `; expected ${JSON.stringify(details.params?.allowedValue)}` : "";
     throw new TypeError(`Invalid ${label}${path}: ${error.message}${expected}`);
   }
 }

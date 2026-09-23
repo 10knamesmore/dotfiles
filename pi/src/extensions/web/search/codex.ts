@@ -22,14 +22,16 @@ function isOfficialCodexModel(model: CodexModel | undefined): model is CodexMode
   if (!model || model.provider !== "openai-codex" || model.api !== "openai-codex-responses") return false;
   try {
     const url = new URL(model.baseUrl);
-    return url.protocol === "https:"
-      && url.hostname.toLowerCase() === "chatgpt.com"
-      && url.port === ""
-      && url.pathname.replace(/\/+$/u, "") === "/backend-api"
-      && url.username === ""
-      && url.password === ""
-      && url.search === ""
-      && url.hash === "";
+    return (
+      url.protocol === "https:" &&
+      url.hostname.toLowerCase() === "chatgpt.com" &&
+      url.port === "" &&
+      url.pathname.replace(/\/+$/u, "") === "/backend-api" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === ""
+    );
   } catch {
     return false;
   }
@@ -40,9 +42,11 @@ function pickPreferredModel(models: readonly CodexModel[]): CodexModel | undefin
     .filter((model) => model.provider === "openai-codex" && model.api === "openai-codex-responses")
     .filter((model) => !model.id.split("-").some((segment) => EXCLUDED_MODEL_SEGMENTS.has(segment)))
     .sort((left, right) => right.id.localeCompare(left.id, undefined, { numeric: true }));
-  return candidates.find((model) => model.id.includes("terra"))
-    ?? candidates.find((model) => /^gpt-\d+(?:\.\d+)?$/u.test(model.id))
-    ?? candidates[0];
+  return (
+    candidates.find((model) => model.id.includes("terra")) ??
+    candidates.find((model) => /^gpt-\d+(?:\.\d+)?$/u.test(model.id)) ??
+    candidates[0]
+  );
 }
 
 function selectModel(ctx: ExtensionContext, modelId: string | undefined): CodexModel {
@@ -144,7 +148,8 @@ function buildBody(request: SearchRequest, model: string): JsonObject {
 function parseSseEvents(text: string): JsonObject[] {
   const events: JsonObject[] = [];
   for (const block of text.replace(/\r\n/g, "\n").split(/\n\n+/u)) {
-    const data = block.split("\n")
+    const data = block
+      .split("\n")
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trimStart())
       .join("\n")
@@ -175,7 +180,8 @@ function parseResponse(text: string): { output: unknown[]; webSearchCallSeen: bo
     }
     if (!isObject(payload)) throw new WebError("invalid_response", "Codex search returned an invalid response.");
     if (payload.status === "failed") throw new WebError("invalid_response", "Codex search failed.");
-    if (payload.status === "incomplete") throw new WebError("invalid_response", "Codex search returned an incomplete response.");
+    if (payload.status === "incomplete")
+      throw new WebError("invalid_response", "Codex search returned an incomplete response.");
     const output = Array.isArray(payload.output) ? payload.output : [];
     return { output, webSearchCallSeen: output.some(isWebSearchCall) };
   }
@@ -226,8 +232,10 @@ function capText(value: unknown, limit: number): string {
 
 function citationSnippet(text: string, start: unknown, end: unknown): string {
   if (typeof start !== "number" || typeof end !== "number") return "";
-  return capText(text.slice(Math.max(0, start - 100), Math.min(text.length, end + 100))
-    .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1"), MAX_SNIPPET_CHARS);
+  return capText(
+    text.slice(Math.max(0, start - 100), Math.min(text.length, end + 100)).replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1"),
+    MAX_SNIPPET_CHARS,
+  );
 }
 
 function extractResult(output: unknown[], limit: number): SearchResult {
@@ -254,7 +262,11 @@ function extractResult(output: unknown[], limit: number): SearchResult {
       if (!Array.isArray(part.annotations)) continue;
       for (const annotation of part.annotations) {
         if (!isObject(annotation) || annotation.type !== "url_citation") continue;
-        addSource(annotation.url, annotation.title, citationSnippet(text, annotation.start_index, annotation.end_index));
+        addSource(
+          annotation.url,
+          annotation.title,
+          citationSnippet(text, annotation.start_index, annotation.end_index),
+        );
       }
     }
   }
@@ -296,7 +308,10 @@ export async function searchCodex(
   }
   if (signal?.aborted) throw new WebError("cancelled", "Request cancelled.");
   if (!auth.ok || !auth.apiKey) {
-    throw new WebError("authentication", "Codex authentication is unavailable. Sign in to OpenAI Codex using Pi's /login.");
+    throw new WebError(
+      "authentication",
+      "Codex authentication is unavailable. Sign in to OpenAI Codex using Pi's /login.",
+    );
   }
   if (auth.baseUrl !== undefined && !isOfficialCodexModel({ ...model, baseUrl: auth.baseUrl })) {
     throw new WebError("unsupported", "Codex search refuses credentials resolved for a nonofficial endpoint.");
@@ -315,11 +330,16 @@ export async function searchCodex(
   const accountId = decodeJwtAccountId(auth.apiKey);
   if (accountId) headers.set("chatgpt-account-id", accountId);
 
-  const response = await requestText(CODEX_RESPONSES_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(buildBody(request, model.id)),
-  }, signal, SEARCH_TIMEOUT_MS);
+  const response = await requestText(
+    CODEX_RESPONSES_URL,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(buildBody(request, model.id)),
+    },
+    signal,
+    SEARCH_TIMEOUT_MS,
+  );
   const parsed = parseResponse(response.text);
   if (!parsed.webSearchCallSeen) {
     throw new WebError("invalid_response", "Codex search returned no web_search_call.");

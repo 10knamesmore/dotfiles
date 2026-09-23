@@ -1,8 +1,4 @@
-import {
-  execFile,
-  type ChildProcess,
-  type ExecFileException,
-} from "node:child_process";
+import { execFile, type ChildProcess, type ExecFileException } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -148,10 +144,7 @@ const UNAVAILABLE: GitStatusSnapshot = { kind: "unavailable" };
 
 function pathIsInside(parent: string, child: string): boolean {
   const path = relative(parent, child);
-  return (
-    path === "" ||
-    (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path))
-  );
+  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -178,9 +171,7 @@ async function readPositiveInteger(path: string): Promise<number | undefined> {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-async function readOperationState(
-  gitDirectory: string,
-): Promise<OperationState> {
+async function readOperationState(gitDirectory: string): Promise<OperationState> {
   const rebaseMerge = resolve(gitDirectory, "rebase-merge");
   if (await exists(rebaseMerge)) {
     const headName = await readTrimmed(resolve(rebaseMerge, "head-name"));
@@ -198,9 +189,7 @@ async function readOperationState(
   if (await exists(rebaseApply)) {
     return {
       operation: {
-        label: (await exists(resolve(rebaseApply, "rebasing")))
-          ? "REBASING"
-          : "AM",
+        label: (await exists(resolve(rebaseApply, "rebasing"))) ? "REBASING" : "AM",
         step: await readPositiveInteger(resolve(rebaseApply, "next")),
         total: await readPositiveInteger(resolve(rebaseApply, "last")),
       },
@@ -259,9 +248,7 @@ function parsePorcelainStatus(output: string): PorcelainStatus {
       const head = record.slice("# branch.head ".length);
       if (head !== "(detached)") status.branch = sanitizeFooterText(head);
     } else if (record.startsWith("# branch.upstream ")) {
-      status.upstream = sanitizeFooterText(
-        record.slice("# branch.upstream ".length),
-      );
+      status.upstream = sanitizeFooterText(record.slice("# branch.upstream ".length));
     } else if (record.startsWith("# branch.ab ")) {
       const [ahead, behind] = record.slice("# branch.ab ".length).split(" ");
       status.ahead = parseNonNegativeInteger(ahead?.replace(/^\+/, ""));
@@ -292,10 +279,7 @@ function parsePorcelainStatus(output: string): PorcelainStatus {
  * Sum `git diff --numstat -z` records for one side, skipping unmerged paths
  * because their combined diffs do not represent a normal index comparison.
  */
-function parseNumstat(
-  output: string,
-  unmergedPaths: ReadonlySet<string>,
-): GitDiffStat {
+function parseNumstat(output: string, unmergedPaths: ReadonlySet<string>): GitDiffStat {
   const stat: GitDiffStat = { files: 0, added: 0, deleted: 0 };
 
   const records = output.split("\0");
@@ -484,22 +468,8 @@ export class GitStatusCache {
       let unstaged: GitDiffStat = EMPTY_DIFF;
       if (status.hasTrackedChanges) {
         const [stagedOutput, unstagedOutput] = await Promise.all([
-          this.runGit(
-            [
-              "-C",
-              cwd,
-              "--no-optional-locks",
-              "diff",
-              "--numstat",
-              "-z",
-              "--cached",
-            ],
-            cwd,
-          ),
-          this.runGit(
-            ["-C", cwd, "--no-optional-locks", "diff", "--numstat", "-z"],
-            cwd,
-          ),
+          this.runGit(["-C", cwd, "--no-optional-locks", "diff", "--numstat", "-z", "--cached"], cwd),
+          this.runGit(["-C", cwd, "--no-optional-locks", "diff", "--numstat", "-z"], cwd),
         ]);
         if (this.disposed || generation !== this.generation) return;
         if (stagedOutput === undefined || unstagedOutput === undefined) {
@@ -523,33 +493,16 @@ export class GitStatusCache {
 
   private async discoverPaths(cwd: string): Promise<GitPaths | undefined> {
     const output = await this.runGit(
-      [
-        "-C",
-        cwd,
-        "rev-parse",
-        "--path-format=absolute",
-        "--show-toplevel",
-        "--absolute-git-dir",
-        "--git-common-dir",
-      ],
+      ["-C", cwd, "rev-parse", "--path-format=absolute", "--show-toplevel", "--absolute-git-dir", "--git-common-dir"],
       cwd,
     );
     if (output === undefined) return undefined;
-    const [repositoryRoot, gitDirectory, commonGitDirectory] = output
-      .split("\n")
-      .filter(Boolean);
-    if (!repositoryRoot || !gitDirectory || !commonGitDirectory)
-      return undefined;
+    const [repositoryRoot, gitDirectory, commonGitDirectory] = output.split("\n").filter(Boolean);
+    if (!repositoryRoot || !gitDirectory || !commonGitDirectory) return undefined;
     return {
-      repositoryRoot: isAbsolute(repositoryRoot)
-        ? repositoryRoot
-        : resolve(cwd, repositoryRoot),
-      gitDirectory: isAbsolute(gitDirectory)
-        ? gitDirectory
-        : resolve(cwd, gitDirectory),
-      commonGitDirectory: isAbsolute(commonGitDirectory)
-        ? commonGitDirectory
-        : resolve(cwd, commonGitDirectory),
+      repositoryRoot: isAbsolute(repositoryRoot) ? repositoryRoot : resolve(cwd, repositoryRoot),
+      gitDirectory: isAbsolute(gitDirectory) ? gitDirectory : resolve(cwd, gitDirectory),
+      commonGitDirectory: isAbsolute(commonGitDirectory) ? commonGitDirectory : resolve(cwd, commonGitDirectory),
     };
   }
 
@@ -564,8 +517,7 @@ export class GitStatusCache {
     this.clearWatchers();
     this.watchedPaths = paths;
     this.watchPath(paths.repositoryRoot);
-    if (!pathIsInside(paths.repositoryRoot, paths.gitDirectory))
-      this.watchPath(paths.gitDirectory);
+    if (!pathIsInside(paths.repositoryRoot, paths.gitDirectory)) this.watchPath(paths.gitDirectory);
     if (
       paths.commonGitDirectory !== paths.gitDirectory &&
       !pathIsInside(paths.repositoryRoot, paths.commonGitDirectory)
@@ -574,16 +526,11 @@ export class GitStatusCache {
     }
   }
 
-  private watchPath(
-    path: string,
-    recursive: boolean = true,
-    generation: number = this.generation,
-  ): void {
+  private watchPath(path: string, recursive: boolean = true, generation: number = this.generation): void {
     if (!this.isCurrentWatchBinding(path, generation)) return;
     try {
       const watcher = watch(path, { recursive }, () => {
-        if (this.isCurrentWatchBinding(path, generation))
-          this.scheduleRefresh();
+        if (this.isCurrentWatchBinding(path, generation)) this.scheduleRefresh();
       });
       this.watchers.add(watcher);
       watcher.on("error", () => {
@@ -594,14 +541,12 @@ export class GitStatusCache {
         else this.scheduleRefresh();
       });
     } catch {
-      if (recursive && this.isCurrentWatchBinding(path, generation))
-        this.watchPath(path, false, generation);
+      if (recursive && this.isCurrentWatchBinding(path, generation)) this.watchPath(path, false, generation);
     }
   }
 
   private isCurrentWatchBinding(path: string, generation: number): boolean {
-    if (this.disposed || generation !== this.generation || !this.watchedPaths)
-      return false;
+    if (this.disposed || generation !== this.generation || !this.watchedPaths) return false;
     return (
       path === this.watchedPaths.repositoryRoot ||
       path === this.watchedPaths.gitDirectory ||
@@ -614,10 +559,7 @@ export class GitStatusCache {
     this.watchers.clear();
   }
 
-  private runGit(
-    args: readonly string[],
-    cwd: string,
-  ): Promise<string | undefined> {
+  private runGit(args: readonly string[], cwd: string): Promise<string | undefined> {
     return new Promise((resolvePromise) => {
       if (this.disposed) {
         resolvePromise(undefined);

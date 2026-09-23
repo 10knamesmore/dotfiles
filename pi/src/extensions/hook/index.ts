@@ -9,20 +9,14 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  ToolCallEvent,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 
 const AGENT_HOOK_PATH = join(homedir(), ".local", "bin", "agent-hook");
 const ADAPTER_TIMEOUT_MS = 2_000;
 const MAX_ADAPTER_OUTPUT_BYTES = 64 * 1024;
 const SUMMARY_MAX_CHARS = 600;
 
-type AdapterDecision =
-  | { decision: "allow" }
-  | { decision: "deny" | "ask"; reason: string };
+type AdapterDecision = { decision: "allow" } | { decision: "deny" | "ask"; reason: string };
 
 interface AdapterProcessResult {
   /** Structured adapter output written to stdout. */
@@ -43,11 +37,7 @@ export function registerHook(pi: ExtensionAPI): void {
     try {
       processResult = await runAdapter(event, ctx.cwd);
     } catch (error: unknown) {
-      reportOnce(
-        ctx,
-        "adapter-process",
-        `工具守卫不可用，当前调用已放行：${errorMessage(error)}`,
-      );
+      reportOnce(ctx, "adapter-process", `工具守卫不可用，当前调用已放行：${errorMessage(error)}`);
       return undefined;
     }
 
@@ -59,11 +49,7 @@ export function registerHook(pi: ExtensionAPI): void {
     try {
       verdict = parseDecision(processResult.stdout);
     } catch (error: unknown) {
-      reportOnce(
-        ctx,
-        "adapter-output",
-        `工具守卫返回无效结果，当前调用已放行：${errorMessage(error)}`,
-      );
+      reportOnce(ctx, "adapter-output", `工具守卫返回无效结果，当前调用已放行：${errorMessage(error)}`);
       return undefined;
     }
 
@@ -91,19 +77,14 @@ export function registerHook(pi: ExtensionAPI): void {
         reason: `无法完成工具调用确认，已拒绝执行。原规则：${verdict.reason}。UI 错误：${errorMessage(error)}`,
       };
     }
-    return approved
-      ? undefined
-      : { block: true, reason: `用户拒绝工具调用。原规则：${verdict.reason}` };
+    return approved ? undefined : { block: true, reason: `用户拒绝工具调用。原规则：${verdict.reason}` };
   });
 }
 
 export default registerHook;
 
 /** Execute one bounded adapter process without a shell. */
-function runAdapter(
-  event: ToolCallEvent,
-  cwd: string,
-): Promise<AdapterProcessResult> {
+function runAdapter(event: ToolCallEvent, cwd: string): Promise<AdapterProcessResult> {
   const stdin = JSON.stringify({
     tool_name: event.toolName,
     tool_input: event.input,
@@ -158,11 +139,7 @@ function runAdapter(
         finish({ stdout, stderr });
         return;
       }
-      finish(
-        new Error(
-          `进程异常退出：code=${String(code)} signal=${String(signal)}`,
-        ),
-      );
+      finish(new Error(`进程异常退出：code=${String(code)} signal=${String(signal)}`));
     });
     child.stdin.on("error", (error: Error) => finish(error));
     child.stdin.end(stdin);
@@ -176,21 +153,14 @@ function parseDecision(stdout: string): AdapterDecision {
   const parsed: unknown = JSON.parse(text);
   if (!isRecord(parsed)) throw new Error("顶层结果不是 object");
   if (parsed.decision === "allow") return { decision: "allow" };
-  if (
-    (parsed.decision === "deny" || parsed.decision === "ask") &&
-    typeof parsed.reason === "string"
-  ) {
+  if ((parsed.decision === "deny" || parsed.decision === "ask") && typeof parsed.reason === "string") {
     return { decision: parsed.decision, reason: parsed.reason };
   }
   throw new Error("decision/reason 不符合协议");
 }
 
 /** Show each infrastructure failure class at most once per extension lifetime. */
-function reportOnce(
-  ctx: ExtensionContext,
-  kind: DiagnosticKind,
-  message: string,
-): void {
+function reportOnce(ctx: ExtensionContext, kind: DiagnosticKind, message: string): void {
   if (reportedDiagnostics.has(kind)) return;
   reportedDiagnostics.add(kind);
   const diagnostic = `[pi-hook] ${sanitizeDisplay(message)}`;
@@ -219,9 +189,7 @@ function summarizeInput(event: ToolCallEvent): string {
 /** Remove terminal controls and keep confirmation dialogs bounded. */
 function truncateDisplay(value: string): string {
   const clean = sanitizeDisplay(value);
-  return clean.length <= SUMMARY_MAX_CHARS
-    ? clean
-    : `${clean.slice(0, SUMMARY_MAX_CHARS - 1)}…`;
+  return clean.length <= SUMMARY_MAX_CHARS ? clean : `${clean.slice(0, SUMMARY_MAX_CHARS - 1)}…`;
 }
 
 /** Remove control characters from diagnostics and confirmation text. */
@@ -236,7 +204,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Convert unknown thrown values into one-line diagnostics. */
 function errorMessage(error: unknown): string {
-  return sanitizeDisplay(
-    error instanceof Error ? error.message : String(error),
-  );
+  return sanitizeDisplay(error instanceof Error ? error.message : String(error));
 }

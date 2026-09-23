@@ -1,12 +1,7 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { sanitizeTodoDisplayLine } from "./display.js";
-import {
-  cloneTodoPhases,
-  isClosedTodo,
-  type TodoItem,
-  type TodoPhase,
-} from "./model.js";
+import { cloneTodoPhases, isClosedTodo, type TodoItem, type TodoPhase } from "./model.js";
 import { selectTodoPreview } from "./preview.js";
 import { formatTodoStatus } from "./summary.js";
 
@@ -16,9 +11,7 @@ const COLLAPSED_TASK_LIMIT = 6;
 const TODO_AUTO_HIDE_TURNS = 2;
 
 function errorMessage(error: unknown): string {
-  return sanitizeTodoDisplayLine(
-    error instanceof Error ? error.message : String(error),
-  );
+  return sanitizeTodoDisplayLine(error instanceof Error ? error.message : String(error));
 }
 
 function allTasks(phases: readonly TodoPhase[]): TodoItem[] {
@@ -53,14 +46,11 @@ function plainTaskLine(task: TodoItem): string {
           : task.status === "blocked"
             ? "!"
             : "○";
-  const reason =
-    task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
+  const reason = task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
   return `  ${marker} ${task.content}${reason}`;
 }
 
-function selectedTodoLines(
-  phases: readonly TodoPhase[],
-): Array<{ phase: TodoPhase; tasks: TodoItem[] }> {
+function selectedTodoLines(phases: readonly TodoPhase[]): Array<{ phase: TodoPhase; tasks: TodoItem[] }> {
   const selection = selectTodoPreview(phases, COLLAPSED_TASK_LIMIT);
   return phases
     .map((phase) => ({
@@ -80,9 +70,7 @@ function renderPlainLines(phases: readonly TodoPhase[]): string[] {
     lines.push(`${phase.name} ${phaseClosed}/${phase.tasks.length}`);
     for (const task of visible) lines.push(plainTaskLine(task));
   }
-  const hidden =
-    tasks.length -
-    visiblePhases.reduce((count, entry) => count + entry.tasks.length, 0);
+  const hidden = tasks.length - visiblePhases.reduce((count, entry) => count + entry.tasks.length, 0);
   if (hidden > 0) lines.push(`… ${hidden} more`);
   return lines;
 }
@@ -90,34 +78,24 @@ function renderPlainLines(phases: readonly TodoPhase[]): string[] {
 class TodoPanelComponent {
   private readonly phases: TodoPhase[];
 
-  public constructor(phases: readonly TodoPhase[], private readonly theme: Theme) {
+  public constructor(
+    phases: readonly TodoPhase[],
+    private readonly theme: Theme,
+  ) {
     this.phases = cloneTodoPhases(phases);
   }
 
   public render(width: number): string[] {
     const tasks = allTasks(this.phases);
     const closed = tasks.filter(isClosedTodo).length;
-    const lines = [
-      this.theme.fg(
-        "accent",
-        this.theme.bold(`Todo ${closed}/${tasks.length}`),
-      ),
-    ];
+    const lines = [this.theme.fg("accent", this.theme.bold(`Todo ${closed}/${tasks.length}`))];
     const visible = selectedTodoLines(this.phases);
     for (const { phase, tasks: phaseTasks } of visible) {
       const phaseClosed = phase.tasks.filter(isClosedTodo).length;
-      lines.push(
-        this.theme.fg(
-          "muted",
-          `${phase.name} ${phaseClosed}/${phase.tasks.length}`,
-        ),
-      );
+      lines.push(this.theme.fg("muted", `${phase.name} ${phaseClosed}/${phase.tasks.length}`));
       for (const task of phaseTasks) lines.push(taskLine(task, this.theme));
     }
-    const visibleCount = visible.reduce(
-      (count, entry) => count + entry.tasks.length,
-      0,
-    );
+    const visibleCount = visible.reduce((count, entry) => count + entry.tasks.length, 0);
     const hidden = tasks.length - visibleCount;
     if (hidden > 0) lines.push(this.theme.fg("dim", `… ${hidden} more`));
     return lines.map((line) => truncateToWidth(line, width));
@@ -142,10 +120,7 @@ export class TodoPresentation {
     ctx: ExtensionContext,
     phases: readonly TodoPhase[],
   ): { enabled: boolean; warning: string | undefined } {
-    const currentlyDisplayed =
-      this.displayEnabled &&
-      !this.autoHidden &&
-      allTasks(phases).length > 0;
+    const currentlyDisplayed = this.displayEnabled && !this.autoHidden && allTasks(phases).length > 0;
     this.displayEnabled = !currentlyDisplayed;
     if (this.displayEnabled) this.autoHidden = false;
     return {
@@ -166,14 +141,8 @@ export class TodoPresentation {
   }
 
   /** Hide a completed list after two subsequent complete turns. */
-  public finishTurn(
-    ctx: ExtensionContext,
-    phases: readonly TodoPhase[],
-  ): string | undefined {
-    if (
-      this.completionTurnSequence === undefined ||
-      this.currentTurnSequence === this.completionTurnSequence
-    )
+  public finishTurn(ctx: ExtensionContext, phases: readonly TodoPhase[]): string | undefined {
+    if (this.completionTurnSequence === undefined || this.currentTurnSequence === this.completionTurnSequence)
       return undefined;
 
     this.completedTurns += 1;
@@ -190,13 +159,9 @@ export class TodoPresentation {
    * UI failures are returned to the caller because a persisted mutation must not
    * be reported as failed merely because its optional presentation could not update.
    */
-  public refresh(
-    ctx: ExtensionContext,
-    phases: readonly TodoPhase[],
-  ): string | undefined {
+  public refresh(ctx: ExtensionContext, phases: readonly TodoPhase[]): string | undefined {
     const tasks = allTasks(phases);
-    const allTasksClosed =
-      tasks.length > 0 && tasks.every((task) => isClosedTodo(task));
+    const allTasksClosed = tasks.length > 0 && tasks.every((task) => isClosedTodo(task));
     if (this.hasRefreshed && !this.allTasksWereClosed && allTasksClosed) {
       this.completionTurnSequence = this.currentTurnSequence;
       this.completedTurns = 0;
@@ -211,20 +176,14 @@ export class TodoPresentation {
     this.hasRefreshed = true;
 
     try {
-      const shouldDisplay =
-        this.displayEnabled && !this.autoHidden && tasks.length > 0;
-      ctx.ui.setStatus(
-        TODO_STATUS_KEY,
-        this.displayStatus(phases),
-      );
+      const shouldDisplay = this.displayEnabled && !this.autoHidden && tasks.length > 0;
+      ctx.ui.setStatus(TODO_STATUS_KEY, this.displayStatus(phases));
       if (!shouldDisplay) {
         ctx.ui.setWidget(TODO_WIDGET_KEY, undefined);
       } else if (ctx.mode === "tui") {
-        ctx.ui.setWidget(
-          TODO_WIDGET_KEY,
-          (_tui, theme) => new TodoPanelComponent(phases, theme),
-          { placement: "aboveEditor" },
-        );
+        ctx.ui.setWidget(TODO_WIDGET_KEY, (_tui, theme) => new TodoPanelComponent(phases, theme), {
+          placement: "aboveEditor",
+        });
       } else if (ctx.mode === "rpc") {
         ctx.ui.setWidget(TODO_WIDGET_KEY, renderPlainLines(phases), {
           placement: "aboveEditor",

@@ -35,16 +35,9 @@ export function collectSessionUsage(ctx: ExtensionContext): SessionUsageTotals {
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type === "message" && entry.message.role === "assistant") {
       addUsage(totals, entry.message.usage, "parent");
-    } else if (
-      entry.type === "message" &&
-      entry.message.role === "toolResult" &&
-      entry.message.usage
-    ) {
+    } else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
       addUsage(totals, entry.message.usage, "tool");
-    } else if (
-      (entry.type === "compaction" || entry.type === "branch_summary") &&
-      entry.usage
-    ) {
+    } else if ((entry.type === "compaction" || entry.type === "branch_summary") && entry.usage) {
       addUsage(totals, entry.usage, "parent");
     }
   }
@@ -86,11 +79,13 @@ export interface PromptRunSnapshot {
 
 /** Measures an accepted prompt until agent_settled, retaining the last completed run. */
 export class PromptRunTracker {
-  private run: {
-    startedAt: number;
-    finishedAt?: number;
-    usage: PromptRunSnapshot["usage"];
-  } | undefined;
+  private run:
+    | {
+        startedAt: number;
+        finishedAt?: number;
+        usage: PromptRunSnapshot["usage"];
+      }
+    | undefined;
 
   /** An automatic continuation must not reset the prompt's totals or clock. */
   public start(): void {
@@ -104,7 +99,7 @@ export class PromptRunTracker {
 
   public record(usage: Usage | undefined): void {
     if (!this.run || !this.isRunning() || !usage) return;
-    const totals = this.run.usage ??= { input: 0, output: 0, costUsd: 0 };
+    const totals = (this.run.usage ??= { input: 0, output: 0, costUsd: 0 });
     totals.input += usage.input + usage.cacheRead + usage.cacheWrite;
     totals.output += usage.output;
     totals.costUsd += usage.cost.total;
@@ -151,15 +146,12 @@ export class RecentHitRateTracker {
 
   /** Close the in-flight turn, keep only the most recent window, and skip empty turns. */
   public endTurn(): void {
-    if (this.current.input === 0 && this.current.cacheWrite === 0 && this.current.cacheRead === 0)
-      return;
+    if (this.current.input === 0 && this.current.cacheWrite === 0 && this.current.cacheRead === 0) return;
     this.turnTokens.push(this.current);
     this.totals.input += this.current.input;
     this.totals.cacheWrite += this.current.cacheWrite;
     this.totals.cacheRead += this.current.cacheRead;
-    const oldest = this.turnTokens.length > RECENT_TURNS
-      ? this.turnTokens.shift()
-      : undefined;
+    const oldest = this.turnTokens.length > RECENT_TURNS ? this.turnTokens.shift() : undefined;
     if (oldest) {
       this.totals.input -= oldest.input;
       this.totals.cacheWrite -= oldest.cacheWrite;
@@ -243,10 +235,7 @@ export class ModelDurationTracker {
   /** Finish an in-flight model call and retain its wall duration. */
   public finish(): boolean {
     if (this.startedAt === undefined) return false;
-    this.accumulatedMilliseconds += Math.max(
-      0,
-      performance.now() - this.startedAt,
-    );
+    this.accumulatedMilliseconds += Math.max(0, performance.now() - this.startedAt);
     this.startedAt = undefined;
     return true;
   }
@@ -261,9 +250,7 @@ export class ModelDurationTracker {
   public elapsedMilliseconds(): number {
     return (
       this.accumulatedMilliseconds +
-      (this.startedAt === undefined
-        ? 0
-        : Math.max(0, performance.now() - this.startedAt))
+      (this.startedAt === undefined ? 0 : Math.max(0, performance.now() - this.startedAt))
     );
   }
 }
@@ -321,8 +308,8 @@ export class ToolUsageTracker {
 
   public snapshot(limit: number): ToolUsageSnapshot {
     const top = [...this.counts.entries()]
-      .sort(([leftName, leftCount], [rightName, rightCount]) =>
-        rightCount - leftCount || leftName.localeCompare(rightName),
+      .sort(
+        ([leftName, leftCount], [rightName, rightCount]) => rightCount - leftCount || leftName.localeCompare(rightName),
       )
       .slice(0, limit)
       .map(([name, count]) => ({ name, count }));

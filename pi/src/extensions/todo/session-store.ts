@@ -1,7 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { cloneTodoPhases, parseTodoPhases, type TodoPhase } from "./model.js";
 
 /** Custom entry type used to persist parent-session todo snapshots. */
@@ -15,8 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function phasesFromContainer(value: unknown): TodoPhase[] | undefined {
-  if (!isRecord(value) || value.version !== TODO_STATE_VERSION)
-    return undefined;
+  if (!isRecord(value) || value.version !== TODO_STATE_VERSION) return undefined;
   return parseTodoPhases(value.phases);
 }
 
@@ -40,10 +36,7 @@ export class TodoSessionStore {
   /** Install a validated state that the caller will return in a successful tool result. */
   public install(phases: readonly TodoPhase[]): void {
     const next = parseTodoPhases(phases);
-    if (next === undefined)
-      throw new Error(
-        "Refusing to install invalid or non-normalized todo state.",
-      );
+    if (next === undefined) throw new Error("Refusing to install invalid or non-normalized todo state.");
     this.phases = next;
   }
 
@@ -61,10 +54,7 @@ export class TodoSessionStore {
       const entry = branch[index];
       if (entry === undefined) continue;
       let restored: TodoPhase[] | undefined;
-      if (
-        entry.type === "custom" &&
-        entry.customType === TODO_STATE_ENTRY_TYPE
-      ) {
+      if (entry.type === "custom" && entry.customType === TODO_STATE_ENTRY_TYPE) {
         restored = phasesFromContainer(entry.data);
         if (restored === undefined) invalidSnapshots += 1;
       } else if (

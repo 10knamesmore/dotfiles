@@ -30,15 +30,14 @@ export function baseTitle(context: TitleContext): string {
 }
 
 /** Busy title: animated phase marker in front of the base title. */
-export function busyTitle(
-  activity: BusyActivity,
-  frameIndex: number,
-  context: TitleContext,
-): string {
+export function busyTitle(activity: BusyActivity, frameIndex: number, context: TitleContext): string {
   const frames = activity.kind === "tool" ? TOOL_FRAMES : MODEL_FRAMES;
   const frame = frames[frameIndex % frames.length] ?? frames[0];
-  const label = activity.kind === "tool"
-    ? activity.toolCount > 1 ? `TOOLS ${activity.toolCount}` : `TOOL · ${sanitizeFooterText(activity.toolName)}`
-    : activity.kind.toUpperCase();
+  const label =
+    activity.kind === "tool"
+      ? activity.toolCount > 1
+        ? `TOOLS ${activity.toolCount}`
+        : `TOOL · ${sanitizeFooterText(activity.toolName)}`
+      : activity.kind.toUpperCase();
   return `${frame} ${label} · ${baseTitle(context)}`;
 }
