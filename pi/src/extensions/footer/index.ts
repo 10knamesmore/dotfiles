@@ -4,6 +4,7 @@ import type {
   SessionBeforeTreeEvent,
 } from "@earendil-works/pi-coding-agent";
 import type { Usage } from "@earendil-works/pi-ai";
+import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi, type EditorStatus } from "../editor/api.js";
 import { ClaudeFooterComponent } from "./component.js";
 import { GitStatusCache } from "./git-status.js";
 import {
@@ -16,7 +17,11 @@ import {
   UsageCounter,
 } from "./metrics.js";
 
-/** Owns dynamic Pi context, provider timing, and footer component disposal. */
+/** Braille spinner frames, advanced while the model or a tool is working. */
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+const SPINNER_INTERVAL_MS = 80;
+
+/** Tracks session metrics and activity for the editor, and owns the footer component. */
 class FooterRuntime {
   private currentContext: ExtensionContext | undefined;
   private component: ClaudeFooterComponent | undefined;
@@ -29,7 +34,10 @@ class FooterRuntime {
   private readonly throughput = new RecentTokensPerSecondTracker();
   private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
-  private working = false;
+  private modelWorking = false;
+  private readonly activeTools = new Map<string, string>();
+  private spinnerFrame = 0;
+  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
   public startSession(ctx: ExtensionContext): void {
@@ -44,12 +52,14 @@ class FooterRuntime {
     this.throughput.reset();
     this.lastTurnModelMilliseconds = 0;
     this.treeSummaryProviderActive = false;
-    this.working = false;
+    this.modelWorking = false;
+    this.activeTools.clear();
+    this.updateSpinner();
     this.component?.dispose();
     this.component = undefined;
     if (ctx.mode !== "tui") return;
 
-    // The footer already shows activity; drop the built-in working loader row.
+    // The editor status badge replaces Pi's built-in working loader row.
     ctx.ui.setWorkingVisible(false);
 
     ctx.ui.setFooter((tui, _theme, footerData) => {
@@ -58,18 +68,32 @@ class FooterRuntime {
         getContext: () => this.currentContext ?? ctx,
         footerData,
         git,
-        modelDuration: this.modelDuration,
         tools: this.tools,
         turns: this.turns,
         usage: this.usage,
         hitRate: this.hitRate,
-        throughput: this.throughput,
-        sessionDuration: this.sessionDuration,
         requestRender: () => tui.requestRender(),
       });
       this.component = component;
       return component;
     });
+  }
+
+  /** Supply the editor border with session metrics and current activity. */
+  public editorStatus(): EditorStatus {
+    const spinner = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
+    const toolNames = [...this.activeTools.values()];
+    const activity = toolNames.length > 0
+      ? { kind: "tool" as const, spinner, toolName: toolNames.at(-1)!, toolCount: toolNames.length }
+      : this.modelWorking
+        ? { kind: "model" as const, spinner }
+        : { kind: "ready" as const };
+    return {
+      sessionMilliseconds: this.sessionDuration.elapsedMilliseconds(),
+      apiMilliseconds: this.modelDuration.elapsedMilliseconds(),
+      tokensPerSecond: this.throughput.tokensPerSecond(),
+      activity,
+    };
   }
 
   /** Update the event context so model, thinking, session entries, and context usage never go stale. */
@@ -83,8 +107,7 @@ class FooterRuntime {
     this.updateContext(ctx);
     if (this.treeSummaryProviderActive) return;
     this.modelDuration.start();
-    this.working = true;
-    this.component?.setWorking(true);
+    this.setModelWorking(true);
     this.component?.requestRender();
   }
 
@@ -92,8 +115,7 @@ class FooterRuntime {
   public modelWorkEnded(ctx: ExtensionContext): void {
     this.updateContext(ctx);
     this.modelDuration.finish();
-    this.working = false;
-    this.component?.setWorking(false);
+    this.setModelWorking(false);
     this.component?.requestRender();
   }
 
@@ -113,8 +135,7 @@ class FooterRuntime {
       event.preparation.userWantsSummary &&
       event.preparation.entriesToSummarize.length > 0;
     if (!this.treeSummaryProviderActive) return;
-    this.working = false;
-    this.component?.setWorking(false);
+    this.setModelWorking(false);
     event.signal.addEventListener(
       "abort",
       () => {
@@ -142,10 +163,17 @@ class FooterRuntime {
     this.component?.requestRender();
   }
 
-  /** Count one finished tool execution. */
-  public toolEnded(name: string, isError: boolean): void {
+  /** Track overlapping tool calls so the editor displays tools until the last call ends. */
+  public toolStarted(id: string, name: string): void {
+    this.activeTools.set(id, name);
+    this.updateSpinner();
+  }
+
+  /** Count one finished tool execution and clear its active status. */
+  public toolEnded(id: string, name: string, isError: boolean): void {
+    this.activeTools.delete(id);
     this.tools.record(name, isError);
-    this.component?.requestRender();
+    this.updateSpinner();
   }
 
   /** Count one finished turn. */
@@ -166,6 +194,8 @@ class FooterRuntime {
 
   /** Count one finished agent run. */
   public agentEnded(): void {
+    this.activeTools.clear();
+    this.updateSpinner();
     this.turns.recordAgent();
     this.component?.requestRender();
   }
@@ -194,10 +224,33 @@ class FooterRuntime {
     this.currentContext = ctx;
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
-    this.working = false;
+    this.modelWorking = false;
+    this.activeTools.clear();
+    this.updateSpinner();
     this.component?.dispose();
     this.component = undefined;
     ctx.ui.setFooter(undefined);
+  }
+
+  private setModelWorking(working: boolean): void {
+    if (this.modelWorking === working) return;
+    this.modelWorking = working;
+    this.updateSpinner();
+  }
+
+  private updateSpinner(): void {
+    const active = this.modelWorking || this.activeTools.size > 0;
+    if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
+      this.spinnerFrame = 0;
+      this.spinnerTimer = setInterval(() => {
+        this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
+        this.component?.requestRender();
+      }, SPINNER_INTERVAL_MS);
+    } else if (!active && this.spinnerTimer) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = undefined;
+    }
+    this.component?.requestRender();
   }
 
   private cwd(ctx: ExtensionContext): string {
@@ -208,6 +261,9 @@ class FooterRuntime {
 /** Register the Claude-style footer against Pi 0.84.4 lifecycle and provider events. */
 export function registerFooter(pi: ExtensionAPI): void {
   const runtime = new FooterRuntime();
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
+    (requested as PromptEditorApi).useStatus(() => runtime.editorStatus());
+  });
   pi.on("session_start", (_event, ctx) => runtime.startSession(ctx));
   pi.on("session_before_tree", (event, ctx) =>
     runtime.treeNavigationStarted(event, ctx),
@@ -246,9 +302,13 @@ export function registerFooter(pi: ExtensionAPI): void {
     runtime.updateContext(ctx);
     runtime.turnEnded();
   });
+  pi.on("tool_execution_start", (event, ctx) => {
+    runtime.updateContext(ctx);
+    runtime.toolStarted(event.toolCallId, event.toolName);
+  });
   pi.on("tool_execution_end", (event, ctx) => {
     runtime.updateContext(ctx);
-    runtime.toolEnded(event.toolName, event.isError);
+    runtime.toolEnded(event.toolCallId, event.toolName, event.isError);
   });
   pi.on("model_select", (_event, ctx) => runtime.modelChanged(ctx));
   pi.on("thinking_level_select", (_event, ctx) => runtime.contextChanged(ctx));

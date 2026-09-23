@@ -103,9 +103,9 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
     case "shift+j":
       return { type: "pageMove", delta: 1 };
     case "tab":
-      return { type: "cycleLive", delta: 1 };
+      return level === "agent" ? { type: "none" } : { type: "cycleLive", delta: 1 };
     case "shift+tab":
-      return { type: "cycleLive", delta: -1 };
+      return level === "agent" ? { type: "none" } : { type: "cycleLive", delta: -1 };
     case "enter":
     case "return":
       if (level === "agent") return { type: "steer" };
@@ -157,7 +157,6 @@ export function footerHint(state: FooterState, theme: ThemeLike): string {
     parts.push("j/k scroll", "J/K page");
     if (state.canSteer) parts.push("enter steer");
     else if (state.canMessage) parts.push("enter message");
-    if (state.canCycle) parts.push("tab next live");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
     parts.push("esc back");
   }

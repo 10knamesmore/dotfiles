@@ -74,7 +74,6 @@ export class AgentView {
 
   get canSteer(): boolean { return !!this.deps.onSteer && this.deps.live() && this.isActive(); }
   get canMessage(): boolean { return !!this.deps.onMessage && !this.deps.live() && !!this.deps.canMessage?.(); }
-  get composerOpen(): boolean { return this.composer !== undefined; }
   get canStop(): boolean { return !!this.deps.onStop && this.deps.live() && this.isActive(); }
   get isStopArmed(): boolean { return this.stopArmed; }
 
@@ -106,8 +105,8 @@ export class AgentView {
       return true;
     }
     this.stopArmed = false;
-    if (keyId === "[" || keyId === "]") {
-      this.selectBlock(keyId === "]" ? 1 : -1);
+    if (keyId === "tab" || keyId === "shift+tab") {
+      this.selectBlock(keyId === "tab" ? 1 : -1);
     } else if (keyId === "space" || data === " ") {
       this.toggleSelected();
     } else if (keyId === "t" || keyId === "o") {
@@ -268,7 +267,7 @@ export class AgentView {
     this.scrollOffset = this.autoScroll ? max : Math.min(this.scrollOffset, max);
     for (let index = 0; index < viewport; index += 1) lines.push(layout.lines[this.scrollOffset + index] ?? "");
     const position = this.autoScroll ? this.isActive() ? "Following latest" : "End of transcript" : "Reading history";
-    lines.push(theme.fg("muted", `${position} · g top · G latest · [ ] block · Space fold`));
+    lines.push(theme.fg("muted", `${position} · g top · G latest · Tab / Shift+Tab block · Space fold`));
     if (this.composer) {
       const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;
       const prefix = `✎ ${kind}: `;

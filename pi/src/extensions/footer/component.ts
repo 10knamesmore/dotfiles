@@ -3,27 +3,17 @@ import type {
   ExtensionContext,
   ReadonlyFooterDataProvider,
 } from "@earendil-works/pi-coding-agent";
-import {
-  truncateToWidth,
-  visibleWidth,
-  type Component,
-} from "@earendil-works/pi-tui";
+import type { Component } from "@earendil-works/pi-tui";
 import {
   fitByDropping,
-  fitRequiredPair,
-  formatDuration,
   formatFooterCwd,
   formatTokens,
-  formatTokensPerSecond,
   sanitizeFooterText,
 } from "./format.js";
 import type { GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
 import {
-  type ActiveSessionDurationTracker,
-  type ModelDurationTracker,
   type RecentHitRateTracker,
-  RecentTokensPerSecondTracker,
   type SessionUsageTotals,
   type ToolUsageSnapshot,
   ToolUsageTracker,
@@ -31,10 +21,6 @@ import {
   type UsageCounter,
 } from "./metrics.js";
 import { palette, separator } from "./palette.js";
-
-/** Braille spinner frames, same pace as Pi's default working indicator. */
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
-const SPINNER_INTERVAL_MS = 80;
 
 interface ClaudeFooterComponentOptions {
   /** Returns the latest event context instead of a session-start snapshot. */
@@ -45,11 +31,6 @@ interface ClaudeFooterComponentOptions {
 
   /** Event-driven git snapshot cache owned by this component. */
   git: GitStatusCache;
-
-  /**
-   * Wall duration of model calls observed during the active extension session.
-   */
-  modelDuration: ModelDurationTracker;
 
   /** Tool execution counts observed during the active extension session. */
   tools: ToolUsageTracker;
@@ -62,15 +43,6 @@ interface ClaudeFooterComponentOptions {
 
   /** Cache hit rate over the most recent completed turns. */
   hitRate: RecentHitRateTracker;
-
-  /** Generated-token throughput over the most recent completed turns. */
-  throughput: RecentTokensPerSecondTracker;
-
-  /**
-   * Monotonic elapsed time observed since the active session's latest
-   * `session_start`.
-   */
-  sessionDuration: ActiveSessionDurationTracker;
 
   /** Requests an event-driven TUI repaint. */
   requestRender: () => void;
@@ -114,26 +86,12 @@ interface ThirdLineRenderOptions {
   /** Pi-owned extension status provider. */
   footerData: ReadonlyFooterDataProvider;
 
-  /** Model wall-duration tracker. */
-  modelDuration: ModelDurationTracker;
-
   /** Tool execution tracker. */
   tools: ToolUsageTracker;
 
   /** Turn and agent-run tracker. */
   turns: TurnTracker;
 
-  /** Recent generated-token throughput tracker. */
-  throughput: RecentTokensPerSecondTracker;
-
-  /** True while a provider request is in flight (spinner active). */
-  working: boolean;
-
-  /** Current spinner frame index, advanced by the component's timer. */
-  spinnerFrame: number;
-
-  /** Active session wall-duration tracker. */
-  sessionDuration: ActiveSessionDurationTracker;
 }
 
 function currentUsername(): string {
@@ -333,76 +291,6 @@ function formatRecentHitRate(hitRate: number | undefined): string {
   return palette.red(`${hitRate}%`);
 }
 
-function joined(parts: readonly string[]): string {
-  const nonEmptyParts = parts.filter(Boolean);
-  return nonEmptyParts.join(separator);
-}
-
-function modelVariants(ctx: ExtensionContext): {
-  full: string;
-  withoutThinking: string;
-  modelOnly: string;
-} {
-  if (!ctx.model) {
-    const noModel = palette.sky("no-model");
-    return {
-      full: noModel,
-      withoutThinking: noModel,
-      modelOnly: noModel,
-    };
-  }
-
-  const modelName = sanitizeFooterText(ctx.model.name || ctx.model.id);
-  const provider = sanitizeFooterText(ctx.model.provider);
-  const modelOnly = palette.sky(modelName);
-  const withoutThinking = `${palette.overlay2(`${provider}/`)}${modelOnly}`;
-  let thinking = "";
-
-  if (ctx.model.reasoning) {
-    thinking = ` ${palette.mauve(`(${ctx.thinkingLevel ?? "off"})`)}`;
-  }
-
-  return {
-    full: `${withoutThinking}${thinking}`,
-    withoutThinking,
-    modelOnly,
-  };
-}
-
-function fitModelContextLine(
-  ctx: ExtensionContext,
-  totals: string,
-  width: number,
-): string {
-  const model = modelVariants(ctx);
-  const context = formatContext(ctx);
-  let line = joined([model.full, context, totals]);
-
-  if (visibleWidth(line) <= width) {
-    return line;
-  }
-
-  line = joined([model.full, context]);
-
-  if (visibleWidth(line) <= width) {
-    return line;
-  }
-
-  line = joined([model.withoutThinking, context]);
-
-  if (visibleWidth(line) <= width) {
-    return line;
-  }
-
-  line = joined([model.modelOnly, context]);
-
-  if (visibleWidth(line) <= width) {
-    return line;
-  }
-
-  return fitRequiredPair(model.modelOnly, context, width);
-}
-
 function renderSecondLine(options: SecondLineRenderOptions): string {
   const { width, ctx, usage, hitRate } = options;
   const totalsParts = [
@@ -422,11 +310,7 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
 
   const totals = totalsParts.join(" ");
 
-  return truncateToWidth(
-    fitModelContextLine(ctx, totals, width),
-    width,
-    palette.overlay2("…"),
-  );
+  return fitByDropping([formatContext(ctx), totals], [1], width, separator);
 }
 
 function statusPriority(key: string): number {
@@ -485,39 +369,14 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
   const {
     width,
     footerData,
-    modelDuration,
     tools,
     turns,
-    throughput,
-    sessionDuration,
   } = options;
-  const sessionTime = formatDuration(sessionDuration.elapsedMilliseconds());
-  const modelTime = formatDuration(modelDuration.elapsedMilliseconds());
-  const tokensPerSecond = throughput.tokensPerSecond();
-
-  // `session 1m1s(api 2m2s) 13.3 toks/s` as one cohesive timing block:
-  // API wall duration in parentheses right after the session duration (no
-  // space), then throughput; the whole block drops together when narrow.
-  const apiDurationText =
-    `${palette.overlay2("(api")} ${palette.sky(modelTime)}${palette.overlay2(")")}`;
-  const throughputText =
-    tokensPerSecond === undefined
-      ? ""
-      : ` ${palette.sky(formatTokensPerSecond(tokensPerSecond))} ${palette.overlay2("toks/s")}`;
-  const spinnerText = options.working
-    ? ` ${palette.sky(SPINNER_FRAMES[options.spinnerFrame] ?? SPINNER_FRAMES[0])}`
-    : "";
-  const timingText =
-    `${palette.overlay2("session")} ${palette.lavender(sessionTime)}` +
-    `${apiDurationText}${spinnerText}${throughputText}`;
-
-  const toolSnapshot = tools.snapshot(3);
-  const toolUsage = formatToolUsage(toolSnapshot);
-  const turnSnapshot = turns.snapshot();
-  const turnCount = formatTurns(turnSnapshot);
+  const toolUsage = formatToolUsage(tools.snapshot(3));
+  const turnCount = formatTurns(turns.snapshot());
   const statuses = formatExtensionStatuses(footerData);
-  const thirdParts = [timingText, toolUsage, turnCount, statuses];
-  const dropOrder = [1, 2, 0];
+  const thirdParts = [toolUsage, turnCount, statuses];
+  const dropOrder = [0, 1];
 
   return fitByDropping(thirdParts, dropOrder, width, separator);
 }
@@ -530,9 +389,6 @@ export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
   private disposed = false;
-  private working = false;
-  private spinnerFrame = 0;
-  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
   public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
@@ -562,27 +418,6 @@ export class ClaudeFooterComponent implements Component {
     }
   }
 
-  /**
-   * Reflect provider in-flight state: start the spinner timer on transition
-   * to working, stop and clear it when idle again.
-   */
-  public setWorking(working: boolean): void {
-    if (this.working === working) return;
-    this.working = working;
-    if (working) {
-      this.spinnerFrame = 0;
-      this.spinnerTimer ??= setInterval(() => {
-        if (this.disposed) return;
-        this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
-        this.options.requestRender();
-      }, SPINNER_INTERVAL_MS);
-    } else if (this.spinnerTimer !== undefined) {
-      clearInterval(this.spinnerTimer);
-      this.spinnerTimer = undefined;
-    }
-    this.options.requestRender();
-  }
-
   public render(width: number): string[] {
     if (width <= 0) {
       return ["", "", ""];
@@ -609,13 +444,8 @@ export class ClaudeFooterComponent implements Component {
       renderThirdLine({
         width,
         footerData: this.options.footerData,
-        modelDuration: this.options.modelDuration,
         tools: this.options.tools,
         turns: this.options.turns,
-        throughput: this.options.throughput,
-        sessionDuration: this.options.sessionDuration,
-        working: this.working,
-        spinnerFrame: this.spinnerFrame,
       }),
     ];
   }
@@ -624,17 +454,13 @@ export class ClaudeFooterComponent implements Component {
     // The footer reads current state from its sources during every render.
   }
 
-  /** Stop git watchers, debounce timers, the spinner timer, and any running git process. */
+  /** Stop git watchers, debounce timers, and any running git process. */
   public dispose(): void {
     if (this.disposed) {
       return;
     }
 
     this.disposed = true;
-    if (this.spinnerTimer !== undefined) {
-      clearInterval(this.spinnerTimer);
-      this.spinnerTimer = undefined;
-    }
     this.options.git.dispose();
   }
 }

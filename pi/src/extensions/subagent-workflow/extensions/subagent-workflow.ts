@@ -28,7 +28,7 @@ import { registerModelTierGuidance } from "../src/settings/model-tier-guidance.j
 import { fenceDirectlyDeliveredRun, registerSubagentTool, resolveFollowUpSpec } from "../src/tool/subagent-tool.js";
 import { registerEntryMarkers } from "../src/ui/entry-markers.js";
 import { registerNavigator, type NavigatorFollowUp, type NavigatorOpenContext } from "../src/ui/navigator/navigator.js";
-import { createAgentInputEditorFactory } from "../src/ui/input-navigation.js";
+import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../../editor/api.js";
 import { FOLLOW_UP_PROMPT_PREFIX } from "../src/ui/navigator/transcript.js";
 import { SubagentStatusWidget } from "../src/ui/status-widget.js";
 import { safeDeliveryValue } from "../src/ui/delivery-safe.js";
@@ -328,7 +328,6 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   registerWorkflowTool(pi, selfPath, { approvalPolicy: settings.workflowApproval, observeRun });
 
   // /agents is the canonical name; /workflows stays registered as a public alias.
-  let inputEditorFactory: ReturnType<typeof createAgentInputEditorFactory> | undefined;
   const openNavigator = registerNavigator(pi, {
     followUp: createNavigatorFollowUp(pi, selfPath, widget),
     describeWorkflow: (script) => parseWorkflowScript(script).meta.name,
@@ -340,6 +339,27 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
       await openNavigator(ctx);
     },
   });
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
+    (requested as PromptEditorApi).useAgentNavigation({
+      selectNext: () => widget.selectRun(1),
+      selectPrevious: () => widget.selectRun(-1),
+      hasSelection: () => widget.hasSelectedRun(),
+      openSelection: () => {
+        const target = widget.takeSelectedRun();
+        if (!target) return false;
+        const ctx = editorContext;
+        if (!ctx) return false;
+        void openNavigator(ctx, target).catch((error: unknown) => {
+          const message = `Could not open agent view: ${errorMessage(error)}`;
+          ctx.ui.notify(message, "error");
+          reportDiagnostic(`[subagent-workflow] ${message}`);
+        });
+        return true;
+      },
+      clearSelection: () => widget.clearSelectedRun(),
+    });
+  });
+  let editorContext: ExtensionContext | undefined;
   pi.on("message_start", (event, ctx) => {
     if (event.message.role !== "user") return;
     acknowledgeDeliveryMessage(ctx.sessionManager.getSessionId(), userMessageText(event.message.content));
@@ -347,23 +367,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();
     markSessionOpen(sessionId);
-    if (ctx.hasUI) {
-      inputEditorFactory = createAgentInputEditorFactory({
-        selectNext: () => widget.selectRun(1),
-        selectPrevious: () => widget.selectRun(-1),
-        hasSelection: () => widget.hasSelectedRun(),
-        takeSelection: () => widget.takeSelectedRun(),
-        clearSelection: () => widget.clearSelectedRun(),
-        openSelection: (target) => {
-          void openNavigator(ctx, target).catch((error: unknown) => {
-            const message = `Could not open agent view: ${errorMessage(error)}`;
-            ctx.ui.notify(message, "error");
-            reportDiagnostic(`[subagent-workflow] ${message}`);
-          });
-        },
-      });
-      ctx.ui.setEditorComponent(inputEditorFactory);
-    }
+    editorContext = ctx;
     if (ctx.hasUI) setTuiSession();
     usageFooter.attach(ctx);
     try {
@@ -375,10 +379,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("session_shutdown", async (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();
     markSessionClosed(sessionId);
-    if (ctx.hasUI && inputEditorFactory && ctx.ui.getEditorComponent() === inputEditorFactory) {
-      ctx.ui.setEditorComponent(undefined);
-      inputEditorFactory = undefined;
-    }
+    editorContext = undefined;
     try {
       widget.dispose();
     } catch (error) {

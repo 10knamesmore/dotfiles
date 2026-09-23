@@ -242,7 +242,7 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
 
       const act = (data: string) => {
         const keyId = navigatorKeyId(data);
-        // A focused composer owns tab; otherwise AgentView declines it so live-run cycling can handle it.
+        // AgentView owns block navigation and composer input before navigator shortcuts.
         if (state.level === "agent" && agentView?.handleInput(data, keyId)) return;
         const action = keyToAction(keyId, state.level);
         if (action.type !== "stop") stopArmedRunId = undefined;
@@ -376,14 +376,12 @@ function renderContent(
   if (state.level === "agent" && agentView) {
     return {
       lines: agentView.render(inner, budget, theme),
-      // A focused composer owns tab, so the cycle hint hides while it is open.
       footer: footerHint({
         level: "agent",
         canSteer: agentView.canSteer,
         canMessage: agentView.canMessage,
         canStop: agentView.canStop,
         stopArmed: agentView.isStopArmed,
-        canCycle: canCycle && !agentView.composerOpen,
       }, theme),
       hasSpinner: !!state.runId
         && !!state.childId

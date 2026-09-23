@@ -84,32 +84,3 @@ export function fitByDropping(
   }
   return truncateToWidth(line, width, palette.overlay2("…"));
 }
-
-/** Preserve both required fields when the model/context row becomes narrower than their full text. */
-export function fitRequiredPair(
-  left: string,
-  right: string,
-  width: number,
-): string {
-  if (width <= 0) return "";
-  const complete = `${left}${separator}${right}`;
-  if (visibleWidth(complete) <= width) return complete;
-  const separatorWidth = visibleWidth(separator);
-  if (width <= separatorWidth + 4)
-    return truncateToWidth(complete, width, palette.overlay2("…"));
-
-  const available = width - separatorWidth;
-  let leftWidth = Math.min(
-    visibleWidth(left),
-    Math.max(4, Math.floor(available * 0.58)),
-  );
-  let rightWidth = Math.max(1, available - leftWidth);
-  const unusedRight = Math.max(0, rightWidth - visibleWidth(right));
-  leftWidth = Math.min(visibleWidth(left), leftWidth + unusedRight);
-  rightWidth = Math.max(1, available - leftWidth);
-  return `${truncateToWidth(left, leftWidth, palette.overlay2("…"))}${separator}${truncateToWidth(
-    right,
-    rightWidth,
-    palette.overlay2("…"),
-  )}`;
-}
