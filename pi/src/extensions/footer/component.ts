@@ -11,10 +11,16 @@ import {
   formatTokens,
   sanitizeFooterText,
 } from "./format.js";
-import type { GitFileStatus, GitStatusSnapshot } from "./git-status.js";
+import type {
+  GitDiffStat,
+  GitFileStatus,
+  GitStatusSnapshot,
+} from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
 import {
   type RecentHitRateTracker,
+  type PromptRunSnapshot,
+  type PromptRunTracker,
   type SessionUsageTotals,
   type ToolUsageSnapshot,
   ToolUsageTracker,
@@ -38,6 +44,9 @@ interface ClaudeFooterComponentOptions {
 
   /** Turn and agent-run counts observed during the active extension session. */
   turns: TurnTracker;
+
+  /** Parent-model usage and wall time for the current or last accepted prompt. */
+  promptRun: PromptRunTracker;
 
   /** Session-total usage grown by events, pre-filled from persisted entries. */
   usage: UsageCounter;
@@ -93,6 +102,8 @@ interface ThirdLineRenderOptions {
   /** Turn and agent-run tracker. */
   turns: TurnTracker;
 
+  /** Current or last prompt, absent before the first run in this runtime. */
+  promptRun: PromptRunSnapshot | undefined;
 }
 
 function currentUsername(): string {
@@ -129,46 +140,78 @@ function formatGitOperation(snapshot: GitStatusSnapshot): string {
   return palette.yellow(`(${operation.label}${progress})`);
 }
 
-function formatGitFiles(files: GitFileStatus): string {
-  const parts: string[] = [];
+/** Prefix a git segment with the pipe that separates it from the previous one. */
+function gitSegment(segment: string): string {
+  return segment === "" ? "" : `${palette.overlay2("|")} ${segment}`;
+}
 
-  if (files.conflicted > 0) {
-    parts.push(palette.red(`👎${files.conflicted}`));
+/** Upstream tracking state shown after the branch name. */
+function formatGitTracking(snapshot: GitStatusSnapshot): string {
+  if (snapshot.kind === "unavailable" || snapshot.detached) {
+    return "";
   }
 
-  if (files.stashed > 0) {
-    parts.push(palette.mauve(`&${files.stashed}`));
+  if (snapshot.upstream === undefined) {
+    return palette.overlay2("no upstream");
   }
 
-  if (files.deleted > 0) {
-    parts.push(palette.red(`✘${files.deleted}`));
-  }
+  const parts = [palette.overlay2("→"), palette.sky(snapshot.upstream)];
 
-  if (files.renamed > 0) {
-    parts.push(palette.overlay2(`»${files.renamed}`));
-  }
-
-  if (files.modified > 0) {
-    parts.push(palette.sky(`!${files.modified}`));
-  }
-
-  if (files.staged > 0) {
-    parts.push(palette.green(`${files.staged}`));
-  }
-
-  if (files.untracked > 0) {
-    parts.push(palette.overlay2(`?${files.untracked}`));
-  }
-
-  if (files.ahead > 0 && files.behind > 0) {
-    parts.push(palette.peach(`⇕⇡${files.ahead}⇣${files.behind}`));
-  } else if (files.ahead > 0) {
-    parts.push(palette.peach(`⇡${files.ahead}`));
-  } else if (files.behind > 0) {
-    parts.push(palette.peach(`⇣${files.behind}`));
+  if (snapshot.ahead === undefined || snapshot.behind === undefined) {
+    parts.push(palette.yellow("↑? ↓?"));
+  } else if (snapshot.ahead === 0 && snapshot.behind === 0) {
+    parts.push(palette.green("synced"));
+  } else {
+    if (snapshot.ahead > 0) parts.push(palette.peach(`↑${snapshot.ahead}`));
+    if (snapshot.behind > 0) parts.push(palette.peach(`↓${snapshot.behind}`));
   }
 
   return parts.join(" ");
+}
+
+/** One staged/unstaged group: file count plus text line totals. */
+function formatGitDiffStat(
+  label: string,
+  stat: GitDiffStat,
+  labelColor: (text: string) => string,
+): string {
+  if (stat.files === 0) {
+    return "";
+  }
+
+  const parts = [labelColor(`${label} ${stat.files}`)];
+
+  if (stat.added > 0) parts.push(palette.green(`+${stat.added}`));
+  if (stat.deleted > 0) parts.push(palette.red(`−${stat.deleted}`));
+
+  return parts.join(" ");
+}
+
+/** Conflicts stay separate from the staged/unstaged diff totals. */
+function formatGitConflicts(files: GitFileStatus): string {
+  return files.conflicted > 0
+    ? palette.red(`conflicts ${files.conflicted}`)
+    : "";
+}
+
+function formatGitUntracked(files: GitFileStatus): string {
+  return files.untracked > 0
+    ? palette.overlay2(`untracked ${files.untracked}`)
+    : "";
+}
+
+function formatGitStash(files: GitFileStatus): string {
+  return files.stashed > 0 ? palette.mauve(`stash ${files.stashed}`) : "";
+}
+
+/** True when no tracked, untracked, or unmerged change is present. */
+function gitIsClean(files: GitFileStatus): boolean {
+  return (
+    files.staged.files === 0 &&
+    files.unstaged.files === 0 &&
+    files.untracked === 0 &&
+    files.conflicted === 0
+  );
 }
 
 function renderFirstLine(options: FirstLineRenderOptions): string {
@@ -184,21 +227,29 @@ function renderFirstLine(options: FirstLineRenderOptions): string {
     formatFooterCwd(ctx.sessionManager.getCwd(), homedir()),
   );
 
-  let branch = "";
-  let files = "";
+  const parts = [identity, cwd];
 
   if (git.kind === "repository") {
-    branch = palette.yellow(git.branch);
-    files = formatGitFiles(git.files);
+    parts.push(
+      gitSegment(palette.yellow(git.branch)),
+      formatGitTracking(git),
+      formatGitOperation(git),
+      formatGitConflicts(git.files),
+      gitSegment(formatGitDiffStat("staged", git.files.staged, palette.green)),
+      gitSegment(
+        formatGitDiffStat("unstaged", git.files.unstaged, palette.sky),
+      ),
+      gitSegment(formatGitUntracked(git.files)),
+      gitSegment(formatGitStash(git.files)),
+      gitSegment(gitIsClean(git.files) ? palette.green("clean") : ""),
+    );
   }
 
-  const operation = formatGitOperation(git);
+  // Drop order: stats, then the static identity, then upstream state; cwd,
+  // branch, and operation/conflict state always remain.
+  const dropOrder = [10, 9, 8, 7, 6, 0, 3];
 
-  return fitByDropping(
-    [identity, cwd, branch, operation, files],
-    [4, 3, 2, 0],
-    width,
-  );
+  return fitByDropping(parts, dropOrder, width);
 }
 
 function formatContext(ctx: ExtensionContext): string {
@@ -284,15 +335,18 @@ function formatRecentHitRate(hitRate: number | undefined): string {
     return "";
   }
 
-  if (hitRate >= 70) {
-    return palette.green(`${hitRate}%`);
+  const percent = Math.round(hitRate * 10) / 10;
+  const label = `${percent.toFixed(1)}%`;
+
+  if (percent >= 90) {
+    return palette.green(label);
   }
 
-  if (hitRate >= 40) {
-    return palette.yellow(`${hitRate}%`);
+  if (percent >= 80) {
+    return palette.yellow(label);
   }
 
-  return palette.red(`${hitRate}%`);
+  return palette.red(label);
 }
 
 function renderSecondLine(options: SecondLineRenderOptions): string {
@@ -365,18 +419,29 @@ function formatExtensionStatuses(
   return "";
 }
 
+function formatPromptRun(run: PromptRunSnapshot | undefined): string {
+  if (!run) return "";
+  const label = run.state === "running" ? "run" : "last";
+  const duration = palette.lavender(formatDuration(run.elapsedMilliseconds));
+  const input = palette.peach(`in:${run.usage ? formatTokens(run.usage.input, 2) : "—"}`);
+  const output = palette.sky(`out:${run.usage ? formatTokens(run.usage.output, 2) : "—"}`);
+  const cost = run.usage ? palette.peach(`~$${run.usage.costUsd.toFixed(3)}`) : palette.overlay2("—");
+  return `${palette.overlay2(label)} ${duration} · ${input} ${output} · ${cost}`;
+}
+
 function renderThirdLine(options: ThirdLineRenderOptions): string {
   const {
     width,
     footerData,
     tools,
     turns,
+    promptRun,
   } = options;
   const toolUsage = formatToolUsage(tools.snapshot(4));
   const turnCount = formatTurns(turns.snapshot());
   const statuses = formatExtensionStatuses(footerData);
-  const thirdParts = [toolUsage, turnCount, statuses];
-  const dropOrder = [0, 1];
+  const thirdParts = [formatPromptRun(promptRun), toolUsage, turnCount, statuses];
+  const dropOrder = [1, 2, 3];
 
   return fitByDropping(thirdParts, dropOrder, width, separator);
 }
@@ -446,6 +511,7 @@ export class ClaudeFooterComponent implements Component {
         footerData: this.options.footerData,
         tools: this.options.tools,
         turns: this.options.turns,
+        promptRun: this.options.promptRun.snapshot(),
       }),
     ];
   }

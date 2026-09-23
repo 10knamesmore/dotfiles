@@ -164,7 +164,7 @@ export async function spawnSubprocessChild(
   } catch (error) {
     // Await real exit before rethrowing: the runner's failure path has no
     // session to dispose, so this is the only place that guarantees the
-    // process is gone before worktree cleanup or the next admission runs.
+    // process is gone before the next admission runs.
     rpc.kill("SIGKILL");
     await rpc.exited;
     throw error;

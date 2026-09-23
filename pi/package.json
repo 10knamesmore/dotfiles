@@ -8,7 +8,8 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "update:pi": "pnpm update --latest --no-save @earendil-works/pi-ai @earendil-works/pi-coding-agent @earendil-works/pi-tui"
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
@@ -17,9 +18,9 @@
     "turndown": "7.2.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.84.4",
-    "@earendil-works/pi-coding-agent": "0.84.4",
-    "@earendil-works/pi-tui": "0.84.4",
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@earendil-works/pi-tui": "latest",
     "@types/node": "22.19.19",
     "@types/turndown": "5.0.5",
     "typebox": "1.3.7",

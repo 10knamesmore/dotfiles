@@ -1,4 +1,8 @@
 allowBuilds:
   "@google/genai": false
+  esbuild: false
   protobufjs: false
 confirmModulesPurge: false
+minimumReleaseAgeExclude:
+  - '@earendil-works/chord'
+  - '@earendil-works/pi-*'

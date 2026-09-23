@@ -3,14 +3,16 @@ import type {
   ExtensionContext,
   SessionBeforeTreeEvent,
 } from "@earendil-works/pi-coding-agent";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { AssistantMessageEvent, Usage } from "@earendil-works/pi-ai";
 import { performance } from "node:perf_hooks";
 import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi, type EditorStatus } from "../editor/api.js";
+import { ModelResponseTracker, SESSION_ACTIVITY_CHANGED } from "./activity.js";
 import { ClaudeFooterComponent } from "./component.js";
 import { GitStatusCache } from "./git-status.js";
 import {
   ActiveSessionDurationTracker,
   ModelDurationTracker,
+  PromptRunTracker,
   RecentHitRateTracker,
   RecentTokensPerSecondTracker,
   ToolUsageTracker,
@@ -27,6 +29,8 @@ class FooterRuntime {
   private currentContext: ExtensionContext | undefined;
   private component: ClaudeFooterComponent | undefined;
   private readonly modelDuration = new ModelDurationTracker();
+  private readonly modelResponse = new ModelResponseTracker();
+  private readonly promptRun = new PromptRunTracker();
   private readonly sessionDuration = new ActiveSessionDurationTracker();
   private readonly tools = new ToolUsageTracker();
   private readonly turns = new TurnTracker();
@@ -35,17 +39,21 @@ class FooterRuntime {
   private readonly throughput = new RecentTokensPerSecondTracker();
   private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
-  private modelWorking = false;
   private readonly activeTools = new Map<string, string>();
   private spinnerFrame = 0;
   private spinnerTimer: ReturnType<typeof setInterval> | undefined;
   private idleStartedAt: number | undefined;
   private idleTimer: ReturnType<typeof setInterval> | undefined;
+  private lastPublishedActivity: EditorStatus["activity"] | undefined;
+
+  public constructor(private readonly onActivityChanged: (activity: EditorStatus["activity"]) => void) {}
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
   public startSession(ctx: ExtensionContext): void {
     this.currentContext = ctx;
     this.modelDuration.reset();
+    this.modelResponse.reset();
+    this.promptRun.reset();
     this.sessionDuration.reset();
     this.tools.reset();
     this.turns.reset();
@@ -55,8 +63,8 @@ class FooterRuntime {
     this.throughput.reset();
     this.lastTurnModelMilliseconds = 0;
     this.treeSummaryProviderActive = false;
-    this.modelWorking = false;
     this.activeTools.clear();
+    this.lastPublishedActivity = undefined;
     this.updateSpinner();
     this.stopIdle();
     this.component?.dispose();
@@ -74,6 +82,7 @@ class FooterRuntime {
         git,
         tools: this.tools,
         turns: this.turns,
+        promptRun: this.promptRun,
         usage: this.usage,
         hitRate: this.hitRate,
         requestRender: () => tui.requestRender(),
@@ -85,13 +94,8 @@ class FooterRuntime {
 
   /** Supply the editor border with session metrics and current activity. */
   public editorStatus(): EditorStatus {
-    const spinner = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
-    const toolNames = [...this.activeTools.values()];
-    const activity = toolNames.length > 0
-      ? { kind: "tool" as const, spinner, toolName: toolNames.at(-1)!, toolCount: toolNames.length }
-      : this.modelWorking
-        ? { kind: "model" as const, spinner }
-        : { kind: "ready" as const };
+    const model = this.modelResponse.snapshot();
+    const waitingForNextRequest = model.phase === "ready" && this.promptRun.isRunning();
     return {
       sessionMilliseconds: this.sessionDuration.elapsedMilliseconds(),
       ...(this.idleStartedAt === undefined
@@ -99,7 +103,8 @@ class FooterRuntime {
         : { idleMilliseconds: Math.max(0, performance.now() - this.idleStartedAt) }),
       apiMilliseconds: this.modelDuration.elapsedMilliseconds(),
       tokensPerSecond: this.throughput.tokensPerSecond(),
-      activity,
+      timeToFirstTokenMilliseconds: waitingForNextRequest ? undefined : model.timeToFirstTokenMilliseconds,
+      activity: this.activityStatus(),
     };
   }
 
@@ -114,7 +119,14 @@ class FooterRuntime {
     this.updateContext(ctx);
     if (this.treeSummaryProviderActive) return;
     this.modelDuration.start();
-    this.setModelWorking(true);
+    this.modelResponse.startRequest();
+    this.updateSpinner();
+  }
+
+  /** Observe generated content rather than stream-open or HTTP-header events. */
+  public modelResponseUpdated(event: AssistantMessageEvent): void {
+    this.modelResponse.record(event);
+    this.publishActivity();
     this.component?.requestRender();
   }
 
@@ -122,12 +134,25 @@ class FooterRuntime {
   public modelWorkEnded(ctx: ExtensionContext): void {
     this.updateContext(ctx);
     this.modelDuration.finish();
-    this.setModelWorking(false);
-    this.component?.requestRender();
+    this.modelResponse.finishRequest();
+    this.updateSpinner();
+  }
+
+  /** Compaction streams have their own lifecycle and no ordinary message updates. */
+  public compactionStarted(ctx: ExtensionContext): void {
+    this.nextUserOperation(ctx);
+    this.modelResponse.startCompaction();
+    this.updateSpinner();
+  }
+
+  /** Both cancellation and success must clear the compacting badge. */
+  public compactionEnded(ctx: ExtensionContext): void {
+    this.modelResponse.finishCompaction();
+    this.modelWorkEnded(ctx);
   }
 
   /**
-   * Exclude branch-summary requests because Pi 0.84.4 has no matching failure event.
+   * Exclude branch-summary requests because Pi has no matching failure event.
    *
    * Successful navigation closes with `session_tree`; cancellation closes through
    * its abort signal. A later user/agent/compaction operation also clears stale
@@ -142,7 +167,8 @@ class FooterRuntime {
       event.preparation.userWantsSummary &&
       event.preparation.entriesToSummarize.length > 0;
     if (!this.treeSummaryProviderActive) return;
-    this.setModelWorking(false);
+    this.modelResponse.finishRequest();
+    this.updateSpinner();
     event.signal.addEventListener(
       "abort",
       () => {
@@ -199,14 +225,23 @@ class FooterRuntime {
     this.throughput.record(usage);
   }
 
-  /** Start measuring one parent-agent run. */
+  /** Start a prompt only once Pi enters the agent loop; retries keep its totals. */
   public agentStarted(): void {
+    if (!this.promptRun.isRunning()) {
+      this.modelResponse.reset();
+      this.promptRun.start();
+    }
     this.stopIdle();
     this.turns.startAgent();
+    this.updateSpinner();
   }
 
   /** A settled run has no automatic continuation; the next action is up to the user. */
   public agentSettled(): void {
+    this.promptRun.finish();
+    this.modelResponse.finishRequest();
+    this.activeTools.clear();
+    this.updateSpinner();
     this.stopIdle();
     this.idleStartedAt = performance.now();
     if (this.currentContext?.mode === "tui") {
@@ -215,7 +250,7 @@ class FooterRuntime {
     this.component?.requestRender();
   }
 
-  /** The user submitted another prompt; do not count the new agent's work as idle. */
+  /** Prompt preparation may still fail before agent_start, so no run starts here. */
   public promptSubmitted(): void {
     this.stopIdle();
   }
@@ -231,6 +266,7 @@ class FooterRuntime {
   /** Add one completed message or summary usage record to the session total. */
   public usageRecorded(usage: Usage | undefined, source: "parent" | "tool"): void {
     this.usage.record(usage, source);
+    if (source === "parent") this.promptRun.record(usage);
     this.component?.requestRender();
   }
 
@@ -252,7 +288,8 @@ class FooterRuntime {
     this.currentContext = ctx;
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
-    this.modelWorking = false;
+    this.modelResponse.reset();
+    this.promptRun.finish();
     this.activeTools.clear();
     this.updateSpinner();
     this.stopIdle();
@@ -271,14 +308,32 @@ class FooterRuntime {
     if (wasIdle) this.component?.requestRender();
   }
 
-  private setModelWorking(working: boolean): void {
-    if (this.modelWorking === working) return;
-    this.modelWorking = working;
-    this.updateSpinner();
+  /** One activity decision shared by editor rendering and title subscribers. */
+  private activityStatus(): EditorStatus["activity"] {
+    const spinner = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
+    const model = this.modelResponse.snapshot();
+    if (model.phase === "compacting") return { kind: "compacting", spinner };
+    const toolNames = [...this.activeTools.values()];
+    if (toolNames.length > 0) {
+      return { kind: "tool", spinner, toolName: toolNames.at(-1)!, toolCount: toolNames.length };
+    }
+    if (model.phase !== "ready") return { kind: model.phase, spinner };
+    return this.promptRun.isRunning() ? { kind: "waiting", spinner } : { kind: "ready" };
+  }
+
+  private publishActivity(): void {
+    const next = this.activityStatus();
+    const previous = this.lastPublishedActivity;
+    if (previous?.kind === next.kind) {
+      if (next.kind !== "tool") return;
+      if (previous.kind === "tool" && previous.toolName === next.toolName && previous.toolCount === next.toolCount) return;
+    }
+    this.lastPublishedActivity = next;
+    this.onActivityChanged(next);
   }
 
   private updateSpinner(): void {
-    const active = this.modelWorking || this.activeTools.size > 0;
+    const active = this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.promptRun.isRunning();
     if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
       this.spinnerFrame = 0;
       this.spinnerTimer = setInterval(() => {
@@ -289,6 +344,7 @@ class FooterRuntime {
       clearInterval(this.spinnerTimer);
       this.spinnerTimer = undefined;
     }
+    this.publishActivity();
     this.component?.requestRender();
   }
 
@@ -297,9 +353,9 @@ class FooterRuntime {
   }
 }
 
-/** Register the Claude-style footer against Pi 0.84.4 lifecycle and provider events. */
+/** Connect the editor and footer to Pi's lifecycle and provider events. */
 export function registerFooter(pi: ExtensionAPI): void {
-  const runtime = new FooterRuntime();
+  const runtime = new FooterRuntime((activity) => pi.events.emit(SESSION_ACTIVITY_CHANGED, activity));
   pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
     (requested as PromptEditorApi).useStatus(() => runtime.editorStatus());
   });
@@ -311,17 +367,16 @@ export function registerFooter(pi: ExtensionAPI): void {
     runtime.treeNavigationEnded(ctx);
     runtime.usageRecorded(event.summaryEntry?.usage, "parent");
   });
-  pi.on("session_before_compact", (_event, ctx) =>
-    runtime.nextUserOperation(ctx),
-  );
+  pi.on("session_before_compact", (_event, ctx) => runtime.compactionStarted(ctx));
   pi.on("session_compact", (event, ctx) => {
-    runtime.modelWorkEnded(ctx);
+    runtime.compactionEnded(ctx);
     runtime.usageRecorded(event.compactionEntry.usage, "parent");
   });
-  pi.on("session_compact_failed", (_event, ctx) => runtime.modelWorkEnded(ctx));
+  pi.on("session_compact_failed", (_event, ctx) => runtime.compactionEnded(ctx));
   pi.on("before_provider_request", (_event, ctx) =>
     runtime.providerRequestStarted(ctx),
   );
+  pi.on("message_update", (event) => runtime.modelResponseUpdated(event.assistantMessageEvent));
   pi.on("message_end", (event, ctx) => {
     if (event.message.role === "assistant") {
       runtime.modelWorkEnded(ctx);

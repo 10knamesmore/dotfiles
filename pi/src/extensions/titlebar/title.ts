@@ -1,4 +1,6 @@
 import { basename } from "node:path";
+import type { EditorActivity } from "../editor/api.js";
+import { sanitizeFooterText } from "../footer/format.js";
 
 /**
  * Prefix Pi writes in front of its own terminal title. Pi derives it from the
@@ -7,20 +9,11 @@ import { basename } from "node:path";
  */
 const TITLE_PREFIX = "π";
 
-/** Animation frames per busy phase; the shapes differ so model and tool work look distinct. */
-const SPINNER_FRAMES = {
-  model: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
-  tool: ["◐", "◓", "◑", "◒"],
-} as const;
+/** Tool execution keeps a distinct spinner from model work. */
+const MODEL_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+const TOOL_FRAMES = ["◐", "◓", "◑", "◒"] as const;
 
-/** Work the agent can be busy with, in the order one turn performs it. */
-export type BusyPhase = keyof typeof SPINNER_FRAMES;
-
-/** Word naming each busy phase in the title. */
-const PHASE_LABELS: Record<BusyPhase, string> = {
-  model: "model",
-  tool: "tool",
-};
+type BusyActivity = Exclude<EditorActivity, { kind: "ready" }>;
 
 /** Session identity Pi shows in the title. */
 export interface TitleContext {
@@ -38,11 +31,14 @@ export function baseTitle(context: TitleContext): string {
 
 /** Busy title: animated phase marker in front of the base title. */
 export function busyTitle(
-  phase: BusyPhase,
+  activity: BusyActivity,
   frameIndex: number,
   context: TitleContext,
 ): string {
-  const frames = SPINNER_FRAMES[phase];
+  const frames = activity.kind === "tool" ? TOOL_FRAMES : MODEL_FRAMES;
   const frame = frames[frameIndex % frames.length] ?? frames[0];
-  return `${frame} ${PHASE_LABELS[phase]} · ${baseTitle(context)}`;
+  const label = activity.kind === "tool"
+    ? activity.toolCount > 1 ? `TOOLS ${activity.toolCount}` : `TOOL · ${sanitizeFooterText(activity.toolName)}`
+    : activity.kind.toUpperCase();
+  return `${frame} ${label} · ${baseTitle(context)}`;
 }

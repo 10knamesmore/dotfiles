@@ -11,6 +11,7 @@ import {
   SettingsManager,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import type { FollowUpReference, SubagentSpec, ResolvedSpec, ThinkingLevel } from "../types.js";
 import type { ChildSession } from "./child-session.js";
 import type { SchemaCapture } from "./schema-tool.js";
@@ -98,18 +99,24 @@ function suggestQualified(bareId: string, registry: ExtensionContext["modelRegis
   return "";
 }
 
+/**
+ * Resolve the child's model and the level it will actually run at. pi clamps
+ * unsupported levels per model inside the child, so clamp here with the same
+ * function: the run record, the UI receipt, and the workflow fingerprint must
+ * show the effective level rather than the requested one.
+ */
 export function resolveModel(spec: SubagentSpec, ctx: Pick<ParentExtensionContext, "model" | "modelRegistry">, inheritedThinking: ThinkingLevel): { model: NonNullable<ExtensionContext["model"]>; thinking: ThinkingLevel } {
-  const thinking = spec.thinkingLevel ?? inheritedThinking;
+  const requested = spec.thinkingLevel ?? inheritedThinking;
   // Only an OMITTED model inherits; an empty string is an authoring error and
   // must fail loudly like any other invalid reference.
   if (spec.model === undefined) {
     if (!ctx.model) throw new Error("No model is active in the parent session, and the spec does not name one");
-    return { model: ctx.model, thinking };
+    return { model: ctx.model, thinking: clampThinkingLevel(ctx.model, requested) };
   }
   const [provider, id] = parseModel(spec.model, ctx.modelRegistry);
   const model = ctx.modelRegistry.find(provider, id);
   if (!model) throw new Error(unknownModelError(spec.model, ctx.modelRegistry));
-  return { model, thinking };
+  return { model, thinking: clampThinkingLevel(model, requested) };
 }
 
 /**

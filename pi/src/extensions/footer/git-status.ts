@@ -11,35 +11,36 @@ import { sanitizeFooterText } from "./format.js";
 const REFRESH_DEBOUNCE_MS = 500;
 const GIT_TIMEOUT_MS = 5_000;
 const MAX_GIT_OUTPUT_BYTES = 2 * 1024 * 1024;
+const DETACHED_HEAD_HASH_LENGTH = 7;
 
-/** Counts represented by the porcelain-v2 status snapshot. */
-export interface GitFileStatus {
-  /** Paths whose index state differs from HEAD. */
-  staged: number;
+/** Added/deleted line totals for one side of the index/worktree comparison. */
+export interface GitDiffStat {
+  /** Files reported by the diff, including binary files. */
+  files: number;
 
-  /** Tracked paths modified in the worktree. */
-  modified: number;
+  /** Added text lines; binary files contribute no lines. */
+  added: number;
 
-  /** Tracked paths deleted in the worktree. */
+  /** Deleted text lines; binary files contribute no lines. */
   deleted: number;
+}
 
-  /** Rename records reported by porcelain v2. */
-  renamed: number;
+/** Worktree/index counters derived from porcelain v2 and `--numstat` output. */
+export interface GitFileStatus {
+  /** Index state relative to HEAD. */
+  staged: GitDiffStat;
 
-  /** Untracked paths. */
+  /** Worktree state relative to the index. */
+  unstaged: GitDiffStat;
+
+  /** Untracked files, with directories expanded to individual files. */
   untracked: number;
 
-  /** Unmerged paths. */
+  /** Unmerged paths, reported separately from the staged/unstaged diffs. */
   conflicted: number;
 
   /** Stash entries reported by `--show-stash`. */
   stashed: number;
-
-  /** Commits ahead of the configured upstream. */
-  ahead: number;
-
-  /** Commits behind the configured upstream. */
-  behind: number;
 }
 
 /** Git operation shown beside the branch while repository metadata carries one. */
@@ -64,8 +65,23 @@ export type GitStatusSnapshot =
       /** Git resolved a repository for the current cwd. */
       kind: "repository";
 
-      /** Current branch name, or `detached` when HEAD is detached outside a named operation. */
+      /**
+       * Branch name, or `detached @ <short hash>` when HEAD is detached without a
+       * recoverable operation branch.
+       */
       branch: string;
+
+      /** True when HEAD is detached, including an in-progress rebase. */
+      detached: boolean;
+
+      /** Configured upstream short name; absent when the branch has none. */
+      upstream: string | undefined;
+
+      /** Commits ahead of the upstream; unknown when its ref cannot be compared. */
+      ahead: number | undefined;
+
+      /** Commits behind the upstream; unknown when its ref cannot be compared. */
+      behind: number | undefined;
 
       /** In-progress operation read from the worktree git directory. */
       operation: GitOperation | undefined;
@@ -93,17 +109,40 @@ interface OperationState {
   originalBranch: string | undefined;
 }
 
-const EMPTY_FILES: GitFileStatus = {
-  staged: 0,
-  modified: 0,
-  deleted: 0,
-  renamed: 0,
-  untracked: 0,
-  conflicted: 0,
-  stashed: 0,
-  ahead: 0,
-  behind: 0,
-};
+/** Values parsed from one `git status --porcelain=v2 -z --branch` output. */
+interface PorcelainStatus {
+  /** Current branch name; undefined when HEAD is detached. */
+  branch: string | undefined;
+
+  /** HEAD commit hash; undefined on an unborn branch. */
+  headOid: string | undefined;
+
+  /** Configured upstream short name. */
+  upstream: string | undefined;
+
+  /** Commits ahead of the upstream, if Git supplied branch.ab. */
+  ahead: number | undefined;
+
+  /** Commits behind the upstream, if Git supplied branch.ab. */
+  behind: number | undefined;
+
+  /** Untracked file count with directories expanded. */
+  untracked: number;
+
+  /** Unmerged path count. */
+  conflicted: number;
+
+  /** Stash entry count. */
+  stashed: number;
+
+  /** Unmerged paths, used to keep conflict entries out of the diff totals. */
+  unmergedPaths: Set<string>;
+
+  /** True when the index or worktree holds at least one tracked change. */
+  hasTrackedChanges: boolean;
+}
+
+const EMPTY_DIFF: GitDiffStat = { files: 0, added: 0, deleted: 0 };
 
 const UNAVAILABLE: GitStatusSnapshot = { kind: "unavailable" };
 
@@ -191,59 +230,132 @@ function parseNonNegativeInteger(raw: string | undefined): number {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function parseStatus(
-  output: string,
-  operationState: OperationState,
-): GitStatusSnapshot {
-  const files: GitFileStatus = { ...EMPTY_FILES };
-  let branch = "detached";
-  for (const line of output.split("\n")) {
-    if (line.startsWith("# branch.head ")) {
-      const head = sanitizeFooterText(line.slice("# branch.head ".length));
-      if (head && head !== "(detached)") branch = head;
-      continue;
-    }
-    if (line.startsWith("# branch.ab ")) {
-      const [ahead, behind] = line.slice("# branch.ab ".length).split(" ");
-      files.ahead = parseNonNegativeInteger(ahead?.replace(/^\+/, ""));
-      files.behind = parseNonNegativeInteger(behind?.replace(/^-/, ""));
-      continue;
-    }
-    if (line.startsWith("# stash ")) {
-      files.stashed = parseNonNegativeInteger(line.slice("# stash ".length));
-      continue;
-    }
-    if (line.startsWith("1 ") || line.startsWith("2 ")) {
-      const indexState = line[2] ?? ".";
-      const worktreeState = line[3] ?? ".";
-      if (indexState !== ".") files.staged += 1;
-      if (worktreeState === "M" || worktreeState === "T") files.modified += 1;
-      if (worktreeState === "D") files.deleted += 1;
-      if (line.startsWith("2 ")) files.renamed += 1;
-      continue;
-    }
-    if (line.startsWith("u ")) files.conflicted += 1;
-    else if (line.startsWith("? ")) files.untracked += 1;
-  }
-  if (branch === "detached" && operationState.originalBranch)
-    branch = sanitizeFooterText(operationState.originalBranch);
-  return {
-    kind: "repository",
-    branch,
-    operation: operationState.operation,
-    files,
-  };
+/** Path field of a porcelain-v2 unmerged record; nine fixed fields precede it. */
+function unmergedPath(record: string): string | undefined {
+  return record.split(" ").slice(10).join(" ");
 }
 
-function snapshotSignature(snapshot: GitStatusSnapshot): string {
-  if (snapshot.kind === "unavailable") return snapshot.kind;
-  return [
-    snapshot.branch,
-    snapshot.operation?.label ?? "",
-    snapshot.operation?.step ?? "",
-    snapshot.operation?.total ?? "",
-    ...Object.values(snapshot.files),
-  ].join("\0");
+function parsePorcelainStatus(output: string): PorcelainStatus {
+  const status: PorcelainStatus = {
+    branch: undefined,
+    headOid: undefined,
+    upstream: undefined,
+    ahead: undefined,
+    behind: undefined,
+    untracked: 0,
+    conflicted: 0,
+    stashed: 0,
+    unmergedPaths: new Set(),
+    hasTrackedChanges: false,
+  };
+
+  const records = output.split("\0");
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index] ?? "";
+    if (record.startsWith("# branch.oid ")) {
+      const oid = record.slice("# branch.oid ".length);
+      if (oid !== "(initial)") status.headOid = oid;
+    } else if (record.startsWith("# branch.head ")) {
+      const head = record.slice("# branch.head ".length);
+      if (head !== "(detached)") status.branch = sanitizeFooterText(head);
+    } else if (record.startsWith("# branch.upstream ")) {
+      status.upstream = sanitizeFooterText(
+        record.slice("# branch.upstream ".length),
+      );
+    } else if (record.startsWith("# branch.ab ")) {
+      const [ahead, behind] = record.slice("# branch.ab ".length).split(" ");
+      status.ahead = parseNonNegativeInteger(ahead?.replace(/^\+/, ""));
+      status.behind = parseNonNegativeInteger(behind?.replace(/^-/, ""));
+    } else if (record.startsWith("# stash ")) {
+      status.stashed = parseNonNegativeInteger(record.slice("# stash ".length));
+    } else if (record.startsWith("2 ")) {
+      status.hasTrackedChanges = true;
+      // With -z, a rename record is followed by its original path as its own
+      // NUL record; consume it so a path that begins like an entry stays data.
+      index += 1;
+    } else if (record.startsWith("1 ")) {
+      status.hasTrackedChanges = true;
+    } else if (record.startsWith("u ")) {
+      status.hasTrackedChanges = true;
+      status.conflicted += 1;
+      const path = unmergedPath(record);
+      if (path !== undefined) status.unmergedPaths.add(path);
+    } else if (record.startsWith("? ")) {
+      status.untracked += 1;
+    }
+  }
+
+  return status;
+}
+
+/**
+ * Sum `git diff --numstat -z` records for one side, skipping unmerged paths
+ * because their combined diffs do not represent a normal index comparison.
+ */
+function parseNumstat(
+  output: string,
+  unmergedPaths: ReadonlySet<string>,
+): GitDiffStat {
+  const stat: GitDiffStat = { files: 0, added: 0, deleted: 0 };
+
+  const records = output.split("\0");
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index] ?? "";
+    if (record === "") continue;
+
+    const firstTab = record.indexOf("\t");
+    const secondTab = record.indexOf("\t", firstTab + 1);
+    if (firstTab < 0 || secondTab < 0) continue;
+
+    const path = record.slice(secondTab + 1);
+    if (path === "") {
+      // Rename/copy: with -z, the old and new paths are the next two records.
+      const newPath = records[index + 2] ?? "";
+      index += 2;
+      if (unmergedPaths.has(newPath)) continue;
+    } else if (unmergedPaths.has(path)) {
+      continue;
+    }
+
+    stat.files += 1;
+    const added = record.slice(0, firstTab);
+    const deleted = record.slice(firstTab + 1, secondTab);
+    if (added !== "-" && deleted !== "-") {
+      stat.added += parseNonNegativeInteger(added);
+      stat.deleted += parseNonNegativeInteger(deleted);
+    }
+  }
+
+  return stat;
+}
+
+function buildSnapshot(
+  status: PorcelainStatus,
+  staged: GitDiffStat,
+  unstaged: GitDiffStat,
+  operationState: OperationState,
+): GitStatusSnapshot {
+  let branch = status.branch ?? operationState.originalBranch;
+  if (branch === undefined && status.headOid !== undefined) {
+    branch = `detached @ ${status.headOid.slice(0, DETACHED_HEAD_HASH_LENGTH)}`;
+  }
+
+  return {
+    kind: "repository",
+    branch: branch === undefined ? "@" : sanitizeFooterText(branch),
+    detached: status.branch === undefined,
+    upstream: status.upstream,
+    ahead: status.ahead,
+    behind: status.behind,
+    operation: operationState.operation,
+    files: {
+      staged,
+      unstaged,
+      untracked: status.untracked,
+      conflicted: status.conflicted,
+      stashed: status.stashed,
+    },
+  };
 }
 
 /**
@@ -313,8 +425,7 @@ export class GitStatusCache {
   }
 
   private installSnapshot(next: GitStatusSnapshot): void {
-    if (snapshotSignature(next) === snapshotSignature(this.snapshotValue))
-      return;
+    if (JSON.stringify(next) === JSON.stringify(this.snapshotValue)) return;
     this.snapshotValue = next;
     this.onChange();
   }
@@ -349,26 +460,58 @@ export class GitStatusCache {
         return;
       }
       this.installWatchers(paths);
-      const status = await this.runGit(
+      const statusOutput = await this.runGit(
         [
           "-C",
           cwd,
           "--no-optional-locks",
           "status",
           "--porcelain=v2",
+          "-z",
           "--branch",
           "--show-stash",
+          "--untracked-files=all",
         ],
         cwd,
       );
       if (this.disposed || generation !== this.generation) return;
-      if (status === undefined) {
+      if (statusOutput === undefined) {
         this.installSnapshot(UNAVAILABLE);
         return;
       }
+      const status = parsePorcelainStatus(statusOutput);
+      let staged: GitDiffStat = EMPTY_DIFF;
+      let unstaged: GitDiffStat = EMPTY_DIFF;
+      if (status.hasTrackedChanges) {
+        const [stagedOutput, unstagedOutput] = await Promise.all([
+          this.runGit(
+            [
+              "-C",
+              cwd,
+              "--no-optional-locks",
+              "diff",
+              "--numstat",
+              "-z",
+              "--cached",
+            ],
+            cwd,
+          ),
+          this.runGit(
+            ["-C", cwd, "--no-optional-locks", "diff", "--numstat", "-z"],
+            cwd,
+          ),
+        ]);
+        if (this.disposed || generation !== this.generation) return;
+        if (stagedOutput === undefined || unstagedOutput === undefined) {
+          this.installSnapshot(UNAVAILABLE);
+          return;
+        }
+        staged = parseNumstat(stagedOutput, status.unmergedPaths);
+        unstaged = parseNumstat(unstagedOutput, status.unmergedPaths);
+      }
       const operation = await readOperationState(paths.gitDirectory);
       if (this.disposed || generation !== this.generation) return;
-      this.installSnapshot(parseStatus(status, operation));
+      this.installSnapshot(buildSnapshot(status, staged, unstaged, operation));
     } finally {
       this.refreshInFlight = false;
       if (this.refreshPending && !this.disposed) {

@@ -1,6 +1,6 @@
 ---
 name: workflow-authoring
-description: Author scripts for the pi-subagent-workflow runtime. This skill explains determinism, replay, concurrency, structured output, and worktree isolation; it does not execute or orchestrate workflows.
+description: Author scripts for the pi-subagent-workflow runtime. This skill explains determinism, replay, concurrency, and structured output; it does not execute or orchestrate workflows.
 ---
 
 # Authoring workflow scripts
@@ -29,8 +29,7 @@ optional. The header must be a literal - no computed values.
 - `agent(prompt, opts)` - run one subagent. Returns the schema-validated
   value when `schema` is set, otherwise the child's final text. On child
   failure it resolves to `null` (never throws) - guard results before
-  dereferencing. With `isolation: 'worktree'` it returns
-  `{ value, patch, changed }`; the patch is never applied automatically.
+  dereferencing.
 - `parallel(thunks, options?)` - explicit barrier over `() => Promise`
   thunks; result order is preserved. A thunk that throws rejects the barrier
   after launched branch work settles.
@@ -51,7 +50,7 @@ branch group should intentionally run below the global limit.
 ## agent() options
 
 `model`, `thinkingLevel`, `tools`, `excludeTools`, `schema`, `cwd`,
-`isolation`, `label`, `phase`.
+`label`, `phase`.
 
 - `model` is required and must be `"max"`, `"high"`, or `"mid"`. Direct
   provider/model-id values are rejected. The parent system prompt shows the
@@ -67,8 +66,10 @@ branch group should intentionally run below the global limit.
   or task labels such as "implement", "debug", and "review" alone do not justify
   a higher tier. Respect an explicit user choice.
 - `thinkingLevel` is independent: `model: 'mid', thinkingLevel: 'max'` is valid.
-  Omit `thinkingLevel` to inherit the parent's current level; do not lower it
-  merely because you chose `mid`.
+  Explicit values are limited to `medium`, `xhigh`, and `max`; omit it to
+  inherit the parent's current level, and do not lower it merely because you
+  chose `mid`. A level the target model does not support is clamped to the
+  nearest supported one, and the run record reports the effective level.
 - Tiers are configured by the user through `/model-tiers` or the `model-tier`
   field in `~/.pi/agent/config.json`. Unconfigured or unavailable tiers fail;
   ask the user to fix the binding instead of changing it or substituting a tier.
@@ -128,12 +129,3 @@ On resume, omit `args` to reuse the persisted value; passing `args` overrides
 it (and reruns calls whose payloads change). A `generation.pending` marker
 left by a crash quarantines the run directory: run the workflow fresh and
 delete the quarantined directory rather than removing the marker.
-
-## Worktree isolation
-
-`isolation: 'worktree'` gives the child its own checkout at the same
-repo-relative cwd. Changes come back as `patch` for explicit review - never
-auto-applied or auto-committed to the source branch. A child may commit
-inside its detached worktree; those commits are captured in the returned
-patch and never touch the source branch. Oversized patches fail collection
-and retain the worktree rather than silently degrading.

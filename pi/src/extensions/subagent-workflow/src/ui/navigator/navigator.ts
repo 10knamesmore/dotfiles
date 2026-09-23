@@ -455,7 +455,7 @@ interface AgentFollowUpControls {
  * follow-up resolver revalidates authoritatively when the message is sent.
  */
 export function isMessageableChild(child: ChildRow | undefined): boolean {
-  if (!child?.sessionFile || child.spec.isolation === "worktree") return false;
+  if (!child?.sessionFile) return false;
   return child.status === "completed" || child.status === "failed" || child.status === "aborted";
 }
 

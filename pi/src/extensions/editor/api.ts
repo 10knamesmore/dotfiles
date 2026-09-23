@@ -9,7 +9,7 @@ export interface PromptEditorApi {
 }
 
 export type EditorActivity =
-  | { kind: "model"; spinner: string }
+  | { kind: "waiting" | "thinking" | "writing" | "compacting"; spinner: string }
   | { kind: "tool"; spinner: string; toolName: string; toolCount: number }
   | { kind: "ready" };
 
@@ -19,6 +19,8 @@ export interface EditorStatus {
   idleMilliseconds?: number;
   apiMilliseconds: number;
   tokensPerSecond?: number;
+  /** First generated content of the current or last ordinary model request. */
+  timeToFirstTokenMilliseconds?: number;
   activity: EditorActivity;
 }
 

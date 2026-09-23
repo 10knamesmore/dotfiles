@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadChildExtensionEnvironment, resolveModel, type ParentContext } from "../runner/child.js";
-import { assertInlineWorktreePatch, isInlineWorktreePatch } from "../runner/inline-patch.js";
 import { subagentRunner } from "../runner/runner.js";
 import { readRunSnapshot } from "../store/run-snapshot.js";
 import { RunStore } from "../store/run-store.js";
@@ -13,7 +12,7 @@ import { readPersonalConfig, type ModelTiers } from "../../../../config/index.js
 import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentSpec } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
-import { bindAbort, errorMessage, isRecord } from "../util.js";
+import { bindAbort, errorMessage } from "../util.js";
 import {
   describeFingerprintDrift,
   hashAgentPayload,
@@ -295,9 +294,8 @@ export function startParsedWorkflow(
       // into an unauthorized cache miss on the next resume.
       if (abortSignal.aborted) throw new WorkflowAbortedError();
       if (cached?.hash === hash) {
-        // Drift permission is enforced on every hash match BEFORE the replay
-        // safety gate below: a drifted entry with an unreplayable worktree
-        // result must still refuse, not silently rerun.
+        // Drift permission is enforced on every hash match: a drifted entry
+        // must still refuse, not silently rerun.
         const drift = describeFingerprintDrift(cached.fingerprint, fingerprint);
         if (drift.length > 0 && !rerunAuthorized.has(cached.childId)) {
           // Re-executing a completed call can repeat side effects, so drift
@@ -308,7 +306,7 @@ export function startParsedWorkflow(
             `Cannot replay workflow call ${cached.childId}${callLabel(spec)}: its execution environment changed: ${drift.join("; ")}. ${REPLAY_RECOVERY_OPTIONS(cached.childId)}`,
           );
         }
-        if (drift.length === 0 && isReplaySafeAgentResult(cached.result, spec)) {
+        if (drift.length === 0) {
           return cached.result;
         }
       }
@@ -352,7 +350,7 @@ export function startParsedWorkflow(
         liveHandles.delete(handle);
       }
       if (child.status === "failed") failedChildren.push({ key, result: child });
-      const result = child.status === "completed" ? workflowAgentResult(child, spec) : null;
+      const result = child.status === "completed" ? (child.structured ?? child.text) : null;
       // Only journal successful calls. A failed/aborted call left unjournaled
       // becomes a cache miss on resume and re-executes - which is what the
       // advertised "resume to recover" recovery path promises. Journaling its
@@ -360,9 +358,8 @@ export function startParsedWorkflow(
       if (child.status === "completed") {
         // The journaled fingerprint IS the prospective scan: resume recomputes
         // that same scan, so recording anything else would manufacture drift.
-        // Its declared boundary: the scan reads the authored cwd, so a
-        // worktree-isolated child of a dirty checkout can differ from it -
-        // repository contents are deliberately outside the fingerprint.
+        // Its declared boundary: the scan reads the authored cwd; repository
+        // contents are deliberately outside the fingerprint.
         const entry: JournalEntry = { call, hash, fingerprint, result, childId: child.id };
         journal.entries.set(key, entry);
         store.appendJournal(entry);
@@ -516,23 +513,6 @@ function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Worktree metadata must survive the workflow bridge for explicit review/apply. */
-function workflowAgentResult(child: SubagentResult, spec: SubagentSpec): unknown {
-  const value = child.structured ?? child.text;
-  if (spec.isolation !== "worktree") return value;
-  const patch = child.patch ?? "";
-  // Production collection enforces this before cleaning the worktree. Keep the
-  // bridge check as defense in depth so no alternate runner can poison the
-  // journal or post an oversized value into the bounded workflow worker.
-  assertInlineWorktreePatch(patch);
-  return { value, patch, changed: child.changed ?? [] };
-}
-
-function isReplaySafeAgentResult(result: unknown, spec: SubagentSpec): boolean {
-  if (spec.isolation !== "worktree") return true;
-  if (!isRecord(result)) return false;
-  return isInlineWorktreePatch(result.patch);
-}
 
 function readPersistedArgs(runDir: string): unknown {
   const path = join(runDir, "args.json");

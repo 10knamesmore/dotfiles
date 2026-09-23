@@ -1,78 +1,61 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
-import {
-  type BusyPhase,
-  type TitleContext,
-  baseTitle,
-  busyTitle,
-} from "./title.js";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { EditorActivity } from "../editor/api.js";
+import { SESSION_ACTIVITY_CHANGED } from "../footer/activity.js";
+import { baseTitle, busyTitle, type TitleContext } from "./title.js";
 
-/** Spinner cadence, matching the titlebar spinner example shipped with Pi. */
 const FRAME_INTERVAL_MS = 80;
 
-/**
- * Mirror the agent's live state into the terminal title: an animated `model` or
- * `tool` marker while Pi works, and Pi's own `π - <session> - <dir>` title once
- * the agent settles.
- */
+/** Show the editor's activity in the terminal title, restoring Pi's title when ready. */
 export function registerTitlebar(pi: ExtensionAPI): void {
-  let phase: BusyPhase | null = null;
+  let activity: EditorActivity = { kind: "ready" };
+  let context: ExtensionContext | undefined;
   let frameIndex = 0;
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let paintedContext: ExtensionContext | null = null;
+  let timer: ReturnType<typeof setInterval> | undefined;
 
   function titleContext(ctx: ExtensionContext): TitleContext {
     return { sessionName: pi.getSessionName(), cwd: ctx.cwd };
   }
 
-  /** Advance the marker of whichever phase is currently running. */
-  function animate(): void {
-    const ctx = paintedContext;
-    if (phase === null || ctx === null) return;
-    frameIndex += 1;
-    ctx.ui.setTitle(busyTitle(phase, frameIndex, titleContext(ctx)));
+  function render(): void {
+    if (context?.mode !== "tui") return;
+    const title = titleContext(context);
+    context.ui.setTitle(activity.kind === "ready"
+      ? baseTitle(title)
+      : busyTitle(activity, frameIndex, title));
   }
 
-  function showIdle(ctx: ExtensionContext): void {
-    if (ctx.mode !== "tui") return;
-    phase = null;
-    frameIndex = 0;
-    paintedContext = null;
-    if (timer !== null) {
-      clearInterval(timer);
-      timer = null;
+  function updateActivity(next: EditorActivity): void {
+    activity = next;
+    if (activity.kind === "ready") {
+      if (timer !== undefined) clearInterval(timer);
+      timer = undefined;
+      frameIndex = 0;
+    } else if (timer === undefined && context?.mode === "tui") {
+      // Phase changes keep the animation running; only a new busy period resets it.
+      frameIndex = 0;
+      timer = setInterval(() => {
+        frameIndex += 1;
+        render();
+      }, FRAME_INTERVAL_MS);
     }
-    ctx.ui.setTitle(baseTitle(titleContext(ctx)));
+    render();
   }
 
-  function showBusy(ctx: ExtensionContext, next: BusyPhase): void {
-    if (ctx.mode !== "tui") return;
-    // A phase switch must not restart the animation, so only a fresh run resets it.
-    if (phase === null) frameIndex = 0;
-    phase = next;
-    paintedContext = ctx;
-    ctx.ui.setTitle(busyTitle(next, frameIndex, titleContext(ctx)));
-    timer ??= setInterval(animate, FRAME_INTERVAL_MS);
-  }
-
-  // One user message runs several turns: each turn streams an assistant reply,
-  // and every tool call in between hands the agent back to the model.
-  pi.on("agent_start", (_event, ctx) => showBusy(ctx, "model"));
-  pi.on("turn_start", (_event, ctx) => showBusy(ctx, "model"));
-  pi.on("tool_execution_start", (_event, ctx) => showBusy(ctx, "tool"));
-  pi.on("agent_settled", (_event, ctx) => {
-    // Another extension may already have started the next run.
-    if (ctx.isIdle() && !ctx.hasPendingMessages()) showIdle(ctx);
+  pi.events.on(SESSION_ACTIVITY_CHANGED, (next) => {
+    if (context?.mode === "tui") updateActivity(next as EditorActivity);
   });
-
-  // Pi rewrites its own title on these events, so a busy marker has to be re-asserted.
+  pi.on("session_start", (_event, ctx) => {
+    context = ctx;
+    updateActivity({ kind: "ready" });
+  });
   pi.on("session_info_changed", (_event, ctx) => {
-    if (phase !== null) showBusy(ctx, phase);
+    context = ctx;
+    render();
   });
-  pi.on("session_start", (_event, ctx) => showIdle(ctx));
-  pi.on("session_shutdown", (_event, ctx) => showIdle(ctx));
+  pi.on("session_shutdown", () => {
+    updateActivity({ kind: "ready" });
+    context = undefined;
+  });
 }
 
 export default registerTitlebar;

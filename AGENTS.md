@@ -75,5 +75,5 @@ docs/
 - 这是个人 dotfiles 仓库，不编写测试代码。改动使用编译、类型检查和必要的真实运行验证。
 - 顶层 `README.md` → `docs/README.md` 符号链接；`AGENTS.md` 是项目指令的真实源文件。
 - 配置管理入口是 `dots`，安装入口是 `bootstrap.sh`。
-- 不安装系统包、rustup、Node、pnpm 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，依次运行 `dots install` 和 `dots sync`。sync 的 Pi hook 按 frozen lockfile 安装 workspace 依赖。
+- 不安装系统包、rustup、Node、pnpm 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，依次运行 `dots install` 和 `dots sync`。Pi SDK 依赖跟随 npm `latest`；sync 的 Pi hook 执行 `pnpm run update:pi`，更新已解析版本并写入 lockfile。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。

@@ -76,6 +76,58 @@ export class UsageCounter {
   }
 }
 
+/** Usage for one accepted prompt, including automatic retries and continuations. */
+export interface PromptRunSnapshot {
+  state: "running" | "finished";
+  elapsedMilliseconds: number;
+  /** Finalized parent-model usage only; child usage remains in the workflow total. */
+  usage: { input: number; output: number; costUsd: number } | undefined;
+}
+
+/** Measures an accepted prompt until agent_settled, retaining the last completed run. */
+export class PromptRunTracker {
+  private run: {
+    startedAt: number;
+    finishedAt?: number;
+    usage: PromptRunSnapshot["usage"];
+  } | undefined;
+
+  /** An automatic continuation must not reset the prompt's totals or clock. */
+  public start(): void {
+    if (this.isRunning()) return;
+    this.run = { startedAt: performance.now(), usage: undefined };
+  }
+
+  public isRunning(): boolean {
+    return this.run !== undefined && this.run.finishedAt === undefined;
+  }
+
+  public record(usage: Usage | undefined): void {
+    if (!this.run || !this.isRunning() || !usage) return;
+    const totals = this.run.usage ??= { input: 0, output: 0, costUsd: 0 };
+    totals.input += usage.input + usage.cacheRead + usage.cacheWrite;
+    totals.output += usage.output;
+    totals.costUsd += usage.cost.total;
+  }
+
+  public finish(): void {
+    if (this.run && this.isRunning()) this.run.finishedAt = performance.now();
+  }
+
+  public reset(): void {
+    this.run = undefined;
+  }
+
+  public snapshot(): PromptRunSnapshot | undefined {
+    if (!this.run) return undefined;
+    return {
+      state: this.run.finishedAt === undefined ? "running" : "finished",
+      elapsedMilliseconds: Math.max(0, (this.run.finishedAt ?? performance.now()) - this.run.startedAt),
+      usage: this.run.usage,
+    };
+  }
+}
+
 /** Number of completed turns retained by recent-turn footer metrics. */
 export const RECENT_TURNS = 5;
 
@@ -129,7 +181,7 @@ export class RecentHitRateTracker {
   public hitRatePercent(): number | undefined {
     const promptTokens = this.totals.input + this.totals.cacheWrite + this.totals.cacheRead;
     if (promptTokens <= 0) return undefined;
-    return Math.round((this.totals.cacheRead / promptTokens) * 100);
+    return (this.totals.cacheRead / promptTokens) * 100;
   }
 }
 

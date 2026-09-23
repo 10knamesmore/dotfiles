@@ -79,7 +79,7 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
     spec: {
       prompt: params.prompt!, model: params.model, thinkingLevel: params.thinkingLevel as ThinkingLevel | undefined,
       tools: params.tools, excludeTools: params.excludeTools, schema: params.schema, cwd: params.cwd,
-      label: params.label, isolation: params.isolation,
+      label: params.label,
     },
   };
 }
@@ -169,9 +169,6 @@ export function resolveFollowUpSpec(
   const resolved = jsonObject(candidate.child.resolved);
   if (!submitted || !resolved) {
     throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted child spec or resolved configuration is missing`);
-  }
-  if (submitted.isolation === "worktree" || typeof resolved.worktreePath === "string") {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: worktree-origin children cannot be continued because their conversation references a checkout that no longer exists`);
   }
   const sessionFile = candidate.child.sessionFile;
   if (typeof sessionFile !== "string" || !sessionFile) {
@@ -292,7 +289,7 @@ export function registerSubagentTool(pi: ExtensionAPI, selfPath: string, widget?
   runner: SubagentRunner = subagentRunner, resolveFollowUp: FollowUpResolver = resolveFollowUpSpec): void {
   const tool: ToolDefinition<typeof SubagentToolParameters, SubagentDetails | undefined> = {
     name: "subagent", label: "Subagent", parameters: SubagentToolParameters,
-    description: "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'max', 'high', or 'mid'; start with mid for exploration, quick feedback, and well-scoped changes, and choose high or max when the child task needs deeper reasoning. Use the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. Use isolation: 'worktree' for parallel edits; changes return as a patch, never applied automatically. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, cwd, and isolation, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
+    description: "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'max', 'high', or 'mid'; use the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, and cwd, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try { input = validateSubagentInput(params); } catch (error) { throw new Error(errorMessage(error)); }

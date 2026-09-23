@@ -13,10 +13,10 @@ distribute("skills", {
   mode = "children",
 })
 dots.hook.before_sync({
-  name = "install Pi dependencies",
+  name = "update Pi dependencies",
   cwd = dots.repo .. "/pi",
   program = "pnpm",
-  args = { "install", "--frozen-lockfile" },
+  args = { "run", "update:pi" },
 })
 
 -- Pi 逐个加载 extension；jiti 沿 source realpath 从 pi/node_modules 解析依赖。

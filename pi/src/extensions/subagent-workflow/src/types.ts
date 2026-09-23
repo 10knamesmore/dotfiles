@@ -38,14 +38,6 @@ export interface SubagentSpec {
   schema?: Record<string, unknown>;
   /** Working directory for the child. Default: parent cwd. */
   cwd?: string;
-  /**
-   * "worktree": run the child in a temporary git worktree of its cwd, so
-   * parallel writers never touch the shared checkout. Fail-closed: if the
-   * worktree cannot be created (not a git repo, git missing), the spawn fails
-   * rather than silently running in the shared tree. Changes come back as
-   * SubagentResult.patch; nothing is committed or applied automatically.
-   */
-  isolation?: "worktree";
   /** Short display label for UI and logs. Default: derived from the prompt. */
   label?: string;
   /** Workflow phase attribution. Set by the workflow runtime. */
@@ -84,15 +76,6 @@ export interface SubagentResult {
   structured?: unknown;
   /** Error description when status is "failed". */
   error?: string;
-  /**
-   * Worktree isolation only: bounded unified diff of everything the child
-   * changed (including untracked files), for an explicit apply/review step.
-   * Empty string when unchanged. If the diff exceeds the internal inline
-   * safety limit, collection fails closed and retains the worktree instead.
-   */
-  patch?: string;
-  /** Worktree isolation only: repo-relative paths the child touched. */
-  changed?: string[];
   usage: UsageSummary;
   /** The fully-resolved spec the child actually ran with (for journaling/UI). */
   resolved: ResolvedSpec;
@@ -122,8 +105,6 @@ export interface ResolvedSpec {
   tools: string[];
   cwd: string;
   label: string;
-  /** Worktree isolation only: absolute path of the temporary worktree. */
-  worktreePath?: string;
 }
 
 /** Live events emitted by a running child, for renderers and the navigator. */

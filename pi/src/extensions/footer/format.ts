@@ -52,6 +52,11 @@ export function formatTokensPerSecond(tokensPerSecond: number): string {
   return `${(tokensPerSecond / 1_000).toFixed(1)}k`;
 }
 
+/** Keep sub-second precision for the time to first generated content. */
+export function formatTokenLatency(milliseconds: number): string {
+  return `${(milliseconds / 1_000).toFixed(1)}s`;
+}
+
 /** Format elapsed wall time for the active session and measured model work. */
 export function formatDuration(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1_000));

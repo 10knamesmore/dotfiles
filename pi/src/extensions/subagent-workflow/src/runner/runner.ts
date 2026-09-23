@@ -16,7 +16,6 @@ import type { ChildSession } from "./child-session.js";
 import { STRUCTURED_REPAIR_PROMPT } from "./schema-tool.js";
 import type { SchemaCapture } from "./schema-tool.js";
 import { Semaphore } from "./semaphore.js";
-import { cleanupWorktree, collectWorktree, createWorktree, WorktreeCollectionError, type Worktree } from "./worktree.js";
 
 // Pi reloads modules per cwd. Share one semaphore so all module instances
 // respect the process-wide concurrency limit.
@@ -154,8 +153,8 @@ class Handle implements SubagentHandle {
       await this.waitForStartup();
       return;
     }
-    // The in-flight task stays authoritative through session shutdown and
-    // worktree collection. Abort the session when it is still attached, then
+    // The in-flight task stays authoritative through session shutdown. Abort
+    // the session when it is still attached, then
     // let that task settle the result instead of synthesizing one here.
     const inFlightPrompt = this.inFlightPrompt;
     if (inFlightPrompt) {
@@ -225,8 +224,8 @@ class Handle implements SubagentHandle {
     // sessionDisposal and cannot retire this handle before teardown completes.
     const disposal = Promise.resolve().then(async () => {
       try {
-        // Awaits real process exit, so callers that run after disposal
-        // (worktree collection) never race a live child.
+        // Awaits real process exit, so callers that run after disposal never
+        // race a live child.
         await session.dispose();
         try {
           // Terminal result publication can already have released run ownership,
@@ -451,7 +450,7 @@ export class SubagentRunner {
     if (runHandles.length > 0 && runHandles.every((handle) => handle.isTerminal)) {
       // No store write here: statuses/usage were already persisted per result
       // event, and full results live in events.jsonl - copying them into
-      // run.json would double-store the largest payloads (worktree patches).
+      // run.json would double-store the largest payloads.
       this.finalizedRuns.add(runId);
       this.dropDeliveredStore(runId);
     }
@@ -565,24 +564,15 @@ export class SubagentRunner {
       await handle.disposeSession();
       void this.retire(handle);
     };
-    let worktree: { sourceCwd: string; tree: Worktree } | undefined;
-    let retainWorktree = false;
     try {
       if (admission.signal.aborted && !handle.isTerminal) handle.finish(this.abortedResult(handle));
       if (handle.isTerminal) return;
       handle.setStatus("running");
-      let childSpec = handle.spec;
-      if (handle.spec.isolation === "worktree") {
-        const sourceCwd = handle.spec.cwd ?? handle.parent.ctx.cwd;
-        const tree = await createWorktree(sourceCwd, `${store.runDir}/worktrees/${handle.id}`);
-        worktree = { sourceCwd, tree };
-        childSpec = { ...handle.spec, cwd: tree.cwd };
-      }
       if (handle.isTerminal) {
         releaseAdmission();
         return;
       }
-      const child = await spawnSubprocessChild(childSpec, handle.parent, {
+      const child = await spawnSubprocessChild(handle.spec, handle.parent, {
         sessionsDir: store.sessionsDir,
         forkSessionFile: handle.forkSessionFile,
       });
@@ -592,7 +582,6 @@ export class SubagentRunner {
         return;
       }
       handle.resolved = child.resolved; handle.schemaCapture = child.schemaCapture;
-      if (worktree) handle.resolved.worktreePath = worktree.tree.path;
       store.resolveChild(handle.id, child.resolved, child.session.sessionFile);
       const projection = this.projections.get(handle.runId)?.projection;
       if (projection) foldProjection(projection, {
@@ -607,29 +596,12 @@ export class SubagentRunner {
         await disposeSessionAndRetire();
         return;
       }
-      // Track the run so abort() can defer to this path (which collects the
-      // worktree patch and yields an aborted result) instead of racing it.
+      // Track the run so abort() can defer to this path (which yields an
+      // aborted result) instead of racing it.
       const runAndFinish = (async (): Promise<SubagentResult> => {
         const result = await this.runPrompt(handle, handle.spec.prompt, agentTimeoutMinutes);
         releaseAdmission();
-        // Shutdown hooks can make final worktree writes. Dispose the session
-        // before collecting so those writes are included in the patch.
         await handle.disposeSession();
-        if (worktree) {
-          try {
-            const changes = await collectWorktree(worktree.tree);
-            result.patch = changes.patch;
-            result.changed = changes.changed;
-          } catch (error) {
-            // Collection failed (e.g. a diff too large to buffer). The child's
-            // work is still in the worktree - keep it and report where, rather
-            // than deleting the only copy in the finally below.
-            retainWorktree = true;
-            const path = error instanceof WorktreeCollectionError ? error.worktreePath : worktree.tree.path;
-            result.status = "failed";
-            result.error = `${errorMessage(error)} - worktree retained at ${path}`;
-          }
-        }
         handle.finish(result);
         return result;
       })();
@@ -639,13 +611,6 @@ export class SubagentRunner {
       handle.finish(this.failure(handle, error));
       await disposeSessionAndRetire();
     } finally {
-      if (worktree && !retainWorktree) {
-        try {
-          await cleanupWorktree(worktree.sourceCwd, worktree.tree.path);
-        } catch (error) {
-          reportDiagnostic(`[subagent-workflow] ${errorMessage(error)}`);
-        }
-      }
       releaseAdmission();
     }
   }

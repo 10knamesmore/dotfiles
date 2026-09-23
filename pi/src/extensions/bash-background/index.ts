@@ -80,11 +80,7 @@ export function registerBashBackground(pi: ExtensionAPI): void {
 
   pi.registerTool<typeof bashSchema, BashBackgroundDetails | undefined>({
     ...builtInBash,
-    description: `${builtInBash.description} With background: true the command runs detached and the call returns its pid instead of waiting.`,
-    promptGuidelines: [
-      ...(builtInBash.promptGuidelines ?? []),
-      "Use bash with background: true for long-running commands such as dev servers or watchers. It returns a pid and a log path instead of waiting, and the session kills the process when it shuts down.",
-    ],
+    description: `${builtInBash.description} With background: true the command runs detached and the call returns its pid instead of waiting; use it for long-running commands such as dev servers or watchers.`,
     parameters: bashSchema,
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {

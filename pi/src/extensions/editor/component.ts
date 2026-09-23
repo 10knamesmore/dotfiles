@@ -1,6 +1,6 @@
 import { CustomEditor, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
-import { formatDuration, formatTokensPerSecond, sanitizeFooterText } from "../footer/format.js";
+import { formatDuration, formatTokensPerSecond, formatTokenLatency, sanitizeFooterText } from "../footer/format.js";
 import { palette } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
 import type { AgentInputNavigation } from "./navigation.js";
@@ -84,7 +84,11 @@ export class PromptEditor extends CustomEditor {
 
   private activityLabel(activity: EditorActivity): string {
     switch (activity.kind) {
-      case "model": return palette.modelBadge(` ${activity.spinner} MODEL `);
+      case "waiting":
+      case "thinking":
+      case "writing":
+      case "compacting":
+        return palette.modelBadge(` ${activity.spinner} ${activity.kind.toUpperCase()} `);
       case "tool": return palette.toolBadge(activity.toolCount > 1
         ? ` ${activity.spinner} TOOLS ${activity.toolCount} `
         : ` ${activity.spinner} TOOL · ${sanitizeFooterText(activity.toolName)} `);
@@ -93,6 +97,13 @@ export class PromptEditor extends CustomEditor {
   }
 
   private timingLabel(status: EditorStatus): string {
+    const showLatency = status.activity.kind !== "tool" && status.activity.kind !== "compacting";
+    const latency = status.timeToFirstTokenMilliseconds === undefined
+      ? status.activity.kind === "waiting" ? "…" : undefined
+      : formatTokenLatency(status.timeToFirstTokenMilliseconds);
+    const ttft = showLatency && latency !== undefined
+      ? `${palette.overlay2("ttft")} ${palette.sky(latency)}${palette.overlay2(" · ")}`
+      : "";
     const idle = status.idleMilliseconds === undefined
       ? ""
       : `${palette.overlay2("idle")} ${palette.lavender(formatDuration(status.idleMilliseconds))}${palette.overlay2(" · ")}`;
@@ -101,7 +112,7 @@ export class PromptEditor extends CustomEditor {
     const tps = status.tokensPerSecond === undefined
       ? ""
       : `${palette.overlay2(" · ")}${palette.sky(formatTokensPerSecond(status.tokensPerSecond))} ${palette.overlay2("t/s")}`;
-    return ` ${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
+    return ` ${ttft}${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
   }
 
   private frameBorder(
