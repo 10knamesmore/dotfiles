@@ -154,6 +154,11 @@ export class TodoPresentation {
     };
   }
 
+  /** The same visible summary used by the status bar and prompt editor. */
+  public displayStatus(phases: readonly TodoPhase[]): string | undefined {
+    return this.displayEnabled && !this.autoHidden ? formatTodoStatus(phases) : undefined;
+  }
+
   /** Record the turn in which a todo mutation may complete the list. */
   public startTurn(): void {
     this.turnSequence += 1;
@@ -210,7 +215,7 @@ export class TodoPresentation {
         this.displayEnabled && !this.autoHidden && tasks.length > 0;
       ctx.ui.setStatus(
         TODO_STATUS_KEY,
-        shouldDisplay ? formatTodoStatus(phases) : undefined,
+        this.displayStatus(phases),
       );
       if (!shouldDisplay) {
         ctx.ui.setWidget(TODO_WIDGET_KEY, undefined);

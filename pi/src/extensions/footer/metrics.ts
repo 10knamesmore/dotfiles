@@ -12,46 +12,52 @@ export interface SessionUsageTotals {
 
   /** Prompt tokens served from provider caches. */
   cacheRead: number;
+
+  /** USD estimate for parent model calls, excluding tool-reported child usage. */
+  parentCostUsd: number;
 }
 
-function addUsage(totals: SessionUsageTotals, usage: Usage): void {
+function addUsage(totals: SessionUsageTotals, usage: Usage, source: "parent" | "tool"): void {
   totals.input += usage.input;
   totals.output += usage.output;
   totals.cacheRead += usage.cacheRead;
+  if (source === "parent") totals.parentCostUsd += usage.cost.total;
 }
 
-/** Sum Pi's recorded assistant, tool, compaction, and branch-summary usage. */
+/** Sum all recorded tokens, but price only the parent model's assistant and summary requests. */
 export function collectSessionUsage(ctx: ExtensionContext): SessionUsageTotals {
   const totals: SessionUsageTotals = {
     input: 0,
     output: 0,
     cacheRead: 0,
+    parentCostUsd: 0,
   };
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type === "message" && entry.message.role === "assistant") {
-      addUsage(totals, entry.message.usage);
+      addUsage(totals, entry.message.usage, "parent");
     } else if (
       entry.type === "message" &&
       entry.message.role === "toolResult" &&
       entry.message.usage
     ) {
-      addUsage(totals, entry.message.usage);
+      addUsage(totals, entry.message.usage, "tool");
     } else if (
       (entry.type === "compaction" || entry.type === "branch_summary") &&
       entry.usage
     ) {
-      addUsage(totals, entry.usage);
+      addUsage(totals, entry.usage, "parent");
     }
   }
   return totals;
 }
 
-/** Session-total usage: pre-filled from persisted entries, then grown by events only. */
+/** Session totals: restore persisted entries, then count each new event once. */
 export class UsageCounter {
   private totals: SessionUsageTotals = {
     input: 0,
     output: 0,
     cacheRead: 0,
+    parentCostUsd: 0,
   };
 
   /** Recompute from persisted entries so resumed sessions keep full-session totals. */
@@ -60,8 +66,8 @@ export class UsageCounter {
   }
 
   /** Add one completed message or summary usage record exactly once. */
-  public record(usage: Usage | undefined): void {
-    if (usage) addUsage(this.totals, usage);
+  public record(usage: Usage | undefined, source: "parent" | "tool"): void {
+    if (usage) addUsage(this.totals, usage, source);
   }
 
   /** Return the accumulated totals. */
@@ -276,23 +282,35 @@ export class ToolUsageTracker {
 export class TurnTracker {
   private turns = 0;
   private agents = 0;
+  private agentStartedAt: number | undefined;
+  private recentAgentMilliseconds: number | undefined;
 
   public recordTurn(): void {
     this.turns += 1;
   }
 
-  public recordAgent(): void {
-    this.agents += 1;
+  public startAgent(): void {
+    this.agentStartedAt = performance.now();
   }
 
-  /** Clear counts when Pi replaces the active session. */
+  public recordAgent(): void {
+    this.agents += 1;
+    if (this.agentStartedAt !== undefined) {
+      this.recentAgentMilliseconds = Math.max(0, performance.now() - this.agentStartedAt);
+      this.agentStartedAt = undefined;
+    }
+  }
+
+  /** Clear counts and duration when Pi replaces the active session. */
   public reset(): void {
     this.turns = 0;
     this.agents = 0;
+    this.agentStartedAt = undefined;
+    this.recentAgentMilliseconds = undefined;
   }
 
-  public snapshot(): { readonly turns: number; readonly agents: number } {
-    return { turns: this.turns, agents: this.agents };
+  public snapshot(): { readonly turns: number; readonly agents: number; readonly recentAgentMilliseconds?: number } {
+    return { turns: this.turns, agents: this.agents, recentAgentMilliseconds: this.recentAgentMilliseconds };
   }
 }
 

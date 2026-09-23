@@ -340,7 +340,9 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     },
   });
   pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
-    (requested as PromptEditorApi).useAgentNavigation({
+    const editor = requested as PromptEditorApi;
+    editor.useWorkflowUsage(() => usageFooter.statusText());
+    editor.useAgentNavigation({
       selectNext: () => widget.selectRun(1),
       selectPrevious: () => widget.selectRun(-1),
       hasSelection: () => widget.hasSelectedRun(),

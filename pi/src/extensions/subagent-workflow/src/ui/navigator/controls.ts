@@ -78,7 +78,6 @@ export function runActionAvailability(
 type NavAction =
   | { type: "move"; delta: number }
   | { type: "pageMove"; delta: number }
-  | { type: "cycleLive"; delta: 1 | -1 }
   | { type: "drill" }
   | { type: "back" }
   | { type: "close" }
@@ -90,22 +89,18 @@ type NavAction =
 /** Map a parsed key id to an action for the given level. */
 export function keyToAction(keyId: string | undefined, level: Level): NavAction {
   switch (keyId) {
-    case "up":
     case "k":
       return { type: "move", delta: -1 };
-    case "down":
     case "j":
       return { type: "move", delta: 1 };
-    case "pageup":
     case "shift+k":
+      return { type: "move", delta: -7 };
+    case "shift+j":
+      return { type: "move", delta: 7 };
+    case "pageup":
       return { type: "pageMove", delta: -1 };
     case "pagedown":
-    case "shift+j":
       return { type: "pageMove", delta: 1 };
-    case "tab":
-      return level === "agent" ? { type: "none" } : { type: "cycleLive", delta: 1 };
-    case "shift+tab":
-      return level === "agent" ? { type: "none" } : { type: "cycleLive", delta: -1 };
     case "enter":
     case "return":
       if (level === "agent") return { type: "steer" };
@@ -127,8 +122,6 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
 
 interface FooterState {
   level: Level;
-  /** Whether at least two live runs are available to cycle between. */
-  canCycle?: boolean;
   /** Run-detail only: the active status filter, shown in the hint. */
   filter?: FilterMode;
   /** Whether the selected run or agent can currently be stopped. */
@@ -143,18 +136,14 @@ interface FooterState {
 
 /** Compose the footer key-hint line for a level. Matches pi's dim selector footers. */
 export function footerHint(state: FooterState, theme: ThemeLike): string {
-  const parts: string[] = ["↑↓ / jk select"];
+  const parts: string[] = ["j/k focus ±1", "J/K focus ±7"];
   if (state.level === "runs") {
     parts.push("enter open", "esc close");
-    if (state.canCycle) parts.push("tab next live");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
   } else if (state.level === "run") {
     parts.push("enter open", "esc back", `f filter: ${state.filter ?? "all"}`);
-    if (state.canCycle) parts.push("tab next live");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
   } else {
-    parts.length = 0;
-    parts.push("j/k scroll", "J/K page");
     if (state.canSteer) parts.push("enter steer");
     else if (state.canMessage) parts.push("enter message");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");

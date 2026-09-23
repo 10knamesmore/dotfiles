@@ -14,6 +14,8 @@ export class PromptEditor extends CustomEditor {
     private readonly navigation: () => AgentInputNavigation | undefined,
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
+    private readonly todoStatus: () => string | undefined = () => undefined,
+    private readonly workflowUsage: () => string | undefined = () => undefined,
   ) {
     super(tui, theme, keybindings);
     this.inputKeybindings = keybindings;
@@ -74,9 +76,9 @@ export class PromptEditor extends CustomEditor {
       ...lines.slice(bottom + 1),
     ].map((line) => `${this.borderColor("│")}${line}${this.borderColor("│")}`);
     return [
-      this.frameBorder(lines[0] ?? "", top, width, "╭", "╮"),
+      this.frameBorder(lines[0] ?? "", top, width, "╭", "╮", this.todoStatus()),
       ...sides,
-      this.frameBorder(lines[bottom]!, modelLabel, width, "╰", "╯"),
+      this.frameBorder(lines[bottom]!, modelLabel, width, "╰", "╯", this.workflowUsage()),
     ];
   }
 
@@ -91,23 +93,46 @@ export class PromptEditor extends CustomEditor {
   }
 
   private timingLabel(status: EditorStatus): string {
+    const idle = status.idleMilliseconds === undefined
+      ? ""
+      : `${palette.overlay2("idle")} ${palette.lavender(formatDuration(status.idleMilliseconds))}${palette.overlay2(" · ")}`;
     const session = palette.lavender(formatDuration(status.sessionMilliseconds));
     const api = palette.sky(formatDuration(status.apiMilliseconds));
     const tps = status.tokensPerSecond === undefined
       ? ""
       : `${palette.overlay2(" · ")}${palette.sky(formatTokensPerSecond(status.tokensPerSecond))} ${palette.overlay2("t/s")}`;
-    return ` ${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
+    return ` ${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
   }
 
-  private frameBorder(original: string, text: string, width: number, left: "╭" | "╰", right: "╮" | "╯"): string {
+  private frameBorder(
+    original: string,
+    text: string,
+    width: number,
+    left: "╭" | "╰",
+    right: "╮" | "╯",
+    rightStatus?: string,
+  ): string {
     const prefix = left === "╭" ? "╭─" : "╰─ ";
-    const budget = Math.max(0, width - visibleWidth(prefix) - 3);
+    const rightLabel = rightStatus && width >= 32
+      ? truncateToWidth(
+        palette.lavender(sanitizeFooterText(rightStatus)),
+        Math.floor((width - 6) * 0.48),
+        palette.overlay2("…"),
+      )
+      : "";
+    const rightWidth = visibleWidth(rightLabel);
+    const budget = Math.max(0, width - visibleWidth(prefix) - (rightLabel ? rightWidth + 6 : 3));
     const scroll = /^─── ([↑↓]) (\d+) more /u.exec(stripTerminalSequences(original));
     const hint = scroll ? `${scroll[1]}${scroll[2]}` : "";
     const textWidth = hint && visibleWidth(hint) + 1 < budget ? budget - visibleWidth(hint) - 1 : budget;
     const label = truncateToWidth(text, textWidth, palette.overlay2("…"))
       + (textWidth < budget ? ` ${hint}` : "");
     const remaining = width - visibleWidth(prefix) - visibleWidth(label) - 1;
+    if (rightLabel) {
+      const fill = "─".repeat(remaining - (label ? 1 : 0) - rightWidth - 3);
+      return this.borderColor(prefix) + label
+        + this.borderColor(`${label ? " " : ""}${fill} `) + rightLabel + this.borderColor(` ─${right}`);
+    }
     return this.borderColor(prefix) + label
       + this.borderColor(`${label ? " " : ""}${"─".repeat(remaining - (label ? 1 : 0))}${right}`);
   }

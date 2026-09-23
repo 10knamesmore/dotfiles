@@ -105,8 +105,12 @@ export class AgentView {
       return true;
     }
     this.stopArmed = false;
-    if (keyId === "tab" || keyId === "shift+tab") {
-      this.selectBlock(keyId === "tab" ? 1 : -1);
+    if (keyId === "j" || keyId === "k" || keyId === "shift+j" || keyId === "shift+k") {
+      const direction = keyId.endsWith("j") ? 1 : -1;
+      const distance = keyId.startsWith("shift+") ? 7 : 1;
+      this.selectBlock(direction * distance);
+    } else if (keyId === "g" || keyId === "shift+g") {
+      this.focusBlock(keyId === "g" ? 0 : -1);
     } else if (keyId === "space" || data === " ") {
       this.toggleSelected();
     } else if (keyId === "t" || keyId === "o") {
@@ -143,19 +147,26 @@ export class AgentView {
     return this.transcriptCache = { messages, resultKey, live, theme: this.lastTheme, width: this.lastWidth, blocks, layout };
   }
 
-  private selectBlock(delta: 1 | -1): void {
+  private selectBlock(delta: number): void {
     const { layout } = this.currentTranscript();
     if (layout.blocks.length === 0) return;
     let index = layout.blocks.findIndex((block) => block.id === this.selectedId);
     if (index < 0) {
       const visible = layout.blocks.filter((block) => block.end > this.scrollOffset && block.start < this.scrollOffset + this.lastViewport);
       const target = delta > 0 ? visible[0] : visible.at(-1);
-      index = Math.max(0, layout.blocks.findIndex((block) => block === target));
+      index = target ? layout.blocks.indexOf(target) : delta > 0 ? 0 : layout.blocks.length - 1;
     } else index = Math.max(0, Math.min(layout.blocks.length - 1, index + delta));
-    const block = layout.blocks[index]!;
+    this.focusBlock(index);
+  }
+
+  private focusBlock(index: number): void {
+    const block = this.currentTranscript().layout.blocks.at(index);
+    if (!block) return;
     this.selectedId = block.id;
     this.autoScroll = false;
     if (block.start < this.scrollOffset || block.start >= this.scrollOffset + this.lastViewport) this.scrollOffset = block.start;
+    // An explicit focus move owns the viewport; do not re-anchor to the old block on the next render.
+    this.lastLayout = undefined;
     this.invalidate();
   }
 
@@ -216,12 +227,8 @@ export class AgentView {
   private scroll(keyId: string | undefined): boolean {
     const max = Math.max(0, this.currentTranscript().layout.lines.length - this.lastViewport);
     switch (keyId) {
-      case "up": case "k": this.scrollOffset = Math.max(0, this.scrollOffset - 1); this.autoScroll = false; return true;
-      case "down": case "j": this.scrollOffset = Math.min(max, this.scrollOffset + 1); break;
-      case "pageup": case "shift+up": case "shift+k": this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport); this.autoScroll = false; return true;
-      case "pagedown": case "shift+down": case "shift+j": this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport); break;
-      case "g": this.scrollOffset = 0; this.autoScroll = false; return true;
-      case "shift+g": this.scrollOffset = max; this.autoScroll = true; return true;
+      case "pageup": this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport); this.autoScroll = false; return true;
+      case "pagedown": this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport); break;
       default: return false;
     }
     this.autoScroll = this.scrollOffset >= max;
@@ -267,7 +274,7 @@ export class AgentView {
     this.scrollOffset = this.autoScroll ? max : Math.min(this.scrollOffset, max);
     for (let index = 0; index < viewport; index += 1) lines.push(layout.lines[this.scrollOffset + index] ?? "");
     const position = this.autoScroll ? this.isActive() ? "Following latest" : "End of transcript" : "Reading history";
-    lines.push(theme.fg("muted", `${position} · g top · G latest · Tab / Shift+Tab block · Space fold`));
+    lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · Space fold`));
     if (this.composer) {
       const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;
       const prefix = `✎ ${kind}: `;

@@ -268,25 +268,6 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
               state.scroll = page.row;
             } else state.pageMove(action.delta, currentCount(), navigationPageSize(tui));
             break;
-          case "cycleLive": {
-            const runs = model.runs();
-            const liveRunIds = orderedLiveRunIds(runs, runner.liveRunIds());
-            if (liveRunIds.length < 2) break;
-            const currentIndex = liveRunIds.indexOf(state.currentRunId(runs) ?? "");
-            const targetIndex = currentIndex < 0
-              ? (action.delta === 1 ? 0 : liveRunIds.length - 1)
-              : (currentIndex + action.delta + liveRunIds.length) % liveRunIds.length;
-            const targetRunId = liveRunIds[targetIndex]!;
-            if (state.level === "runs") {
-              state.reconcileRuns(runs);
-              const targetRow = runs.findIndex((run) => run.runId === targetRunId);
-              state.moveRun(targetRow - state.cursor, runs);
-            } else {
-              disposeAgentView();
-              state.switchRun(targetRunId);
-            }
-            break;
-          }
           case "drill":
             if (state.drill(model) === "agent") openAgentView();
             break;
@@ -323,12 +304,10 @@ function openNavigator(services: NavigatorServices, ctx: NavigatorOpenContext, m
           const maxTotal = Math.max(8, Math.floor(rows * 0.9));
           const inner = Math.max(20, width - 4);
           const runs = model.runs();
-          const canCycle = orderedLiveRunIds(runs, runner.liveRunIds()).length >= 2;
           const content = renderContent(
             state,
             model,
             runs,
-            canCycle,
             agentView,
             theme,
             inner,
@@ -364,7 +343,6 @@ function renderContent(
   state: NavigatorState,
   model: NavigatorModel,
   runs: RunSummary[],
-  canCycle: boolean,
   agentView: AgentView | undefined,
   theme: ThemeLike,
   inner: number,
@@ -399,7 +377,6 @@ function renderContent(
       footer: footerHint({
         level: "run",
         filter: state.filter,
-        canCycle,
         ...actions,
         stopArmed: actions.canStop && stopArmedRunId === detail.runId,
       }, theme),
@@ -413,7 +390,6 @@ function renderContent(
     lines: renderRunList(runs, state.cursor, theme, inner, now, budget),
     footer: footerHint({
       level: "runs",
-      canCycle,
       ...actions,
       stopArmed: actions.canStop && stopArmedRunId === selectedRunId,
     }, theme),

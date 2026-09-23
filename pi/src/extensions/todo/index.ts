@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../editor/api.js";
 import { registerTodoCommand } from "./command.js";
 import { TodoPresentation } from "./presentation.js";
 import { TodoSessionStore } from "./session-store.js";
@@ -19,6 +20,9 @@ export function registerSessionTodo(pi: ExtensionAPI): void {
 
   const store = new TodoSessionStore(pi);
   const presentation = new TodoPresentation();
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
+    (requested as PromptEditorApi).useTodoStatus(() => presentation.displayStatus(store.snapshot()));
+  });
   const restore = (ctx: Parameters<TodoSessionStore["restore"]>[0]): void => {
     const restoreWarning = store.restore(ctx);
     const presentationWarning = presentation.refresh(ctx, store.snapshot());

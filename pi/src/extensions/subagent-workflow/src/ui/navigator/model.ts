@@ -77,7 +77,7 @@ export class NavigatorState {
   move(delta: number, count: number): void {
     if (count <= 0) return;
     const frame = this.top();
-    frame.cursor = (frame.cursor + delta + count) % count;
+    frame.cursor = ((frame.cursor + delta) % count + count) % count;
   }
 
   /** Move by one viewport without wrapping at the ends. */

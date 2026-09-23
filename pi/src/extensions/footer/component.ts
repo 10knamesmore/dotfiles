@@ -6,6 +6,7 @@ import type {
 import type { Component } from "@earendil-works/pi-tui";
 import {
   fitByDropping,
+  formatDuration,
   formatFooterCwd,
   formatTokens,
   sanitizeFooterText,
@@ -257,7 +258,7 @@ function formatToolUsage(snapshot: ToolUsageSnapshot): string {
   return parts.join(" ");
 }
 
-function formatTurns(snapshot: { turns: number; agents: number }): string {
+function formatTurns(snapshot: { turns: number; agents: number; recentAgentMilliseconds?: number }): string {
   const turnSummary = [
     palette.overlay2("turns"),
     palette.lavender(String(snapshot.turns)),
@@ -270,6 +271,9 @@ function formatTurns(snapshot: { turns: number; agents: number }): string {
   const agentSummary = [
     palette.overlay2("agents"),
     palette.lavender(String(snapshot.agents)),
+    ...(snapshot.recentAgentMilliseconds === undefined
+      ? []
+      : [palette.overlay2(`(last ${formatDuration(snapshot.recentAgentMilliseconds)})`)]),
   ].join(" ");
 
   return `${turnSummary}${separator}${agentSummary}`;
@@ -309,21 +313,16 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
   }
 
   const totals = totalsParts.join(" ");
+  const cost = usage.parentCostUsd > 0
+    ? palette.peach(`$${usage.parentCostUsd.toFixed(3)}`)
+    : "";
 
-  return fitByDropping([formatContext(ctx), totals], [1], width, separator);
+  return fitByDropping([formatContext(ctx), totals, cost], [1], width, separator);
 }
 
 function statusPriority(key: string): number {
-  if (key === "todo") {
-    return 0;
-  }
-
   if (key === "subagent-workflow") {
     return 1;
-  }
-
-  if (key === "subagent-workflow:usage") {
-    return 3;
   }
 
   return 2;
@@ -333,6 +332,7 @@ function formatExtensionStatuses(
   footerData: ReadonlyFooterDataProvider,
 ): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
+    .filter(([key]) => key !== "todo" && key !== "subagent-workflow:usage")
     .sort(([leftKey], [rightKey]) => {
       const priorityDifference =
         statusPriority(leftKey) - statusPriority(rightKey);
@@ -372,7 +372,7 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
     tools,
     turns,
   } = options;
-  const toolUsage = formatToolUsage(tools.snapshot(3));
+  const toolUsage = formatToolUsage(tools.snapshot(4));
   const turnCount = formatTurns(turns.snapshot());
   const statuses = formatExtensionStatuses(footerData);
   const thirdParts = [toolUsage, turnCount, statuses];

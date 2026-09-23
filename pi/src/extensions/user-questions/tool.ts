@@ -260,17 +260,11 @@ class UserQuestionsComponent implements Component, Focusable {
         }
         return;
       }
-      if (
-        matchesKey(data, Key.right) ||
-        matchesKey(data, Key.tab)
-      ) {
+      if (matchesKey(data, Key.tab)) {
         this.saveInputAndNavigate(1);
         return;
       }
-      if (
-        matchesKey(data, Key.left) ||
-        matchesKey(data, Key.shift("tab"))
-      ) {
+      if (matchesKey(data, Key.shift("tab"))) {
         this.saveInputAndNavigate(-1);
         return;
       }
@@ -680,7 +674,7 @@ class UserQuestionsComponent implements Component, Focusable {
       return "Type your note • Enter save • Esc discard";
     }
     if (this.inputMode) {
-      return "←→ or Tab/Shift+Tab save and navigate • Enter save and next • Alt+←/→ move cursor • Esc back/cancel";
+      return "←→ move cursor • Tab/Shift+Tab save and navigate • Enter save and next • Esc back/cancel";
     }
     if (question === undefined) {
       return "Enter submit • ←→ or Tab/Shift+Tab navigate • Esc cancel";

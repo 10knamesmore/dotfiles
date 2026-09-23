@@ -56,6 +56,11 @@ export class SubagentUsageFooter {
     this.unsubscribeChildEvents = runner.subscribeChildEvents((event) => this.observeChildEvent(event));
   }
 
+  /** Current footer text, shared with the prompt editor without recalculating usage. */
+  statusText(): string | undefined {
+    return this.lastStatus;
+  }
+
   /** Restore durable totals whenever pi starts, resumes, forks, or reloads a session. */
   attach(ctx: FooterContext): void {
     if (this.disposed) return;

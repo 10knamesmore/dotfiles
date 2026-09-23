@@ -4,6 +4,8 @@ import type { AgentInputNavigation } from "./navigation.js";
 export interface PromptEditorApi {
   useAgentNavigation(navigation: AgentInputNavigation): void;
   useStatus(readStatus: () => EditorStatus): void;
+  useTodoStatus(readTodoStatus: () => string | undefined): void;
+  useWorkflowUsage(readWorkflowUsage: () => string | undefined): void;
 }
 
 export type EditorActivity =
@@ -13,6 +15,8 @@ export type EditorActivity =
 
 export interface EditorStatus {
   sessionMilliseconds: number;
+  /** Time since the last fully settled run; absent before a run or while the next prompt is processing. */
+  idleMilliseconds?: number;
   apiMilliseconds: number;
   tokensPerSecond?: number;
   activity: EditorActivity;

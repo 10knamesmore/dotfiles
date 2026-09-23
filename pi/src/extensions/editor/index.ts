@@ -15,9 +15,13 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     currentContext = ctx;
     let navigation: AgentInputNavigation | undefined;
     let readStatus: (() => EditorStatus) | undefined;
+    let readTodoStatus: (() => string | undefined) | undefined;
+    let readWorkflowUsage: (() => string | undefined) | undefined;
     const api: PromptEditorApi = {
       useAgentNavigation: (contribution) => { navigation = contribution; },
       useStatus: (contribution) => { readStatus = contribution; },
+      useTodoStatus: (contribution) => { readTodoStatus = contribution; },
+      useWorkflowUsage: (contribution) => { readWorkflowUsage = contribution; },
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
     installedFactory = (tui, theme, keybindings) => new PromptEditor(
@@ -25,6 +29,8 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       () => navigation,
       () => readStatus?.(),
       () => currentContext,
+      () => readTodoStatus?.(),
+      () => readWorkflowUsage?.(),
     );
     ctx.ui.setEditorComponent(installedFactory);
   });
