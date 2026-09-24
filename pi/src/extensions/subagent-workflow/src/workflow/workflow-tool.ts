@@ -61,18 +61,9 @@ interface WorkflowToolServices {
   observeRun?: (run: StartedWorkflow, ctx: ExtensionContext) => void;
 }
 
-const DESCRIPTION = `Execute deterministic JavaScript orchestration over subagents. Use workflow when results feed later spawns, when you need phases, pipelines, or resumable control flow, or for more than about eight independent items; up to that many independent one-shot tasks are just that many subagent calls in one turn. Read the workflow-authoring skill before writing a non-trivial script or diagnosing a replay error; launch and runtime errors also name the exact rule violated.
+const DESCRIPTION = `Execute deterministic JavaScript orchestration over subagents. Use workflow when results feed later spawns, when you need phases, pipelines, or resumable control flow, or for more than about eight independent items; up to that many independent one-shot tasks are just that many subagent calls in one turn. You must read the workflow-authoring skill before calling this tool: it defines the script format, globals, agent options, determinism rules, and resume semantics.
 
-The script is a module string beginning with a literal header:
-export const meta = { name: 'audit-routes', description: 'Audit routes', phases: [{ title: 'Discover' }, { title: 'Audit' }] }
-const result = await agent('List route files', { model: 'mid', schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
-const files = result?.files.filter(Boolean) ?? []
-phase('Audit')
-return parallel(files.map(file => () => agent('Audit ' + file, { model: 'high' })))
-
-Globals: agent(prompt, opts), parallel(thunks), pipeline(items, ...stages), phase(title), log(message), and args. agent opts: model (required: 'max', 'high', or 'mid'; direct provider/model-id values are rejected; use the current model-tier mappings and guidance in the system prompt), thinkingLevel, tools, excludeTools, schema, cwd, label, phase. Every prompt must be self-contained: the child receives neither the parent conversation nor workflow variables unless interpolated. A failed agent() resolves to null - guard before dereferencing. Scripts must be deterministic: no wall-clock, randomness, or raw Promise concurrency - use parallel/pipeline and pass varying inputs through args. Resume with resumeRunId replays completed calls from the journal; drift on a completed call fails closed with an error naming the childId and the rerunChildIds recovery.
-
-Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) A resumeRunId still requires exactly one of script or scriptPath.`;
+Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.)`;
 
 /**
  * UI-side launch receipt rendered for the workflow tool row.

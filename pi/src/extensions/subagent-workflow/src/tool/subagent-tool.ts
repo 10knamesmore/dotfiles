@@ -46,10 +46,14 @@ export const SubagentToolParameters = Type.Object(
     followUp: Type.Optional(
       Type.Object(
         {
-          id: Type.String({ minLength: 1 }),
-          prompt: Type.String({ minLength: 1 }),
+          id: Type.String({ minLength: 1, description: "Child id from a completed spawn result." }),
+          prompt: Type.String({ minLength: 1, description: "Self-contained task for the follow-up turn." }),
         },
-        { additionalProperties: false },
+        {
+          additionalProperties: false,
+          description:
+            "Fork a completed child's persisted session into a new child and run. It inherits that child's model, thinking level, tools, schema, and cwd, so none of those may be set at the top level; label is the one exception and names the new turn.",
+        },
       ),
     ),
   },
@@ -333,7 +337,7 @@ export function registerSubagentTool(
     label: "Subagent",
     parameters: SubagentToolParameters,
     description:
-      "Spawn one ad-hoc child. Each child starts cold with only its self-contained prompt. New children require model: 'max', 'high', or 'mid'; use the current model-tier mappings and guidance in the system prompt. Direct provider/model-id values are rejected. Thinking level inherits from the parent unless overridden. Add schema (JSON Schema) for validated structured output. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The global semaphore paces all spawns, so never batch to control concurrency. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) followUp: { id, prompt } forks a completed child's persisted session into a new child and run; it inherits that child's model, thinking level, tools, schema, and cwd, so none of those may be set at the top level - label is the one exception and should name the new turn. Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
+      "Spawn one ad-hoc child. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try {

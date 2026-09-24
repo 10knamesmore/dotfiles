@@ -26,7 +26,7 @@ const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
 const TOOL_DESCRIPTION =
-  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. stdin is unavailable. Output is limited, larger output is saved to a file.";
+  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in the session working directory(cwd); relative paths and local imports resolve there. stdin is unavailable. Output is limited, larger output is saved to a file.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
