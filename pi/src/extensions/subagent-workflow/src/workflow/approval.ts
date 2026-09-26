@@ -8,7 +8,11 @@
  * Reject throws a clear error the model can relay.
  */
 
-import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SettingsManager, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { WorkflowSettings } from "../../../../config/index.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
@@ -27,7 +31,8 @@ export interface LaunchPlan {
 export interface ApprovalContext {
   mode: ExtensionMode;
   cwd: string;
-  ui: Pick<ExtensionUIContext, "select" | "editor" | "notify">;
+  isProjectTrusted(): boolean;
+  ui: Pick<ExtensionUIContext, "select" | "custom" | "notify">;
 }
 
 export type WorkflowApprovalPolicy = WorkflowSettings["workflowApproval"];
@@ -35,6 +40,50 @@ export type WorkflowApprovalPolicy = WorkflowSettings["workflowApproval"];
 const OPEN = "Open in editor";
 const ACCEPT = "Accept";
 const REJECT = "Reject";
+
+/** Edit a temporary JavaScript file with Pi's configured external editor, releasing the TUI until it exits. */
+async function editWorkflowScript(draft: string, ctx: ApprovalContext): Promise<string> {
+  const command = SettingsManager.create(ctx.cwd, undefined, {
+    projectTrusted: ctx.isProjectTrusted(),
+  }).getExternalEditorCommand();
+  const directory = await mkdtemp(join(tmpdir(), "pi-workflow-editor-"));
+  const scriptPath = join(directory, "workflow.js");
+  try {
+    await writeFile(scriptPath, draft, "utf8");
+    reportDiagnostic(`[subagent-workflow] opening workflow editor: ${command}`);
+    await ctx.ui.custom<void>(async (tui, _theme, _keybindings, done) => {
+      tui.stop();
+      try {
+        const [editor, ...editorArgs] = command.split(" ");
+        // Match Pi's editor command handling; async spawn also releases console input on Windows.
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn(editor!, [...editorArgs, scriptPath], {
+            cwd: ctx.cwd,
+            stdio: "inherit",
+            shell: process.platform === "win32",
+          });
+          child.once("error", reject);
+          child.once("close", (code, signal) => {
+            if (code === 0) resolve();
+            else reject(new Error(`External editor exited with ${signal ? `signal ${signal}` : `code ${code}`}`));
+          });
+        });
+      } finally {
+        tui.start();
+        tui.requestRender(true);
+      }
+      done();
+      return { render: () => [], invalidate: () => {} };
+    });
+    const saved = await readFile(scriptPath, "utf8");
+    reportDiagnostic("[subagent-workflow] workflow editor completed");
+    return saved;
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch((error: unknown) => {
+      reportDiagnostic(`[subagent-workflow] workflow editor cleanup failed: ${errorMessage(error)}`);
+    });
+  }
+}
 
 export function buildApprovalSummary(plan: LaunchPlan): string {
   const { meta } = plan.workflow;
@@ -63,10 +112,14 @@ export async function approveLaunch(
   for (;;) {
     const choice = await ctx.ui.select(summary, options);
     if (choice === OPEN) {
-      // pi exposes no direct "spawn $EDITOR" API; its multi-line editor is the sanctioned
-      // extension editor surface and offers Ctrl+G to the external $EDITOR.
-      const saved = await ctx.ui.editor("Workflow script", draft);
-      if (saved === undefined) continue;
+      let saved: string;
+      try {
+        saved = await editWorkflowScript(draft, ctx);
+      } catch (error) {
+        reportDiagnostic(`[subagent-workflow] workflow editor failed: ${errorMessage(error)}`);
+        ctx.ui.notify("External editor failed. Your workflow draft is unchanged.", "error");
+        continue;
+      }
       draft = saved;
       try {
         summary = buildApprovalSummary({ ...plan, workflow: parseWorkflowScript(draft) });
