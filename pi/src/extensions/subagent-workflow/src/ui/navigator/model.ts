@@ -58,7 +58,7 @@ export class NavigatorState {
   private selectedChildId: string | undefined;
   childId: string | undefined;
   filter: FilterMode = "all";
-  /** Explicit workflow layout row used by PageUp/PageDown; undefined follows the selected child. */
+  /** Layout row to center in the list viewport; undefined follows the selected run or child. */
   scroll: number | undefined;
 
   private top(): Frame {
@@ -85,7 +85,7 @@ export class NavigatorState {
   move(delta: number, count: number): void {
     if (count <= 0) return;
     const frame = this.top();
-    frame.cursor = (((frame.cursor + delta) % count) + count) % count;
+    frame.cursor = Math.max(0, Math.min(frame.cursor + delta, count - 1));
   }
 
   /** Move by one viewport without wrapping at the ends. */
@@ -186,12 +186,13 @@ export class NavigatorState {
       const run = runs[frame.cursor];
       if (!run || (run.corrupt && run.label !== "quarantined - crashed mid-resume")) return undefined;
       this.runId = run.runId;
+      this.scroll = undefined;
       this.stack.push({ level: "run", cursor: 0 });
       return "run";
     }
     if (frame.level === "run" && this.runId) {
       // Reconcile before reading the index: rows can have reordered since the
-      // last render, and Enter must open the agent the user sees selected.
+      // last render, and opening must use the agent the user sees selected.
       const children = orderedChildren(model.detail(this.runId), this.filter);
       this.reconcileChildren(children);
       const child = children[frame.cursor];

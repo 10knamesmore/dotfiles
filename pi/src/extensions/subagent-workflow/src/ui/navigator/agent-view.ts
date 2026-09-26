@@ -4,6 +4,7 @@ import { Input, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { SubagentStatus, UsageSummary } from "../../types.js";
 import { formatTokenUsage, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
+import { keyToAction } from "./controls.js";
 import {
   blockCanCollapse,
   blockIsExpanded,
@@ -276,19 +277,13 @@ export class AgentView {
   }
 
   private scroll(keyId: string | undefined): boolean {
+    const action = keyToAction(keyId, "agent");
+    if (action.type !== "scroll" && action.type !== "pageMove") return false;
+    const pages = action.type === "scroll" ? action.pages : action.delta;
+    const distance = Math.max(1, Math.floor(this.lastViewport * Math.abs(pages)));
     const max = Math.max(0, this.currentTranscript().layout.lines.length - this.lastViewport);
-    switch (keyId) {
-      case "pageup":
-        this.scrollOffset = Math.max(0, this.scrollOffset - this.lastViewport);
-        this.autoScroll = false;
-        return true;
-      case "pagedown":
-        this.scrollOffset = Math.min(max, this.scrollOffset + this.lastViewport);
-        break;
-      default:
-        return false;
-    }
-    this.autoScroll = this.scrollOffset >= max;
+    this.scrollOffset = Math.max(0, Math.min(max, this.scrollOffset + Math.sign(pages) * distance));
+    this.autoScroll = pages > 0 && this.scrollOffset >= max;
     return true;
   }
 

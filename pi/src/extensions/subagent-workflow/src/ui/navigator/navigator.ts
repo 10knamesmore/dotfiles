@@ -2,8 +2,8 @@
  * The /agents full-screen navigator overlay and its command registration.
  *
  * `/agents` and `/workflows` open the same three-level overlay:
- *   runs ──enter──▶ run detail ──enter──▶ agent transcript
- *        ◀──esc───            ◀──esc────
+ *   runs ──enter/l──▶ run detail ──enter/l──▶ agent transcript
+ *        ◀──esc/h───            ◀──esc/h────
  *
  * Data comes from the run store (kept current by the runner on every event); the
  * live runner is consulted only for pinning active runs, transcript refresh
@@ -33,7 +33,7 @@ import {
   type RunActionAvailability,
 } from "./controls.js";
 import { NavigatorModel, NavigatorState } from "./model.js";
-import { pageRunDetail, renderRunDetail, renderRunList } from "./render.js";
+import { pageRunDetail, renderRunDetail, renderRunList, scrollRunDetail, scrollRunList } from "./render.js";
 import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
 import { readSessionMessages, type TranscriptMessage } from "./transcript.js";
 
@@ -296,17 +296,40 @@ function openNavigator(
         switch (action.type) {
           case "move":
             if (state.level === "runs") state.moveRun(action.delta, model.runs());
-            else if (state.level === "run" && state.runId) {
+            else if (state.level === "run" && state.runId)
               state.moveChild(action.delta, orderedChildren(model.detail(state.runId), state.filter));
-              state.scroll = undefined;
-            } else {
-              state.move(action.delta, currentCount());
-              state.scroll = undefined;
+            else state.move(action.delta, currentCount());
+            state.scroll = undefined;
+            break;
+          case "scroll":
+            if (state.level === "runs") {
+              const runs = model.runs();
+              state.reconcileRuns(runs);
+              state.scroll = scrollRunList(
+                runs.length,
+                state.cursor,
+                action.pages,
+                navigatorRowBudget(tui) - 3,
+                state.scroll,
+              );
+            } else if (state.level === "run" && state.runId) {
+              const detail = model.detail(state.runId);
+              state.reconcileChildren(orderedChildren(detail, state.filter));
+              state.scroll = scrollRunDetail(
+                detail,
+                state.cursor,
+                state.filter,
+                action.pages,
+                navigatorRowBudget(tui) - 3,
+                state.scroll,
+              );
             }
             break;
           case "pageMove":
-            if (state.level === "runs") state.pageMoveRun(action.delta, model.runs(), navigationPageSize(tui));
-            else if (state.level === "run" && state.runId) {
+            if (state.level === "runs") {
+              state.pageMoveRun(action.delta, model.runs(), navigationPageSize(tui));
+              state.scroll = undefined;
+            } else if (state.level === "run" && state.runId) {
               const detail = model.detail(state.runId);
               const children = orderedChildren(detail, state.filter);
               state.reconcileChildren(children);
@@ -355,8 +378,7 @@ function openNavigator(
 
       const component: Component & { dispose?(): void } = {
         render: (width: number) => {
-          const rows = tui.terminal?.rows ?? 24;
-          const maxTotal = Math.max(8, Math.floor(rows * 0.9));
+          const maxTotal = navigatorRowBudget(tui);
           const inner = Math.max(20, width - 4);
           const runs = model.runs();
           const content = renderContent(
@@ -451,7 +473,7 @@ function renderContent(
   const selectedRunId = state.currentRunId(runs);
   const actions = selectedRunId ? actionsFor(model.detail(selectedRunId)) : { canStop: false };
   return {
-    lines: renderRunList(runs, state.cursor, theme, inner, now, budget),
+    lines: renderRunList(runs, state.cursor, theme, inner, now, budget, state.scroll),
     footer: footerHint(
       {
         level: "runs",
@@ -476,9 +498,13 @@ function orderedLiveRunIds(runs: readonly RunSummary[], liveRunIds: readonly str
   return runs.filter((run) => live.has(run.runId)).map((run) => run.runId);
 }
 
+function navigatorRowBudget(tui: TUI): number {
+  return Math.max(8, Math.floor((tui.terminal?.rows ?? 24) * 0.9));
+}
+
 /** Approximate selectable rows in one overlay viewport, excluding box chrome and headers. */
 function navigationPageSize(tui: TUI): number {
-  return Math.max(1, Math.floor((tui.terminal?.rows ?? 24) * 0.9) - 7);
+  return Math.max(1, navigatorRowBudget(tui) - 7);
 }
 
 function lastAssistant(messages: readonly TranscriptMessage[]): TranscriptMessage | undefined {

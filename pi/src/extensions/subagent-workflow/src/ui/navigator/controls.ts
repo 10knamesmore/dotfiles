@@ -77,6 +77,7 @@ export function runActionAvailability(
 type NavAction =
   | { type: "move"; delta: number }
   | { type: "pageMove"; delta: number }
+  | { type: "scroll"; pages: number }
   | { type: "drill" }
   | { type: "back" }
   | { type: "close" }
@@ -96,6 +97,14 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
       return { type: "move", delta: -7 };
     case "shift+j":
       return { type: "move", delta: 7 };
+    case "ctrl+u":
+      return { type: "scroll", pages: -0.5 };
+    case "ctrl+d":
+      return { type: "scroll", pages: 0.5 };
+    case "ctrl+b":
+      return { type: "scroll", pages: -1 };
+    case "ctrl+f":
+      return { type: "scroll", pages: 1 };
     case "pageup":
       return { type: "pageMove", delta: -1 };
     case "pagedown":
@@ -104,8 +113,10 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
     case "return":
       if (level === "agent") return { type: "steer" };
       return { type: "drill" };
+    case "l":
     case "right":
       return level === "agent" ? { type: "none" } : { type: "drill" };
+    case "h":
     case "escape":
     case "esc":
     case "left":
@@ -135,18 +146,19 @@ interface FooterState {
 
 /** Compose the footer key-hint line for a level. Matches pi's dim selector footers. */
 export function footerHint(state: FooterState, theme: ThemeLike): string {
-  const parts: string[] = ["j/k focus ±1", "J/K focus ±7"];
+  const parts: string[] = state.level === "agent" ? [] : ["j/k focus", "J/K ±7"];
   if (state.level === "runs") {
-    parts.push("enter open", "esc close");
+    parts.push("enter/l open", "esc/h close");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
   } else if (state.level === "run") {
-    parts.push("enter open", "esc back", `f filter: ${state.filter ?? "all"}`);
+    parts.push("enter/l open", "esc/h back", `f filter: ${state.filter ?? "all"}`);
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
   } else {
     if (state.canSteer) parts.push("enter steer");
     else if (state.canMessage) parts.push("enter message");
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
-    parts.push("esc back");
+    parts.push("esc/h back");
   }
+  parts.push("ctrl+u/d ½ page", "ctrl+b/f page");
   return theme.fg("dim", parts.join(" · "));
 }

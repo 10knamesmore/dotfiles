@@ -1,8 +1,8 @@
 /**
  * Pure line builders for the navigator's run list (level 1) and run detail
  * (level 2). Each returns a fixed-height block: a header, a scroll-windowed body
- * that keeps the cursor visible, and overflow indicators. The agent-detail view
- * (level 3) is a live Component in agent-view.ts.
+ * that follows the cursor unless an explicit scroll row is supplied, and overflow
+ * indicators. The agent-detail view (level 3) is a live Component in agent-view.ts.
  *
  * Rendering is theme-role only and ANSI-safe (truncateToWidth); it depends only
  * on data + cursor + width, so it is deterministic under the PLAIN theme.
@@ -50,10 +50,30 @@ interface ScrollWindow {
 /** A window of up to `cap` rows that keeps `active` visible. */
 export function scrollWindow(total: number, active: number, cap: number): ScrollWindow {
   if (total <= cap) return { start: 0, count: total, moreAbove: false, moreBelow: false };
+  active = clamp(active, 0, total - 1);
   let start = clamp(active - Math.floor(cap / 2), 0, total - cap);
   if (active < start) start = active;
   if (active >= start + cap) start = active - cap + 1;
   return { start, count: cap, moreAbove: start > 0, moreBelow: start + cap < total };
+}
+
+function scrollPage(total: number, active: number, cap: number, pages: number): number {
+  const window = scrollWindow(total, active, cap);
+  const distance = Math.sign(pages) * Math.max(1, Math.floor(cap * Math.abs(pages)));
+  const start = clamp(window.start + distance, 0, Math.max(0, total - cap));
+  // Renderers center on a layout row; return the center of the requested viewport.
+  return start + Math.floor(Math.min(cap, total) / 2);
+}
+
+/** Scroll the run list by full or fractional pages without changing the selected run. */
+export function scrollRunList(
+  total: number,
+  cursor: number,
+  pages: number,
+  maxLines: number,
+  currentRow?: number,
+): number {
+  return scrollPage(total, currentRow ?? cursor, Math.max(1, maxLines - 3), pages);
 }
 
 function selector(selected: boolean): string {
@@ -68,6 +88,7 @@ export function renderRunList(
   width: number,
   now: number,
   maxLines: number,
+  focusRow?: number,
 ): string[] {
   const cap = Math.max(20, width);
   const active = rows.filter((row) => row.status === "running" || row.status === "pending").length;
@@ -78,7 +99,7 @@ export function renderRunList(
     return lines;
   }
   const rowCap = Math.max(1, maxLines - lines.length - 2);
-  const window = scrollWindow(rows.length, cursor, rowCap);
+  const window = scrollWindow(rows.length, focusRow ?? cursor, rowCap);
   if (window.moreAbove) lines.push(theme.fg("dim", "  ↑ more"));
   for (let i = 0; i < window.count; i += 1) {
     const index = window.start + i;
@@ -161,6 +182,23 @@ export function pageRunDetail(
     }
   }
   return { cursor: best, row: targetRow };
+}
+
+/** Scroll across agent, phase and log rows while leaving the selected agent unchanged. */
+export function scrollRunDetail(
+  detail: RunDetail,
+  cursor: number,
+  filter: FilterMode,
+  pages: number,
+  maxLines: number,
+  currentRow?: number,
+): number {
+  const order = orderedChildren(detail, filter);
+  const layout = detail.kind === "workflow" ? buildWorkflowLayout(detail, order) : undefined;
+  const selectedRow = layout
+    ? Math.max(0, layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor))
+    : cursor;
+  return scrollPage(layout?.length ?? order.length, currentRow ?? selectedRow, Math.max(1, maxLines - 4), pages);
 }
 
 /** Level 2: run detail. `cursor` indexes the ordered (filtered) child list; output is at most `maxLines` tall. */
