@@ -8,13 +8,10 @@ import { GitStatusCache } from "./git-status.js";
 import {
   ActiveSessionDurationTracker,
   ModelDurationTracker,
-  PromptRunTracker,
   RecentHitRateTracker,
   RecentTokensPerSecondTracker,
-  ToolUsageTracker,
-  TurnTracker,
-  UsageCounter,
 } from "./metrics.js";
+import { SessionMetrics } from "./session-metrics.js";
 
 /** Braille spinner frames, advanced while the model or a tool is working. */
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
@@ -26,11 +23,8 @@ class FooterRuntime {
   private component: ClaudeFooterComponent | undefined;
   private readonly modelDuration = new ModelDurationTracker();
   private readonly modelResponse = new ModelResponseTracker();
-  private readonly promptRun = new PromptRunTracker();
+  private readonly metrics: SessionMetrics;
   private readonly sessionDuration = new ActiveSessionDurationTracker();
-  private readonly tools = new ToolUsageTracker();
-  private readonly turns = new TurnTracker();
-  private readonly usage = new UsageCounter();
   private readonly hitRate = new RecentHitRateTracker();
   private readonly throughput = new RecentTokensPerSecondTracker();
   private lastTurnModelMilliseconds = 0;
@@ -42,19 +36,20 @@ class FooterRuntime {
   private idleTimer: ReturnType<typeof setInterval> | undefined;
   private lastPublishedActivity: EditorStatus["activity"] | undefined;
 
-  public constructor(private readonly onActivityChanged: (activity: EditorStatus["activity"]) => void) {}
+  public constructor(
+    private readonly onActivityChanged: (activity: EditorStatus["activity"]) => void,
+    appendEntry: ExtensionAPI["appendEntry"],
+  ) {
+    this.metrics = new SessionMetrics(appendEntry);
+  }
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
   public startSession(ctx: ExtensionContext): void {
     this.currentContext = ctx;
     this.modelDuration.reset();
     this.modelResponse.reset();
-    this.promptRun.reset();
+    this.metrics.reset();
     this.sessionDuration.reset();
-    this.tools.reset();
-    this.turns.reset();
-    this.tools.prescan(ctx);
-    this.usage.prescan(ctx);
     this.hitRate.reset();
     this.throughput.reset();
     this.lastTurnModelMilliseconds = 0;
@@ -76,10 +71,7 @@ class FooterRuntime {
         getContext: () => this.currentContext ?? ctx,
         footerData,
         git,
-        tools: this.tools,
-        turns: this.turns,
-        promptRun: this.promptRun,
-        usage: this.usage,
+        metrics: this.metrics,
         hitRate: this.hitRate,
         requestRender: () => tui.requestRender(),
       });
@@ -91,7 +83,7 @@ class FooterRuntime {
   /** Supply the editor border with session metrics and current activity. */
   public editorStatus(): EditorStatus {
     const model = this.modelResponse.snapshot();
-    const waitingForNextRequest = model.phase === "ready" && this.promptRun.isRunning();
+    const waitingForNextRequest = model.phase === "ready" && this.metrics.isRunning();
     return {
       sessionMilliseconds: this.sessionDuration.elapsedMilliseconds(),
       ...(this.idleStartedAt === undefined
@@ -194,19 +186,17 @@ class FooterRuntime {
     this.updateSpinner();
   }
 
-  /** Count one finished tool execution and clear its active status. */
-  public toolEnded(id: string, name: string, isError: boolean): void {
+  /** Clear a tool's live status; completed executions are read from the transcript. */
+  public toolEnded(id: string): void {
     this.activeTools.delete(id);
-    this.tools.record(name, isError);
     this.updateSpinner();
   }
 
-  /** Count one finished turn. */
+  /** Close the recent-turn metrics after the turn's messages have been persisted. */
   public turnEnded(): void {
     const modelMilliseconds = this.modelDuration.elapsedMilliseconds();
     this.throughput.endTurn(modelMilliseconds - this.lastTurnModelMilliseconds);
     this.lastTurnModelMilliseconds = modelMilliseconds;
-    this.turns.recordTurn();
     this.hitRate.endTurn();
     this.component?.requestRender();
   }
@@ -218,19 +208,19 @@ class FooterRuntime {
   }
 
   /** Start a prompt only once Pi enters the agent loop; retries keep its totals. */
-  public agentStarted(): void {
-    if (!this.promptRun.isRunning()) {
+  public agentStarted(ctx: ExtensionContext): void {
+    this.updateContext(ctx);
+    if (!this.metrics.isRunning()) {
       this.modelResponse.reset();
-      this.promptRun.start();
+      this.metrics.startRun(ctx);
     }
     this.stopIdle();
-    this.turns.startAgent();
     this.updateSpinner();
   }
 
   /** A settled run has no automatic continuation; the next action is up to the user. */
   public agentSettled(): void {
-    this.promptRun.finish();
+    this.metrics.finishRun();
     this.modelResponse.finishRequest();
     this.activeTools.clear();
     this.updateSpinner();
@@ -247,19 +237,10 @@ class FooterRuntime {
     this.stopIdle();
   }
 
-  /** Count one finished agent run and retain its elapsed wall time. */
+  /** A low-level loop may be followed by a retry, so only clear its activity. */
   public agentEnded(): void {
     this.activeTools.clear();
     this.updateSpinner();
-    this.turns.recordAgent();
-    this.component?.requestRender();
-  }
-
-  /** Add one completed message or summary usage record to the session total. */
-  public usageRecorded(usage: Usage | undefined, source: "parent" | "tool"): void {
-    this.usage.record(usage, source);
-    if (source === "parent") this.promptRun.record(usage);
-    this.component?.requestRender();
   }
 
   /** Refresh context-derived fields after a non-model session change. */
@@ -281,7 +262,7 @@ class FooterRuntime {
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
     this.modelResponse.reset();
-    this.promptRun.finish();
+    this.metrics.finishRun();
     this.activeTools.clear();
     this.updateSpinner();
     this.stopIdle();
@@ -310,7 +291,7 @@ class FooterRuntime {
       return { kind: "tool", spinner, toolName: toolNames.at(-1)!, toolCount: toolNames.length };
     }
     if (model.phase !== "ready") return { kind: model.phase, spinner };
-    return this.promptRun.isRunning() ? { kind: "waiting", spinner } : { kind: "ready" };
+    return this.metrics.isRunning() ? { kind: "waiting", spinner } : { kind: "ready" };
   }
 
   private publishActivity(): void {
@@ -327,7 +308,7 @@ class FooterRuntime {
 
   private updateSpinner(): void {
     const active =
-      this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.promptRun.isRunning();
+      this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.metrics.isRunning();
     if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
       this.spinnerFrame = 0;
       this.spinnerTimer = setInterval(() => {
@@ -349,35 +330,30 @@ class FooterRuntime {
 
 /** Connect the editor and footer to Pi's lifecycle and provider events. */
 export function registerFooter(pi: ExtensionAPI): void {
-  const runtime = new FooterRuntime((activity) => pi.events.emit(SESSION_ACTIVITY_CHANGED, activity));
+  const runtime = new FooterRuntime(
+    (activity) => pi.events.emit(SESSION_ACTIVITY_CHANGED, activity),
+    (customType, data) => pi.appendEntry(customType, data),
+  );
   pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
     (requested as PromptEditorApi).useStatus(() => runtime.editorStatus());
   });
   pi.on("session_start", (_event, ctx) => runtime.startSession(ctx));
   pi.on("session_before_tree", (event, ctx) => runtime.treeNavigationStarted(event, ctx));
-  pi.on("session_tree", (event, ctx) => {
-    runtime.treeNavigationEnded(ctx);
-    runtime.usageRecorded(event.summaryEntry?.usage, "parent");
-  });
+  pi.on("session_tree", (_event, ctx) => runtime.treeNavigationEnded(ctx));
   pi.on("session_before_compact", (_event, ctx) => runtime.compactionStarted(ctx));
-  pi.on("session_compact", (event, ctx) => {
-    runtime.compactionEnded(ctx);
-    runtime.usageRecorded(event.compactionEntry.usage, "parent");
-  });
+  pi.on("session_compact", (_event, ctx) => runtime.compactionEnded(ctx));
   pi.on("session_compact_failed", (_event, ctx) => runtime.compactionEnded(ctx));
   pi.on("before_provider_request", (_event, ctx) => runtime.providerRequestStarted(ctx));
   pi.on("message_update", (event) => runtime.modelResponseUpdated(event.assistantMessageEvent));
   pi.on("message_end", (event, ctx) => {
     if (event.message.role === "assistant") {
       runtime.modelWorkEnded(ctx);
-      runtime.usageRecorded(event.message.usage, "parent");
       runtime.hitRateRecorded(event.message.usage);
     } else {
       runtime.contextChanged(ctx);
-      if (event.message.role === "toolResult") runtime.usageRecorded(event.message.usage, "tool");
     }
   });
-  pi.on("agent_start", () => runtime.agentStarted());
+  pi.on("agent_start", (_event, ctx) => runtime.agentStarted(ctx));
   pi.on("agent_settled", () => runtime.agentSettled());
   pi.on("agent_end", (_event, ctx) => {
     runtime.modelWorkEnded(ctx);
@@ -393,7 +369,7 @@ export function registerFooter(pi: ExtensionAPI): void {
   });
   pi.on("tool_execution_end", (event, ctx) => {
     runtime.updateContext(ctx);
-    runtime.toolEnded(event.toolCallId, event.toolName, event.isError);
+    runtime.toolEnded(event.toolCallId);
   });
   pi.on("model_select", (_event, ctx) => runtime.modelChanged(ctx));
   pi.on("thinking_level_select", (_event, ctx) => runtime.contextChanged(ctx));

@@ -1,19 +1,16 @@
 import { homedir, hostname, userInfo } from "node:os";
 import type { ExtensionContext, ReadonlyFooterDataProvider } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
+import { visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { fitByDropping, formatDuration, formatFooterCwd, formatTokens, sanitizeFooterText } from "./format.js";
 import type { GitDiffStat, GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
-import {
-  type RecentHitRateTracker,
-  type PromptRunSnapshot,
-  type PromptRunTracker,
-  type SessionUsageTotals,
-  type ToolUsageSnapshot,
-  ToolUsageTracker,
-  TurnTracker,
-  type UsageCounter,
-} from "./metrics.js";
+import type { RecentHitRateTracker } from "./metrics.js";
+import type {
+  PromptRunSnapshot,
+  SessionMetrics,
+  SessionMetricsSnapshot,
+  ToolUsageSnapshot,
+} from "./session-metrics.js";
 import { palette, separator } from "./palette.js";
 
 interface ClaudeFooterComponentOptions {
@@ -26,17 +23,8 @@ interface ClaudeFooterComponentOptions {
   /** Event-driven git snapshot cache owned by this component. */
   git: GitStatusCache;
 
-  /** Tool execution counts observed during the active extension session. */
-  tools: ToolUsageTracker;
-
-  /** Turn and agent-run counts observed during the active extension session. */
-  turns: TurnTracker;
-
-  /** Parent-model usage and wall time for the current or last accepted prompt. */
-  promptRun: PromptRunTracker;
-
-  /** Session-total usage grown by events, pre-filled from persisted entries. */
-  usage: UsageCounter;
+  /** Transcript-derived session totals and the current or last run. */
+  metrics: SessionMetrics;
 
   /** Cache hit rate over the most recent completed turns. */
   hitRate: RecentHitRateTracker;
@@ -63,34 +51,15 @@ interface FirstLineRenderOptions {
 }
 
 interface SecondLineRenderOptions {
-  /** Terminal width available to the second footer line. */
   width: number;
-
-  /** Current Pi extension context. */
-  ctx: ExtensionContext;
-
-  /** Accumulated session usage. */
-  usage: SessionUsageTotals;
-
-  /** Recent cache hit rate, already formatted for display. */
-  hitRate: string;
+  metrics: SessionMetricsSnapshot;
 }
 
 interface ThirdLineRenderOptions {
-  /** Terminal width available to the third footer line. */
   width: number;
-
-  /** Pi-owned extension status provider. */
   footerData: ReadonlyFooterDataProvider;
-
-  /** Tool execution tracker. */
-  tools: ToolUsageTracker;
-
-  /** Turn and agent-run tracker. */
-  turns: TurnTracker;
-
-  /** Current or last prompt, absent before the first run in this runtime. */
   promptRun: PromptRunSnapshot | undefined;
+  hitRate: string;
 }
 
 function currentUsername(): string {
@@ -222,37 +191,7 @@ function renderFirstLine(options: FirstLineRenderOptions): string {
   return fitByDropping(parts, dropOrder, width);
 }
 
-function formatContext(ctx: ExtensionContext): string {
-  const usage = ctx.getContextUsage();
-  const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
-
-  if (usage === undefined || usage.tokens === null || usage.percent === null) {
-    let contextWindowText = "?";
-
-    if (contextWindow > 0) {
-      contextWindowText = formatTokens(contextWindow);
-    }
-
-    return palette.overlay2(`ctx ?/${contextWindowText}`);
-  }
-
-  const percent = Math.round(usage.percent);
-  const usedTokens = formatTokens(usage.tokens);
-  const contextWindowTokens = formatTokens(contextWindow);
-  const body = `ctx ${usedTokens}/${contextWindowTokens} ${percent}%`;
-
-  if (percent >= 70) {
-    return `🥵 ${palette.red(body)}`;
-  }
-
-  if (percent >= 50 || usage.tokens >= 250_000) {
-    return `😢 ${palette.yellow(body)}`;
-  }
-
-  return `😎 ${palette.green(body)}`;
-}
-
-function formatToolUsage(snapshot: ToolUsageSnapshot): string {
+function formatToolUsage(snapshot: ToolUsageSnapshot, includeDetails: boolean): string {
   if (snapshot.total === 0) {
     return "";
   }
@@ -265,7 +204,7 @@ function formatToolUsage(snapshot: ToolUsageSnapshot): string {
     .join(" ");
   const parts = [palette.overlay2("tools"), palette.peach(String(snapshot.total))];
 
-  if (top) {
+  if (includeDetails && top) {
     parts.push(palette.sky(top));
   }
 
@@ -276,24 +215,6 @@ function formatToolUsage(snapshot: ToolUsageSnapshot): string {
   return parts.join(" ");
 }
 
-function formatTurns(snapshot: { turns: number; agents: number; recentAgentMilliseconds?: number }): string {
-  const turnSummary = [palette.overlay2("turns"), palette.lavender(String(snapshot.turns))].join(" ");
-
-  if (snapshot.agents === 0) {
-    return turnSummary;
-  }
-
-  const agentSummary = [
-    palette.overlay2("agents"),
-    palette.lavender(String(snapshot.agents)),
-    ...(snapshot.recentAgentMilliseconds === undefined
-      ? []
-      : [palette.overlay2(`(last ${formatDuration(snapshot.recentAgentMilliseconds)})`)]),
-  ].join(" ");
-
-  return `${turnSummary}${separator}${agentSummary}`;
-}
-
 function formatRecentHitRate(hitRate: number | undefined): string {
   if (hitRate === undefined) {
     return "";
@@ -302,71 +223,35 @@ function formatRecentHitRate(hitRate: number | undefined): string {
   const percent = Math.round(hitRate * 10) / 10;
   const label = `${percent.toFixed(1)}%`;
 
-  if (percent >= 90) {
-    return palette.green(label);
-  }
-
-  if (percent >= 80) {
-    return palette.yellow(label);
-  }
-
-  return palette.red(label);
+  const colored = percent >= 90 ? palette.green(label) : percent >= 80 ? palette.yellow(label) : palette.red(label);
+  return `${palette.overlay2("hit:")}${colored}`;
 }
 
 function renderSecondLine(options: SecondLineRenderOptions): string {
-  const { width, ctx, usage, hitRate } = options;
-  const totalsParts = [
+  const { width, metrics } = options;
+  const { usage, tools } = metrics;
+  const counts = [
+    `${palette.overlay2("runs")} ${palette.lavender(String(metrics.runs))}`,
+    `${palette.overlay2("turns")} ${palette.lavender(String(metrics.turns))}`,
+  ].join(" · ");
+  const totals = [
     palette.peach(`in:${formatTokens(usage.input + usage.cacheRead, 2)}`),
     palette.sky(`out:${formatTokens(usage.output, 2)}`),
-  ];
-
-  if (usage.cacheRead > 0) {
-    totalsParts.push(palette.green(`cached:${formatTokens(usage.cacheRead, 2)}`));
+    palette.peach(`$${usage.parentCostUsd.toFixed(3)}`),
+  ].join(" ");
+  const cached = usage.cacheRead > 0 ? palette.green(`cached:${formatTokens(usage.cacheRead, 2)}`) : "";
+  const parts = [counts, totals, cached, formatToolUsage(tools, true)];
+  if (visibleWidth(parts.filter(Boolean).join(separator)) > width) {
+    parts[3] = formatToolUsage(tools, false);
   }
-
-  if (hitRate) {
-    totalsParts.push(hitRate);
-  }
-
-  const totals = totalsParts.join(" ");
-  const cost = usage.parentCostUsd > 0 ? palette.peach(`$${usage.parentCostUsd.toFixed(3)}`) : "";
-
-  return fitByDropping([formatContext(ctx), totals, cost], [1], width, separator);
-}
-
-function statusPriority(key: string): number {
-  if (key === "subagent-workflow") {
-    return 1;
-  }
-
-  return 2;
+  return fitByDropping(parts, [2, 3], width, separator);
 }
 
 function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
-    .filter(([key]) => key !== "todo" && key !== "subagent-workflow:usage")
-    .sort(([leftKey], [rightKey]) => {
-      const priorityDifference = statusPriority(leftKey) - statusPriority(rightKey);
-
-      if (priorityDifference !== 0) {
-        return priorityDifference;
-      }
-
-      return leftKey.localeCompare(rightKey);
-    })
-    .map(([key, value]) => {
-      const clean = sanitizeFooterText(value);
-
-      if (!clean) {
-        return "";
-      }
-
-      if (key === "subagent-workflow") {
-        return `agents ${clean}`;
-      }
-
-      return clean;
-    })
+    .filter(([key]) => key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage")
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([, value]) => sanitizeFooterText(value))
     .filter(Boolean);
 
   if (statuses.length > 0) {
@@ -376,25 +261,22 @@ function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string
   return "";
 }
 
-function formatPromptRun(run: PromptRunSnapshot | undefined): string {
-  if (!run) return "";
-  const label = run.state === "running" ? "run" : "last";
-  const duration = palette.lavender(formatDuration(run.elapsedMilliseconds));
-  const input = palette.peach(`in:${run.usage ? formatTokens(run.usage.input, 2) : "—"}`);
-  const output = palette.sky(`out:${run.usage ? formatTokens(run.usage.output, 2) : "—"}`);
-  const cost = run.usage ? palette.peach(`~$${run.usage.costUsd.toFixed(3)}`) : palette.overlay2("—");
-  return `${palette.overlay2(label)} ${duration} · ${input} ${output} · ${cost}`;
+function formatPromptRun(run: PromptRunSnapshot | undefined): string[] {
+  const label = run?.state === "running" ? "run" : "last";
+  const duration = palette.lavender(formatDuration(run?.elapsedMilliseconds ?? 0));
+  const turns = `${palette.overlay2("turns")} ${palette.lavender(String(run?.turns ?? 0))}`;
+  const totals = [
+    palette.peach(`in:${formatTokens(run?.usage?.input ?? 0, 2)}`),
+    palette.sky(`out:${formatTokens(run?.usage?.output ?? 0, 2)}`),
+    palette.peach(`$${(run?.usage?.costUsd ?? 0).toFixed(3)}`),
+  ].join(" ");
+  return [`${palette.overlay2(label)} ${duration}`, turns, totals];
 }
 
 function renderThirdLine(options: ThirdLineRenderOptions): string {
-  const { width, footerData, tools, turns, promptRun } = options;
-  const toolUsage = formatToolUsage(tools.snapshot(4));
-  const turnCount = formatTurns(turns.snapshot());
+  const { width, footerData, promptRun, hitRate } = options;
   const statuses = formatExtensionStatuses(footerData);
-  const thirdParts = [formatPromptRun(promptRun), toolUsage, turnCount, statuses];
-  const dropOrder = [1, 2, 3];
-
-  return fitByDropping(thirdParts, dropOrder, width, separator);
+  return fitByDropping([...formatPromptRun(promptRun), hitRate, statuses], [4, 3], width, separator);
 }
 
 /**
@@ -441,7 +323,7 @@ export class ClaudeFooterComponent implements Component {
 
     const ctx = this.options.getContext();
     const git = this.options.git.snapshot();
-    const usage = this.options.usage.snapshot();
+    const metrics = this.options.metrics.snapshot(ctx);
 
     return [
       renderFirstLine({
@@ -451,18 +333,12 @@ export class ClaudeFooterComponent implements Component {
         ctx,
         git,
       }),
-      renderSecondLine({
-        width,
-        ctx,
-        usage,
-        hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
-      }),
+      renderSecondLine({ width, metrics }),
       renderThirdLine({
         width,
         footerData: this.options.footerData,
-        tools: this.options.tools,
-        turns: this.options.turns,
-        promptRun: this.options.promptRun.snapshot(),
+        promptRun: metrics.promptRun,
+        hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
       }),
     ];
   }

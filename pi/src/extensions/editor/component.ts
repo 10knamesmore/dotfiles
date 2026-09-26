@@ -6,8 +6,14 @@ import {
   type EditorTheme,
   type TUI,
 } from "@earendil-works/pi-tui";
-import { formatDuration, formatTokensPerSecond, formatTokenLatency, sanitizeFooterText } from "../footer/format.js";
-import { palette } from "../footer/palette.js";
+import {
+  formatDuration,
+  formatTokens,
+  formatTokensPerSecond,
+  formatTokenLatency,
+  sanitizeFooterText,
+} from "../footer/format.js";
+import { palette, separator } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
 import type { AgentInputNavigation } from "./navigation.js";
 
@@ -79,14 +85,28 @@ export class PromptEditor extends CustomEditor {
     const modelLabel = model
       ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
       : palette.sky("no-model");
+    const modelAndContext = ctx ? `${modelLabel}${separator}${this.contextLabel(ctx)}` : modelLabel;
     const sides = [...lines.slice(1, bottom), ...lines.slice(bottom + 1)].map(
       (line) => `${this.borderColor("│")}${line}${this.borderColor("│")}`,
     );
     return [
       this.frameBorder(lines[0] ?? "", top, width, "╭", "╮", this.todoStatus()),
       ...sides,
-      this.frameBorder(lines[bottom]!, modelLabel, width, "╰", "╯", this.workflowUsage()),
+      this.frameBorder(lines[bottom]!, modelAndContext, width, "╰", "╯", this.workflowUsage()),
     ];
+  }
+
+  private contextLabel(ctx: ExtensionContext): string {
+    const usage = ctx.getContextUsage();
+    const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+    if (usage === undefined || usage.tokens === null || usage.percent === null) {
+      return palette.overlay2(`ctx ?/${contextWindow > 0 ? formatTokens(contextWindow) : "?"}`);
+    }
+    const percent = Math.round(usage.percent);
+    const body = `ctx ${formatTokens(usage.tokens)}/${formatTokens(contextWindow)} ${percent}%`;
+    if (percent >= 70) return `🥵 ${palette.red(body)}`;
+    if (percent >= 50 || usage.tokens >= 250_000) return `😢 ${palette.yellow(body)}`;
+    return `😎 ${palette.green(body)}`;
   }
 
   private activityLabel(activity: EditorActivity): string {
@@ -141,11 +161,16 @@ export class PromptEditor extends CustomEditor {
     rightStatus?: string,
   ): string {
     const prefix = left === "╭" ? "╭─" : "╰─ ";
+    const rightBudget = Math.floor((width - 6) * 0.48);
+    const availableRight =
+      left === "╰"
+        ? Math.min(rightBudget, Math.max(0, width - visibleWidth(prefix) - visibleWidth(text) - 6))
+        : rightBudget;
     const rightLabel =
       rightStatus && width >= 32
         ? truncateToWidth(
             palette.lavender(sanitizeFooterText(rightStatus)),
-            Math.floor((width - 6) * 0.48),
+            availableRight,
             palette.overlay2("…"),
           )
         : "";
