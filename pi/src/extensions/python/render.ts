@@ -34,9 +34,9 @@ export function executionText(result: PythonExecutionResult): string {
   return lines.join("\n");
 }
 
-/** Show the code with Pi's Python syntax highlighting and the selected execution limit. */
+/** Show the highlighted code, execution limit, and any explicitly selected working directory. */
 export function renderPythonCall(
-  args: { code?: string; timeout?: number },
+  args: { code?: string; cwd?: string; timeout?: number },
   theme: Theme,
   context: { expanded: boolean },
 ): Text {
@@ -47,6 +47,7 @@ export function renderPythonCall(
   return new Text(
     theme.fg("toolTitle", theme.bold("python")) +
       theme.fg("muted", ` · ${args.timeout ?? 60}s`) +
+      (args.cwd ? theme.fg("muted", ` · ${clean(args.cwd)}`) : "") +
       (preview ? `\n${highlightCode(preview, "python").join("\n")}` : "") +
       more,
     0,

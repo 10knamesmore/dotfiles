@@ -6,6 +6,7 @@ interface PythonEvent {
   sessionId: string;
   phase: string;
   callId?: string;
+  cwd?: string;
   pid?: number;
   durationMs?: number;
   outcome?: string;

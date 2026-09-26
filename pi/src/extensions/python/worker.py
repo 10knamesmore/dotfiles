@@ -1,6 +1,7 @@
 """Run persistent Python cells over dedicated control and event file descriptors."""
 
 import code
+from contextlib import chdir
 from importlib import metadata
 import io
 import json
@@ -69,12 +70,13 @@ def handle_sigint(_signum: int, _frame: types.FrameType | None) -> None:
 
 
 def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], number: int) -> None:
-    """Capture one cell's output and emit its start and completion events."""
+    """Capture one cell's output, restore its working directory, and report completion."""
     global executing
     call_id = request["callId"]
     source = request["code"]
     output_path = request["outputPath"]
-    assert isinstance(source, str) and isinstance(output_path, str)
+    cwd = request["cwd"]
+    assert isinstance(source, str) and isinstance(output_path, str) and isinstance(cwd, str)
 
     filename = f"<python-{number}>"
     linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
@@ -93,7 +95,10 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
         try:
             executing = True
             send_event({"type": "started", "callId": call_id})
-            interpreter.runsource(source, filename, symbol="exec")
+            with chdir(cwd):
+                interpreter.runsource(source, filename, symbol="exec")
+        except (OSError, ValueError):
+            interpreter.showtraceback()
         except KeyboardInterrupt:
             interpreter.outcome = "interrupted"
             interpreter.showtraceback()
@@ -130,10 +135,8 @@ def main() -> None:
     """Read one LF-delimited request at a time until the controller closes fd3."""
     os.setpgid(0, 0)
     signal.signal(signal.SIGINT, handle_sigint)
-    cwd = os.getcwd()
-    if cwd in sys.path:
-        sys.path.remove(cwd)
-    sys.path.insert(0, cwd)
+    # An empty import path follows each call's cwd instead of pinning the startup directory.
+    sys.path.insert(0, "")
     interpreter = SessionInterpreter()
     send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})
     with os.fdopen(3, "rb") as requests:

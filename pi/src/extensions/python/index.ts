@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { PythonSession, type PythonToolDetails } from "./session.js";
@@ -11,6 +12,13 @@ const Parameters = Type.Object(
       minLength: 1,
       description: "Complete Python code to execute. Use print() to display values.",
     }),
+    cwd: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "Working directory for this call only. Omit to use the session directory; relative paths resolve from it.",
+      }),
+    ),
     timeout: Type.Optional(
       Type.Number({
         exclusiveMinimum: 0,
@@ -26,7 +34,7 @@ const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
 const TOOL_DESCRIPTION =
-  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in the session working directory(cwd); relative paths and local imports resolve there. stdin is unavailable. Output is limited, larger output is saved to a file.";
+  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. stdin is unavailable. Output is limited, larger output is saved to a file.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
@@ -34,7 +42,7 @@ export function registerPython(pi: ExtensionAPI): void {
   const inspectionController = new AbortController();
 
   const createSession = (ctx: ExtensionContext): PythonSession =>
-    new PythonSession(ctx.sessionManager.getSessionId(), notifyEnvironmentCleared, updateEnvironment);
+    new PythonSession(ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared, updateEnvironment);
 
   pi.on("session_start", async (_event, ctx) => {
     session = createSession(ctx);
@@ -106,7 +114,8 @@ export function registerPython(pi: ExtensionAPI): void {
         ],
         details: undefined,
       });
-      const result = await runtime.execute(params.code, params.timeout ?? 60, callId, ctx.cwd, signal, () => {
+      const cwd = resolve(ctx.cwd, params.cwd ?? ".");
+      const result = await runtime.execute(params.code, params.timeout ?? 60, callId, cwd, signal, () => {
         onUpdate?.({
           content: [{ type: "text", text: "Running Python…" }],
           details: undefined,

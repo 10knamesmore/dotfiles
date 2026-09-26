@@ -9,12 +9,14 @@
 工具参数：
 
 ```ts
-{ code: string; timeout?: number }
+{ code: string; cwd?: string; timeout?: number }
 ```
 
 `code` 是完整代码块；通过 `print()` 输出结果，最后一个表达式不会自动显示。不完整代码作为语法错误返回，不等待下一次输入。`timeout` 单位为秒，默认 60，必须是有限正数，最大值受 Node 定时器上限约束。代码收到执行开始确认后计时；uv 启动准备单独限时 120 秒。标准输入为 EOF。
 
-初始工作目录是 Pi 会话目录，项目中的 Python 模块可以直接导入。Python 内的目录变化保留到后续调用，不改变 Pi 或 bash 的工作目录。工具使用 Pi 的串行调度，因此包含 Python 调用的同一批工具按顺序执行。
+`cwd` 只对本次调用生效，省略时使用 Pi 会话目录；可传绝对路径，相对路径以 Pi 会话目录为基准。相对文件路径和新导入的本地模块从本次工作目录解析。目录不存在或不可进入时，本次调用失败，代码不执行，已有 Python 状态保留。
+
+调用结束时恢复工作目录，包括普通异常和可恢复的取消、超时。代码内的 `os.chdir()` 也只影响本次调用；Pi 和 bash 的工作目录不变。变量及已导入模块仍跨调用保留；切换目录不会重新加载同名模块。工具使用 Pi 的串行调度，因此包含 Python 调用的同一批工具按顺序执行。
 
 ## 状态与取消
 
@@ -34,7 +36,7 @@ worker 使用 fd3 接收 LF 分隔的 JSON 请求，fd4 返回事件。每次调
 
 工具返回最后 2000 行或 50 KiB；超限时保留完整输出文件并返回路径，短输出文件在读取后删除。traceback 通过虚拟文件名和缓存的源代码定位到调用中的行。
 
-运行事件写入 Pi agent 目录下的 `python/events.jsonl`，记录会话、调用、进程、解释器、包数量、耗时和退出原因，不记录用户代码或变量。日志保留当前与上一份 5 MiB 文件。uv 和 worker 的基础设施诊断写入单独的临时日志，失败结果提供路径。
+运行事件写入 Pi agent 目录下的 `python/events.jsonl`，记录会话、调用、调用目录、进程、解释器、包数量、耗时和退出原因，不记录用户代码或变量。日志保留当前与上一份 5 MiB 文件。uv 和 worker 的基础设施诊断写入单独的临时日志，失败结果提供路径。
 
 ## 维护与验证
 
@@ -46,6 +48,6 @@ uv lock --project pi/src/extensions/python --check
 uv run --project pi/src/extensions/python --locked -- python pi/src/extensions/python/worker.py --describe-environment
 ```
 
-在真实 Pi 会话中验证跨调用状态复用、异常后继续执行，以及超时和取消后的环境状态。
+在真实 Pi 会话中验证跨调用状态复用、单次目录覆盖与恢复、相对路径及本地模块导入、无效目录和异常后继续执行，以及超时和取消后的目录与环境状态。
 
 增加运行库时使用 `uv add --project pi/src/extensions/python <package>`，同时维护 `pyproject.toml` 与生成的 `uv.lock`。新启动的 worker 会同步锁定环境，已经导入的模块继续留在运行中的 Python 内存里。

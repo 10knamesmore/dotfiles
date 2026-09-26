@@ -89,6 +89,7 @@ export class PythonSession {
 
   public constructor(
     private readonly sessionId: string,
+    private readonly sessionCwd: string,
     private readonly onStateLost: () => void,
     private readonly onEnvironmentReady: (environment: PythonEnvironment) => void,
   ) {}
@@ -97,7 +98,7 @@ export class PythonSession {
     return this.worker?.info !== undefined && !this.worker.stopping && !this.worker.ended;
   }
 
-  /** Execute a complete block, returning partial output even when code fails or the process dies. */
+  /** Execute a complete block in the supplied absolute cwd for this call, preserving partial output on failure. */
   public async execute(
     code: string,
     timeoutSeconds: number,
@@ -117,11 +118,11 @@ export class PythonSession {
     let output = "";
     let truncated = false;
     let outputPath: string | undefined;
-    this.log({ phase: "execute_start", callId });
+    this.log({ phase: "execute_start", callId, cwd });
     try {
       if (signal?.aborted) outcome = "interrupted";
       else {
-        worker = await this.ensureWorker(cwd, signal);
+        worker = await this.ensureWorker(signal);
         if (signal?.aborted || this.disposed) outcome = "interrupted";
         else {
           directory = await mkdtemp(join(tmpdir(), "pi-python-output-"));
@@ -129,7 +130,7 @@ export class PythonSession {
           // Create before dispatch so even an immediate process exit has a readable output file.
           const file = await open(path, "wx", 0o600);
           await file.close();
-          outcome = await this.submit(worker, code, timeoutSeconds, callId, path, signal, onStarted);
+          outcome = await this.submit(worker, code, timeoutSeconds, callId, cwd, path, signal, onStarted);
           const preview = await readOutput(path);
           output = preview.text;
           truncated = preview.truncated;
@@ -171,7 +172,7 @@ export class PythonSession {
     await worker.exited;
   }
 
-  private async ensureWorker(cwd: string, signal?: AbortSignal): Promise<WorkerProcess> {
+  private async ensureWorker(signal?: AbortSignal): Promise<WorkerProcess> {
     if (this.available) return this.worker!;
     if (this.worker && !this.worker.ended) await this.worker.exited;
     const directory = await mkdtemp(join(tmpdir(), "pi-python-startup-"));
@@ -184,7 +185,7 @@ export class PythonSession {
     let launcher: ChildProcess;
     try {
       launcher = spawn("uv", pythonWorkerArguments(), {
-        cwd,
+        cwd: this.sessionCwd,
         detached: true,
         stdio: ["ignore", logFd, logFd, "pipe", "pipe"],
       });
@@ -277,6 +278,7 @@ export class PythonSession {
     code: string,
     timeoutSeconds: number,
     callId: string,
+    cwd: string,
     outputPath: string,
     signal?: AbortSignal,
     onStarted?: () => void,
@@ -303,7 +305,7 @@ export class PythonSession {
       // Bound acknowledgement too; the execution deadline starts only on the started event.
       pending.timer = setTimeout(() => this.terminate(worker), STARTUP_TIMEOUT_MS);
       signal?.addEventListener("abort", abort, { once: true });
-      worker.requests.write(`${JSON.stringify({ type: "execute", callId, code, outputPath })}\n`);
+      worker.requests.write(`${JSON.stringify({ type: "execute", callId, code, cwd, outputPath })}\n`);
     });
   }
 
