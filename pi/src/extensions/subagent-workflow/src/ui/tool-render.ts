@@ -21,10 +21,10 @@
  * full redraw - see `paint` in ./status-widget.ts.
  */
 
-import { truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";
 import type { SubagentHandle, SubagentSpec, ThinkingLevel } from "../types.js";
 import { guardedLines, linesComponent } from "./component.js";
-import { childLabel, clamp, modelEffort, shortModel, type ThemeLike } from "./format.js";
+import { childLabel, formatFullModel, shortModel, type ThemeLike } from "./format.js";
 import { sanitizeTerminalText, sanitizeTerminalTextChunks, UNTRUSTED_FIELD_MAX } from "./sanitize.js";
 import { isRecord } from "../util.js";
 
@@ -44,7 +44,7 @@ interface ChildSnapshot {
   thinking?: string;
 }
 
-/** String, or a fallback - the string fields below are measured and sliced. */
+/** Read a string field from the persisted launch receipt. */
 function text(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
 }
@@ -75,24 +75,13 @@ export interface SubagentDetails {
   children: [ChildSnapshot];
 }
 
-const LABEL_MIN = 6;
-const LABEL_MAX = 28;
-const MODEL_MAX = 24;
-const GAP = "  ";
-
-/** Render the launch receipt within the terminal width. */
+/** Render the complete launch receipt, wrapping at the available terminal width. */
 export function renderRows(details: SubagentDetails, theme: ThemeLike, width: number): string[] {
-  // Never exceed the host-supplied width: pi-tui aborts the process on any
-  // over-wide line, so there is no minimum layout width worth crashing for. A
-  // cramped row is a cosmetic problem; a wide one ends the session.
-  const cap = Math.max(1, width);
   const child = details.children[0];
-  const labelWidth = clamp(child.label.length, LABEL_MIN, LABEL_MAX);
-  const label = truncateToWidth(child.label, labelWidth, "…", true);
-  const cells = [`${theme.fg("dim", "▸")} ${label}`];
-  const model = sanitizeTerminalText(modelEffort(child.modelId, child.thinking, MODEL_MAX));
-  if (model) cells.push(theme.fg("dim", truncateToWidth(model, MODEL_MAX, "…")));
-  return [truncateToWidth(cells.join(GAP), cap)];
+  const cells = [`${theme.fg("dim", "▸")} ${sanitizeTerminalText(child.label)}`];
+  const model = sanitizeTerminalText(formatFullModel(child.modelId, child.thinking));
+  if (model) cells.push(theme.fg("dim", model));
+  return wrapTextWithAnsi(cells.join("  "), Math.max(1, width));
 }
 
 /** Single-line call header line. */
@@ -100,10 +89,10 @@ export function callHeaderLine(label: string, theme: ThemeLike): string {
   return theme.fg("toolTitle", theme.bold(`subagent · ${sanitizeTerminalText(label)}`));
 }
 
-/** Single-line call header component shown above the rows. */
+/** Call header component that wraps the full label to the available width. */
 export function renderCallHeader(label: string, theme: ThemeLike): Component {
   return linesComponent(
-    (width) => [truncateToWidth(callHeaderLine(label, theme), Math.max(1, width))],
+    (width) => wrapTextWithAnsi(callHeaderLine(label, theme), Math.max(1, width)),
     "subagent call header",
   );
 }
@@ -115,7 +104,7 @@ class SubagentRowsComponent implements Component {
   private readonly draw = guardedLines("subagent rows", (width) =>
     this.details
       ? renderRows(this.details, this.theme, width)
-      : this.fallback.map((line) => truncateToWidth(line, Math.max(1, width))),
+      : this.fallback.flatMap((line) => wrapTextWithAnsi(line, Math.max(1, width))),
   );
   constructor(private readonly theme: ThemeLike) {}
   /** Stores the normalized snapshot; `details` is untrusted here. */

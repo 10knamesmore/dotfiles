@@ -7,6 +7,9 @@
 -- 它们卷进仓库。settings.json 也留给 Pi 按机器自行维护。
 granularity("home/.pi/agent", { mode = "children" })
 
+-- Mineral 的 default.lua 和 lua/meta 由程序生成；只链接仓库中的用户配置文件。
+granularity("home/.config/mineral", { mode = "children" })
+
 distribute("skills", {
   src = "tree/home/.agents/skills",
   to = { "~/.codex/skills", "~/.kimi/skills" },

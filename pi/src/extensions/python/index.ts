@@ -30,6 +30,9 @@ const Parameters = Type.Object(
   { additionalProperties: false },
 );
 
+/** Tool names this extension answers to; saved sessions from before the rename still use "python". */
+const PYTHON_TOOL_NAMES = new Set(["python_pi", "python"]);
+
 const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
@@ -86,19 +89,19 @@ export function registerPython(pi: ExtensionAPI): void {
     if (hadEnvironment || hasPythonHistory(ctx)) notifyEnvironmentCleared();
   });
   pi.on("tool_result", (event) => {
-    if (event.toolName !== "python") return;
+    if (event.toolName !== "python_pi") return;
     const details = event.details as PythonToolDetails | undefined;
     if (details) return { isError: details.outcome !== "completed" };
     return undefined;
   });
 
   const tool: ToolDefinition<typeof Parameters, PythonToolDetails | undefined> = {
-    name: "python",
+    name: "python_pi",
     label: "Python",
     description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
     promptSnippet: "Run Python calculations and data analysis with variables preserved across calls",
     promptGuidelines: [
-      "Use python for Python calculations and structured data analysis instead of wrapping Python code in bash. Reuse variables from earlier python calls",
+      "Use python_pi for Python calculations and structured data analysis instead of wrapping Python code in bash. Reuse variables from earlier python_pi calls",
     ],
     parameters: Parameters,
     executionMode: "sequential",
@@ -161,9 +164,9 @@ function hasPythonHistory(ctx: ExtensionContext): boolean {
     if (entry.type === "message") {
       const message = entry.message;
       if (
-        (message.role === "toolResult" && message.toolName === "python") ||
+        (message.role === "toolResult" && PYTHON_TOOL_NAMES.has(message.toolName)) ||
         (message.role === "assistant" &&
-          message.content.some((part) => part.type === "toolCall" && part.name === "python"))
+          message.content.some((part) => part.type === "toolCall" && PYTHON_TOOL_NAMES.has(part.name)))
       )
         return true;
     }

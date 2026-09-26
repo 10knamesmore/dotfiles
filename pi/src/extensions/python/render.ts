@@ -45,7 +45,7 @@ export function renderPythonCall(
   const preview = context.expanded ? source : lines.slice(0, 6).join("\n");
   const more = !context.expanded && lines.length > 6 ? theme.fg("dim", `\n… ${lines.length - 6} more lines`) : "";
   return new Text(
-    theme.fg("toolTitle", theme.bold("python")) +
+    theme.fg("toolTitle", theme.bold("python_pi")) +
       theme.fg("muted", ` · ${args.timeout ?? 60}s`) +
       (args.cwd ? theme.fg("muted", ` · ${clean(args.cwd)}`) : "") +
       (preview ? `\n${highlightCode(preview, "python").join("\n")}` : "") +
