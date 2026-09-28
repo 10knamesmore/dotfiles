@@ -81,8 +81,8 @@ opt.inccommand = "nosplit"
 -- 跳回一堆已关 buffer 的场景很常见。
 opt.jumpoptions = "view,clean"
 
---每个窗口都有一个状态栏
-opt.laststatus = 2
+-- 每个标签页底部只显示一条状态栏，内容跟随当前窗口。
+opt.laststatus = 3
 
 -- 尽量在单词边界换行
 opt.linebreak = true -- Wrap lines at convenient points

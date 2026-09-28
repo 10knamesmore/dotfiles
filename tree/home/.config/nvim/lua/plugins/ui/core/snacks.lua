@@ -265,14 +265,6 @@ return {
           },
         },
       },
-      zen = {
-        toggles = {
-          dim = false,
-        },
-        win = {
-          width = 160,
-        },
-      },
     }
 
     return opts
@@ -280,7 +272,6 @@ return {
   keys = function()
     require("snacks").toggle.diagnostics():map("<leader>ud")
     require("snacks").toggle.dim():map("<leader>uD")
-    require("snacks").toggle.zen():map("<leader>uz")
     local keys = {
       {
         ".",
