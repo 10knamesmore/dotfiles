@@ -172,7 +172,7 @@ return {
       -- 这里面抛错不会归到 nvim-lspconfig、也不走通知，只以裸
       -- "vim.schedule callback: lsp.lua:xxx" 出现。所以自己兜一层。
       local ok, err = pcall(function()
-        -- setup autoformat
+        -- Conform 没有可用 formatter 时，用 LSP 手动格式化。
         Util.format.register(Util.lsp.formatter())
 
         -- setup keymaps

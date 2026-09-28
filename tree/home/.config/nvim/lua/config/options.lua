@@ -1,6 +1,3 @@
--- 手动格式化
-vim.g.autoformat = false
-
 local opt = vim.opt
 
 -- 运行 next等 自动写入

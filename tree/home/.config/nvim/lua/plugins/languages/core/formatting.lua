@@ -1,5 +1,5 @@
 -- Formatting 核心插件：conform.nvim
--- 通过 utils.format 注册为 primary formatter，由 `=` 键触发
+-- `=` 格式化并保存；普通 `:w` 仅保存。
 return {
   {
     "stevearc/conform.nvim",
@@ -18,11 +18,11 @@ return {
       {
         "=",
         function()
-          require("utils.format").format({ force = true })
-          vim.cmd("w")
+          require("utils.format").format()
+          vim.cmd("write")
         end,
         mode = { "n", "x", "v" },
-        desc = "Format File",
+        desc = "Format and Save File",
       },
     },
     init = function()

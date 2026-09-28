@@ -25,10 +25,6 @@ map("n", "<leader>uI", function()
   vim.api.nvim_input("I")
 end, { desc = "Inspect Tree" })
 
-map("n", "<leader>uf", function()
-  utils.format.toggle()
-end, { desc = "Toggle Auto Format" })
-
 map("n", "<leader>uh", function()
   local bufnr = vim.api.nvim_get_current_buf()
   local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr })

@@ -1,13 +1,5 @@
--- 格式化工具模块
--- 提供代码格式化功能，包括自动格式化和手动格式化
-
----@class util.format
----@overload fun(opts?: {force?:boolean})
-local M = setmetatable({}, {
-  __call = function(m, ...)
-    return m.format(...)
-  end,
-})
+-- 手动格式化工具：选择已注册的 formatter，由 `=` 键调用。
+local M = {}
 
 ---@class Formatter
 ---@field name string
@@ -55,89 +47,9 @@ function M.resolve(buf)
   end, M.formatters)
 end
 
---- 显示当前缓冲区的格式化状态与可用格式化器列表。
----@param buf? number
-function M.info(buf)
-  buf = buf or vim.api.nvim_get_current_buf()
-  local Util = require("utils")
-  local gaf = vim.g.autoformat == nil or vim.g.autoformat
-  local baf = vim.b[buf].autoformat
-  local enabled = M.enabled(buf)
-  local lines = {
-    "# Status",
-    ("- [%s] global **%s**"):format(gaf and "x" or " ", gaf and "enabled" or "disabled"),
-    ("- [%s] buffer **%s**"):format(
-      enabled and "x" or " ",
-      baf == nil and "inherit" or baf and "enabled" or "disabled"
-    ),
-  }
-  local have = false
-  for _, formatter in ipairs(M.resolve(buf)) do
-    if #formatter.resolved > 0 then
-      have = true
-      lines[#lines + 1] = "\n# " .. formatter.name .. (formatter.active and " ***(active)***" or "")
-      for _, line in ipairs(formatter.resolved) do
-        lines[#lines + 1] = ("- [%s] **%s**"):format(formatter.active and "x" or " ", line)
-      end
-    end
-  end
-  if not have then
-    lines[#lines + 1] = "\n***No formatters available for this buffer.***"
-  end
-  Util[enabled and "info" or "warn"](
-    table.concat(lines, "\n"),
-    { title = "Format (" .. (enabled and "enabled" or "disabled") .. ")" }
-  )
-end
-
---- 检查指定缓冲区是否启用自动格式化。
----@param buf? number
----@return boolean
-function M.enabled(buf)
-  buf = (buf == nil or buf == 0) and vim.api.nvim_get_current_buf() or buf
-  local gaf = vim.g.autoformat
-  local baf = vim.b[buf].autoformat
-
-  -- 如果 buffer 有局部值，使用它
-  if baf ~= nil then
-    return baf
-  end
-
-  -- 否则使用全局值，默认 true
-  return gaf == nil or gaf
-end
-
---- 切换全局或缓冲区级别的格式化开关。
----@param buf? boolean
-function M.toggle(buf)
-  M.enable(not M.enabled(), buf)
-end
-
---- 启用或禁用格式化，并刷新状态提示。
----@param enable? boolean
----@param buf? boolean
-function M.enable(enable, buf)
-  if enable == nil then
-    enable = true
-  end
-  if buf then
-    vim.b.autoformat = enable
-  else
-    vim.g.autoformat = enable
-    vim.b.autoformat = nil
-  end
-  M.info()
-end
-
---- 对目标缓冲区执行格式化。
----@param opts? {force?:boolean, buf?:number}
-function M.format(opts)
-  opts = opts or {}
-  local buf = opts.buf or vim.api.nvim_get_current_buf()
-  if not ((opts and opts.force) or M.enabled(buf)) then
-    return
-  end
-
+--- 格式化当前缓冲区；没有可用 formatter 时提示用户。
+function M.format()
+  local buf = vim.api.nvim_get_current_buf()
   local Util = require("utils")
   local done = false
   for _, formatter in ipairs(M.resolve(buf)) do
@@ -149,7 +61,7 @@ function M.format(opts)
     end
   end
 
-  if not done and opts and opts.force then
+  if not done then
     Util.warn("No formatter available", { title = "Format" })
   end
 end
