@@ -83,6 +83,12 @@ return {
             check = {
               command = "clippy",
             },
+            -- 补全文档显示完整函数签名（含 pub/泛型/where 子句；默认只给参数+返回类型）
+            completion = {
+              fullFunctionSignatures = {
+                enable = true,
+              },
+            },
             diagnostics = {
               enable = true,
               -- schema 里是复数 warningsAsHint（rust-analyzer --print-config-schema）
@@ -107,6 +113,10 @@ return {
             inlayHints = {
               closureCaptureHints = {
                 enable = true,
+              },
+              -- 无字段枚举显示判别值（= 0/1/…）
+              discriminantHints = {
+                enable = "fieldless",
               },
             },
             procMacro = {

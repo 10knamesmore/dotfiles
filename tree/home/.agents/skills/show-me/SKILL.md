@@ -3,7 +3,7 @@ name: show-me
 description: Help the user understand the current topic visually with concise diagrams, code-shape sketches, and focused HTML artifacts.
 ---
 
-用**中文**
+用**中文**, 用dark theme
 
 Help the user understand the current topic of conversation visually. Skip the preamble and keep prose brief. Pick the smallest view that makes the key point clear.
 
@@ -116,7 +116,7 @@ function expandSkill(command: string): string {
 }
 ```
 
-- For a visual UI, layout, state comparison, or concept too dense for Mermaid, write one focused HTML file — a diagram, an infographic, or a short slide deck, whichever fits the point. Match the product's colors, type, spacing, and components; use real labels and data; only support desktop. Then open it for the user:
+- For a visual UI, layout, state comparison, or concept too dense for Mermaid, write one focused HTML file in dark theme — a diagram, an infographic, or a short slide deck, whichever fits the point. Match the product's colors, type, spacing, and components; use real labels and data; only support desktop. Then open it for the user:
 
 ```
 Bash(open path/to/show-me-{description}.html)

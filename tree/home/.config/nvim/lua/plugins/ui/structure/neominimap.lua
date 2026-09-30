@@ -4,12 +4,19 @@ return {
   version = "v3.x.x",
   lazy = false, -- 作者推荐不使用 lazy load，以便正确挂载 buffer/window 监听
   keys = {
-    { "<leader>m", "<cmd>Neominimap Toggle<cr>", desc = "Toggle Global Minimap" },
+    {
+      "<leader>m",
+      function()
+        vim.cmd("Neominimap Toggle")
+        vim.defer_fn(place_minimaps_in_right_padding, 50)
+      end,
+      desc = "Toggle Global Minimap",
+    },
   },
   init = function()
     ---@type Neominimap.UserConfig
     vim.g.neominimap = {
-      auto_enable = true, -- 打开文件时默认启用小地图
+      auto_enable = false,
       log_level = vim.log.levels.OFF,
       notification_level = vim.log.levels.INFO,
 
