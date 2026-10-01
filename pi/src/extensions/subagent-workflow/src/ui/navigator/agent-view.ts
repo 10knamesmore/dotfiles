@@ -4,7 +4,7 @@ import { Input, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { SubagentStatus, UsageSummary } from "../../types.js";
 import { formatTokenUsage, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
-import { keyToAction } from "./controls.js";
+import { keyToAction, scrollDistance } from "./controls.js";
 import {
   blockCanCollapse,
   blockIsExpanded,
@@ -170,7 +170,7 @@ export class AgentView {
     if (this.selectedId && !present.has(this.selectedId)) this.selectedId = undefined;
     const layout = renderTranscript(
       blocks,
-      { expanded: this.expanded, selectedId: this.selectedId, outputOnly: this.outputOnly },
+      { expanded: this.expanded, outputOnly: this.outputOnly },
       this.lastWidth,
       this.lastTheme,
       getMarkdownTheme(),
@@ -212,9 +212,6 @@ export class AgentView {
     this.autoScroll = false;
     if (block.start < this.scrollOffset || block.start >= this.scrollOffset + this.lastViewport)
       this.scrollOffset = block.start;
-    // An explicit focus move owns the viewport; do not re-anchor to the old block on the next render.
-    this.lastLayout = undefined;
-    this.invalidate();
   }
 
   private toggleSelected(): void {
@@ -279,11 +276,11 @@ export class AgentView {
   private scroll(keyId: string | undefined): boolean {
     const action = keyToAction(keyId, "agent");
     if (action.type !== "scroll" && action.type !== "pageMove") return false;
-    const pages = action.type === "scroll" ? action.pages : action.delta;
-    const distance = Math.max(1, Math.floor(this.lastViewport * Math.abs(pages)));
+    const amount = action.type === "scroll" ? action.amount : { pages: action.delta };
+    const distance = scrollDistance(amount, this.lastViewport);
     const max = Math.max(0, this.currentTranscript().layout.lines.length - this.lastViewport);
-    this.scrollOffset = Math.max(0, Math.min(max, this.scrollOffset + Math.sign(pages) * distance));
-    this.autoScroll = pages > 0 && this.scrollOffset >= max;
+    this.scrollOffset = Math.max(0, Math.min(max, this.scrollOffset + distance));
+    this.autoScroll = distance > 0 && this.scrollOffset >= max;
     return true;
   }
 
@@ -329,7 +326,11 @@ export class AgentView {
     const { layout } = this.currentTranscript();
     const max = Math.max(0, layout.lines.length - viewport);
     this.scrollOffset = this.autoScroll ? max : Math.min(this.scrollOffset, max);
-    for (let index = 0; index < viewport; index += 1) lines.push(layout.lines[this.scrollOffset + index] ?? "");
+    const selected = layout.blocks.find((block) => block.id === this.selectedId);
+    for (let index = 0; index < viewport; index += 1) {
+      const row = this.scrollOffset + index;
+      lines.push(selected?.start === row ? selected.selectedHeading : (layout.lines[row] ?? ""));
+    }
     const position = this.autoScroll ? (this.isActive() ? "Following latest" : "End of transcript") : "Reading history";
     lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · Space fold`));
     if (this.composer) {

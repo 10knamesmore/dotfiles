@@ -8,14 +8,18 @@ const TRANSCRIPT_MAX_LINES = 2_000;
 
 export interface TranscriptDisplayState {
   expanded: ReadonlyMap<string, boolean>;
-  selectedId?: string;
   outputOnly: boolean;
 }
 
 /** Row ranges let selection and scroll anchors follow blocks after folding or streaming changes. */
 export interface TranscriptLayout {
   lines: string[];
-  blocks: Array<{ id: string; start: number; end: number; collapsible: boolean }>;
+  blocks: Array<{ id: string; start: number; end: number; collapsible: boolean; selectedHeading: string }>;
+}
+
+interface RenderedBlock {
+  lines: string[];
+  selectedHeading: string;
 }
 
 function toolStatusLabel(block: ToolBlock): string {
@@ -73,7 +77,7 @@ function renderBlock(
   maxLines: number,
   theme: ThemeLike,
   markdownTheme: MarkdownTheme,
-): string[] {
+): RenderedBlock {
   const expanded = blockIsExpanded(block, state.expanded) && !(state.outputOnly && block.kind === "tool");
   const color = blockColor(block);
   const inner = Math.max(1, width - 4);
@@ -123,10 +127,11 @@ function renderBlock(
       : boundedBody(new Markdown(block.body.text, 0, 0, markdownTheme).render(inner), bodyLimit, block.body.elided);
   }
   body = boundedBody(body, bodyLimit, false);
-  return [heading, ...body].map((line, index) => {
-    const border = theme.fg(color, index === 0 && state.selectedId === block.id ? "❯ │ " : "  │ ");
-    return truncateToWidth(`${border}${line}`, width);
-  });
+  const border = theme.fg(color, "  │ ");
+  return {
+    lines: [heading, ...body].map((line) => truncateToWidth(`${border}${line}`, width)),
+    selectedHeading: truncateToWidth(`${theme.fg(color, "❯ │ ")}${heading}`, width),
+  };
 }
 
 /** Show failed tools even in output-only mode; successful tool details and thinking start folded. */
@@ -146,7 +151,7 @@ export function renderTranscript(
   );
   const turns = new Map<string, number>();
   for (const block of blocks) if (block.turn && !turns.has(block.turn)) turns.set(block.turn, turns.size + 1);
-  const rendered: Array<{ block: TranscriptBlock; lines: string[] }> = [];
+  const rendered: Array<RenderedBlock & { block: TranscriptBlock }> = [];
   let remaining = TRANSCRIPT_MAX_LINES - 2;
   let omitted = false;
   for (let index = visible.length - 1; index >= 0; index -= 1) {
@@ -155,20 +160,26 @@ export function renderTranscript(
       break;
     }
     const block = visible[index]!;
-    const lines = renderBlock(block, state, width, remaining - 2, theme, markdownTheme);
-    rendered.push({ block, lines });
-    remaining -= lines.length + 2;
+    const content = renderBlock(block, state, width, remaining - 2, theme, markdownTheme);
+    rendered.push({ block, ...content });
+    remaining -= content.lines.length + 2;
   }
   const layout: TranscriptLayout = { lines: [], blocks: [] };
   if (omitted) layout.lines.push(theme.fg("muted", "… older transcript blocks not shown"));
   let lastTurn: string | undefined;
-  for (const { block, lines } of rendered.reverse()) {
+  for (const { block, lines, selectedHeading } of rendered.reverse()) {
     if (layout.lines.length > 0) layout.lines.push("");
     if (block.turn && block.turn !== lastTurn) layout.lines.push(theme.fg("dim", `  Turn ${turns.get(block.turn)}`));
     lastTurn = block.turn;
     const start = layout.lines.length;
     layout.lines.push(...lines);
-    layout.blocks.push({ id: block.id, start, end: layout.lines.length, collapsible: blockCanCollapse(block) });
+    layout.blocks.push({
+      id: block.id,
+      start,
+      end: layout.lines.length,
+      collapsible: blockCanCollapse(block),
+      selectedHeading,
+    });
   }
   if (layout.lines.length === 0)
     layout.lines.push(theme.fg("muted", state.outputOnly ? "No output yet." : "No transcript yet."));

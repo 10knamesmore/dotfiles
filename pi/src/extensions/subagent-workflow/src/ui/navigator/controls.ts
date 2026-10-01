@@ -74,10 +74,17 @@ export function runActionAvailability(
   };
 }
 
+export type ScrollAmount = { lines: number } | { pages: number };
+
+export function scrollDistance(amount: ScrollAmount, viewportRows: number): number {
+  if ("lines" in amount) return amount.lines;
+  return Math.sign(amount.pages) * Math.max(1, Math.floor(viewportRows * Math.abs(amount.pages)));
+}
+
 type NavAction =
   | { type: "move"; delta: number }
   | { type: "pageMove"; delta: number }
-  | { type: "scroll"; pages: number }
+  | { type: "scroll"; amount: ScrollAmount }
   | { type: "drill" }
   | { type: "back" }
   | { type: "close" }
@@ -98,13 +105,13 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
     case "shift+j":
       return { type: "move", delta: 7 };
     case "ctrl+u":
-      return { type: "scroll", pages: -0.5 };
+      return { type: "scroll", amount: { lines: -1 } };
     case "ctrl+d":
-      return { type: "scroll", pages: 0.5 };
+      return { type: "scroll", amount: { lines: 1 } };
     case "ctrl+b":
-      return { type: "scroll", pages: -1 };
+      return { type: "scroll", amount: { pages: -0.5 } };
     case "ctrl+f":
-      return { type: "scroll", pages: 1 };
+      return { type: "scroll", amount: { pages: 0.5 } };
     case "pageup":
       return { type: "pageMove", delta: -1 };
     case "pagedown":
@@ -159,6 +166,6 @@ export function footerHint(state: FooterState, theme: ThemeLike): string {
     if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
     parts.push("esc/h back");
   }
-  parts.push("ctrl+u/d ½ page", "ctrl+b/f page");
+  parts.push("ctrl+u/d line", "ctrl+b/f ½ page");
   return theme.fg("dim", parts.join(" · "));
 }

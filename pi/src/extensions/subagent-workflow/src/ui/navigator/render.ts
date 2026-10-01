@@ -22,8 +22,7 @@ import {
 } from "../format.js";
 import { sumUsage } from "../../store/run-store.js";
 import { sanitizeTerminalText } from "../sanitize.js";
-import type { FilterMode } from "./controls.js";
-import { orderedChildren } from "./controls.js";
+import { orderedChildren, scrollDistance, type FilterMode, type ScrollAmount } from "./controls.js";
 import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
 
 const LABEL_MAX = 30;
@@ -57,23 +56,23 @@ export function scrollWindow(total: number, active: number, cap: number): Scroll
   return { start, count: cap, moreAbove: start > 0, moreBelow: start + cap < total };
 }
 
-function scrollPage(total: number, active: number, cap: number, pages: number): number {
+function scrollRows(total: number, active: number, cap: number, amount: ScrollAmount): number {
   const window = scrollWindow(total, active, cap);
-  const distance = Math.sign(pages) * Math.max(1, Math.floor(cap * Math.abs(pages)));
+  const distance = scrollDistance(amount, cap);
   const start = clamp(window.start + distance, 0, Math.max(0, total - cap));
   // Renderers center on a layout row; return the center of the requested viewport.
   return start + Math.floor(Math.min(cap, total) / 2);
 }
 
-/** Scroll the run list by full or fractional pages without changing the selected run. */
+/** Scroll the run list without changing the selected run. */
 export function scrollRunList(
   total: number,
   cursor: number,
-  pages: number,
+  amount: ScrollAmount,
   maxLines: number,
   currentRow?: number,
 ): number {
-  return scrollPage(total, currentRow ?? cursor, Math.max(1, maxLines - 3), pages);
+  return scrollRows(total, currentRow ?? cursor, Math.max(1, maxLines - 3), amount);
 }
 
 function selector(selected: boolean): string {
@@ -189,7 +188,7 @@ export function scrollRunDetail(
   detail: RunDetail,
   cursor: number,
   filter: FilterMode,
-  pages: number,
+  amount: ScrollAmount,
   maxLines: number,
   currentRow?: number,
 ): number {
@@ -198,7 +197,7 @@ export function scrollRunDetail(
   const selectedRow = layout
     ? Math.max(0, layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor))
     : cursor;
-  return scrollPage(layout?.length ?? order.length, currentRow ?? selectedRow, Math.max(1, maxLines - 4), pages);
+  return scrollRows(layout?.length ?? order.length, currentRow ?? selectedRow, Math.max(1, maxLines - 4), amount);
 }
 
 /** Level 2: run detail. `cursor` indexes the ordered (filtered) child list; output is at most `maxLines` tall. */

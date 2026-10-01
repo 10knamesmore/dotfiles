@@ -308,7 +308,7 @@ function openNavigator(
               state.scroll = scrollRunList(
                 runs.length,
                 state.cursor,
-                action.pages,
+                action.amount,
                 navigatorRowBudget(tui) - 3,
                 state.scroll,
               );
@@ -319,7 +319,7 @@ function openNavigator(
                 detail,
                 state.cursor,
                 state.filter,
-                action.pages,
+                action.amount,
                 navigatorRowBudget(tui) - 3,
                 state.scroll,
               );
@@ -380,11 +380,9 @@ function openNavigator(
         render: (width: number) => {
           const maxTotal = navigatorRowBudget(tui);
           const inner = Math.max(20, width - 4);
-          const runs = model.runs();
           const content = renderContent(
             state,
             model,
-            runs,
             agentView,
             theme,
             inner,
@@ -421,7 +419,6 @@ interface RenderedContent {
 function renderContent(
   state: NavigatorState,
   model: NavigatorModel,
-  runs: RunSummary[],
   agentView: AgentView | undefined,
   theme: ThemeLike,
   inner: number,
@@ -469,6 +466,7 @@ function renderContent(
       hasSpinner: detail.children.some((child) => child.status === "running"),
     };
   }
+  const runs = model.runs();
   state.reconcileRuns(runs);
   const selectedRunId = state.currentRunId(runs);
   const actions = selectedRunId ? actionsFor(model.detail(selectedRunId)) : { canStop: false };
