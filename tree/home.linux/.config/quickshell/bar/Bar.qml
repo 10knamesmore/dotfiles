@@ -31,9 +31,9 @@ PanelWindow {
     anchors.right: true
     implicitHeight: root.barHeight + (root.transientReveal ? root.trackingBandHeight : 0)
     exclusiveZone: root.revealed ? 50 : 0
-    margins.top: root.revealed ? BarLayout.current.topMargin : -(root.implicitHeight + 12)
-    margins.left: BarLayout.current.sideMargin
-    margins.right: BarLayout.current.sideMargin
+    margins.top: root.revealed ? BarLayout.topMargin : -(root.implicitHeight + 12)
+    margins.left: BarLayout.sideMargin
+    margins.right: BarLayout.sideMargin
     color: "transparent"
     // 单独 namespace
     WlrLayershell.namespace: "quickshell-bar"
@@ -50,40 +50,22 @@ PanelWindow {
             id: barHover
         }
 
-        // ── floating 悬浮底板（barBackground 预设才显示）──
-        Rectangle {
-            id: barPlate
-
-            anchors.fill: parent
-            visible: BarLayout.current.barBackground
-            radius: BarLayout.current.squareCorners ? 0 : Tokens.radiusL
-            color: Colors.withAlpha(Colors.base, BarLayout.current.barAlpha)
-            border.color: Colors.overlay(Tokens.borderAlpha)
-            border.width: BarLayout.current.barBackground ? Tokens.borderWidth : 0
-
-            SoftShadow {
-                anchors.fill: parent
-                radius: parent.radius
-                visible: BarLayout.current.barBackground
-            }
-        }
-
         // ── 左区 ──
         RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: 4
-            spacing: BarLayout.current.spacing
+            spacing: BarLayout.spacing
             height: parent.height
 
             Repeater {
-                model: BarLayout.current.leftWidgets
+                model: BarLayout.leftWidgets
 
                 delegate: WidgetSlot {
                     required property var modelData
 
                     widgetItem: modelData
-                    flat: BarLayout.current.moduleFlat
+                    flat: BarLayout.moduleFlat
                     barScreen: root.modelData
                     barWindow: root
                     Layout.preferredWidth: implicitWidth
@@ -95,17 +77,17 @@ PanelWindow {
         // ── 中区 ──
         RowLayout {
             anchors.centerIn: parent
-            spacing: BarLayout.current.spacing
+            spacing: BarLayout.spacing
             height: parent.height
 
             Repeater {
-                model: BarLayout.current.centerWidgets
+                model: BarLayout.centerWidgets
 
                 delegate: WidgetSlot {
                     required property var modelData
 
                     widgetItem: modelData
-                    flat: BarLayout.current.moduleFlat
+                    flat: BarLayout.moduleFlat
                     barScreen: root.modelData
                     barWindow: root
                     Layout.preferredWidth: implicitWidth
@@ -119,17 +101,17 @@ PanelWindow {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: 4
-            spacing: BarLayout.current.spacing
+            spacing: BarLayout.spacing
             height: parent.height
 
             Repeater {
-                model: BarLayout.current.rightWidgets
+                model: BarLayout.rightWidgets
 
                 delegate: WidgetSlot {
                     required property var modelData
 
                     widgetItem: modelData
-                    flat: BarLayout.current.moduleFlat
+                    flat: BarLayout.moduleFlat
                     barScreen: root.modelData
                     barWindow: root
                     Layout.preferredWidth: implicitWidth

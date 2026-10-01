@@ -23,7 +23,6 @@ PanelOverlay {
     readonly property int volumePct: AudioService.volume
     readonly property bool volumeMuted: AudioService.muted
     property bool nightLightEnabled: false
-    property bool caffeineEnabled: false
     // 电源档位（power-profiles-daemon 的 ActiveProfile），由面板开关切换，daemon 自己持久化
     property string powerProfile: "balanced"
     // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
@@ -38,7 +37,6 @@ PanelOverlay {
         btDeviceProc.running = true;
         brightnessProc.running = true;
         nightLightReader.running = true;
-        caffeineCheckProc.running = true;
         powerProfileProc.running = true;
         // 音量直接 binding Pipewire，无需 polling
     }
@@ -64,18 +62,6 @@ PanelOverlay {
         nightLightApplier.command = [root._effectsScript, "apply"];
         nightLightApplier.running = true;
         root.nightLightEnabled = !root.nightLightEnabled;
-    }
-
-    function toggleCaffeine() {
-        if (root.caffeineEnabled) {
-            caffeineStopProc.command = ["sh", "-c", "kill $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null; rm -f /tmp/quickshell-caffeine.pid"];
-            caffeineStopProc.running = true;
-            root.caffeineEnabled = false;
-        } else {
-            caffeineStartProc.command = ["sh", "-c", "systemd-inhibit --what=idle --who=quickshell --why=caffeine sleep infinity & echo $! > /tmp/quickshell-caffeine.pid"];
-            caffeineStartProc.running = true;
-            root.caffeineEnabled = true;
-        }
     }
 
     // 均衡 ↔ 性能：只动 PPD 的 ActiveProfile，它会把 platform_profile 和 EPP 一起切
@@ -209,28 +195,6 @@ PanelOverlay {
         id: nightLightApplier
     }
 
-    // 咖啡因 — systemd-inhibit (通过 PID 文件管理)
-    Process {
-        id: caffeineStartProc
-    }
-
-    Process {
-        id: caffeineStopProc
-    }
-
-    Process {
-        id: caffeineCheckProc
-
-        command: ["sh", "-c", "kill -0 $(cat /tmp/quickshell-caffeine.pid 2>/dev/null) 2>/dev/null && echo 1 || echo 0"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                return root.caffeineEnabled = data.trim() === "1";
-            }
-        }
-
-    }
-
     // 电源档位：power-profiles-daemon，D-Bus property 读写等价 powerprofilesctl get/set
     //（用 busctl 免掉 python-gobject 可选依赖，busctl 是 systemd 自带）
     Process {
@@ -361,14 +325,6 @@ PanelOverlay {
                 }
 
                 QuickToggle {
-                    icon: SystemState.dndEnabled ? "󰂛" : "󰂚"
-                    label: "勿扰"
-                    status: SystemState.dndEnabled ? "已开启" : "已关闭"
-                    toggled: SystemState.dndEnabled
-                    onClicked: SystemState.dndEnabled = !SystemState.dndEnabled
-                }
-
-                QuickToggle {
                     icon: root.volumeMuted ? "" : "󰕾"
                     label: "静音"
                     status: root.volumeMuted ? "已静音" : "未静音"
@@ -382,14 +338,6 @@ PanelOverlay {
                     status: root.nightLightEnabled ? "已开启" : "已关闭"
                     toggled: root.nightLightEnabled
                     onClicked: root.toggleNightLight()
-                }
-
-                QuickToggle {
-                    icon: root.caffeineEnabled ? "󰅶" : "󰾪"
-                    label: "咖啡因"
-                    status: root.caffeineEnabled ? "保持唤醒" : "已关闭"
-                    toggled: root.caffeineEnabled
-                    onClicked: root.toggleCaffeine()
                 }
 
                 QuickToggle {
@@ -412,27 +360,6 @@ PanelOverlay {
                     }
                 }
 
-            }
-
-            Divider {
-                Layout.fillWidth: true
-            }
-
-            // ── 主题切换 ──
-            SectionLabel {
-                text: "主题"
-            }
-
-            ThemePicker {
-                Layout.fillWidth: true
-            }
-
-            SectionLabel {
-                text: "栏样式"
-            }
-
-            BarStylePicker {
-                Layout.fillWidth: true
             }
 
             Divider {

@@ -27,7 +27,7 @@ node_modules
 
 __pycache__
 
-cli/target/
+**/*/target/
 
 .superpowers/
 
