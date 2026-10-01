@@ -53,6 +53,8 @@ PanelWindow {
         // ── 左区 ──
         RowLayout {
             anchors.left: parent.left
+            anchors.right: centerRow.left
+            anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: 4
             spacing: BarLayout.spacing
@@ -68,14 +70,20 @@ PanelWindow {
                     flat: BarLayout.moduleFlat
                     barScreen: root.modelData
                     barWindow: root
+                    Layout.fillWidth: modelData === "navigation"
+                    Layout.minimumWidth: modelData === "navigation" ? 0 : implicitWidth
+                    Layout.maximumWidth: implicitWidth
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: implicitHeight
                 }
             }
+
+            Item { Layout.fillWidth: true }
         }
 
         // ── 中区 ──
         RowLayout {
+            id: centerRow
             anchors.centerIn: parent
             spacing: BarLayout.spacing
             height: parent.height

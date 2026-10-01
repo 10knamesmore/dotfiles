@@ -4,33 +4,61 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 网络状态单例。每五秒全局运行一次 network_status.sh，NetworkModule 只读取本单例，
-// 因而多显示器不会重复采集同一份主机状态。
 Singleton {
     id: root
 
-    property string iconText: "󰤮"
-    property string valueText: "…"
-    property string tooltipText: ""
-    property bool disconnected: false
+    property string connectionType: "disconnected"
+    property string interfaceName: ""
+    property string address: ""
+    property string ssid: ""
+    property int signalStrength: 0
+    readonly property bool disconnected: connectionType === "disconnected"
 
     Process {
         id: reader
 
-        command: [Quickshell.env("DOTS_SCRIPTS") + "/network_status.sh"]
+        command: ["bash", "-c", `
+            set -euo pipefail
+            export LC_ALL=C
+            iface=$(ip route show default | awk 'NR == 1 {print $5}')
+            if [[ -z "$iface" ]]; then
+                printf 'disconnected\\n'
+                exit
+            fi
+            if [[ -d "/sys/class/net/$iface/wireless" ]]; then
+                printf 'wifi\\n'
+            else
+                printf 'ethernet\\n'
+            fi
+            printf '%s\\n' "$iface"
+            ip -4 -o addr show dev "$iface" | awk 'BEGIN {ORS=""} /inet / {print $4 " "} END {print "\\n"}'
+            if [[ -d "/sys/class/net/$iface/wireless" ]]; then
+                nmcli -t --escape no -f ACTIVE,SIGNAL,SSID dev wifi list ifname "$iface" --rescan no
+            fi
+        `]
 
-        stdout: SplitParser {
-            onRead: (data) => {
-                try {
-                    let obj = JSON.parse(data);
-                    root.iconText = obj.icon ?? "󰤮";
-                    root.valueText = obj.value ?? "";
-                    root.tooltipText = obj.tooltip ?? "";
-                    root.disconnected = obj.class === "disconnected";
-                } catch (e) {
-                    root.valueText = data;
-                }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = text.split("\n");
+                const activeNetwork = lines.slice(3).find(line => line.startsWith("yes:"));
+                root.connectionType = lines[0];
+                root.interfaceName = lines[1] ?? "";
+                root.address = (lines[2] ?? "").trim();
+                root.ssid = activeNetwork ? activeNetwork.substring(activeNetwork.indexOf(":", 4) + 1) : "";
+                root.signalStrength = activeNetwork ? Number(activeNetwork.split(":")[1]) : 0;
             }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "")
+                    console.warn("Network status:", text.trim());
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 || exitStatus !== 0)
+                console.warn("Network status collection failed:", exitCode, exitStatus);
         }
     }
 
@@ -39,9 +67,6 @@ Singleton {
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: {
-            reader.running = false;
-            reader.running = true;
-        }
+        onTriggered: reader.running = true
     }
 }

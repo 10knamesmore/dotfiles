@@ -7,10 +7,15 @@ import QtQuick
 BarModule {
     id: root
 
-    // 网络状态收口到 NetworkService 单例（全局一次 fork），本模块只渲染
-    readonly property string iconText: NetworkService.iconText
-    readonly property string valueText: NetworkService.valueText
-    readonly property string tooltipText: NetworkService.tooltipText
+    readonly property bool wifi: NetworkService.connectionType === "wifi"
+    readonly property string iconText: disconnected ? "󰤮" : wifi
+        ? ["󰤟", "󰤢", "󰤥", "󰤨"][Math.min(3, Math.floor(NetworkService.signalStrength / 25))]
+        : "󰈁"
+    readonly property string valueText: disconnected ? "Disconnected"
+        : wifi ? NetworkService.ssid : NetworkService.interfaceName
+    readonly property string detailText: disconnected ? "" : wifi
+        ? "信号: " + NetworkService.signalStrength + "% · IP: " + NetworkService.address
+        : "IP: " + NetworkService.address
     readonly property bool disconnected: NetworkService.disconnected
 
     accentColor: Colors.sky
@@ -36,6 +41,15 @@ BarModule {
             font.pixelSize: Fonts.icon
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
+
+            Text {
+                anchors.centerIn: parent
+                z: -1
+                visible: root.wifi
+                text: "󰤨"
+                color: Colors.surface2
+                font: icon.font
+            }
         }
 
         Text {
@@ -56,10 +70,9 @@ BarModule {
 
         }
 
-        // 悬停与面板使用同一段 IP/SSID 摘要，收起时跟随轮廓收回。
         Text {
             id: detail
-            text: root.tooltipText.split("\n")[0]
+            text: root.detailText
             visible: root.detailProgress > 0 && text !== ""
             width: Math.min(implicitWidth, Math.max(0, label.parent.width - root.compactWidth + 27)) * root.detailProgress
             elide: Text.ElideRight

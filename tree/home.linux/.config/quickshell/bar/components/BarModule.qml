@@ -130,18 +130,10 @@ Rectangle {
     }
 
     Behavior on color {
-        ColorAnimation {
-            duration: Tokens.animFast
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: Anim.standard
-        }
+        BarColorAnimation {}
     }
     Behavior on border.color {
-        ColorAnimation {
-            duration: Tokens.animFast
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: Anim.standard
-        }
+        BarColorAnimation {}
     }
     Behavior on hoverReveal {
         enabled: !root.headerInPanel
@@ -149,7 +141,7 @@ Rectangle {
     }
     Behavior on implicitWidth {
         enabled: !root.headerInPanel
-        NumberAnimation { duration: Tokens.animSlow; easing.type: Easing.OutCubic }
+        BarWidthAnimation {}
     }
     Behavior on scale {
         enabled: !root.headerInPanel

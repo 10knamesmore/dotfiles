@@ -1,0 +1,5 @@
+singleton WindowUpdates 1.0 WindowUpdates.qml
+NavigationModule 1.0 NavigationModule.qml
+WindowContext 1.0 WindowContext.qml
+WorkspaceStrip 1.0 WorkspaceStrip.qml
+WindowMap 1.0 WindowMap.qml

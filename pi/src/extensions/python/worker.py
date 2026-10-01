@@ -11,6 +11,7 @@ import platform
 import signal
 import sys
 import types
+from typing import Literal, cast, override
 
 
 WORKER_REQUEST_FD = 3
@@ -25,8 +26,9 @@ class SessionInterpreter(code.InteractiveInterpreter):
         main = types.ModuleType("__main__")
         sys.modules["__main__"] = main
         super().__init__(main.__dict__)
-        self.outcome = "completed"
+        self.outcome: Literal["completed", "python_error", "interrupted"] = "completed"
 
+    @override
     def runsource(self, source: str, filename: str = "<input>", symbol: str = "exec") -> bool:
         """Reject incomplete cells without retaining them for the next call."""
         if super().runsource(source, filename, symbol):
@@ -36,20 +38,23 @@ class SessionInterpreter(code.InteractiveInterpreter):
                 self.showsyntaxerror(filename)
         return False
 
-    def showsyntaxerror(self, filename: str | None = None) -> None:
+    @override
+    def showsyntaxerror(self, filename: str | None = None, **kwargs: str) -> None:
         """Mark a compilation failure while preserving the interpreter's traceback."""
         self.outcome = "python_error"
-        super().showsyntaxerror(filename)
+        super().showsyntaxerror(filename, **kwargs)
 
+    @override
     def showtraceback(self) -> None:
         """Mark a runtime failure while preserving the interpreter's traceback."""
         self.outcome = "python_error"
         super().showtraceback()
 
-    def runcode(self, compiled: types.CodeType) -> None:
+    @override
+    def runcode(self, code: types.CodeType) -> None:
         """Keep SystemExit and KeyboardInterrupt from terminating the session."""
         try:
-            exec(compiled, self.locals)
+            exec(code, self.locals)
         except KeyboardInterrupt:
             self.outcome = "interrupted"
             super().showtraceback()
@@ -113,13 +118,13 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
     filename = f"<python-{number}>"
     linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
     original_stdout, original_stderr = sys.stdout, sys.stderr
-    original_stdout.flush()
-    original_stderr.flush()
+    _ = original_stdout.flush()
+    _ = original_stderr.flush()
     saved_stdout, saved_stderr = os.dup(1), os.dup(2)
     output_fd = os.open(output_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
     try:
-        os.dup2(output_fd, 1)
-        os.dup2(output_fd, 2)
+        _ = os.dup2(output_fd, 1)
+        _ = os.dup2(output_fd, 2)
         stdout = io.TextIOWrapper(os.fdopen(os.dup(1), "wb", buffering=0), encoding="utf-8", errors="backslashreplace", write_through=True)
         stderr = io.TextIOWrapper(os.fdopen(os.dup(2), "wb", buffering=0), encoding="utf-8", errors="backslashreplace", write_through=True)
         sys.stdout, sys.stderr = stdout, stderr
@@ -128,7 +133,7 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
             executing = True
             send_event({"type": "started", "callId": call_id})
             with chdir(cwd):
-                interpreter.runsource(source, filename, symbol="exec")
+                _ = interpreter.runsource(source, filename, symbol="exec")
         except (OSError, ValueError):
             interpreter.showtraceback()
         except KeyboardInterrupt:
@@ -146,8 +151,8 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
             stdout.close()
             stderr.close()
     finally:
-        os.dup2(saved_stdout, 1)
-        os.dup2(saved_stderr, 2)
+        _ = os.dup2(saved_stdout, 1)
+        _ = os.dup2(saved_stderr, 2)
         os.close(saved_stdout)
         os.close(saved_stderr)
         os.close(output_fd)
@@ -166,7 +171,7 @@ def describe_environment() -> dict[str, object]:
 def main() -> None:
     """Read one LF-delimited request at a time until the controller closes fd3."""
     os.setpgid(0, 0)
-    signal.signal(signal.SIGINT, handle_sigint)
+    _ = signal.signal(signal.SIGINT, handle_sigint)
     # Resolve the SDK before user code can shadow it with a same-named module in the call cwd.
     install_terminal_ownership_hook()
     # An empty import path follows each call's cwd instead of pinning the startup directory.
@@ -175,7 +180,7 @@ def main() -> None:
     send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})
     with os.fdopen(WORKER_REQUEST_FD, "rb") as requests:
         for number, frame in enumerate(requests, start=1):
-            request = json.loads(frame.decode("utf-8"))
+            request = cast(dict[str, object], json.loads(frame.decode("utf-8")))
             execute_cell(interpreter, request, number)
 
 

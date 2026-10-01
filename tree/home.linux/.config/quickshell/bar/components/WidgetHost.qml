@@ -1,4 +1,5 @@
 import "../modules"
+import "../navigation"
 import "../../state"
 import QtQuick
 
@@ -19,12 +20,8 @@ Loader {
 
     sourceComponent: {
         switch (item.id) {
-        case "workspaces":
-            return cWorkspaces;
-        case "scrollstatus":
-            return cScrollStatus;
-        case "windowtitle":
-            return cWindowTitle;
+        case "navigation":
+            return cNavigation;
         case "tray":
             return cTray;
         case "netspeed":
@@ -58,17 +55,9 @@ Loader {
 
     // 上下文型
     Component {
-        id: cWorkspaces
-        WorkspacesModule {
+        id: cNavigation
+        NavigationModule {
             barScreen: host.barScreen
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cScrollStatus
-        ScrollStatusModule {
-            barScreen: host.barScreen
-            flat: host.flat
         }
     }
     Component {
@@ -87,12 +76,6 @@ Loader {
         }
     }
     // 普通型
-    Component {
-        id: cWindowTitle
-        WindowTitleModule {
-            flat: host.flat
-        }
-    }
     Component {
         id: cMedia
         MediaModule {

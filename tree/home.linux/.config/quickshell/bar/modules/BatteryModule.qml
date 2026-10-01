@@ -1,7 +1,6 @@
 import "../../theme"
 import "../components"
 import QtQuick
-import QtQuick.Layouts
 import Quickshell.Services.UPower
 
 BarModule {
@@ -63,7 +62,10 @@ BarModule {
         return "";
     }
 
-    implicitWidth: root.hovered ? Math.max(hoverRow.implicitWidth + 32, label.implicitWidth + 32) : label.implicitWidth + 32
+    readonly property real compactWidth: batteryIconText.implicitWidth + 5 + percentageText.implicitWidth + 32
+    readonly property real detailsWidth: statusLabel.implicitWidth + 16
+        + (remainingTime.text !== "" ? remainingTime.implicitWidth + 6 : 0)
+    implicitWidth: compactWidth + (hovered ? detailsWidth : 0)
     // 状态底色
     tintColor: {
         if (charging || full)
@@ -85,16 +87,13 @@ BarModule {
         return Colors.green;
     }
 
-    // ── 默认视图 ──
+    // 图标和百分比始终保留；状态与剩余时间随 hover 展开。
     Row {
-        id: label
-
-        visible: opacity > 0
-        opacity: 1 - root.hoverReveal
         anchors.centerIn: parent
-        spacing: 5
+        spacing: 0
 
         Text {
+            id: batteryIconText
             text: root.batteryIcon()
             color: root.accentColor
             font.family: Fonts.family
@@ -103,60 +102,43 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
         }
 
+        Item {
+            width: 5
+            height: 1
+        }
+
         Text {
+            id: percentageText
             text: root.pct + "%"
-            color: root.pct <= 10 ? Colors.red : (root.pct <= 30 ? Colors.peach : Colors.text)
+            color: root.hovered ? root.accentColor
+                : (root.pct <= 10 ? Colors.red : (root.pct <= 30 ? Colors.peach : Colors.text))
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
 
             Behavior on color {
-                ColorAnimation {
-                    duration: 300
-                }
+                ColorAnimation { duration: 300 }
             }
         }
-    }
 
-    // ── hover 视图：图标 + 百分比 + 状态 + 剩余时间 ──
-    Row {
-        id: hoverRow
-
-        visible: root.hoverDetailsVisible
-        opacity: root.hoverReveal
-        anchors.centerIn: parent
-        spacing: 6
-
-        Text {
-            text: root.batteryIcon()
-            color: root.accentColor
-            font.family: Fonts.family
-            font.pixelSize: Fonts.icon
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
+        Item {
+            width: 6 * root.hoverReveal
+            height: 1
         }
 
-        Text {
-            text: root.pct + "%"
-            color: root.accentColor
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
-        }
-
-        // 状态标签
         Rectangle {
-            color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.2)
+            visible: root.hoverDetailsVisible
+            color: Colors.withAlpha(root.accentColor, 0.2)
             radius: 4
-            width: statusText.implicitWidth + 10
-            height: statusText.implicitHeight + 4
+            width: (statusLabel.implicitWidth + 10) * root.hoverReveal
+            height: statusLabel.implicitHeight + 4
+            opacity: root.hoverReveal
+            clip: true
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
-                id: statusText
-
+                id: statusLabel
                 anchors.centerIn: parent
                 text: root.statusText()
                 color: root.accentColor
@@ -166,10 +148,18 @@ BarModule {
             }
         }
 
-        // 剩余时间
+        Item {
+            width: remainingTime.text !== "" ? 6 * root.hoverReveal : 0
+            height: 1
+        }
+
         Text {
-            visible: root.timeRemaining() !== ""
+            id: remainingTime
+            visible: root.hoverDetailsVisible && text !== ""
             text: root.timeRemaining()
+            width: implicitWidth * root.hoverReveal
+            opacity: root.hoverReveal
+            clip: true
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.caption

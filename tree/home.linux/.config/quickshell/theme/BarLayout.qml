@@ -2,7 +2,7 @@ pragma Singleton
 
 import QtQuick
 
-// Bar 布局 —「分组悬浮」：整栏无底板，左/中区散装模块，右区模块按组装进药丸
+// 顶栏布局：左侧导航信息带，中部独立模块，右侧按功能分组。
 QtObject {
     readonly property int spacing: 8
     readonly property int sideMargin: 6
@@ -10,7 +10,7 @@ QtObject {
     readonly property bool moduleFlat: true
 
     // widget 项支持：字符串 id / {id, props} / {group: [...]}
-    readonly property var leftWidgets: ["workspaces", "scrollstatus", "windowtitle", "tray"]
+    readonly property var leftWidgets: ["navigation", "tray"]
     readonly property var centerWidgets: [{
         "id": "netspeed",
         "props": {
