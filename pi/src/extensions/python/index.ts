@@ -37,10 +37,12 @@ const PYTHON_TOOL_NAMES = new Set(["python_pi", "python"]);
 const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
-const TERMINAL_SESSION_SKILL = fileURLToPath(new URL("./native/pi-terminal/skills/terminal-session/SKILL.md", import.meta.url));
+const TERMINAL_SESSION_SKILL = fileURLToPath(
+  new URL("./native/pi-terminal/skills/terminal-session/SKILL.md", import.meta.url),
+);
 
 const TOOL_DESCRIPTION =
-  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. stdin is unavailable. Output is limited, larger output is saved to a file.";
+  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable. Output is limited, larger output is saved to a file.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
@@ -106,7 +108,8 @@ export function registerPython(pi: ExtensionAPI): void {
     description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
     promptSnippet: "Run Python calculations and data analysis with variables preserved across calls",
     promptGuidelines: [
-      "Use python_pi for Python calculations and structured data analysis instead of wrapping Python code in bash. Reuse variables from earlier python_pi calls",
+      "Use python_pi for Python calculations and structured data analysis. Reuse variables from earlier python_pi calls",
+      "Prefer python_pi over running Python through bash, including heredoc scripts and python -c. ",
     ],
     parameters: Parameters,
     executionMode: "sequential",
