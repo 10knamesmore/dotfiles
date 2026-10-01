@@ -1,0 +1,282 @@
+{
+  "disable_ai": true,
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
+  "vim_mode": true,
+  "vim": {
+    "use_system_clipboard": "always"
+  },
+  "which_key": {
+    "enabled": true,
+    "delay_ms": 300
+  },
+  "relative_line_numbers": "enabled",
+  "vertical_scroll_margin": 4,
+  "soft_wrap": "editor_width",
+  "semantic_tokens": "combined",
+  "tab_size": 4,
+  "hard_tabs": false,
+
+  "autosave": "off",
+  "format_on_save": "off",
+
+  "ui_font_size": 16,
+
+  "buffer_font_family": "VictorMono Nerd Font Mono",
+  "buffer_font_fallbacks": ["Maple Mono NF CN"],
+  "buffer_font_size": 15,
+  "theme": {
+    "mode": "dark",
+    "dark": "Tokyo Night Moon",
+    "light": "Tokyo Night Light"
+  },
+
+  "theme_overrides": {
+    "Tokyo Night Moon": {
+      "syntax": {
+        "comment": { "font_style": "italic" },
+        "comment.doc": { "font_style": "italic" },
+        "comment.documentation": { "font_style": "italic" },
+        "function": { "font_style": "italic", "font_weight": 700 },
+        "function.call": { "font_style": "italic", "font_weight": 700 },
+        "function.method": { "font_style": "italic", "font_weight": 700 },
+        "function.method.call": { "font_style": "italic", "font_weight": 700 },
+        "function.builtin": { "color": "#65bcff" },
+        "function.macro": { "color": "#86e1fc" },
+        "keyword": {
+          "color": "#fca7ea",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "keyword.coroutine": {
+          "color": "#fca7ea",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "keyword.function": { "font_style": "italic", "font_weight": 700 },
+        "keyword.modifier": {
+          "color": "#fca7ea",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "keyword.return": {
+          "color": "#fca7ea",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "keyword.type": {
+          "color": "#fca7ea",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "keyword.import": { "color": "#86e1fc" },
+        "keyword.directive": { "color": "#86e1fc" },
+        "keyword.directive.define": { "color": "#86e1fc" },
+        "constant": { "font_style": "italic", "font_weight": 700 },
+        "constant.builtin": { "color": "#65bcff" },
+        "constant.macro": { "color": "#86e1fc" },
+        "boolean": { "font_style": "italic", "font_weight": 700 },
+        "string": { "font_style": "italic" },
+        "string.doc": { "color": "#ffc777" },
+        "string.documentation": { "color": "#ffc777" },
+        "string.regex": { "color": "#b4f9f8" },
+        "string.regexp": { "color": "#b4f9f8" },
+        "namespace": { "color": "#86e1fc" },
+        "property": { "color": "#4fd6be" },
+        "variable.member": { "color": "#4fd6be" },
+        "variable.parameter": { "color": "#ffc777" },
+        "type.builtin": { "color": "#589ed7" },
+        "type.interface": { "color": "#83c3fc" },
+        "type.interface.definition": { "color": "#83c3fc" },
+        "type.struct": { "color": "#65bcff" },
+        "type.struct.definition": { "color": "#65bcff" },
+        "enum": {
+          "color": "#86e1fc",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "type.enum": {
+          "color": "#86e1fc",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "type.enum.definition": {
+          "color": "#86e1fc",
+          "font_style": "italic",
+          "font_weight": 700
+        },
+        "type.enum.member": {
+          "color": "#ff966c",
+          "font_style": "italic",
+          "font_weight": 700
+        }
+      }
+    }
+  },
+  "minimap": {
+    "show": "auto"
+  },
+  "inlay_hints": {
+    "enabled": true
+  },
+  "code_lens": "on",
+  "project_panel": {
+    "dock": "left"
+  },
+  "outline_panel": {
+    "dock": "left"
+  },
+  "git_panel": {
+    "dock": "left"
+  },
+  "terminal": {
+    "shell": {
+      "with_arguments": {
+        "program": "zsh",
+        "args": ["-l"]
+      }
+    },
+    "working_directory": "current_project_directory",
+    "dock": "bottom",
+    "font_size": 14,
+    "option_as_meta": true
+  },
+
+  "auto_install_extensions": {
+    "tokyo-night": true,
+    "html": true,
+    "vue": true,
+    "toml": true,
+    "marksman": true,
+    "biome": true
+  },
+  "file_types": {
+    "Shell Script": [".zshrc_dotfiles", "yabairc"]
+  },
+  "languages": {
+    "Rust": {
+      "format_on_save": "off",
+      "formatter": "language_server"
+    },
+    "Shell Script": {
+      "formatter": "language_server"
+    },
+    "Markdown": {
+      "language_servers": ["marksman"],
+      "formatter": "prettier",
+      "remove_trailing_whitespace_on_save": false
+    },
+    "TypeScript": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "TSX": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "JavaScript": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "Vue.js": {
+      "formatter": "prettier"
+    },
+    "HTML": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "CSS": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "SCSS": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "JSON": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "JSONC": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    },
+    "YAML": {
+      "tab_size": 2,
+      "formatter": "prettier"
+    }
+  },
+  "global_lsp_settings": {
+    "semantic_token_rules": [
+      { "token_type": "builtinType", "style": ["type.builtin"] },
+      { "token_type": "selfKeyword", "style": ["variable.builtin"] },
+      { "token_type": "selfTypeKeyword", "style": ["variable.builtin"] },
+      { "token_type": "typeAlias", "style": ["type.definition"] }
+    ]
+  },
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "checkOnSave": true,
+        "check": {
+          "command": "clippy"
+        },
+        "cargo": {
+          "buildScripts": { "enable": true }
+        },
+        "procMacro": { "enable": true },
+        "references": {
+          "excludeTests": true,
+          "excludeImports": true
+        },
+        "completion": {
+          "fullFunctionSignatures": { "enable": true }
+        },
+        "diagnostics": {
+          "warningsAsHint": ["inactive-code"]
+        },
+        "inlayHints": {
+          "closureCaptureHints": { "enable": true },
+          "discriminantHints": { "enable": "fieldless" }
+        },
+        "lens": {
+          "references": {
+            "adt": { "enable": true },
+            "method": { "enable": true },
+            "trait": { "enable": true },
+            "enumVariant": { "enable": true }
+          }
+        }
+      }
+    },
+    "vtsls": {
+      "settings": {
+        "vtsls": {
+          "autoUseWorkspaceTsdk": true,
+          "experimental": {
+            "maxInlayHintLength": 30
+          }
+        },
+        "typescript": {
+          "suggest": { "completeFunctionCalls": true },
+          "inlayHints": {
+            "parameterNames": { "enabled": "literals" }
+          }
+        },
+        "javascript": {
+          "suggest": { "completeFunctionCalls": true },
+          "inlayHints": {
+            "parameterNames": { "enabled": "literals" }
+          }
+        }
+      }
+    },
+    "biome": {
+      "settings": {
+        "require_config_file": true
+      }
+    }
+  }
+}

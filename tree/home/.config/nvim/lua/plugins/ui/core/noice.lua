@@ -111,6 +111,10 @@ return {
       stages = "slide",
       timeout = 4000,
       top_down = true,
+      -- 通知是浮动窗口，但不应在最后一个编辑窗口关闭后接管焦点。
+      on_open = function(win)
+        vim.api.nvim_win_set_config(win, { focusable = false })
+      end,
     },
   },
 }

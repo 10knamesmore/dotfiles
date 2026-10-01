@@ -40,10 +40,13 @@ proxy() {
             export http_proxy="$url" https_proxy="$url" all_proxy="$url"
             export HTTP_PROXY="$url" HTTPS_PROXY="$url" ALL_PROXY="$url"
             export no_proxy="127.0.0.1,localhost,::1,xz07,non-convex.tech,.non-convex.tech" NO_PROXY="127.0.0.1,localhost,::1,xz07,non-convex.tech,.non-convex.tech"
+            # starship 的 env_var.proxy 直接读它显示，省掉每行提示符 fork 一次 shell 的开销。
+            export DOTS_PROXY_DISPLAY="${url#http://}"
             ;;
         off)
             unset http_proxy https_proxy all_proxy ftp_proxy
             unset HTTP_PROXY HTTPS_PROXY ALL_PROXY FTP_PROXY
+            unset DOTS_PROXY_DISPLAY
             print "proxy off"
             ;;
         status)

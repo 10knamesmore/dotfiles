@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { PythonSession, type PythonToolDetails } from "./session.js";
@@ -36,11 +37,15 @@ const PYTHON_TOOL_NAMES = new Set(["python_pi", "python"]);
 const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
+const TERMINAL_SESSION_SKILL = fileURLToPath(new URL("./native/pi-terminal/skills/terminal-session/SKILL.md", import.meta.url));
+
 const TOOL_DESCRIPTION =
   "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. stdin is unavailable. Output is limited, larger output is saved to a file.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
+  pi.on("resources_discover", () => ({ skillPaths: [TERMINAL_SESSION_SKILL] }));
+
   let session: PythonSession | undefined;
   const inspectionController = new AbortController();
 

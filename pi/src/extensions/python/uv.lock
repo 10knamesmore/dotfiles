@@ -768,6 +768,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "openai" },
+    { name = "pi-terminal-sdk" },
     { name = "pillow" },
     { name = "psutil" },
     { name = "rapidfuzz" },
@@ -783,6 +784,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "openai", specifier = ">=3.19.2" },
+    { name = "pi-terminal-sdk", directory = "native/pi-terminal" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "rapidfuzz", specifier = ">=3.14.6" },
@@ -791,6 +793,11 @@ requires-dist = [
     { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "tree-sitter-language-pack", specifier = ">=1.20.0" },
 ]
+
+[[package]]
+name = "pi-terminal-sdk"
+version = "0.1.0"
+source = { directory = "native/pi-terminal" }
 
 [[package]]
 name = "pillow"

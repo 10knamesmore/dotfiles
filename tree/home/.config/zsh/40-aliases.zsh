@@ -114,4 +114,4 @@ alias zja="zellij attach"
 # ================================
 # AI
 # ================================
-alias cc="codex"
+alias cc="codex --profile ftai"

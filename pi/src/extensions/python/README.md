@@ -6,6 +6,7 @@
 
 运行依赖由本目录的 `pyproject.toml` 和 `uv.lock` 管理，`.venv/` 是本地产物。需要 uv 和符合 `requires-python` 的解释器；uv 按自身配置查找或准备解释器。
 
+`native/pi-terminal/` 放的是rust构建的原生python模块，Python worker 通过本目录的 path dependency 构建它。
 工具参数：
 
 ```ts

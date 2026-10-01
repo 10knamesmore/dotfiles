@@ -10,6 +10,9 @@ granularity("home/.pi/agent", { mode = "children" })
 -- Mineral 的 default.lua 和 lua/meta 由程序生成；只链接仓库中的用户配置文件。
 granularity("home/.config/mineral", { mode = "children" })
 
+-- Zed 只管理配置文件；conversations、prompts、themes 等本地内容不纳入仓库。
+granularity("home/.config/zed", { mode = "children" })
+
 distribute("skills", {
   src = "tree/home/.agents/skills",
   to = { "~/.codex/skills", "~/.kimi/skills" },
@@ -21,6 +24,13 @@ dots.hook.before_sync({
   program = "pnpm",
   args = { "run", "update:pi" },
 })
+-- 构建本地 PyO3 wheel
+dots.hook.before_sync({
+  name = "prepare Pi Python environment",
+  cwd = dots.repo .. "/pi/src/extensions/python",
+  program = "uv",
+  args = { "sync", "--locked" },
+})
 
 -- Pi 逐个加载 extension；jiti 沿 source realpath 从 pi/node_modules 解析依赖。
 -- agent 目录也可能尚不存在，因此首次 sync 就要创建这些链接。
@@ -30,11 +40,6 @@ distribute("pi-extensions", {
   mode = "children",
   required = true,
 })
-dots.resource.symlink({
-  source = dots.repo .. "/pi/src/extensions/subagent-workflow/skills/workflow-authoring",
-  target = dots.home .. "/.pi/agent/skills/workflow-authoring",
-})
-
 -- 全局指令源统一放在 .agents；各工具从自己的全局目录加载同一文件。
 distribute("agents-md", {
   src = "tree/home/.agents/AGENTS.md",

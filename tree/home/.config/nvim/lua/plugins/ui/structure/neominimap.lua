@@ -2,13 +2,13 @@
 return {
   "Isrothy/neominimap.nvim",
   version = "v3.x.x",
+  enabled = false,
   lazy = false, -- 作者推荐不使用 lazy load，以便正确挂载 buffer/window 监听
   keys = {
     {
       "<leader>m",
       function()
         vim.cmd("Neominimap Toggle")
-        vim.defer_fn(place_minimaps_in_right_padding, 50)
       end,
       desc = "Toggle Global Minimap",
     },
@@ -52,7 +52,7 @@ return {
       current_line_position = "percent",
 
       --- 可选 "float"（浮动跟随）或 "split"（分屏固定侧边栏）
-      layout = "float",
+      layout = "split",
 
       split = {
         minimap_width = 20,

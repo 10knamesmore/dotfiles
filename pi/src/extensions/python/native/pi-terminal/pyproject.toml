@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "pi-terminal-sdk"
+version = "0.1.0"
+description = "Unix PTY and terminal screen SDK for Pi's Python worker"
+requires-python = ">=3.12"
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "pi_terminal"
+features = ["python-extension"]
+locked = true
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "src/**/*.rs" },
+]

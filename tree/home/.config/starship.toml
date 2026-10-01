@@ -10,7 +10,7 @@ $status$cmd_duration$python$rust$nodejs$memory_usage$jobs[─╮](fg:overlay2)
 """
 
 right_format          = """
-$localip$custom[─╯](fg:overlay2)
+$localip$env_var[─╯](fg:overlay2)
 """
 
 add_newline           = true
@@ -20,10 +20,6 @@ palette               = 'catppuccin_mocha'
 [profiles]
 transient             = """
 $time[> ](fg:green)
-"""
-
-rtransient            = """
-$directory$time[ <](fg:green)
 """
 
 [os]
@@ -88,30 +84,32 @@ truncation_symbol     = "…/"
 [git_branch]
 symbol                = "[](fg:peach bg:yellow) on  "
 style                 = "bg:yellow fg:crust"
-format                = '[$symbol$branch]($style)'
+format                = '[$symbol$branch( \($remote_name/$remote_branch\))]($style)'
 always_show_remote    = true
 
 [git_state]
 style                 = "bg:yellow fg:crust"
 
-[git_metrics]
-disabled              = false
-added_style           = "bold italic fg:dark_green bg:yellow"
-deleted_style         = "bold italic fg:dark_red bg:yellow"
-format                = "[ +$added]($added_style)[ ](bg:yellow)[-$deleted ]($deleted_style)"
-
 [git_status]
-format                = '[ $all_status$ahead_behind](bold italic fg:crust bg:yellow)[](fg:yellow)'
-conflicted            = "[👎$count](fg:dark_red bg:yellow)"
-ahead                 = "⇡$count"
+# 用细粒度变量替掉 $all_status：git status 的 X 列（已暂存）→ 大写 A/M/D/T，Y 列（未暂存）→ 小写 a/m/d/t。
+# 颜色按语义分：绿=暂存区增改、蓝=工作区增改、红=删除（两侧）与冲突、crust=未跟踪/重命名、lavender=stash。
+# 这些细粒度变量默认是空串、也不在 $all_status 里，必须像下面这样逐个写进 format 才会出现。
+format                = '[ $conflicted$renamed$index_added$index_modified$index_deleted$index_typechanged$worktree_added$worktree_modified$worktree_deleted$worktree_typechanged$untracked$stashed$ahead_behind](bold italic fg:crust bg:yellow)[](fg:yellow)'
+conflicted            = "[👎$count ](bold fg:dark_red   bg:yellow)"
+renamed               = "[»$count ](bold fg:crust      bg:yellow)"
+index_added           = "[A$count ](bold fg:dark_green bg:yellow)"
+index_modified        = "[M$count ](bold fg:dark_green bg:yellow)"
+index_deleted         = "[D$count ](bold fg:dark_red   bg:yellow)"
+index_typechanged     = "[T$count ](bold fg:dark_green bg:yellow)"
+worktree_added        = "[a$count ](bold fg:dark_blue  bg:yellow)"
+worktree_modified     = "[m$count ](bold fg:dark_blue  bg:yellow)"
+worktree_deleted      = "[d$count ](bold fg:dark_red   bg:yellow)"
+worktree_typechanged  = "[t$count ](bold fg:dark_blue  bg:yellow)"
+untracked             = "[?$count ](bold underline italic fg:crust    bg:yellow)"
+stashed               = "[&$count ](bold fg:lavender  bg:yellow)"
 behind                = "⇣$count"
+ahead                 = "⇡$count"
 diverged              = "⇕⇡${ahead_count}⇣${behind_count}"
-stashed               = '[&$count ](bold                  fg:crust      bg:yellow)'
-untracked             = "[?$count ](bold underline italic fg:crust      bg:yellow)"
-modified              = "[!$count ](bold underline italic fg:dark_blue  bg:yellow)"
-staged                = "[$count ](bold underline italic fg:dark_green bg:yellow)"
-renamed               = "[»$count ](bold underline italic fg:crust      bg:yellow)"
-deleted               = "[✘$count ](bold underline italic fg:dark_red   bg:yellow)"
 
 [jobs]
 symbol                = '+'
@@ -188,7 +186,7 @@ style                 = 'bold bg:red fg:crust'
 format                = '[$symbol$signal_name ]($style)'
 success_symbol        = '[](fg:overlay0)[ ](bg:overlay0)✔ '
 success_style         = 'bold fg:green bg:overlay0'
-symbol                = '[](fg:red)[ ](bg:red)✘ \[\]'
+symbol                = '[](fg:red)[ ](bg:red)✘ \[$int\]'
 failure_style         = 'italic bold bg:red fg:crust'
 sigint_symbol         = "[](fg:red)[ ](bg:red)✘ "
 signal_symbol         = "[](fg:red)[ ](bg:red)SIG "
@@ -199,11 +197,13 @@ recognize_signal_code = true
 map_symbol            = true
 disabled              = false
 
-[custom.proxy]
-command               = 'echo $http_proxy | sed "s/http:\/\///"'
-when                  = '''! test -z "$http_proxy"'''
+[env_var.proxy]
+# 只读环境变量，不起子进程；proxy() 额外导出展示用变量，替掉原来每次 echo|sed 的 fork（实测 ≈10ms/次）。
+# 注意：命名子模块在 format 里要用裸 $env_var 引用，写成 $env_var.proxy 时点号会被当字面量打印出来。
+variable              = "DOTS_PROXY_DISPLAY"
 style                 = "italic bold fg:crust bg:lavender"
-format                = "[](fg:lavender bg:blue)[ $output  ]($style)"
+format                = "[](fg:lavender bg:blue)[ $env_value  ]($style)"
+description           = "当前代理（来自 proxy() 导出的 DOTS_PROXY_DISPLAY）"
 
 [palettes.catppuccin_mocha]
 rosewater             = "#f5e0dc"

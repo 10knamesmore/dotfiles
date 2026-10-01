@@ -1,0 +1,44 @@
+[package]
+name = "pi-terminal-sdk"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Unix PTY and terminal screen SDK for Pi's Python worker"
+
+[lib]
+name = "pi_terminal"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+libc = "0.2"
+alacritty_terminal = { version = "=0.26.0", default-features = false }
+portable-pty = "0.9"
+regex = "1"
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+
+pyo3 = { version = "0.29.2", default-features = false, features = [
+    "macros",
+    "abi3-py312",
+], optional = true }
+pythonize = { version = "0.29", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.30", features = ["process", "signal", "fs"] }
+
+[features]
+default = ["python-extension"]
+python-extension = [
+    "dep:pyo3",
+    "dep:pythonize",
+    "pyo3/extension-module",
+]
+
+[lints.rust]
+missing_docs = "deny"
+
+[package.metadata.maturin]
+bindings = "pyo3"
+module-name = "pi_terminal"
+features = ["python-extension"]

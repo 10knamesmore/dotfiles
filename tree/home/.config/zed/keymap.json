@@ -1,0 +1,139 @@
+[
+  {
+    "bindings": {
+      "ctrl-/": "terminal_panel::Toggle"
+    }
+  },
+  {
+    "context": "Editor && mode == full && vim_mode == insert",
+    "bindings": {
+      "j k": "vim::NormalBefore",
+      "k j": "vim::NormalBefore"
+    }
+  },
+  {
+    // Leader 只作用于正文，不影响搜索输入框、补全菜单和终端 TUI。
+    "context": "Editor && mode == full && (vim_mode == normal || vim_mode == visual) && !menu",
+    "bindings": {
+      "space": null,
+      "q": null,
+      "<": null,
+      ">": null,
+      "shift-b": "vim::FirstNonWhitespace",
+      "shift-e": "vim::EndOfLine",
+      "shift-j": ["workspace::SendKeystrokes", "7 g j"],
+      "shift-k": ["workspace::SendKeystrokes", "7 g k"],
+      "shift-w": "workspace::ActivateNextPane",
+      "ctrl-j": ["editor::SelectNext", { "replace_newest": false }],
+      "ctrl-k": "editor::Hover",
+      "=": "workspace::FormatAndSave",
+
+      // 文件、搜索与符号
+      "space space": "file_finder::Toggle",
+      "space /": "pane::DeploySearch",
+      "space b": "tab_switcher::ToggleAll",
+      "space e": "project_panel::ToggleFocus",
+      "space h": "outline::Toggle",
+      "space s s": "outline::Toggle",
+      "space s shift-s": "project_symbols::Toggle",
+      "space s w": ["pane::DeploySearch", { "whole_word": true }],
+      "space s c": "command_palette::Toggle",
+      "space s k": "zed::OpenKeymap",
+      "space s f": "language_selector::Toggle",
+      "space s m": "vim::ToggleMarksView",
+      "space s r": "vim::ToggleRegistersView",
+      "space s o": "zed::OpenSettings",
+      "space s h": "file_finder::Toggle",
+      "space s shift-c": "theme_selector::Toggle",
+
+      // Code；ck 提供 Hover，K 保留 Neovim 的向上 7 行。
+      "space c a": "editor::ToggleCodeActions",
+      "space c r": "editor::Rename",
+      "space c d": "editor::GoToTypeDefinition",
+      "space c k": "editor::Hover",
+      "space c f": "workspace::FormatAndSave",
+      "space c s": "outline_panel::ToggleFocus",
+      "space c shift-c": "editor::ToggleCodeLens",
+      "space c t": "task::Spawn",
+      "space c shift-t": "task::Rerun",
+      "space c p": "markdown::OpenPreviewToTheSide",
+
+      // 窗口与标签；wd 关闭整个窗格，td 只关闭当前标签。
+      "space w h": "workspace::ActivatePaneLeft",
+      "space w j": "workspace::ActivatePaneDown",
+      "space w k": "workspace::ActivatePaneUp",
+      "space w l": "workspace::ActivatePaneRight",
+      "space w w": "workspace::ActivateNextPane",
+      "space w v": "pane::SplitRight",
+      "space w s": "pane::SplitDown",
+      "space w d": "pane::CloseAllItems",
+      "space w =": "vim::ResetPaneSizes",
+      "space t h": "pane::ActivatePreviousItem",
+      "space t l": "pane::ActivateNextItem",
+      "space t d": "pane::CloseActiveItem",
+
+      // Git：保留 lazygit，原生面板和 diff 用另外的入口。
+      "space g g": ["task::Spawn", { "task_name": "lazygit" }],
+      "space g s": "git_panel::ToggleFocus",
+      "space g c": "git_graph::Open",
+      "space g f": "git::FileHistory",
+      "space g shift-s": "git::ViewStash",
+      "space g d": "git::Diff",
+      "space g k": "editor::ToggleSelectedDiffHunks",
+      "space g l": "editor::BlameHover",
+      "space g shift-b": "editor::OpenPermalinkToLine",
+
+      // Diagnostics、UI 与复制位置（供外部 coding agent 使用）。
+      "space x x": "diagnostics::Deploy",
+      "space x b": "diagnostics::DeployCurrentFile",
+      "space x d": "editor::Hover",
+      "space u h": "editor::ToggleInlayHints",
+      "space u d": "editor::ToggleDiagnostics",
+      "space u w": "editor::ToggleSoftWrap",
+      "space u l": "editor::ToggleRelativeLineNumbers",
+      "space m": "editor::ToggleMinimap",
+      "space y l": "editor::CopyFileLocation",
+      "space o": "vim::InsertEmptyLineBelow",
+      "space shift-o": "vim::InsertEmptyLineAbove"
+    }
+  },
+  {
+    "context": "Editor && mode == full && vim_mode == normal && !menu",
+    "bindings": {
+      "shift-h": "pane::GoBack",
+      "shift-l": "pane::GoForward",
+      "shift-f": "vim::MoveToNext",
+      "g d": "editor::GoToDefinition",
+      "g i": "editor::GoToImplementation",
+      "g r": "editor::FindAllReferences",
+      "g y": "editor::CopyFileName",
+      "g shift-y": "workspace::CopyPath",
+      "] d": "editor::GoToDiagnostic",
+      "[ d": "editor::GoToPreviousDiagnostic",
+      "] h": "editor::GoToHunk",
+      "[ h": "editor::GoToPreviousHunk"
+    }
+  },
+  {
+    "context": "Editor && mode == full && vim_mode == normal && extension == rs && !menu",
+    "bindings": {
+      "space c e": "editor::ExpandMacroRecursively"
+    }
+  },
+  {
+    "context": "Picker > Editor",
+    "bindings": {
+      "ctrl-j": "menu::SelectNext",
+      "ctrl-k": "menu::SelectPrevious"
+    }
+  },
+  {
+    "context": "ProjectPanel && not_editing",
+    "bindings": {
+      "space": null,
+      "space e": "project_panel::ToggleFocus",
+      "space space": "file_finder::Toggle",
+      "space /": "pane::DeploySearch"
+    }
+  }
+]

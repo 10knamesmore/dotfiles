@@ -12,6 +12,8 @@ interface PythonEvent {
   outcome?: string;
   reason?: string;
   logPath?: string;
+  action?: string;
+  terminalId?: string;
   interpreter?: { executable: string; version: string };
   packageCount?: number;
 }

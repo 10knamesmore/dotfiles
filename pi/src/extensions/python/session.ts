@@ -41,10 +41,20 @@ interface WorkerInfo {
   environment: PythonEnvironment;
 }
 
+/** One PTY child process group owned by a worker; killing the worker's own group does not reach it. */
+interface OwnedTerminal {
+  id: string;
+  pid: number;
+}
+
+type TerminalOwnershipMessage = Extract<WorkerMessage, { type: "terminal_ownership" }>;
+
 type WorkerMessage =
   | (WorkerInfo & { type: "ready" })
   | { type: "started"; callId: string }
-  | { type: "completed"; callId: string; outcome: "completed" | "python_error" | "interrupted" };
+  | { type: "completed"; callId: string; outcome: "completed" | "python_error" | "interrupted" }
+  | { type: "terminal_ownership"; action: "opened" | "closed"; id: string; pid: number }
+  | { type: "startup_error"; reason: string };
 
 interface PendingExecution {
   callId: string;
@@ -69,6 +79,8 @@ interface WorkerProcess {
   resolveExited: () => void;
   info?: WorkerInfo;
   pending?: PendingExecution;
+  /** PTY child process groups reported by the terminal SDK, keyed by the ownership id it sent. */
+  ownedTerminals: Map<string, OwnedTerminal>;
   stopping: boolean;
   ended: boolean;
   logPath: string;
@@ -211,6 +223,7 @@ export class PythonSession {
       rejectReady,
       exited,
       resolveExited,
+      ownedTerminals: new Map(),
       stopping: false,
       ended: false,
       logPath,
@@ -219,7 +232,6 @@ export class PythonSession {
     const decoder = new StringDecoder("utf8");
     let buffer = "";
     worker.events.on("data", (chunk: Buffer) => {
-      if (worker.stopping || worker.ended) return;
       buffer += decoder.write(chunk);
       let end: number;
       try {
@@ -305,11 +317,31 @@ export class PythonSession {
       // Bound acknowledgement too; the execution deadline starts only on the started event.
       pending.timer = setTimeout(() => this.terminate(worker), STARTUP_TIMEOUT_MS);
       signal?.addEventListener("abort", abort, { once: true });
-      worker.requests.write(`${JSON.stringify({ type: "execute", callId, code, cwd, outputPath })}\n`);
+      try {
+        worker.requests.write(`${JSON.stringify({ type: "execute", callId, code, cwd, outputPath })}\n`);
+      } catch (error) {
+        this.log({ phase: "request_write_failed", callId, reason: errorMessage(error), logPath: worker.logPath });
+        pending.finish("process_exited");
+        this.terminate(worker);
+      }
     });
   }
 
   private receive(worker: WorkerProcess, message: WorkerMessage): void {
+    // Ownership arrives while user code runs, but it must never depend on a pending execution.
+    if (message.type === "terminal_ownership") {
+      this.recordTerminalOwnership(worker, message);
+      return;
+    }
+    // A terminated worker only still reports terminal ownership; later control events are stale.
+    if (worker.stopping || worker.ended) return;
+    if (message.type === "startup_error") {
+      if (!worker.info) {
+        worker.rejectReady(new Error(`Python worker startup failed: ${message.reason}`));
+        this.log({ phase: "startup_failure", reason: message.reason, logPath: worker.logPath });
+      }
+      return;
+    }
     if (message.type === "ready") {
       if (worker.info) throw new Error("Python sent duplicate readiness.");
       worker.info = message;
@@ -340,6 +372,31 @@ export class PythonSession {
     }
   }
 
+  /** Track the PTY process groups that survive a worker SIGKILL so termination can reach them. */
+  private recordTerminalOwnership(worker: WorkerProcess, message: TerminalOwnershipMessage): void {
+    if (message.action === "closed") {
+      worker.ownedTerminals.delete(message.id);
+    } else if (worker.stopping || worker.ended) {
+      // The worker is already being killed or gone; Python can no longer clean up a group opened now.
+      this.log({
+        phase: "terminal_kill",
+        terminalId: message.id,
+        pid: message.pid,
+        callId: worker.pending?.callId,
+      });
+      this.signalGroup(message.pid, "SIGKILL");
+    } else {
+      worker.ownedTerminals.set(message.id, { id: message.id, pid: message.pid });
+    }
+    this.log({
+      phase: "terminal_ownership",
+      action: message.action,
+      terminalId: message.id,
+      pid: message.pid,
+      callId: worker.pending?.callId,
+    });
+  }
+
   private interrupt(worker: WorkerProcess, reason: "interrupted" | "timed_out"): void {
     const pending = worker.pending;
     if (!pending || pending.stopReason) return;
@@ -357,14 +414,33 @@ export class PythonSession {
     if (worker.ended || worker.stopping) return;
     worker.stopping = true;
     this.log({ phase: "terminate", pid: worker.info?.pid, callId: worker.pending?.callId });
+    // PTY children lead their own groups, so the worker kill below cannot reach them.
+    this.terminateOwnedTerminals(worker);
     // Killing the worker group first also stops subprocesses blocked in a native call.
     if (worker.info) this.signalGroup(worker.info.pid, "SIGKILL");
     if (worker.launcher.pid) this.signalGroup(worker.launcher.pid, "SIGKILL");
   }
 
+  /** Kill each owned group once from a snapshot, then forget it so a recycled pid cannot be signalled again. */
+  private terminateOwnedTerminals(worker: WorkerProcess): void {
+    const terminals = [...worker.ownedTerminals.values()];
+    worker.ownedTerminals.clear();
+    for (const terminal of terminals) {
+      this.log({
+        phase: "terminal_kill",
+        terminalId: terminal.id,
+        pid: terminal.pid,
+        callId: worker.pending?.callId,
+      });
+      this.signalGroup(terminal.pid, "SIGKILL");
+    }
+  }
+
   private processEnded(worker: WorkerProcess): void {
     if (worker.ended) return;
     worker.ended = true;
+    // A SIGKILLed worker never runs its Python cleanup, so its PTY groups need this pass.
+    this.terminateOwnedTerminals(worker);
     if (worker.info) {
       this.signalGroup(worker.info.pid, "SIGKILL");
       if (!this.disposed) this.onStateLost();
@@ -372,7 +448,7 @@ export class PythonSession {
     worker.rejectReady(new Error(`Python did not become ready. Diagnostics: ${worker.logPath}`));
     worker.pending?.finish("process_exited");
     worker.requests.destroy();
-    worker.events.destroy();
+    // Keep reading: pipe-buffered ownership events may arrive after the exit event.
     worker.resolveExited();
   }
 
@@ -408,6 +484,19 @@ function parseMessage(line: string): WorkerMessage {
     (message.type === "started" ||
       (message.type === "completed" && ["completed", "python_error", "interrupted"].includes(String(message.outcome))))
   ) {
+    return message as unknown as WorkerMessage;
+  }
+  if (
+    message.type === "terminal_ownership" &&
+    (message.action === "opened" || message.action === "closed") &&
+    typeof message.id === "string" &&
+    message.id.length > 0 &&
+    Number.isSafeInteger(message.pid) &&
+    (message.pid as number) > 0
+  ) {
+    return message as unknown as WorkerMessage;
+  }
+  if (message.type === "startup_error" && typeof message.reason === "string" && message.reason.length > 0) {
     return message as unknown as WorkerMessage;
   }
   throw new Error("Invalid Python control message.");

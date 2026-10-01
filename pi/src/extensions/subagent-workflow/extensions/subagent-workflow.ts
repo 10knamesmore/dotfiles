@@ -1,5 +1,5 @@
 import { readdirSync, type Dirent } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ParentContext } from "../src/runner/child.js";
@@ -47,6 +47,7 @@ import { parseWorkflowScript } from "../src/workflow/parser.js";
 import { registerWorkflowTool } from "../src/workflow/workflow-tool.js";
 
 const selfPath = fileURLToPath(import.meta.url);
+const WORKFLOW_AUTHORING_SKILL = join(dirname(selfPath), "../skills/workflow-authoring/SKILL.md");
 const CATCH_UP_RUN_CAP = 10;
 
 type TerminalStatus = "completed" | "failed" | "aborted";
@@ -333,6 +334,8 @@ function userMessageText(content: string | Array<{ type: string; text?: string }
 }
 
 export default function subagentWorkflow(pi: ExtensionAPI): void {
+  pi.on("resources_discover", () => ({ skillPaths: [WORKFLOW_AUTHORING_SKILL] }));
+
   const widget = new SubagentStatusWidget(subagentRunner);
   const usageFooter = new SubagentUsageFooter(subagentRunner);
   const settings = readPersonalConfig()["subagent-workflow"];

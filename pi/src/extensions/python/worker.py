@@ -13,6 +13,10 @@ import sys
 import types
 
 
+WORKER_REQUEST_FD = 3
+WORKER_EVENT_FD = 4
+
+
 class SessionInterpreter(code.InteractiveInterpreter):
     """Execute complete cells in a persistent main module and report failures."""
 
@@ -57,7 +61,35 @@ def send_event(event: dict[str, object]) -> None:
     """Write a complete JSON event to the dedicated event descriptor."""
     frame = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
     while frame:
-        frame = frame[os.write(4, frame):]
+        frame = frame[os.write(WORKER_EVENT_FD, frame):]
+
+
+def handle_terminal_ownership(event: dict[str, object]) -> None:
+    """Forward one PTY ownership change to the controller without terminal contents."""
+    action = event.get("action")
+    session_id = event.get("id")
+    pid = event.get("pid")
+    if action not in ("opened", "closed") or not isinstance(session_id, str) or not session_id:
+        raise ValueError(f"malformed terminal ownership event: {event!r}")
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        raise ValueError(f"terminal ownership event for {session_id!r} has no positive pid")
+    send_event({"type": "terminal_ownership", "action": action, "id": session_id, "pid": pid})
+
+
+def install_terminal_ownership_hook() -> None:
+    """Install the SDK lifecycle hook, stopping with a clear diagnostic when it is unavailable."""
+    try:
+        from pi_terminal import _set_lifecycle_hook, _set_worker_control_fds
+    except ImportError as error:
+        reason = f"the pi-terminal SDK is required but not importable: {error}"
+        try:
+            send_event({"type": "startup_error", "reason": reason})
+        except OSError:
+            # The event pipe may already be gone; stderr still carries the reason.
+            pass
+        raise SystemExit(reason) from error
+    _set_worker_control_fds((WORKER_REQUEST_FD, WORKER_EVENT_FD))
+    _set_lifecycle_hook(handle_terminal_ownership)
 
 
 executing = False
@@ -135,11 +167,13 @@ def main() -> None:
     """Read one LF-delimited request at a time until the controller closes fd3."""
     os.setpgid(0, 0)
     signal.signal(signal.SIGINT, handle_sigint)
+    # Resolve the SDK before user code can shadow it with a same-named module in the call cwd.
+    install_terminal_ownership_hook()
     # An empty import path follows each call's cwd instead of pinning the startup directory.
     sys.path.insert(0, "")
     interpreter = SessionInterpreter()
     send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})
-    with os.fdopen(3, "rb") as requests:
+    with os.fdopen(WORKER_REQUEST_FD, "rb") as requests:
         for number, frame in enumerate(requests, start=1):
             request = json.loads(frame.decode("utf-8"))
             execute_cell(interpreter, request, number)

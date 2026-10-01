@@ -15,7 +15,7 @@ import {
 } from "../subagent-spec.js";
 import { isModelTier, readPersonalConfig } from "../../../../config/index.js";
 import { resolveTierSpec } from "../runner/model-tier.js";
-import type { SubagentHandle, SubagentResult, SubagentSpec, SubagentStatus, ThinkingLevel } from "../types.js";
+import type { SubagentHandle, SubagentResult, SubagentStatus, ThinkingLevel } from "../types.js";
 import {
   resolveModel,
   submittedSpec,
@@ -337,7 +337,7 @@ export function registerSubagentTool(
     label: "Subagent",
     parameters: SubagentToolParameters,
     description:
-      "Spawn one ad-hoc child. For several independent children, call this tool several times in the same turn - up to about eight; beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. Every run is background: the call returns as soon as the child starts and its result arrives later as a steered message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.) Compose each child for the task at hand; recurring task shapes belong in skills, not fixed agent personas.",
+      "Spawn one ad-hoc child. beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The call returns as soon as the child starts and its result arrives later as a steered message, end the turn and continue when the message arrives. Compose each child for the task at hand, DO NOT orchestrate multiple agents (include yourself) to modify files in the same path.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try {

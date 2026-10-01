@@ -13,15 +13,6 @@ return {
     integrations = {
       dashboard = { enabled = true },
     },
-    callbacks = {
-      -- 留白窗口由插件以 noautocmd 创建；通知 minimap 更新位置。
-      postEnable = function()
-        vim.api.nvim_exec_autocmds("User", { pattern = "CenteredEditorLayoutChanged" })
-      end,
-      postDisable = function()
-        vim.api.nvim_exec_autocmds("User", { pattern = "CenteredEditorLayoutChanged" })
-      end,
-    },
   },
   keys = {
     { "<leader>uC", "<cmd>NoNeckPain<cr>", desc = "Toggle centered editor" },
