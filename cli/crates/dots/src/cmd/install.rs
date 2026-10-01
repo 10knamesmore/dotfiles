@@ -14,7 +14,7 @@ use crate::render;
 /// 执行所有启用的 Cargo binary 声明。
 ///
 /// 每项 declaration 都直接映射为一次 `cargo install`。没有声明时成功返回，不执行任何
-/// 卸载操作，也不替调用方添加 `--force`。
+/// 卸载操作。Workspace 声明加 `--force`，每次都用最新构建刷新已安装的 binary；
 pub fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     let home = home_dir()?;
@@ -45,7 +45,7 @@ fn execute_declaration(
             eprintln!("  install workspace binary {binary}");
             run_cargo_install(
                 Command::new("cargo")
-                    .args(["install", "--locked", "--path"])
+                    .args(["install", "--locked", "--force", "--path"])
                     .arg(path)
                     .args(["--bin", binary, "--root"])
                     .arg(root),
