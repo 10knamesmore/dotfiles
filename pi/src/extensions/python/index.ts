@@ -31,8 +31,7 @@ const Parameters = Type.Object(
   { additionalProperties: false },
 );
 
-/** Tool names this extension answers to; saved sessions from before the rename still use "python". */
-const PYTHON_TOOL_NAMES = new Set(["python_pi", "python"]);
+const PYTHON_TOOL_NAME = "python_repl";
 
 const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
@@ -96,20 +95,20 @@ export function registerPython(pi: ExtensionAPI): void {
     if (hadEnvironment || hasPythonHistory(ctx)) notifyEnvironmentCleared();
   });
   pi.on("tool_result", (event) => {
-    if (event.toolName !== "python_pi") return;
+    if (event.toolName !== PYTHON_TOOL_NAME) return;
     const details = event.details as PythonToolDetails | undefined;
     if (details) return { isError: details.outcome !== "completed" };
     return undefined;
   });
 
   const tool: ToolDefinition<typeof Parameters, PythonToolDetails | undefined> = {
-    name: "python_pi",
+    name: PYTHON_TOOL_NAME,
     label: "Python",
     description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
     promptSnippet: "Run Python calculations and data analysis with variables preserved across calls",
     promptGuidelines: [
-      "Use python_pi for Python calculations and structured data analysis. Reuse variables from earlier python_pi calls",
-      "Prefer python_pi over running Python through bash, including heredoc scripts and python -c. ",
+      "Use python_repl for Python calculations and structured data analysis. Reuse variables from earlier python_repl calls",
+      "Prefer python_repl over running Python through bash, including heredoc scripts and python -c. ",
     ],
     parameters: Parameters,
     executionMode: "sequential",
@@ -172,9 +171,9 @@ function hasPythonHistory(ctx: ExtensionContext): boolean {
     if (entry.type === "message") {
       const message = entry.message;
       if (
-        (message.role === "toolResult" && PYTHON_TOOL_NAMES.has(message.toolName)) ||
+        (message.role === "toolResult" && message.toolName === PYTHON_TOOL_NAME) ||
         (message.role === "assistant" &&
-          message.content.some((part) => part.type === "toolCall" && PYTHON_TOOL_NAMES.has(part.name)))
+          message.content.some((part) => part.type === "toolCall" && part.name === PYTHON_TOOL_NAME))
       )
         return true;
     }
