@@ -9,13 +9,10 @@ BarModule {
     id: root
 
     accentColor: SystemState.notificationCount > 0 ? Colors.yellow : Colors.overlay0
-    implicitWidth: label.implicitWidth + 32
+    implicitWidth: icon.implicitWidth + (count.visible ? count.implicitWidth + 5 : 0) + 32
     onClicked: mouse => {
         PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.toggleNotification();
+        MorphState.openFrom(root, () => PanelState.toggleNotification());
     }
     onRightClicked: {
         SystemState.clearAllNotifications();
@@ -24,10 +21,12 @@ BarModule {
     Row {
         id: label
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         spacing: 5
 
         Text {
+            id: icon
             text: SystemState.notificationCount > 0 ? "󰂚" : "󰂜"
             color: SystemState.notificationCount > 0 ? Colors.yellow : Colors.overlay1
             font.family: Fonts.family
@@ -36,6 +35,7 @@ BarModule {
         }
 
         Text {
+            id: count
             visible: SystemState.notificationCount > 0
             text: SystemState.notificationCount
             color: Colors.text
@@ -45,6 +45,14 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
         }
 
+        Text {
+            text: "通知"
+            opacity: root.expansion
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.body
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 
 }

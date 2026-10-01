@@ -14,22 +14,22 @@ BarModule {
     readonly property bool disconnected: NetworkService.disconnected
 
     accentColor: Colors.sky
-    implicitWidth: label.implicitWidth + 32
+    readonly property real compactWidth: icon.implicitWidth + value.implicitWidth + 37
+    implicitWidth: compactWidth + (hovered ? detail.implicitWidth + 5 : 0)
     onClicked: mouse => {
         PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.toggleNetwork();
+        MorphState.openFrom(root, () => PanelState.toggleNetwork());
     }
 
     Row {
         id: label
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         spacing: 5
 
         Text {
+            id: icon
             text: root.iconText
             color: root.disconnected ? Colors.red : Colors.sky
             font.family: Fonts.family
@@ -39,6 +39,7 @@ BarModule {
         }
 
         Text {
+            id: value
             text: root.valueText
             color: root.disconnected ? Colors.red : Colors.text
             font.family: Fonts.family
@@ -55,19 +56,18 @@ BarModule {
 
         }
 
-        // hover 展开显示 tooltip（IP/SSID）
+        // 悬停与面板使用同一段 IP/SSID 摘要，收起时跟随轮廓收回。
         Text {
-            visible: root.hovered && root.tooltipText !== ""
+            id: detail
             text: root.tooltipText.split("\n")[0]
+            visible: root.detailProgress > 0 && text !== ""
+            width: Math.min(implicitWidth, Math.max(0, label.parent.width - root.compactWidth + 27)) * root.detailProgress
+            elide: Text.ElideRight
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
             anchors.verticalCenter: parent.verticalCenter
-            opacity: root.hovered ? 1 : 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: Tokens.animNormal }
-            }
+            opacity: root.detailProgress
         }
     }
 

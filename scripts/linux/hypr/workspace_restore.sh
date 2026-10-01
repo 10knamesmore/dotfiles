@@ -30,7 +30,7 @@ echo "$saved" | jq -c '.[]' | while IFS= read -r entry; do
   ')"
 
   if [[ -n "$addr" ]]; then
-    hyprctl dispatch movetoworkspacesilent "$target_ws,address:$addr" >/dev/null 2>&1 || true
+    hyprctl dispatch "hl.dsp.window.move({ workspace = '$target_ws', window = 'address:$addr', follow = false })" >/dev/null 2>&1 || true
     # 从候选列表中移除已处理的窗口，避免重复移动
     clients="$(echo "$clients" | jq --arg a "$addr" '[.[] | select(.address != $a)]')"
     moved=$((moved + 1))

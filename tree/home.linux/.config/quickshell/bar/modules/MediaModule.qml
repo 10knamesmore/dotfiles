@@ -5,153 +5,96 @@ import "../components"
 import QtQuick
 import Quickshell.Io
 
-// 媒体播放模块 — 显示歌名+artist，左键打开面板，右键切换歌词显示
+// 曲名、播放状态与进度保留在同一行；悬停和展开面板时显示播放器名与 PID。
 BarModule {
     id: root
 
     readonly property var player: MediaService.activePlayer
-
     property bool showLyric: false
     property int playerPid: 0
     property bool copied: false
-
-    // 完整内容文字
-    property string fullContent: {
+    readonly property string fullContent: {
         if (!player)
             return "暂无媒体播放";
         if (showLyric && LyricsState.currentLyric.length > 0)
             return LyricsState.currentLyric;
-        let t = player.trackTitle || "";
-        let a = player.trackArtist || "";
-        if (!t)
-            return player.identity;
-        return a ? t + " - " + a : t;
+        const title = player.trackTitle || "";
+        const artist = player.trackArtist || "";
+        return title ? (artist ? title + " - " + artist : title) : player.identity;
     }
-
-    // 截断内容文字
-    property string truncatedContent: {
-        if (!player)
-            return "暂无媒体播放";
-        if (showLyric && LyricsState.currentLyric.length > 0) {
-            let l = LyricsState.currentLyric;
-            return l.length > 40 ? l.substring(0, 37) + "…" : l;
-        }
-        let t = player.trackTitle || "";
-        let a = player.trackArtist || "";
-        if (!t)
-            return player.identity;
-        let display = a ? t + " - " + a : t;
-        return display.length > 35 ? display.substring(0, 32) + "…" : display;
+    readonly property string compactContent: {
+        const limit = showLyric && LyricsState.currentLyric.length > 0 ? 40 : 35;
+        return fullContent.length > limit ? fullContent.substring(0, limit - 3) + "…" : fullContent;
     }
 
     function playIcon() {
-        if (!player)
-            return "󰓛";
-        return player.isPlaying ? "󰏤" : "󰐊";
+        return !player ? "󰓛" : (player.isPlaying ? "󰏤" : "󰐊");
     }
 
     accentColor: Colors.pink
     progress: player && player.lengthSupported && player.length > 0 ? player.position / player.length : -1
-    implicitWidth: root.hovered
-        ? Math.min(hoverRow.implicitWidth + 32, 600)
-        : Math.max(row.implicitWidth + 32, 80)
-    onClicked: mouse => {
+    readonly property real compactWidth: Math.max(compactMeasure.implicitWidth + iconText.implicitWidth + 38, 80)
+    readonly property real hoverWidth: Math.min(600, fullMeasure.implicitWidth + iconText.implicitWidth + 38
+        + (player ? identityText.implicitWidth + 16 : 0) + (playerPid > 0 ? Math.max(pidMeasure.implicitWidth, 70) + 6 : 0))
+    implicitWidth: hovered ? hoverWidth : compactWidth
+    onClicked: {
         PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.toggleMedia();
+        MorphState.openFrom(root, () => PanelState.toggleMedia());
     }
     onRightClicked: {
-        if (root.hovered && root.playerPid > 0) {
+        if (root.playerPid > 0) {
             copyProc.command = ["wl-copy", String(root.playerPid)];
             copyProc.running = true;
             root.copied = true;
             copiedTimer.restart();
         } else {
-            showLyric = !showLyric;
+            root.showLyric = !root.showLyric;
         }
     }
 
-    // ── PID 获取 ──
     Process {
         id: pidReader
-
-        property string _buf: ""
-
+        property string output: ""
         command: root.player ? ["pgrep", "-fi", root.player.identity] : ["true"]
-
-        stdout: SplitParser {
-            onRead: data => pidReader._buf += data + "\n"
-        }
-
+        stdout: SplitParser { onRead: data => pidReader.output += data + "\n" }
         onExited: {
-            let line = pidReader._buf.trim().split("\n")[0];
-            root.playerPid = parseInt(line) || 0;
-            pidReader._buf = "";
+            root.playerPid = parseInt(output.trim().split("\n")[0]) || 0;
+            output = "";
         }
     }
-
-    // PID 在 player 生命周期内不变，且只有 hover/右键复制使用；每次 player 变化时读取一次。
     onPlayerChanged: {
         if (root.player)
             pidReader.running = true;
         else
             root.playerPid = 0;
     }
-
     Component.onCompleted: {
         if (root.player)
             pidReader.running = true;
     }
+    Process { id: copyProc }
+    Timer { id: copiedTimer; interval: 1500; onTriggered: root.copied = false }
 
-    Process {
-        id: copyProc
+    Text {
+        id: compactMeasure
+        visible: false
+        text: root.compactContent
+        font.family: Fonts.family
+        font.pixelSize: Fonts.body
+        font.weight: Font.Medium
     }
 
-    Timer {
-        id: copiedTimer
-
-        interval: 1500
-        onTriggered: root.copied = false
+    Text {
+        id: fullMeasure
+        visible: false
+        text: root.fullContent
+        font.family: Fonts.family
+        font.pixelSize: Fonts.body
+        font.weight: Font.Medium
     }
 
-    // ── 默认视图 ──
-    Row {
-        id: row
-
-        visible: !root.hovered
-        anchors.centerIn: parent
-        spacing: 6
-
-        Text {
-            text: root.playIcon()
-            color: Colors.pink
-            font.family: Fonts.family
-            font.pixelSize: Fonts.title
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Text {
-            text: root.truncatedContent
-            color: root.showLyric && LyricsState.currentLyric.length > 0 ? Colors.mauve : Colors.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.body
-            font.weight: Font.Medium
-            font.italic: root.showLyric && LyricsState.currentLyric.length > 0
-            anchors.verticalCenter: parent.verticalCenter
-
-            Behavior on color {
-                ColorAnimation { duration: Tokens.animFast }
-            }
-        }
-    }
-
-    // 隐藏测量：PID 文字的固定宽度（取较长的那个状态）
     Text {
         id: pidMeasure
-
         visible: false
         text: "PID " + root.playerPid
         font.family: Fonts.family
@@ -159,32 +102,26 @@ BarModule {
         font.weight: Font.DemiBold
     }
 
-    // ── hover 视图：进程名 + 播放图标 + 完整内容 + PID ──
     Row {
-        id: hoverRow
-
-        property real maxWidth: 600
-        // 固定预留宽度，避免内容文字挤压 PID
-        property real reservedWidth: (root.player ? identityText.implicitWidth + 10 + spacing : 0) + 20 + spacing + (root.playerPid > 0 ? Math.max(pidMeasure.implicitWidth, 70) + spacing : 0) + 32
-
-        visible: root.hovered
-        anchors.centerIn: parent
+        id: row
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width
         spacing: 6
 
-        // 进程名标签
         Rectangle {
             id: identityTag
-
-            visible: root.player !== null
-            color: Colors.withAlpha(Colors.pink, 0.2)
-            radius: 4
-            width: identityText.implicitWidth + 10
+            visible: root.player !== null && root.detailProgress > 0
+            width: root.player ? (identityText.implicitWidth + 10) * root.detailProgress : 0
             height: identityText.implicitHeight + 4
+            radius: 4
+            color: Colors.withAlpha(Colors.pink, 0.2)
+            opacity: root.detailProgress
+            clip: true
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 id: identityText
-
                 anchors.centerIn: parent
                 text: root.player ? root.player.identity : ""
                 color: Colors.pink
@@ -193,9 +130,8 @@ BarModule {
                 font.weight: Font.DemiBold
             }
         }
-
-        // 播放图标
         Text {
+            id: iconText
             text: root.playIcon()
             color: Colors.pink
             font.family: Fonts.family
@@ -203,35 +139,33 @@ BarModule {
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
         }
-
-        // 完整内容
         Text {
             text: root.fullContent
-            color: root.showLyric && LyricsState.currentLyric.length > 0 ? Colors.mauve : Colors.pink
+            width: Math.max(0, row.width - iconText.width - identityTag.width - pidText.width
+                - 6 - root.detailProgress * 6 * ((root.player ? 1 : 0) + (root.playerPid > 0 ? 1 : 0)))
+            elide: Text.ElideRight
+            color: root.showLyric && LyricsState.currentLyric.length > 0 ? Colors.mauve
+                : (root.detailProgress > 0 ? Colors.pink : Colors.text)
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.Medium
             font.italic: root.showLyric && LyricsState.currentLyric.length > 0
-            elide: Text.ElideRight
-            width: Math.min(implicitWidth, hoverRow.maxWidth - hoverRow.reservedWidth)
             anchors.verticalCenter: parent.verticalCenter
+            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
         }
-
-        // PID
         Text {
             id: pidText
-
-            visible: root.playerPid > 0
+            visible: root.playerPid > 0 && root.detailProgress > 0
             text: root.copied ? "✓ Copied" : "PID " + root.playerPid
+            width: root.playerPid > 0 ? Math.max(pidMeasure.implicitWidth, 70) * root.detailProgress : 0
+            opacity: root.detailProgress
+            clip: true
             color: root.copied ? Colors.green : Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
             font.weight: root.copied ? Font.DemiBold : Font.Normal
             anchors.verticalCenter: parent.verticalCenter
-
-            Behavior on color {
-                ColorAnimation { duration: Tokens.animFast }
-            }
+            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
         }
     }
 }

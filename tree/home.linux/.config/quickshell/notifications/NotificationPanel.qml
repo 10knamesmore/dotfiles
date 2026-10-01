@@ -36,8 +36,10 @@ PanelOverlay {
         // ── 标题栏 ──
         RowLayout {
             Layout.fillWidth: true
+            visible: !root.hasMorphSource || SystemState.notificationCount > 0
 
             Text {
+                visible: !root.hasMorphSource
                 text: "󰂚"
                 color: Colors.overlay1
                 font.family: Fonts.family
@@ -45,6 +47,7 @@ PanelOverlay {
             }
 
             Text {
+                visible: !root.hasMorphSource
                 text: "通知"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -58,7 +61,7 @@ PanelOverlay {
 
             // 通知计数
             Text {
-                visible: SystemState.notificationCount > 0
+                visible: !root.hasMorphSource && SystemState.notificationCount > 0
                 text: SystemState.notificationCount + " 条"
                 color: Colors.subtext0
                 font.family: Fonts.family

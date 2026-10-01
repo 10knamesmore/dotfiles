@@ -7,7 +7,9 @@ import "../theme"
 import "../state"
 import "../components"
 
-// 快捷键速查面板 — 解析 keybindings.conf，分组卡片，可搜索
+// 快捷键速查面板 — 数据来自 `hyprctl binds`：hyprland.lua 里每条 bind 的 description
+// 约定写成「分组 · 标签」，分组标题取 " · " 前那段。
+// 绑定由 Lua 闭包实现时 Hyprland 只报 dispatcher __lua，标签只能来自 description。
 PanelOverlay {
     id: root
 
@@ -19,7 +21,6 @@ PanelOverlay {
     onCloseRequested: PanelState.keybindingsOpen = false
 
     property string searchQuery: ""
-    property var _lines: []
     property var _sections: []   // [{title, bindings: [{key, desc}]}]
 
     ListModel { id: filteredModel }
@@ -39,173 +40,63 @@ PanelOverlay {
     }
 
     function loadKeybindings() {
-        root._lines = [];
-        confProc.running = true;
+        bindsProc.running = true;
     }
 
     Process {
-        id: confProc
-        command: ["cat", Quickshell.env("HOME") + "/.config/hypr/keybindings.conf"]
-        onStarted: root._lines = []
-        stdout: SplitParser {
-            onRead: data => root._lines.push(data)
+        id: bindsProc
+        command: ["hyprctl", "binds", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: root.parseBinds(text)
         }
-        onExited: root.parseAndFilter()
     }
 
-    function parseAndFilter() {
-        // 解析变量
-        let vars = {};
-        for (let line of _lines) {
-            let vm = line.match(/^\$(\w+)\s*=\s*(.+)/);
-            if (vm) vars["$" + vm[1]] = vm[2].trim();
+    // 只渲染带 description 的绑定（即 hyprland.lua keybindings 段声明的那些）。
+    function parseBinds(json) {
+        let raw = [];
+        try { raw = JSON.parse(json); } catch (e) { raw = []; }
+
+        let byGroup = new Map();
+        for (let b of raw) {
+            if (!b.has_description || !b.description)
+                continue;
+            let parts = b.description.split(" · ");
+            let group = parts.length > 1 ? parts[0] : "通用";
+            let label = parts.length > 1 ? parts.slice(1).join(" · ") : b.description;
+            if (!byGroup.has(group))
+                byGroup.set(group, []);
+            byGroup.get(group).push({ key: formatKeyCombo(b.modmask, b.key), desc: label });
         }
 
-        // 解析分组和绑定
         let sections = [];
-        let currentSection = { title: "通用", bindings: [] };
-
-        for (let line of _lines) {
-            line = line.trim();
-            if (!line || line.match(/^\$\w+\s*=/)) continue;
-
-            // 检测分组标题
-            let sectionMatch = line.match(/^#{2,}\s*(.+?)\s*#{2,}$/);
-            if (sectionMatch) {
-                if (currentSection.bindings.length > 0)
-                    sections.push(currentSection);
-                currentSection = { title: sectionMatch[1].trim(), bindings: [] };
-                continue;
-            }
-            // 单行注释作为子标题
-            if (line.startsWith("#") && !line.startsWith("##")) {
-                let comment = line.replace(/^#+\s*/, "").trim();
-                if (comment.length > 0 && comment.length < 50 && !comment.startsWith("请参") && !comment.startsWith("exec")) {
-                    // 如果当前分组已有绑定，开始新分组
-                    if (currentSection.bindings.length > 0) {
-                        sections.push(currentSection);
-                        currentSection = { title: comment, bindings: [] };
-                    } else {
-                        currentSection.title = comment;
-                    }
-                }
-                continue;
-            }
-
-            // 解析 bind 行
-            let bindMatch = line.match(/^bind[eml]*\s*=\s*(.+)/);
-            if (!bindMatch) continue;
-
-            let parts = bindMatch[1].split(",").map(s => s.trim());
-            if (parts.length < 3) continue;
-
-            let mods = parts[0];
-            let key = parts[1];
-            let action = parts[2];
-            let args = parts.slice(3).join(", ").trim();
-
-            // 变量替换
-            for (let [k, v] of Object.entries(vars)) {
-                mods = mods.replace(k, v);
-                args = args.replace(k, v);
-            }
-
-            // 格式化按键组合
-            let keyCombo = formatKeyCombo(mods, key);
-
-            // 格式化描述
-            let desc = formatDescription(action, args);
-
-            currentSection.bindings.push({ key: keyCombo, desc: desc });
-        }
-        if (currentSection.bindings.length > 0)
-            sections.push(currentSection);
+        for (let [title, bindings] of byGroup)
+            sections.push({ title: title, bindings: bindings });
 
         root._sections = sections;
         applyFilter();
     }
 
-    function formatKeyCombo(mods, key) {
+    // modmask 位（Hyprland）：1=Shift 4=Ctrl 8=Alt 64=Super
+    function formatKeyCombo(modmask, key) {
         let parts = [];
-        let m = mods.toUpperCase();
-        if (m.includes("SUPER")) parts.push("Super");
-        if (m.includes("CONTROL") || m.includes("CTRL")) parts.push("Ctrl");
-        if (m.includes("SHIFT")) parts.push("Shift");
-        if (m.includes("ALT")) parts.push("Alt");
+        if (modmask & 64) parts.push("Super");
+        if (modmask & 4) parts.push("Ctrl");
+        if (modmask & 1) parts.push("Shift");
+        if (modmask & 8) parts.push("Alt");
 
-        // 格式化特殊键名
         let keyName = key;
         if (key === "mouse:272") keyName = "LMB";
         else if (key === "mouse:273") keyName = "RMB";
+        else if (key === "mouse:274") keyName = "MMB";
         else if (key.startsWith("XF86")) keyName = key.replace("XF86", "").replace(/([A-Z])/g, " $1").trim();
         else if (key === "slash") keyName = "/";
         else if (key === "period") keyName = ".";
+        else if (key === "apostrophe") keyName = "'";
         else if (key === "TAB") keyName = "Tab";
-        else keyName = key.toUpperCase();
+        else if (key.length === 1) keyName = key.toUpperCase();
 
         parts.push(keyName);
         return parts.join(" + ");
-    }
-
-    function formatDescription(action, args) {
-        // 映射常见 dispatcher 到中文
-        let map = {
-            "killactive": "关闭窗口",
-            "togglefloating": "切换浮动",
-            "togglegroup": "切换分组",
-            "changegroupactive": args === "f" ? "下一个标签" : "上一个标签",
-            "movefocus": "切换焦点 " + ({l:"←",r:"→",u:"↑",d:"↓"}[args] || args),
-            "workspace": "切换到工作区 " + args,
-            "movetoworkspace": args === "special" ? "移到暂存区" : "移到工作区 " + args,
-            "movetoworkspacesilent": "静默移到工作区 " + args,
-            "togglespecialworkspace": "切换暂存区",
-            "fullscreen": "全屏",
-            "movewindow": "移动窗口",
-            "resizewindow": "调整窗口大小",
-            "layoutmsg": args === "togglesplit" ? "切换布局方向" : args,
-        };
-
-        if (map[action]) return map[action];
-
-        // exec 命令解析
-        if (action === "exec") {
-            if (args.includes("hyprshot -m region")) return "区域截图";
-            if (args.includes("hyprshot -m window")) return "窗口截图";
-            if (args.includes("screen_record_toggle") && args.includes("region")) return "区域录屏";
-            if (args.includes("screen_record_toggle")) return "录屏";
-            if (args.includes("hyprlock")) return "锁屏";
-            if (args.includes("toggle_fullscreen")) return "切换全屏";
-            if (args.includes("toggleBar")) return "切换状态栏";
-            if (args.includes("launcher")) return "应用启动器";
-            if (args.includes("settings")) return "快捷设置";
-            if (args.includes("keybindings")) return "快捷键速查";
-            if (args.includes("launch_yazi")) return "文件管理器";
-            if (args.includes("opacity_toggle")) return "透明度切换";
-            if (args.includes("quick_note")) return "快速笔记";
-            if (args.includes("focus_mode")) return "专注模式";
-            if (args.includes("workspace_save")) return "保存工作区";
-            if (args.includes("workspace_restore")) return "恢复工作区";
-            if (args.includes("layout_dispatch")) {
-                let dir = args.includes(" h") ? "←" : args.includes(" l") ? "→" : args.includes(" k") ? "↑" : "↓";
-                if (args.includes("shift")) return "移动窗口 " + dir;
-                if (args.includes("ctrl")) return "调整大小 " + dir;
-            }
-            if (args.includes("wpctl set-volume") && args.includes("+")) return "音量+";
-            if (args.includes("wpctl set-volume") && args.includes("-")) return "音量-";
-            if (args.includes("wpctl set-mute") && args.includes("SINK")) return "静音切换";
-            if (args.includes("wpctl set-mute") && args.includes("SOURCE")) return "麦克风静音";
-            if (args.includes("brightnessctl") && args.includes("+")) return "亮度+";
-            if (args.includes("brightnessctl") && args.includes("-")) return "亮度-";
-            if (args.includes("playerctl next")) return "下一首";
-            if (args.includes("playerctl play-pause")) return "播放/暂停";
-            if (args.includes("playerctl previous")) return "上一首";
-            if (args.includes("$terminal")) return "终端";
-            // 通用 fallback
-            let short = args.replace(/.*\//, "").replace(/\.sh$/, "");
-            return short.length > 40 ? short.substring(0, 37) + "..." : short;
-        }
-
-        return action + (args ? " " + args : "");
     }
 
     function applyFilter() {

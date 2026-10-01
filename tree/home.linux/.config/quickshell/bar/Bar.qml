@@ -18,7 +18,7 @@ PanelWindow {
     property int trackingBandHeight: 44
 
     function queueAutoHide() {
-        if (!root.transientReveal || PanelState.anyPanelOpen || barHover.hovered || trackingHover.hovered)
+        if (!root.transientReveal || PanelState.anyPanelOpen || MorphState.heldItems.length > 0 || barHover.hovered || trackingHover.hovered)
             return;
 
         hideTimer.stop();
@@ -140,7 +140,7 @@ PanelWindow {
 
         interval: 180
         onTriggered: {
-            if (root.transientReveal && !PanelState.anyPanelOpen && !barHover.hovered && !trackingHover.hovered)
+            if (root.transientReveal && !PanelState.anyPanelOpen && MorphState.heldItems.length === 0 && !barHover.hovered && !trackingHover.hovered)
                 BarState.hideHoverBar();
         }
     }
@@ -150,6 +150,17 @@ PanelWindow {
 
         function onAnyPanelOpenChanged() {
             if (PanelState.anyPanelOpen)
+                hideTimer.stop();
+            else
+                root.queueAutoHide();
+        }
+    }
+
+    Connections {
+        target: MorphState
+
+        function onHeldItemsChanged() {
+            if (MorphState.heldItems.length > 0)
                 hideTimer.stop();
             else
                 root.queueAutoHide();

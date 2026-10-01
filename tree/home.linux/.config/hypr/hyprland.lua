@@ -321,7 +321,13 @@ hl.window_rule({
 -- Layer rules
 -- ============================================================
 
--- 只给面板（默认 namespace "quickshell"）开模糊；bar 单独命名 "quickshell-bar"，
+-- 胶囊和面板使用实色底，形变与淡入淡出由 QML 驱动。
+hl.layer_rule({
+  name = "quickshell_panels",
+  match = { namespace = "^quickshell-panel$" },
+  no_anim = true,
+})
+
 hl.layer_rule({
   name = "quickshell_blur",
   match = { namespace = "^quickshell$" },
@@ -331,53 +337,67 @@ hl.layer_rule({
 
 -- ============================================================
 -- Keybindings
+--
+-- 统一走本地 bind()：description 会进 Hyprland 的 bind 记录，
+-- 速查面板（Super + /）直接读 `hyprctl binds`，不再解析配置文件。
+-- 约定格式「分组 · 标签」，前半段是面板里的卡片标题。
 -- ============================================================
 
+local function bind(keys, desc, dispatcher, opts)
+  opts = opts or {}
+  opts.description = desc
+  hl.bind(keys, dispatcher, opts)
+end
+
 -- 应用启动
-hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
-hl.bind(mainMod .. " + D", hl.dsp.window.close())
-hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/toggle_fullscreen.sh"))
-hl.bind(mainMod .. " + T", hl.dsp.global("quickshell:toggleBar"))
-hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(terminal .. " launch_yazi.sh"))
+bind(mainMod .. " + Q", "应用启动 · 终端", hl.dsp.exec_cmd(terminal))
+bind(mainMod .. " + D", "窗口 · 关闭", hl.dsp.window.close())
+bind(mainMod .. " + F", "窗口 · 切换全屏", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/toggle_fullscreen.sh"))
+bind(mainMod .. " + T", "面板 · 切换状态栏", hl.dsp.global("quickshell:toggleBar"))
+bind(mainMod .. " + E", "应用启动 · 文件管理器", hl.dsp.exec_cmd(terminal .. " launch_yazi.sh"))
 -- float 挪到 ALT+V，对齐 macOS 的 `alt - v`，并腾出 SUPER+V 给 keyd 做粘贴
-hl.bind("ALT + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + R", hl.dsp.global("quickshell:launcher"))
-hl.bind(mainMod .. " + S", hl.dsp.layout("togglesplit"))
-hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("hyprshot -m region"))
-hl.bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprshot -m window"))
-hl.bind(mainMod .. " + SHIFT + T", hl.dsp.global("quickshell:settings"))
-hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("hyprlock"))
+bind("ALT + V", "窗口 · 切换浮动", hl.dsp.window.float({ action = "toggle" }))
+bind(mainMod .. " + R", "应用启动 · 应用启动器", hl.dsp.global("quickshell:launcher"))
+bind(mainMod .. " + S", "布局 · 切换方向", hl.dsp.layout("togglesplit"))
+bind(mainMod .. " + P", "截图 · 区域", hl.dsp.exec_cmd("hyprshot -m region"))
+bind(mainMod .. " + SHIFT + P", "截图 · 窗口", hl.dsp.exec_cmd("hyprshot -m window"))
+bind(mainMod .. " + SHIFT + T", "面板 · 快捷设置", hl.dsp.global("quickshell:settings"))
+bind(mainMod .. " + SHIFT + Q", "会话 · 锁屏", hl.dsp.exec_cmd("hyprlock"))
 
 -- 焦点切换（hjkl）
-hl.bind(mainMod .. " + h", hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + l", hl.dsp.focus({ direction = "right" }))
-hl.bind(mainMod .. " + k", hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + j", hl.dsp.focus({ direction = "down" }))
+bind(mainMod .. " + h", "焦点切换 · ←", hl.dsp.focus({ direction = "left" }))
+bind(mainMod .. " + l", "焦点切换 · →", hl.dsp.focus({ direction = "right" }))
+bind(mainMod .. " + k", "焦点切换 · ↑", hl.dsp.focus({ direction = "up" }))
+bind(mainMod .. " + j", "焦点切换 · ↓", hl.dsp.focus({ direction = "down" }))
 
 -- 移动窗口（按当前布局自动分流脚本）
-hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift h"))
-hl.bind(mainMod .. " + SHIFT + J", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift j"))
-hl.bind(mainMod .. " + SHIFT + K", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift k"))
-hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift l"))
+bind(mainMod .. " + SHIFT + H", "移动窗口 · ←", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift h"))
+bind(mainMod .. " + SHIFT + J", "移动窗口 · ↓", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift j"))
+bind(mainMod .. " + SHIFT + K", "移动窗口 · ↑", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift k"))
+bind(mainMod .. " + SHIFT + L", "移动窗口 · →", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift l"))
 
 -- 调整尺寸（binde 等价：repeating = true）
-hl.bind(
+bind(
   mainMod .. " + CONTROL + H",
+  "调整大小 · ←",
   hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl h"),
   { repeating = true }
 )
-hl.bind(
+bind(
   mainMod .. " + CONTROL + J",
+  "调整大小 · ↓",
   hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl j"),
   { repeating = true }
 )
-hl.bind(
+bind(
   mainMod .. " + CONTROL + K",
+  "调整大小 · ↑",
   hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl k"),
   { repeating = true }
 )
-hl.bind(
+bind(
   mainMod .. " + CONTROL + L",
+  "调整大小 · →",
   hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl l"),
   { repeating = true }
 )
@@ -385,72 +405,63 @@ hl.bind(
 -- 工作区切换 / 移动窗口 / silent 移动
 for i = 1, 10 do
   local key = i % 10 -- 10 → 键 "0"
-  hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-  hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = tostring(i) }))
-  hl.bind(mainMod .. " + CONTROL + " .. key, hl.dsp.window.move({ workspace = tostring(i), silent = true }))
+  bind(mainMod .. " + " .. key, "工作区 · 切到 " .. i, hl.dsp.focus({ workspace = i }))
+  bind(mainMod .. " + SHIFT + " .. key, "工作区 · 移到 " .. i, hl.dsp.window.move({ workspace = tostring(i) }))
+  bind(mainMod .. " + CONTROL + " .. key, "工作区 · 静默移到 " .. i, hl.dsp.window.move({ workspace = tostring(i), silent = true }))
 end
 
 -- 特殊工作区
-hl.bind(mainMod .. " + M", hl.dsp.workspace.toggle_special("special"))
-hl.bind(mainMod .. " + SHIFT + M", hl.dsp.window.move({ workspace = "special" }))
+bind(mainMod .. " + M", "暂存区 · 切换", hl.dsp.workspace.toggle_special("special"))
+bind(mainMod .. " + SHIFT + M", "暂存区 · 移入", hl.dsp.window.move({ workspace = "special" }))
 
 -- 窗口分组
-hl.bind(mainMod .. " + G", hl.dsp.group.toggle())
-hl.bind(mainMod .. " + TAB", hl.dsp.group.next())
-hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.group.next({ reverse = true }))
+bind(mainMod .. " + G", "分组 · 切换分组", hl.dsp.group.toggle())
+bind(mainMod .. " + TAB", "分组 · 下一个标签", hl.dsp.group.next())
+bind(mainMod .. " + SHIFT + TAB", "分组 · 上一个标签", hl.dsp.group.next({ reverse = true }))
 
 -- QuickShell 全局触发
-hl.bind(mainMod .. " + slash", hl.dsp.global("quickshell:keybindings"))
-hl.bind(mainMod .. " + N", hl.dsp.global("quickshell:notes"))
-hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.global("quickshell:journal"))
+bind(mainMod .. " + slash", "面板 · 快捷键速查", hl.dsp.global("quickshell:keybindings"))
+bind(mainMod .. " + N", "面板 · 快速笔记", hl.dsp.global("quickshell:notes"))
+bind(mainMod .. " + SHIFT + apostrophe", "面板 · 系统日志", hl.dsp.global("quickshell:journal"))
 
 -- 自定义脚本
-hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_save.sh"))
-hl.bind(mainMod .. " + CONTROL + SHIFT + S", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_restore.sh"))
+bind(mainMod .. " + O", "脚本 · 透明度切换", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
+bind(mainMod .. " + SHIFT + S", "脚本 · 保存工作区", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_save.sh"))
+bind(mainMod .. " + CONTROL + SHIFT + S", "脚本 · 恢复工作区", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_restore.sh"))
 
 -- 鼠标拖动 / 调整大小（bindm 等价：mouse = true）
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+bind(mainMod .. " + mouse:272", "鼠标 · 拖动窗口", hl.dsp.window.drag(), { mouse = true })
+bind(mainMod .. " + mouse:273", "鼠标 · 调整窗口大小", hl.dsp.window.resize(), { mouse = true })
 
 -- 多媒体按键（bindel 等价：locked + repeating）
 -- 多媒体键先执行 wpctl，再通过 Lua dispatcher 通知 QuickShell OSD。
-hl.bind("XF86AudioRaiseVolume", function()
+bind("XF86AudioRaiseVolume", "多媒体 · 音量+", function()
   hl.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+")
   hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
-hl.bind("XF86AudioLowerVolume", function()
+bind("XF86AudioLowerVolume", "多媒体 · 音量-", function()
   hl.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-")
   hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
-hl.bind("XF86AudioMute", function()
+bind("XF86AudioMute", "多媒体 · 静音切换", function()
   hl.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
   hl.dispatch(hl.dsp.global("quickshell:osdVolume"))
 end, { locked = true, repeating = true })
 
-hl.bind(
+bind(
   "XF86AudioMicMute",
+  "多媒体 · 麦克风静音",
   hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
   { locked = true, repeating = true }
 )
 
-hl.bind("XF86MonBrightnessUp", function()
-  hl.exec_cmd("brightnessctl s 10%+")
-  hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
-end, { locked = true, repeating = true })
-
-hl.bind("XF86MonBrightnessDown", function()
-  hl.exec_cmd("brightnessctl s 10%-")
-  hl.dispatch(hl.dsp.global("quickshell:osdBrightness"))
-end, { locked = true, repeating = true })
-
 -- 播放控制（bindl 等价：locked，锁屏时仍可用）
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
-hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+bind("XF86AudioNext", "播放 · 下一首", hl.dsp.exec_cmd("playerctl next"), { locked = true })
+bind("XF86AudioPause", "播放 · 播放/暂停", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+bind("XF86AudioPlay", "播放 · 播放/暂停", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+bind("XF86AudioPrev", "播放 · 上一首", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 
 -- ============================================================
 -- Autostart（exec-once 等价）
@@ -472,4 +483,5 @@ hl.on("hyprland.start", function()
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
   exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
   hl.exec_cmd("clash-verge") -- tauri 单实例
+  exec_once("google-chrome-stable", "chrome") -- Chrome 进程名是 chrome
 end)

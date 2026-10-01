@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 系统监控采集 — 每秒读一次 /proc/stat + /proc/meminfo + /proc/net/dev，
+// 顶栏资源采集 — 每秒读一次 /proc/stat + /proc/meminfo + /proc/net/dev，
 // 进程内直读（FileView.blockAllReads），算好 CPU / 内存 / 网速写入 SystemStats。
 // 采集不创建外部进程。
 Scope {
@@ -27,16 +27,6 @@ Scope {
         root._parseCpu(statFile.text());
         root._parseMem(memFile.text());
         root._parseNet(netFile.text());
-        root._pushHist();
-    }
-
-    // 环形历史缓冲：必须新数组赋值才能触发绑定（原地 push 不触发）
-    function _pushHist() {
-        let m = SystemStats.histMax;
-        SystemStats.cpuHist = SystemStats.cpuHist.concat([SystemStats.cpuUsage]).slice(-m);
-        SystemStats.memHist = SystemStats.memHist.concat([SystemStats.memUsagePct]).slice(-m);
-        SystemStats.netUpHist = SystemStats.netUpHist.concat([SystemStats.netUpSpeed]).slice(-m);
-        SystemStats.netDownHist = SystemStats.netDownHist.concat([SystemStats.netDownSpeed]).slice(-m);
     }
 
     function _parseCpu(seg) {
@@ -85,7 +75,6 @@ Scope {
             SystemStats.memUsagePct = Math.round(used / vals.MemTotal * 100);
             let usedGib = (used / 1.04858e+06).toFixed(1);
             let totalGib = (vals.MemTotal / 1.04858e+06).toFixed(1);
-            SystemStats.memDetailText = usedGib + "/" + totalGib + "G";
             let swapUsed = vals.SwapTotal - (vals.SwapFree ?? 0);
             SystemStats.memTooltipText = "RAM: " + usedGib + " / " + totalGib + " GiB (" + SystemStats.memUsagePct + "%)" + (vals.SwapTotal > 0 ? "\nSwap: " + (swapUsed / 1.04858e+06).toFixed(1) + " / " + (vals.SwapTotal / 1.04858e+06).toFixed(1) + " GiB" : "");
         }

@@ -1,25 +1,18 @@
 import QtQuick
 pragma Singleton
 
-// 系统监控数据 — 由 SystemStatsService 每秒更新一次；bar 的 Cpu/Memory/NetSpeed 模块纯读取
+// 顶栏资源统计 — SystemStatsService 每秒更新，Cpu/Memory/NetSpeed 胶囊读取；不保存历史曲线。
 QtObject {
     // ── CPU ──
     property int cpuUsage: 0
     property var cpuCorePcts: []        // per-core 使用率数组
     // ── 内存 ──
     property int memUsagePct: 0
-    property string memDetailText: ""   // "8.1/15.5G"
-    property string memTooltipText: ""
+    property string memTooltipText: ""  // "RAM: 8.1 / 15.5 GiB (52%)\nSwap: ..."
     // ── 网络（取第一个物理接口）──
     property string netIface: ""
     property real netUpSpeed: 0         // bytes/s
     property real netDownSpeed: 0
     property real netUpTotal: 0
     property real netDownTotal: 0
-    // ── 历史缓冲（系统面板曲线用，环形 60 样本）──
-    readonly property int histMax: 60
-    property var cpuHist: []
-    property var memHist: []
-    property var netUpHist: []
-    property var netDownHist: []
 }

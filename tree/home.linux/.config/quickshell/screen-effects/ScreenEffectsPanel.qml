@@ -43,6 +43,7 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
+                visible: !root.hasMorphSource
                 text: "屏幕效果"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title

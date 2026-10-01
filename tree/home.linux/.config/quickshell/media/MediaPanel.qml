@@ -69,6 +69,7 @@ PanelOverlay {
         // ── 曲目信息 ──
         Text {
             Layout.fillWidth: true
+            visible: !root.hasMorphSource
             text: root.player ? (root.player.trackTitle || "未在播放") : "无播放器"
             color: Colors.text
             font.family: Fonts.family

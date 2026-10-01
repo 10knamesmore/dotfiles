@@ -17,20 +17,30 @@ BarModule {
     implicitWidth: label.implicitWidth + 32
     onClicked: mouse => {
         PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.toggleScreenEffects();
+        MorphState.openFrom(root, () => PanelState.toggleScreenEffects());
     }
 
-    Text {
-        id: label
+    Row {
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 8
 
-        anchors.centerIn: parent
-        text: root.effectsActive ? "󰌁" : "󰌀"
-        color: root.effectsActive ? Colors.flamingo : Colors.overlay1
-        font.family: Fonts.family
-        font.pixelSize: Fonts.title
-        font.weight: Font.DemiBold
+        Text {
+            id: label
+            text: root.effectsActive ? "󰌁" : "󰌀"
+            color: root.effectsActive ? Colors.flamingo : Colors.overlay1
+            font.family: Fonts.family
+            font.pixelSize: Fonts.title
+            font.weight: Font.DemiBold
+        }
+
+        Text {
+            text: "屏幕效果"
+            opacity: root.expansion
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.body
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 }

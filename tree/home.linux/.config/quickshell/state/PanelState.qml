@@ -19,9 +19,7 @@ QtObject {
     property bool journalOpen: false
     property bool bluetoothOpen: false
     property bool displayOpen: false
-    property bool systemMonitorOpen: false
-    property string systemMonitorTab: "cpu"
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || bluetoothOpen || displayOpen || systemMonitorOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || bluetoothOpen || displayOpen
 
     function toggleScreenEffects() {
         screenEffectsOpen = !screenEffectsOpen;
@@ -79,10 +77,6 @@ QtObject {
         displayOpen = !displayOpen;
     }
 
-    function toggleSystemMonitor() {
-        systemMonitorOpen = !systemMonitorOpen;
-    }
-
     // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
         MorphState.reset();
@@ -100,7 +94,6 @@ QtObject {
         journalOpen = false;
         bluetoothOpen = false;
         displayOpen = false;
-        systemMonitorOpen = false;
     }
 
 }

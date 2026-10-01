@@ -1,4 +1,5 @@
 import "../modules"
+import "../../state"
 import QtQuick
 
 // id → bar module 工厂。特例 props（direction / barScreen / barWindow）与 flat 在此集中注入。
@@ -13,6 +14,8 @@ Loader {
     property var barScreen: null
     property var barWindow: null
     property bool flat: false
+    property Item morphItem: null
+    opacity: MorphState.isHeld(host.morphItem) ? 0 : 1
 
     sourceComponent: {
         switch (item.id) {
@@ -38,6 +41,8 @@ Loader {
             return cAudio;
         case "network":
             return cNetwork;
+        case "bluetooth":
+            return cBluetooth;
         case "clipboard":
             return cClipboard;
         case "notification":
@@ -121,6 +126,12 @@ Loader {
     Component {
         id: cNetwork
         NetworkModule {
+            flat: host.flat
+        }
+    }
+    Component {
+        id: cBluetooth
+        BluetoothModule {
             flat: host.flat
         }
     }

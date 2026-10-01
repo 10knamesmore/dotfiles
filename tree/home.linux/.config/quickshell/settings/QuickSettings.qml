@@ -1,12 +1,10 @@
 import "../components"
-import "../services"
 import "../theme"
 import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.Mpris
 import Quickshell.Wayland
 
 // Quick Settings — 左侧滑出面板
@@ -14,54 +12,11 @@ PanelOverlay {
     id: root
 
     // ── 系统状态 ──
-    property bool wifiEnabled: true
-    property bool btEnabled: true
-    property string wifiName: ""
-    property string btDevice: ""
-    property int brightnessValue: 100
-    // 音量统一走 AudioService
-    readonly property int volumePct: AudioService.volume
-    readonly property bool volumeMuted: AudioService.muted
-    property bool nightLightEnabled: false
     // 电源档位（power-profiles-daemon 的 ActiveProfile），由面板开关切换，daemon 自己持久化
     property string powerProfile: "balanced"
-    // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
-    property string _home: Quickshell.env("HOME")
-    property string _effectsState: _home + "/.cache/hypr/screen-effects.json"
-    property string _effectsScript: _home + "/dotfiles/.gen/scripts/hypr/screen_effects.sh"
 
     function refreshStatus() {
-        wifiProc.running = true;
-        wifiNameProc.running = true; // 否则 wifiName 永远空，WiFi 开关显示不出 SSID
-        btPowerProc.running = true;
-        btDeviceProc.running = true;
-        brightnessProc.running = true;
-        nightLightReader.running = true;
         powerProfileProc.running = true;
-        // 音量直接 binding Pipewire，无需 polling
-    }
-
-    function toggleNightLight() {
-        let json;
-        if (root.nightLightEnabled)
-            json = JSON.stringify({
-            "warmth": 0,
-            "grain": 0,
-            "grain_size": 50,
-            "shadow_boost": 40
-        });
-        else
-            json = JSON.stringify({
-            "warmth": 60,
-            "grain": 85,
-            "grain_size": 10,
-            "shadow_boost": 40
-        });
-        nightLightWriter.command = ["sh", "-c", "echo '" + json + "' > " + root._effectsState];
-        nightLightWriter.running = true;
-        nightLightApplier.command = [root._effectsScript, "apply"];
-        nightLightApplier.running = true;
-        root.nightLightEnabled = !root.nightLightEnabled;
     }
 
     // 均衡 ↔ 性能：只动 PPD 的 ActiveProfile，它会把 platform_profile 和 EPP 一起切
@@ -90,109 +45,7 @@ PanelOverlay {
 
     // ── 进程 ──
     Process {
-        id: wifiProc
-
-        command: ["nmcli", "radio", "wifi"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                return root.wifiEnabled = data.trim() === "enabled";
-            }
-        }
-
-    }
-
-    Process {
-        id: wifiNameProc
-
-        command: ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                if (data.startsWith("yes:"))
-                    root.wifiName = data.substring(4);
-
-            }
-        }
-
-    }
-
-    Process {
-        id: btPowerProc
-
-        command: ["bluetoothctl", "show"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                if (data.includes("Powered:"))
-                    root.btEnabled = data.includes("yes");
-
-            }
-        }
-
-    }
-
-    Process {
-        id: btDeviceProc
-
-        command: ["bluetoothctl", "devices", "Connected"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                let parts = data.split(" ");
-                if (parts.length >= 3)
-                    root.btDevice = parts.slice(2).join(" ");
-
-            }
-        }
-
-    }
-
-    Process {
-        id: brightnessProc
-
-        command: ["brightnessctl", "-m"]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                let parts = data.split(",");
-                if (parts.length >= 4)
-                    root.brightnessValue = parseInt(parts[3]) || 0;
-
-            }
-        }
-
-    }
-
-    Process {
         id: actionProc
-    }
-
-    // 夜灯状态读取
-    Process {
-        id: nightLightReader
-
-        command: ["cat", root._effectsState]
-
-        stdout: SplitParser {
-            onRead: (data) => {
-                try {
-                    let obj = JSON.parse(data);
-                    root.nightLightEnabled = (obj.warmth > 0 || obj.grain > 0);
-                } catch (e) {
-                }
-            }
-        }
-
-    }
-
-    // 夜灯写入 + 应用
-    Process {
-        id: nightLightWriter
-    }
-
-    Process {
-        id: nightLightApplier
     }
 
     // 电源档位：power-profiles-daemon，D-Bus property 读写等价 powerprofilesctl get/set
@@ -250,37 +103,6 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
-            // ── 滑块区 ──
-            SectionLabel {
-                text: "调节"
-            }
-
-            SettingsSlider {
-                Layout.fillWidth: true
-                icon: root.brightnessValue > 50 ? "󰃠" : "󰃞"
-                value: root.brightnessValue / 100
-                label: "亮度 " + root.brightnessValue + "%"
-                accentColor: Colors.yellow
-                onMoved: (val) => {
-                    root.brightnessValue = Math.round(val * 100);
-                    actionProc.command = [Quickshell.env("HOME") + "/dotfiles/.gen/scripts/hypr/screen_effects.sh", "brightness", String(root.brightnessValue)];
-                    actionProc.running = true;
-                }
-            }
-
-            SettingsSlider {
-                Layout.fillWidth: true
-                icon: root.volumeMuted ? "" : (root.volumePct < 50 ? "" : "")
-                value: root.volumePct / 100
-                label: "音量 " + root.volumePct + "%"
-                accentColor: Colors.blue
-                onMoved: (val) => AudioService.setVolume(Math.round(val * 100))
-            }
-
-            Divider {
-                Layout.fillWidth: true
-            }
-
             // ── 开关区 ──
             SectionLabel {
                 text: "快捷开关"
@@ -288,57 +110,9 @@ PanelOverlay {
 
             GridLayout {
                 Layout.fillWidth: true
-                columns: 3
+                columns: 2
                 rowSpacing: 8
                 columnSpacing: 8
-
-                QuickToggle {
-                    icon: root.wifiEnabled ? "󰤨" : "󰤭"
-                    label: "WiFi"
-                    status: root.wifiName || (root.wifiEnabled ? "已开启" : "已关闭")
-                    toggled: root.wifiEnabled
-                    onClicked: {
-                        actionProc.command = ["nmcli", "radio", "wifi", root.wifiEnabled ? "off" : "on"];
-                        actionProc.running = true;
-                        root.wifiEnabled = !root.wifiEnabled;
-                    }
-                    onRightClicked: {
-                        PanelState.settingsOpen = false;
-                        PanelState.toggleNetwork();
-                    }
-                }
-
-                QuickToggle {
-                    icon: root.btEnabled ? "󰂯" : "󰂲"
-                    label: "蓝牙"
-                    status: root.btDevice || (root.btEnabled ? "已开启" : "已关闭")
-                    toggled: root.btEnabled
-                    onClicked: {
-                        actionProc.command = ["bluetoothctl", "power", root.btEnabled ? "off" : "on"];
-                        actionProc.running = true;
-                        root.btEnabled = !root.btEnabled;
-                    }
-                    onRightClicked: {
-                        PanelState.settingsOpen = false;
-                        PanelState.toggleBluetooth();
-                    }
-                }
-
-                QuickToggle {
-                    icon: root.volumeMuted ? "" : "󰕾"
-                    label: "静音"
-                    status: root.volumeMuted ? "已静音" : "未静音"
-                    toggled: root.volumeMuted
-                    onClicked: AudioService.toggleMute()
-                }
-
-                QuickToggle {
-                    icon: root.nightLightEnabled ? "󰛨" : "󰹏"
-                    label: "夜灯"
-                    status: root.nightLightEnabled ? "已开启" : "已关闭"
-                    toggled: root.nightLightEnabled
-                    onClicked: root.toggleNightLight()
-                }
 
                 QuickToggle {
                     icon: "󰓅"
@@ -366,19 +140,8 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
-            // ── 媒体卡片 ──
-            MediaCard {
-                Layout.fillWidth: true
-                player: MediaService.activePlayer
-            }
-
             // ── 天气卡片 ──
             WeatherCard {
-                Layout.fillWidth: true
-            }
-
-            // ── 电池卡片 ──
-            BatteryCard {
                 Layout.fillWidth: true
             }
 

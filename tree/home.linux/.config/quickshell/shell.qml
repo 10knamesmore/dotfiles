@@ -18,7 +18,6 @@ import "./power"
 import "./screen-effects"
 import "./services"
 import "./settings"
-import "./systemmonitor"
 import "./state"
 import QtQuick
 import Quickshell
@@ -87,13 +86,6 @@ ShellRoot {
             PanelState.closeAll();
             PanelState.togglePowerMenu();
         }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "osdBrightness"
-        description: "Show brightness OSD"
-        onPressed: osdService.requestBrightnessOsd()
     }
 
     GlobalShortcut {
@@ -211,8 +203,6 @@ ShellRoot {
     BluetoothPanel {}
 
     DisplayPanel {}
-
-    SystemMonitorPanel {}
 
     // ── 新增面板 ──
     JournalPanel {}

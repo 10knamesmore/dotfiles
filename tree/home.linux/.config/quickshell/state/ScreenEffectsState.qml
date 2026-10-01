@@ -25,7 +25,7 @@ QtObject {
     signal applyRequested(int warmth, int grain, int grainSize, int shadowBoost)
     signal toggleRequested()
     signal brightnessRequested(int value)
-    // 面板打开时回读背光实际值 —— 亮度可能被亮度键/其他工具改过，State 不是唯一真相源
+    // 面板打开时回读背光实际值 —— 亮度可能被其他工具改过，State 不是唯一真相源
     signal refreshRequested()
 
     function requestApply(w, g, gs, sb) {

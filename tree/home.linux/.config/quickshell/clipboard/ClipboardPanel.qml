@@ -142,6 +142,7 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
+                visible: !root.hasMorphSource
                 text: "󰅍 剪贴板"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title

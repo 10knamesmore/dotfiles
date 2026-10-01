@@ -37,14 +37,7 @@ BarModule {
     implicitWidth: root.hovered
         ? Math.max(hoverRow.implicitWidth + 32, 180)
         : Math.max(label.implicitWidth + 32, 120)
-    onClicked: mouse => {
-        PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.systemMonitorTab = "network";
-        PanelState.systemMonitorOpen = true;
-    }
+    clickable: false
 
     // ── 默认视图 ──
     Text {

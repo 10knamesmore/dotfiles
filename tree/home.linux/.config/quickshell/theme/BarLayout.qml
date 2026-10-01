@@ -25,7 +25,7 @@ QtObject {
     readonly property var rightWidgets: [{
         "group": ["cpu", "memory"]
     }, {
-        "group": ["audio", "network"]
+        "group": ["audio", "network", "bluetooth"]
     }, {
         "group": ["clipboard", "notification", "screeneffects"]
     }, "battery"]

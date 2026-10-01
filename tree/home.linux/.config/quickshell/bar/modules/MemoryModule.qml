@@ -9,14 +9,7 @@ BarModule {
     // 数据来自 SystemStats（SystemStatsService 每秒更新）
     accentColor: Colors.mauve
     implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
-    onClicked: mouse => {
-        PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.systemMonitorTab = "memory";
-        PanelState.systemMonitorOpen = true;
-    }
+    clickable: false
 
     Row {
         id: compactLabel

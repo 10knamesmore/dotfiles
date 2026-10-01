@@ -504,6 +504,7 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
+                visible: !root.hasMorphSource
                 text: root.wifiEnabled ? "󰤨" : "󰤭"
                 color: root.wifiEnabled ? Colors.blue : Colors.overlay1
                 font.family: Fonts.family
@@ -511,6 +512,7 @@ PanelOverlay {
             }
 
             Text {
+                visible: !root.hasMorphSource
                 text: "WiFi"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title

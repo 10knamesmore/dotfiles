@@ -124,7 +124,7 @@ Scope {
         }
 
         function onRefreshRequested() {
-            brightnessReader.command = ["brightnessctl", "-m"];
+            brightnessReader.command = ["brightnessctl", "-d", "amdgpu_bl1", "-m"];
             brightnessReader.running = true;
         }
     }

@@ -1,8 +1,7 @@
 import "../../theme"
 import QtQuick
-import QtQuick.Layouts
 
-// 基础模块包装：圆角背景 + 左侧弧形指示器(hover蔓延) + 弹性缩放 + 柔和阴影 + 状态色调
+// 顶栏胶囊。可展开模块的 capsuleHeader 会暂时移入面板，文字和进度仍使用原组件。
 Rectangle {
     id: root
 
@@ -11,26 +10,33 @@ Rectangle {
     property color tintColor: "transparent"
     property real backgroundAlpha: Tokens.panelAlpha
     property bool flat: false
-    property bool hovered: hoverArea.containsMouse
-    property real progress: -1 // 0~1 进度值，-1 不启用
+    property bool clickable: true
+    property real expansion: 0
+    property real panelProgress: 0
+    property bool hovered: !headerInPanel && hoverArea.containsMouse
+    readonly property bool headerInPanel: header.parent !== root
+    readonly property real detailProgress: headerInPanel ? expansion : (hovered ? 1 : 0)
+    property real progress: -1
     property bool progressDraggable: false
+    readonly property alias capsuleHeader: header
     default property alias contents: inner.data
 
     signal clicked(var mouse)
     signal rightClicked(var mouse)
     signal scrolled(int delta)
     signal progressDragged(real value)
-    signal moved(var mouse) // hover 移动（模块坐标系），配合 hovered 变 false 清理
+    signal moved(var mouse)
 
     clip: true
     radius: Tokens.radiusL
-    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5) : (hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08)) : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, root.backgroundAlpha))
-    border.color: hovered ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
+    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5)
+        : (root.hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08))
+            : Colors.withAlpha(root.backgroundColor, root.backgroundAlpha))
+    border.color: hovered ? Colors.withAlpha(root.accentColor, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: root.flat ? 0 : Tokens.borderWidth
     implicitHeight: 36
-    scale: hovered ? 1.03 : 1.0
+    scale: hovered ? 1.03 : 1
 
-    // 柔和阴影
     SoftShadow {
         anchors.fill: parent
         radius: root.radius
@@ -39,152 +45,78 @@ Rectangle {
         visible: !root.flat
     }
 
-    // 状态色调叠加层（电池/systemd 等用）
-    Rectangle {
+    Item {
+        id: header
         anchors.fill: parent
-        radius: root.radius
-        color: root.tintColor
-        visible: root.tintColor !== Qt.rgba(0, 0, 0, 0)
-
-        Behavior on color {
-            ColorAnimation {
-                duration: Tokens.animElaborate
-                easing.type: Easing.OutCubic
-            }
-        }
-    }
-
-    // 左侧弧形彩色指示器 — hover 时沿胶囊圆弧蔓延（无 progress 时）
-    Item {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: root.hovered ? 8 : 3
-        clip: true
-        visible: root.progress < 0
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.hovered ? root.radius * 2 : parent.width
-            height: root.hovered ? parent.height : parent.height * 0.5
-            radius: root.hovered ? root.radius : 1.5
-            color: root.accentColor
-            opacity: root.hovered ? 1.0 : 0.6
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Tokens.animNormal
-                }
-            }
-
-            Behavior on width {
-                NumberAnimation {
-                    duration: Tokens.animSlow
-                    easing.type: Easing.OutCubic
-                }
-            }
-
-            Behavior on height {
-                NumberAnimation {
-                    duration: Tokens.animElaborate
-                    easing {
-                        type: Easing.OutBack
-                        overshoot: 1.5
-                    }
-                }
-            }
-
-            Behavior on radius {
-                NumberAnimation {
-                    duration: Tokens.animSlow
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
-
-        Behavior on width {
-            NumberAnimation {
-                duration: Tokens.animSlow
-                easing.type: Easing.OutCubic
-            }
-        }
-    }
-
-    // 进度填充 — eclipse 风格，accent 色从左到右铺满模块高度
-    // 外层 Item 按进度宽度做矩形裁剪，内层 Rectangle 始终全宽 + 匹配圆角
-    // 这样左侧圆角始终正确，右侧被 clip 截断为直线（进度 100% 时自然露出右侧圆角）
-    Item {
-        visible: root.progress >= 0
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: root.progress * root.width
         clip: true
 
-        Behavior on width {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.OutCubic
+        Rectangle {
+            anchors.fill: parent
+            radius: root.radius
+            color: root.tintColor
+            visible: root.tintColor !== Qt.rgba(0, 0, 0, 0)
+            Behavior on color {
+                ColorAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutCubic }
             }
         }
 
-        Rectangle {
+        Item {
+            visible: root.progress >= 0
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: root.width
-            radius: root.radius
-            color: root.accentColor
-            opacity: root.hovered ? 0.42 : 0.27
+            width: root.progress * header.width
+            clip: true
 
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Tokens.animFast
+            Behavior on width {
+                enabled: !root.headerInPanel
+                NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: header.width
+                radius: root.radius
+                color: root.accentColor
+                opacity: 0.27 + 0.15 * root.detailProgress
+                Behavior on opacity {
+                    enabled: !root.headerInPanel
+                    NumberAnimation { duration: Tokens.animFast }
                 }
             }
         }
+
+        Item {
+            id: inner
+            anchors.fill: parent
+            anchors.leftMargin: 16
+            anchors.rightMargin: 14 + root.panelProgress * 28
+            anchors.topMargin: 4
+            anchors.bottomMargin: 4
+        }
     }
 
-    // 拖动调节区域（progressDraggable 时覆盖整个模块）
     MouseArea {
         visible: root.progressDraggable
         enabled: root.progressDraggable
         anchors.fill: parent
         preventStealing: true
         cursorShape: Qt.PointingHandCursor
-        onPressed: mouse => {
-            let val = mouse.x / width;
-            root.progressDragged(Math.max(0, Math.min(1, val)));
-        }
+        onPressed: mouse => root.progressDragged(Math.max(0, Math.min(1, mouse.x / width)))
         onPositionChanged: mouse => {
-            if (pressed) {
-                let val = mouse.x / width;
-                root.progressDragged(Math.max(0, Math.min(1, val)));
-            }
-        }
-    }
-
-    // 内容区
-    Item {
-        id: inner
-
-        anchors {
-            fill: parent
-            leftMargin: 16
-            rightMargin: 14
-            topMargin: 4
-            bottomMargin: 4
+            if (pressed)
+                root.progressDragged(Math.max(0, Math.min(1, mouse.x / width)));
         }
     }
 
     MouseArea {
         id: hoverArea
-
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: root.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+        acceptedButtons: root.clickable ? Qt.LeftButton | Qt.RightButton : Qt.NoButton
         onClicked: mouse => {
             if (mouse.button === Qt.RightButton)
                 root.rightClicked(mouse);
@@ -192,9 +124,7 @@ Rectangle {
                 root.clicked(mouse);
         }
         onPositionChanged: mouse => root.moved(mouse)
-        onWheel: wheel => {
-            return root.scrolled(wheel.angleDelta.y > 0 ? 1 : -1);
-        }
+        onWheel: wheel => root.scrolled(wheel.angleDelta.y > 0 ? 1 : -1)
     }
 
     Behavior on color {
@@ -204,7 +134,6 @@ Rectangle {
             easing.bezierCurve: Anim.standard
         }
     }
-
     Behavior on border.color {
         ColorAnimation {
             duration: Tokens.animFast
@@ -212,15 +141,12 @@ Rectangle {
             easing.bezierCurve: Anim.standard
         }
     }
-
     Behavior on implicitWidth {
-        NumberAnimation {
-            duration: Tokens.animSlow
-            easing.type: Easing.OutCubic
-        }
+        enabled: !root.headerInPanel
+        NumberAnimation { duration: Tokens.animSlow; easing.type: Easing.OutCubic }
     }
-
     Behavior on scale {
+        enabled: !root.headerInPanel
         NumberAnimation {
             duration: Tokens.animNormal
             easing.type: Easing.BezierSpline

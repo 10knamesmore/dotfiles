@@ -142,7 +142,6 @@ PanelOverlay {
     }
 
     showing: PanelState.bluetoothOpen
-    entrance: PanelOverlay.Slide
     panelWidth: 400
     panelHeight: root.height * 0.6
     panelTargetX: root.width - 410
@@ -375,6 +374,7 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
+                visible: !root.hasMorphSource
                 text: root.btPowered ? "󰂯" : "󰂲"
                 color: root.btPowered ? Colors.blue : Colors.overlay1
                 font.family: Fonts.family
@@ -382,6 +382,7 @@ PanelOverlay {
             }
 
             Text {
+                visible: !root.hasMorphSource
                 text: "蓝牙"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title

@@ -155,18 +155,11 @@ PanelWindow {
                         width: Math.max(0, Math.min(1, OsdState.osdValue / 100)) * parent.width
                         height: parent.height
                         radius: parent.radius
-                        color: OsdState.osdType === "brightness" ? Colors.yellow : Colors.blue
+                        color: Colors.blue
 
                         Behavior on width {
                             NumberAnimation {
                                 duration: 100
-                            }
-
-                        }
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 200
                             }
 
                         }

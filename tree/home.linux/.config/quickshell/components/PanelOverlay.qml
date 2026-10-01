@@ -5,76 +5,47 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 
-// 通用面板 overlay — morph / 滑入 / 淡入动画
-//
-// 视觉设计：
-//   - 有 morph 源（bar 模块点击等）：从点击点的 40×40 小块「展开」到目标位置目标尺寸，
-//     子元素跟着 anchors 重排显现，给人「光柱展开」感
-//   - 无 morph 源（全局快捷键唤起）：从 closedOffset 方向 slide 到目标 + 淡入
-//
-// 性能权衡：morph 路径会触发子元素 relayout（这是「展开」感的根源，不可避免），
-// 但只发生在 ~500ms 动画期内；静态后无消耗。
-// SoftShadow 内部开了 layer 缓存走 GPU 合成；panel 容器本身含动态内容（ListView 等），
-// 不给它开 layer——否则每帧都要重画整块 FBO，反而更贵。
+// 顶栏展开时直接接管原胶囊的头部，文字、图标和进度保持实时更新。
+// 一个进度同时驱动轮廓、补充信息和内容显现，收起直接回到紧凑胶囊。
 PanelWindow {
     id: root
 
-    // ── 必须绑定 ──
     property bool showing: false
-
-    // ── 遮罩 ──
-    property real backdropOpacity: Tokens.backdropDim
-
-    // ── 面板目标属性 ──
+    property real backdropOpacity: 0
     property real panelWidth: 400
     property real panelHeight: 400
     property int panelRadius: Tokens.radiusL
-
-    // ── 目标位置（-1 = 自动居中）──
     property real panelTargetX: -1
     property real panelTargetY: -1
-
-    // ── 关闭态偏移（无 morph 源时的关闭位移）──
     property real closedOffsetX: 0
     property real closedOffsetY: 20
 
-    // ── 入场特效 ──
-    //   Morph：有点击源（bar 模块点击）时从点击点的小块展开；无点击源时退回 Slide
-    //   Slide：永远从 closedOffset 方向滑入（+ 淡入），忽略点击源
-    // QML 限制：enum 属性只能声明为 int，引用必须写 PanelOverlay.Morph；
-    // 裸写 Entrance.Morph 在 binding 里会静默判 false。
     enum Entrance { Morph, Slide }
     property int entrance: PanelOverlay.Morph
-
-    // ── morph 源（打开时快照）──
-    property real _morphX: -1
-    property real _morphY: -1
-    readonly property bool hasMorphSource: entrance === PanelOverlay.Morph && _morphX >= 0
-
-    // ── 内容 ──
+    property var _source: null
+    property rect _returnBounds: Qt.rect(0, 0, 0, 0)
+    property bool _sourceHeld: false
+    property real _closingDetails: 0
+    property real _closingProgress: 1
+    property real _openingDetails: 0
+    property real _openingProgress: 0
+    readonly property bool hasMorphSource: _source !== null
     default property alias panelContent: panelInner.data
     readonly property alias panel: panel
 
-    // ── 动画状态 ──
     property bool _keepVisible: false
-    property bool _atTarget: false    // true=目标位置，false=源位置
-    property bool _animEnabled: false // 是否启用 Behavior 过渡
+    property bool _atTarget: false
+    property bool _waitingForSize: false
+    readonly property bool _sizeReady: root.width > 0 && root.height > 0
+        && (hasMorphSource
+            ? root.width === _source.screen.width && root.height === _source.screen.height
+            : _matchesAnyScreen(root.width, root.height))
 
     signal closeRequested()
 
-    // 新窗口在 compositor configure 之前 width/height 还是 Qt 默认值（500x500，panelHeight
-    // 甚至会算出 0），此时开动画会让面板从左上角以错误尺寸“形变”展开。等窗口尺寸匹配到
-    // 某块真实屏幕（说明 configure 完成）再启动展开动画。
-    // 不能用 root.screen 比较：compositor 自选屏的 layer surface 上它可能是另一块屏
-    // （实测窗口在 eDP-1 而 root.screen 报 DP-3）。
-    readonly property bool _sizeReady: root.width > 0 && root.height > 0
-        && _matchesAnyScreen(root.width, root.height)
-    property bool _waitingForSize: false
-
     function _matchesAnyScreen(w, h) {
-        for (let i = 0; i < Quickshell.screens.length; i++) {
-            const s = Quickshell.screens[i];
-            if (s.width === w && s.height === h)
+        for (const screen of Quickshell.screens) {
+            if (screen.width === w && screen.height === h)
                 return true;
         }
         return false;
@@ -83,99 +54,141 @@ PanelWindow {
     function _tryStartOpen() {
         if (!_waitingForSize || !_sizeReady)
             return;
-
         _waitingForSize = false;
-        _openTimer.start();
+        openTimer.start();
+    }
+
+    function _releaseSource() {
+        if (!_sourceHeld)
+            return;
+        _source.header.parent = _source.home;
+        MorphState.release(_source.item);
+        _sourceHeld = false;
+    }
+
+    function _finishClose() {
+        _keepVisible = false;
+        if (_sourceHeld)
+            console.info("[panel-morph] returned to capsule on", _source.screen.name);
+        _releaseSource();
+        _source = null;
+    }
+
+    function _animate(opening) {
+        motion.stop();
+        motion.from = panel.progress;
+        motion.to = opening ? 1 : 0;
+        motion.duration = (hasMorphSource ? (opening ? 520 : 200) : Tokens.animElaborate)
+            * Math.abs(motion.to - motion.from);
+        _atTarget = opening;
+        motion.start();
     }
 
     onWidthChanged: _tryStartOpen()
     onHeightChanged: _tryStartOpen()
-
     onShowingChanged: {
+        openTimer.stop();
         if (showing) {
-            _morphX = MorphState.morphSourceX;
-            _morphY = MorphState.morphSourceY;
-            MorphState.reset(); // 点击源一次性：取完即清，不残留给下一次打开
-            _animEnabled = false; // 关闭动画
-            // 快速「关→开」时上一次关闭动画会被打断，Behavior 把面板冻结在中途值，
-            // 此时仅把 _atTarget 设回 false 不会重写几何属性（值本来就已是 false）。
-            // 先置 true 再置 false，让几何绑定在 Behavior 关闭状态下重写一次，把面板
-            // 复位到源位置，下一 tick 的展开动画才能完整重播。
-            _atTarget = true;
+            hideTimer.stop();
+            const source = MorphState.takeSource();
+            // 快速重新打开正在收起的面板时，沿当前轮廓反向展开。
+            if (_sourceHeld && !source) {
+                _openingDetails = _source.item.expansion;
+                _openingProgress = panel.progress;
+                _animate(true);
+                return;
+            }
+            motion.stop();
+            _releaseSource();
+            _source = entrance === PanelOverlay.Morph ? source : null;
+            if (hasMorphSource) {
+                _returnBounds = _source.bounds;
+                _openingDetails = _source.initialDetails;
+                _openingProgress = 0;
+            }
+            screen = hasMorphSource ? _source.screen : null;
+            panel.progress = 0;
             _atTarget = false;
             _keepVisible = true;
-            _hideTimer.stop();
-            if (_sizeReady)
-                _openTimer.start();   // 下一帧开始动画到目标
-            else
-                _waitingForSize = true; // 等 configure 给出真实窗口尺寸
+            contentViewport.contentY = 0;
+            _waitingForSize = true;
+            _tryStartOpen();
         } else {
             _waitingForSize = false;
-            _atTarget = false;    // 动画回到源位置
-            _hideTimer.start();
+            if (hasMorphSource) {
+                // 曲目或计数变化可能改变顶栏宽度，终点使用当前紧凑胶囊的几何。
+                _returnBounds = MorphState.boundsFor(_source.item, _source.barWindow);
+                _closingDetails = _source.item.expansion;
+                _closingProgress = panel.progress;
+                if (_closingProgress > 0)
+                    _animate(false);
+                else
+                    _finishClose();
+            } else {
+                _animate(false);
+                hideTimer.start();
+            }
         }
     }
 
+    Component.onDestruction: _releaseSource()
+
     Timer {
-        id: _openTimer
+        id: openTimer
         interval: 0
         onTriggered: {
-            root._animEnabled = true;
-            root._atTarget = true;
+            if (root.hasMorphSource) {
+                root._source.header.parent = headerDock;
+                MorphState.hold(root._source.item);
+                root._sourceHeld = true;
+                console.info("[panel-morph] live header on", root.screen.name,
+                    panel.targetX, panel.targetY, root.panelWidth, panel.targetHeight);
+            }
+            root._animate(true);
         }
     }
 
-    // 面板与遮罩的淡出在 animNormal（250ms）内结束（morph 模式的面板淡出更早，230ms），
-    // 之后的几何收缩已经不可见；早点 unmap，避免 surface 在不可见状态下继续映射与合成。
-    Timer {
-        id: _hideTimer
-        interval: Tokens.animNormal + 50
-        onTriggered: root._keepVisible = false
+    NumberAnimation {
+        id: motion
+        target: panel
+        property: "progress"
+        easing.type: root.hasMorphSource
+            ? (root._atTarget ? Easing.OutBack : Easing.OutCubic)
+            : Easing.OutQuint
+        easing.overshoot: 0.9
+        onFinished: {
+            if (!root.showing && root.hasMorphSource)
+                root._finishClose();
+        }
     }
 
-    // Hyprland 只在 layer surface 重新 map 时授予 OnDemand 键盘焦点；快速重开会复用
-    // 已映射的 surface，不会重新 map，必须显式 grab，否则按键穿透到下层窗口。
+    Timer {
+        id: hideTimer
+        interval: Tokens.animNormal + 50
+        onTriggered: root._finishClose()
+    }
+
+    Binding {
+        target: root._source ? root._source.item : null
+        property: "expansion"
+        value: Math.max(0, Math.min(1, !root.hasMorphSource ? 0 : root._atTarget
+            ? (root._openingProgress < 1
+                ? root._openingDetails + (1 - root._openingDetails) * (panel.progress - root._openingProgress) / (1 - root._openingProgress)
+                : 1)
+            : (root._closingProgress > 0 ? root._closingDetails * panel.progress / root._closingProgress : 0)))
+        when: root.hasMorphSource
+    }
+
+    Binding {
+        target: root._source ? root._source.item : null
+        property: "panelProgress"
+        value: panel.revealProgress
+        when: root.hasMorphSource
+    }
+
     HyprlandFocusGrab {
         windows: [root]
         active: root.showing
-    }
-
-    // 关闭时延迟淡出（morph 模式）— 80ms 停顿后 150ms 淡出，
-    // 让用户先看到面板"开始收缩"再消失
-    Item {
-        id: _closeFade
-        property real fadeValue: 1
-
-        states: [
-            State {
-                name: "open"; when: root.showing
-                PropertyChanges { target: _closeFade; fadeValue: 1 }
-            },
-            State {
-                name: "closed"; when: !root.showing
-                PropertyChanges { target: _closeFade; fadeValue: 0 }
-            }
-        ]
-
-        transitions: [
-            Transition {
-                from: "open"; to: "closed"
-                SequentialAnimation {
-                    PauseAnimation { duration: 80 }
-                    NumberAnimation {
-                        target: _closeFade; property: "fadeValue"
-                        duration: 150; easing.type: Easing.OutQuint
-                    }
-                }
-            },
-            Transition {
-                from: "closed"; to: "open"
-                NumberAnimation {
-                    target: _closeFade; property: "fadeValue"
-                    duration: 0
-                }
-            }
-        ]
     }
 
     anchors.top: true
@@ -185,59 +198,64 @@ PanelWindow {
     visible: showing || _keepVisible
     focusable: showing
     exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.namespace: "quickshell-panel"
     color: "transparent"
 
-    // ── 遮罩 ──
     Rectangle {
         anchors.fill: parent
         color: "#000000"
-        opacity: root.showing ? root.backdropOpacity : 0
-
+        opacity: root._atTarget && !root.hasMorphSource ? root.backdropOpacity : 0
         Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
-            }
+            NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
         }
     }
 
-    // Esc 关闭
     Item {
         focus: root.showing
         Keys.onEscapePressed: root.closeRequested()
     }
-
-    // 点击外部关闭
     MouseArea {
         anchors.fill: parent
         onClicked: root.closeRequested()
     }
 
-    // ── panel 容器（几何动画 morph）──
     Rectangle {
         id: panel
 
-        property real targetX: root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2
-        property real targetY: root.panelTargetY >= 0 ? root.panelTargetY : (root.height - root.panelHeight) / 2
-        property real srcX: root.hasMorphSource ? root._morphX - 20 : targetX + root.closedOffsetX
-        property real srcY: root.hasMorphSource ? root._morphY - 20 : targetY + root.closedOffsetY
-        property real srcW: root.hasMorphSource ? 40 : root.panelWidth
-        property real srcH: root.hasMorphSource ? 40 : root.panelHeight
-        property int srcR: root.hasMorphSource ? 20 : root.panelRadius
+        property real progress: 0
+        readonly property real revealProgress: Math.max(0, Math.min(1, progress))
+        // 横向略微领先，纵向的回弹稍明显；两轴从第一帧同时运动。
+        readonly property real widthProgress: root.hasMorphSource
+            ? progress + 0.14 * Math.sin(Math.PI * progress) : progress
+        readonly property real headerHeight: root.hasMorphSource ? root._source.bounds.height : 0
+        readonly property real targetHeight: Math.min(root.panelHeight + headerHeight,
+            root.hasMorphSource ? root.height - targetY - 10 : root.panelHeight)
+        readonly property real targetX: root.hasMorphSource
+            ? Math.max(10, Math.min(root.width - root.panelWidth - 10,
+                root._source.bounds.x + (root._source.bounds.width - root.panelWidth) / 2))
+            : (root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2)
+        readonly property real targetY: root.hasMorphSource ? root._source.bounds.y
+            : (root.panelTargetY >= 0 ? root.panelTargetY : (root.height - root.panelHeight) / 2)
+        readonly property real sourceX: root.hasMorphSource ? root._returnBounds.x : targetX + root.closedOffsetX
+        readonly property real sourceY: root.hasMorphSource ? root._returnBounds.y : targetY + root.closedOffsetY
+        readonly property real sourceWidth: root.hasMorphSource ? root._returnBounds.width : root.panelWidth
+        readonly property real sourceHeight: root.hasMorphSource ? root._returnBounds.height : root.panelHeight
 
-        x: root._atTarget ? targetX : srcX
-        y: root._atTarget ? targetY : srcY
-        width: root._atTarget ? root.panelWidth : srcW
-        height: root._atTarget ? root.panelHeight : srcH
-        radius: root._atTarget ? root.panelRadius : srcR
-        color: Colors.withAlpha(Colors.base,
-            root._atTarget ? Tokens.panelAlpha : (root.hasMorphSource ? Tokens.panelAlpha * 0.5 : Tokens.panelAlpha))
-        border.color: Colors.overlay(root._atTarget ? Tokens.borderAlpha : 0)
-        border.width: 1
-        opacity: root.hasMorphSource ? _closeFade.fadeValue : (root._atTarget ? 1 : 0)
+        x: sourceX + (targetX - sourceX) * widthProgress
+        y: sourceY + (targetY - sourceY) * progress
+        width: sourceWidth + (root.panelWidth - sourceWidth) * widthProgress
+        height: sourceHeight + (targetHeight - sourceHeight) * progress
+        radius: root.hasMorphSource
+            ? root._source.item.radius + (root.panelRadius - root._source.item.radius) * progress
+            : root.panelRadius
+        color: root.hasMorphSource
+            ? Qt.tint(root._source.item.color, Colors.withAlpha(Colors.surface0, revealProgress))
+            : Colors.surface0
+        border.color: Colors.overlay(Tokens.borderAlpha)
+        border.width: root.hasMorphSource
+            ? root._source.item.border.width + (1 - root._source.item.border.width) * revealProgress : 1
+        opacity: root.hasMorphSource ? (root._sourceHeld ? 1 : 0) : (root._atTarget ? 1 : 0)
         clip: true
-
 
         MouseArea {
             anchors.fill: parent
@@ -245,56 +263,68 @@ PanelWindow {
         }
 
         Item {
-            id: panelInner
-            anchors.fill: parent
-            opacity: root._atTarget ? 1 : 0
+            id: headerDock
+            width: parent.width
+            height: panel.headerHeight
+            visible: root.hasMorphSource
 
-            Behavior on opacity {
-                enabled: root._animEnabled
-                NumberAnimation {
-                    duration: root.hasMorphSource ? Tokens.animNormal : Tokens.animFast
-                    easing.type: Easing.OutCubic
+            MouseArea {
+                anchors.fill: parent
+                z: 1
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                cursorShape: Qt.PointingHandCursor
+                onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton)
+                        root._source.item.rightClicked(mouse);
+                    else
+                        root.closeRequested();
                 }
             }
-        }
 
-        InnerGlow {}
-
-        Behavior on x {
-            enabled: root._animEnabled
-            NumberAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutQuint }
-        }
-        Behavior on y {
-            enabled: root._animEnabled
-            NumberAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutQuint }
-        }
-        Behavior on width {
-            enabled: root._animEnabled
-            NumberAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutQuint }
-        }
-        Behavior on height {
-            enabled: root._animEnabled
-            NumberAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutQuint }
-        }
-        Behavior on radius {
-            enabled: root._animEnabled
-            NumberAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutQuint }
-        }
-        Behavior on opacity {
-            enabled: root._animEnabled
-            NumberAnimation {
-                duration: Tokens.animNormal
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Anim.standard
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                text: "⌃"
+                color: Colors.subtext0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.title
+                opacity: panel.revealProgress
+                z: 2
             }
         }
-        Behavior on color {
-            enabled: root._animEnabled
-            ColorAnimation { duration: Tokens.animSlow }
+
+        Rectangle {
+            x: Tokens.spaceL
+            y: panel.headerHeight
+            width: parent.width - Tokens.spaceL * 2
+            height: 1
+            color: Colors.surface1
+            opacity: root.hasMorphSource ? panel.revealProgress : 0
         }
-        Behavior on border.color {
-            enabled: root._animEnabled
-            ColorAnimation { duration: Tokens.animSlow }
+
+        Flickable {
+            id: contentViewport
+            y: panel.headerHeight
+            width: root.panelWidth
+            height: Math.max(0, panel.height - y)
+            contentWidth: width
+            contentHeight: root.panelHeight
+            interactive: root.showing && contentHeight > height
+            clip: true
+            opacity: root.hasMorphSource ? Math.min(1, panel.progress * 1.5) : (root._atTarget ? 1 : 0)
+            enabled: root.showing
+
+            Item {
+                id: panelInner
+                width: root.panelWidth
+                height: root.panelHeight
+            }
+        }
+
+        Behavior on opacity {
+            enabled: !root.hasMorphSource
+            NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
         }
     }
 }

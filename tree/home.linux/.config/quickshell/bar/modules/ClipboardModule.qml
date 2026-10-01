@@ -9,26 +9,34 @@ BarModule {
     id: root
 
     accentColor: Colors.flamingo
-    implicitWidth: label.implicitWidth + 32
+    implicitWidth: icon.implicitWidth + 32
     onClicked: mouse => {
         PanelState.closeAll();
-        let pos = root.mapToItem(null, mouse.x, mouse.y);
-        MorphState.morphSourceX = pos.x + 2;
-        MorphState.morphSourceY = pos.y + 6;
-        PanelState.toggleClipboard();
+        MorphState.openFrom(root, () => PanelState.toggleClipboard());
     }
 
     Row {
         id: label
 
-        anchors.centerIn: parent
-        spacing: 5
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 8
 
         Text {
+            id: icon
             text: "󰅍"
             color: Colors.flamingo
             font.family: Fonts.family
             font.pixelSize: Fonts.title
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Text {
+            text: "剪贴板"
+            opacity: root.expansion
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.body
             anchors.verticalCenter: parent.verticalCenter
         }
 
