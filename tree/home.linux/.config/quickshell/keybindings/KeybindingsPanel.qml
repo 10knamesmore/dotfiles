@@ -12,6 +12,7 @@ PanelOverlay {
     id: root
 
     showing: PanelState.keybindingsOpen
+    entrance: PanelOverlay.Slide
     panelWidth: Math.min(700, root.width - 40)
     panelHeight: root.height * 0.8
     backdropOpacity: Tokens.backdropMedium

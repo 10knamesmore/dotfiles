@@ -11,6 +11,7 @@ PanelOverlay {
     id: root
 
     showing: PanelState.journalOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 880
     panelHeight: root.height * 0.7
     onCloseRequested: PanelState.journalOpen = false

@@ -10,6 +10,7 @@ PanelOverlay {
     id: root
 
     showing: PanelState.launcherOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 600
     panelHeight: root.height * 0.55
     panelRadius: Tokens.radiusXL

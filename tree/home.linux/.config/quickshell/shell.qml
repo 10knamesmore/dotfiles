@@ -1,7 +1,6 @@
 //@ pragma IconTheme breeze-dark
 //@ pragma UseQApplication
 
-import "./ai"
 import "./bar"
 import "./bluetooth"
 import "./display"
@@ -156,16 +155,6 @@ ShellRoot {
 
     GlobalShortcut {
         appid: "quickshell"
-        name: "ai"
-        description: "Toggle AI assistant panel"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleAi();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
         name: "bluetooth"
         description: "Toggle bluetooth panel"
         onPressed: {
@@ -229,6 +218,4 @@ ShellRoot {
     JournalPanel {}
 
     NotesPanel {}
-
-    AiPanel {}
 }

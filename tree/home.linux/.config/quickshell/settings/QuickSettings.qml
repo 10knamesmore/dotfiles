@@ -24,6 +24,8 @@ PanelOverlay {
     readonly property bool volumeMuted: AudioService.muted
     property bool nightLightEnabled: false
     property bool caffeineEnabled: false
+    // 电源档位（power-profiles-daemon 的 ActiveProfile），由面板开关切换，daemon 自己持久化
+    property string powerProfile: "balanced"
     // 夜灯状态文件/脚本路径（与 ScreenEffectsPanel 共享）
     property string _home: Quickshell.env("HOME")
     property string _effectsState: _home + "/.cache/hypr/screen-effects.json"
@@ -37,6 +39,7 @@ PanelOverlay {
         brightnessProc.running = true;
         nightLightReader.running = true;
         caffeineCheckProc.running = true;
+        powerProfileProc.running = true;
         // 音量直接 binding Pipewire，无需 polling
     }
 
@@ -75,7 +78,17 @@ PanelOverlay {
         }
     }
 
+    // 均衡 ↔ 性能：只动 PPD 的 ActiveProfile，它会把 platform_profile 和 EPP 一起切
+    function togglePerformanceMode() {
+        let target = root.powerProfile === "performance" ? "balanced" : "performance";
+        powerProfileSetProc.command = ["busctl", "--system", "set-property",
+            "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles",
+            "net.hadess.PowerProfiles", "ActiveProfile", "s", target];
+        powerProfileSetProc.running = true;
+    }
+
     showing: PanelState.settingsOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 340
     panelHeight: root.height - 64
     panelTargetX: 10
@@ -218,6 +231,36 @@ PanelOverlay {
 
     }
 
+    // 电源档位：power-profiles-daemon，D-Bus property 读写等价 powerprofilesctl get/set
+    //（用 busctl 免掉 python-gobject 可选依赖，busctl 是 systemd 自带）
+    Process {
+        id: powerProfileProc
+
+        command: ["busctl", "--system", "get-property",
+            "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles",
+            "net.hadess.PowerProfiles", "ActiveProfile"]
+
+        stdout: SplitParser {
+            onRead: (data) => {
+                let m = data.match(/"([^"]+)"/);
+                if (m)
+                    root.powerProfile = m[1];
+            }
+        }
+
+    }
+
+    Process {
+        id: powerProfileSetProc
+
+        // 无论成败都回读，以 daemon 的实际状态为准
+        onExited: {
+            powerProfileProc.running = false;
+            powerProfileProc.running = true;
+        }
+
+    }
+
     // ── UI ──
     Flickable {
         anchors.fill: parent
@@ -347,6 +390,14 @@ PanelOverlay {
                     status: root.caffeineEnabled ? "保持唤醒" : "已关闭"
                     toggled: root.caffeineEnabled
                     onClicked: root.toggleCaffeine()
+                }
+
+                QuickToggle {
+                    icon: "󰓅"
+                    label: "性能"
+                    status: root.powerProfile === "performance" ? "性能模式" : "均衡模式"
+                    toggled: root.powerProfile === "performance"
+                    onClicked: root.togglePerformanceMode()
                 }
 
                 QuickToggle {

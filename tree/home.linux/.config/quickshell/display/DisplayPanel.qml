@@ -90,6 +90,7 @@ PanelOverlay {
     }
 
     showing: PanelState.displayOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 720
     panelHeight: root.height * 0.7
     panelTargetX: (root.width - 720) / 2

@@ -10,6 +10,7 @@ PanelOverlay {
     id: root
 
     showing: PanelState.notesOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 520
     panelHeight: root.height * 0.75
 

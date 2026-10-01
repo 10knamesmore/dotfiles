@@ -17,12 +17,11 @@ QtObject {
     // ── 新面板 ──
     property bool notesOpen: false
     property bool journalOpen: false
-    property bool aiOpen: false
     property bool bluetoothOpen: false
     property bool displayOpen: false
     property bool systemMonitorOpen: false
     property string systemMonitorTab: "cpu"
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || aiOpen || bluetoothOpen || displayOpen || systemMonitorOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || bluetoothOpen || displayOpen || systemMonitorOpen
 
     function toggleScreenEffects() {
         screenEffectsOpen = !screenEffectsOpen;
@@ -72,10 +71,6 @@ QtObject {
         journalOpen = !journalOpen;
     }
 
-    function toggleAi() {
-        aiOpen = !aiOpen;
-    }
-
     function toggleBluetooth() {
         bluetoothOpen = !bluetoothOpen;
     }
@@ -103,7 +98,6 @@ QtObject {
         networkOpen = false;
         notesOpen = false;
         journalOpen = false;
-        aiOpen = false;
         bluetoothOpen = false;
         displayOpen = false;
         systemMonitorOpen = false;

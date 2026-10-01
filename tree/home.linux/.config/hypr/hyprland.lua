@@ -117,7 +117,7 @@ hl.config({
   decoration = {
     rounding = 12,
     rounding_power = 2.0,
-    active_opacity = 0.995,
+    active_opacity = 1,
     inactive_opacity = 0.95,
     fullscreen_opacity = 1,
     dim_inactive = true,
@@ -140,9 +140,9 @@ hl.config({
       color_inactive = "rgba(11111b99)",
     },
 
-    -- 窗口位移运动模糊；掉帧时降低 samples。
+    -- 窗口位移运动模糊
     motion_blur = {
-      enabled = true,
+      enabled = false,
       samples = 15,
     },
   },
@@ -321,9 +321,10 @@ hl.window_rule({
 -- Layer rules
 -- ============================================================
 
+-- 只给面板（默认 namespace "quickshell"）开模糊；bar 单独命名 "quickshell-bar"，
 hl.layer_rule({
   name = "quickshell_blur",
-  match = { namespace = "quickshell" },
+  match = { namespace = "^quickshell$" },
   blur = true,
   ignore_alpha = 0.1,
 })
@@ -400,7 +401,6 @@ hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.group.next({ reverse = true }))
 
 -- QuickShell 全局触发
 hl.bind(mainMod .. " + slash", hl.dsp.global("quickshell:keybindings"))
-hl.bind(mainMod .. " + SHIFT + A", hl.dsp.global("quickshell:ai"))
 hl.bind(mainMod .. " + N", hl.dsp.global("quickshell:notes"))
 hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.global("quickshell:journal"))
 
@@ -470,6 +470,6 @@ hl.on("hyprland.start", function()
   exec_once("hypridle")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
+  exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
   hl.exec_cmd("clash-verge") -- tauri 单实例
-  hl.exec_cmd("google-chrome-stable") -- 自带单实例锁
 end)

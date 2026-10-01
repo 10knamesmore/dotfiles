@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland._Ipc
+import Quickshell.Wayland
 
 PanelWindow {
     id: root
@@ -34,6 +35,8 @@ PanelWindow {
     margins.left: BarLayout.current.sideMargin
     margins.right: BarLayout.current.sideMargin
     color: "transparent"
+    // 单独 namespace
+    WlrLayershell.namespace: "quickshell-bar"
 
     Item {
         id: barContent

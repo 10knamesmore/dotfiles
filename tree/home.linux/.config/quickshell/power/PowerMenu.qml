@@ -3,6 +3,7 @@ import "../state"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 
 // 电源菜单 — 全屏遮罩 + 居中操作按钮
@@ -53,6 +54,13 @@ PanelWindow {
     Item {
         focus: root.showing
         Keys.onEscapePressed: PanelState.powerMenuOpen = false
+    }
+
+    // 关闭动画期间 surface 还映射着，快速重开不会重新 map；Hyprland 只在 map 时
+    // 授予 OnDemand 键盘焦点，所以必须显式 grab，否则按键穿透到下层窗口。
+    HyprlandFocusGrab {
+        windows: [root]
+        active: root.showing
     }
 
     // 居中按钮行

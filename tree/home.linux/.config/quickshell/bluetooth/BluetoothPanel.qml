@@ -142,6 +142,7 @@ PanelOverlay {
     }
 
     showing: PanelState.bluetoothOpen
+    entrance: PanelOverlay.Slide
     panelWidth: 400
     panelHeight: root.height * 0.6
     panelTargetX: root.width - 410
