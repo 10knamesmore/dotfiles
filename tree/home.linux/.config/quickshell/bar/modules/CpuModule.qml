@@ -13,8 +13,8 @@ BarModule {
     readonly property var barColors: ["#69ff94", "#2aa9ff", "#f8f8f2", "#f8f8f2", "#ffffa5", "#ffffa5", "#ff9977", "#dd532e"]
     // 构建彩色柱状图富文本
     property string chartHtml: {
-        // 只在 hover 展开时读取 cpuCorePcts；QML 动态依赖追踪保证隐藏态不参与每秒重算。
-        if (!root.hovered)
+        // 收回时保留图表直到淡出结束，完全隐藏后不再读取各核心数据。
+        if (!root.hovered && !root.hoverDetailsVisible)
             return "";
         let cores = SystemStats.cpuCorePcts;
         if (cores.length === 0)
@@ -33,7 +33,8 @@ BarModule {
     }
 
     accentColor: Colors.blue
-    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
+    implicitWidth: compactLabel.implicitWidth + 32
+        + (hovered && chartHtml !== "" ? coreChart.implicitWidth + label.spacing : 0)
     clickable: false
 
     // 紧凑模式宽度参考
@@ -41,7 +42,7 @@ BarModule {
         id: compactLabel
         visible: false
         spacing: 5
-        Text { text: label.children[0].text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
+        Text { text: cpuIcon.text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
         Text { text: SystemStats.cpuUsage + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
     }
 
@@ -52,7 +53,8 @@ BarModule {
         spacing: 5
 
         Text {
-            text: ""
+            id: cpuIcon
+            text: ""
             color: Colors.blue
             font.family: Fonts.family
             font.pixelSize: Fonts.icon
@@ -79,18 +81,17 @@ BarModule {
 
         // Per-core bar chart — hover 时展开显示
         Text {
-            visible: root.chartHtml !== "" && root.hovered
+            id: coreChart
+            visible: root.chartHtml !== "" && root.hoverDetailsVisible
+            width: implicitWidth * root.hoverReveal
+            clip: true
             textFormat: Text.RichText
             text: root.chartHtml
             font.family: Fonts.family
             font.pixelSize: Fonts.body
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
-            opacity: root.hovered ? 1 : 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: Tokens.animNormal }
-            }
+            opacity: root.hoverReveal
         }
 
     }

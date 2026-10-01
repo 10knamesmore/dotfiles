@@ -15,7 +15,9 @@ Rectangle {
     property real panelProgress: 0
     property bool hovered: !headerInPanel && hoverArea.containsMouse
     readonly property bool headerInPanel: header.parent !== root
-    readonly property real detailProgress: headerInPanel ? expansion : (hovered ? 1 : 0)
+    property real hoverReveal: hovered ? 1 : 0
+    readonly property bool hoverDetailsVisible: hoverReveal > 0
+    readonly property real detailProgress: headerInPanel ? expansion : hoverReveal
     property real progress: -1
     property bool progressDraggable: false
     readonly property alias capsuleHeader: header
@@ -61,15 +63,15 @@ Rectangle {
         }
 
         Item {
+            property real displayedProgress: Math.max(0, root.progress)
             visible: root.progress >= 0
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: root.progress * header.width
+            width: displayedProgress * header.width
             clip: true
 
-            Behavior on width {
-                enabled: !root.headerInPanel
+            Behavior on displayedProgress {
                 NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
             }
 
@@ -80,7 +82,7 @@ Rectangle {
                 width: header.width
                 radius: root.radius
                 color: root.accentColor
-                opacity: 0.27 + 0.15 * root.detailProgress
+                opacity: 0.27 + 0.15 * (root.headerInPanel ? root.expansion : (root.hovered ? 1 : 0))
                 Behavior on opacity {
                     enabled: !root.headerInPanel
                     NumberAnimation { duration: Tokens.animFast }
@@ -140,6 +142,10 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
+    }
+    Behavior on hoverReveal {
+        enabled: !root.headerInPanel
+        NumberAnimation { duration: Tokens.animSlow; easing.type: Easing.OutCubic }
     }
     Behavior on implicitWidth {
         enabled: !root.headerInPanel

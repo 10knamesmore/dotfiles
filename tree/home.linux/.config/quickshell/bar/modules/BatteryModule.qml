@@ -89,7 +89,8 @@ BarModule {
     Row {
         id: label
 
-        visible: !root.hovered
+        visible: opacity > 0
+        opacity: 1 - root.hoverReveal
         anchors.centerIn: parent
         spacing: 5
 
@@ -122,7 +123,8 @@ BarModule {
     Row {
         id: hoverRow
 
-        visible: root.hovered
+        visible: root.hoverDetailsVisible
+        opacity: root.hoverReveal
         anchors.centerIn: parent
         spacing: 6
 

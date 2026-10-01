@@ -169,7 +169,10 @@ BarModule {
     }
 
     accentColor: Colors.yellow
-    implicitWidth: contentRow.implicitWidth + 32
+    implicitWidth: 32 + (specialState !== "" ? specialStatusIcon.implicitWidth
+        : (layoutData.length > 0 ? columnsRow.implicitWidth : 0)
+            + (hovered && totalCols > 0 ? columnPosition.implicitWidth
+                + (layoutData.length > 0 ? contentRow.spacing : 0) : 0))
     Component.onCompleted: fetchProc.running = true
     onClicked: mouse => {
         let r = rectAt(mouse.x, mouse.y);
@@ -233,6 +236,7 @@ BarModule {
         spacing: 4
 
         Text {
+            id: specialStatusIcon
             visible: root.specialState !== ""
             text: root.specialState === "float" ? "󰹙" : root.specialState === "fullscreen" ? "󰊓" : "󰽥"
             color: Colors.yellow
@@ -249,23 +253,21 @@ BarModule {
 
         // hover 时显示列位置文字
         Text {
-            visible: root.hovered && root.specialState === "" && root.totalCols > 0
+            id: columnPosition
+            visible: root.hoverDetailsVisible && root.specialState === "" && root.totalCols > 0
+            width: implicitWidth * root.hoverReveal
+            clip: true
             text: root.curCol + "/" + root.totalCols
             color: Colors.yellow
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
-            opacity: root.hovered ? 1 : 0
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Tokens.animNormal
-                }
-            }
+            opacity: root.hoverReveal
         }
 
         Row {
+            id: columnsRow
             visible: root.specialState === "" && root.layoutData.length > 0
             spacing: 2
             anchors.verticalCenter: parent.verticalCenter

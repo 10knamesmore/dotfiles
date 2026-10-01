@@ -8,14 +8,15 @@ BarModule {
 
     // 数据来自 SystemStats（SystemStatsService 每秒更新）
     accentColor: Colors.mauve
-    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
+    implicitWidth: compactLabel.implicitWidth + 32
+        + (hovered && SystemStats.memTooltipText !== "" ? memoryDetails.implicitWidth + label.spacing : 0)
     clickable: false
 
     Row {
         id: compactLabel
         visible: false
         spacing: 5
-        Text { text: label.children[0].text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
+        Text { text: memoryIcon.text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
         Text { text: SystemStats.memUsagePct + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
     }
 
@@ -26,7 +27,8 @@ BarModule {
         spacing: 5
 
         Text {
-            text: ""
+            id: memoryIcon
+            text: "󰍛"
             color: Colors.mauve
             font.family: Fonts.family
             font.pixelSize: Fonts.icon
@@ -53,17 +55,16 @@ BarModule {
 
         // hover 展开显示详细内存（RAM + Swap，memTooltipText 折成一行）
         Text {
-            visible: root.hovered && SystemStats.memTooltipText !== ""
+            id: memoryDetails
+            visible: root.hoverDetailsVisible && SystemStats.memTooltipText !== ""
+            width: implicitWidth * root.hoverReveal
+            clip: true
             text: SystemStats.memTooltipText.replace("\n", "  ·  ")
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
             anchors.verticalCenter: parent.verticalCenter
-            opacity: root.hovered ? 1 : 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: Tokens.animNormal }
-            }
+            opacity: root.hoverReveal
         }
     }
 

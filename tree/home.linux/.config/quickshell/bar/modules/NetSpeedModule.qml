@@ -33,40 +33,28 @@ BarModule {
 
     property string displayText: (direction === "up" ? "󰕒" : "󰁅") + " " + formatSpeed(speed)
 
+    readonly property real expandedContentWidth: speedLabel.implicitWidth + totalLabel.implicitWidth + 6
+        + (ifaceName !== "" ? ifaceText.implicitWidth + 16 : 0)
     accentColor: Colors.teal
     implicitWidth: root.hovered
-        ? Math.max(hoverRow.implicitWidth + 32, 180)
-        : Math.max(label.implicitWidth + 32, 120)
+        ? Math.max(expandedContentWidth + 32, 180)
+        : Math.max(speedLabel.implicitWidth + 32, 120)
     clickable: false
 
-    // ── 默认视图 ──
-    Text {
-        id: label
-
-        visible: !root.hovered
-        anchors.centerIn: parent
-        text: root.displayText
-        color: Colors.teal
-        font.family: Fonts.family
-        font.pixelSize: Fonts.bodyLarge
-        font.weight: Font.DemiBold
-    }
-
-    // ── hover 视图：接口名 + 速度 + 累计流量 ──
+    // 方向与网速始终使用同一组件；只有两侧的补充信息渐变显隐。
     Row {
-        id: hoverRow
-
-        visible: root.hovered
         anchors.centerIn: parent
-        spacing: 6
+        spacing: 0
 
         // 接口名标签
         Rectangle {
-            visible: root.ifaceName !== ""
+            visible: root.ifaceName !== "" && root.hoverDetailsVisible
             color: Colors.withAlpha(Colors.teal, 0.2)
             radius: 4
-            width: ifaceText.implicitWidth + 10
+            width: (ifaceText.implicitWidth + 10) * root.hoverReveal
             height: ifaceText.implicitHeight + 4
+            opacity: root.hoverReveal
+            clip: true
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
@@ -81,8 +69,14 @@ BarModule {
             }
         }
 
+        Item {
+            width: root.ifaceName !== "" ? 6 * root.hoverReveal : 0
+            height: 1
+        }
+
         // 方向图标 + 速度
         Text {
+            id: speedLabel
             text: root.displayText
             color: Colors.teal
             font.family: Fonts.family
@@ -91,8 +85,18 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
         }
 
+        Item {
+            width: 6 * root.hoverReveal
+            height: 1
+        }
+
         // 累计流量
         Text {
+            id: totalLabel
+            visible: root.hoverDetailsVisible
+            width: implicitWidth * root.hoverReveal
+            opacity: root.hoverReveal
+            clip: true
             text: "Σ " + root.formatTotal(root.totalBytes)
             color: Colors.subtext0
             font.family: Fonts.family

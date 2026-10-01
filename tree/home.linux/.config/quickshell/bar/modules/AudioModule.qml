@@ -27,7 +27,8 @@ BarModule {
     progress: root.muted ? 0 : root.volumePct / 100
     progressDraggable: true
     onProgressDragged: value => AudioService.setVolume(Math.round(value * 100))
-    implicitWidth: hovered ? (label.implicitWidth + 32) : (compactLabel.implicitWidth + 32)
+    implicitWidth: compactLabel.implicitWidth + 32
+        + (hovered && !muted ? volumeText.implicitWidth + (compactLabel.implicitWidth > 0 ? label.spacing : 0) : 0)
     onClicked: AudioService.toggleMute()
     onScrolled: delta => AudioService.step(delta > 0 ? 5 : -5)
 
@@ -54,7 +55,11 @@ BarModule {
         }
 
         Text {
-            visible: !root.muted && root.hovered
+            id: volumeText
+            visible: !root.muted && root.hoverDetailsVisible
+            width: implicitWidth * root.hoverReveal
+            opacity: root.hoverReveal
+            clip: true
             text: root.volumePct + "%"
             color: Colors.text
             font.family: Fonts.family
