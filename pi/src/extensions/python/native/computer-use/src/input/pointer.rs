@@ -1,23 +1,15 @@
-//! Map capture image pixels to monitor-local pointer events and discrete wheel notches.
-
-use std::time::{Duration, Instant};
+//! Map desktop coordinates to output-local virtual pointer events and prompt events.
 
 use pyo3::prelude::*;
+use serde_json::json;
+use std::time::{Duration, Instant};
 use wayland_client::protocol::wl_pointer::{Axis, AxisSource, ButtonState};
 
-use super::{Input, with_input};
-use crate::capture::Capture;
+use super::Input;
+use crate::desktop::{Control, Target};
 use crate::hyprland::{self, Monitor};
 use crate::wait;
 use crate::wayland::VirtualPointer;
-
-fn point(x: f64, y: f64, relative_to: Option<&Capture>) -> PyResult<(f64, f64)> {
-    match relative_to {
-        Some(shot) => shot.desktop_point(x, y),
-        None if x.is_finite() && y.is_finite() => Ok((x, y)),
-        None => Err(wait::invalid("coordinates must be finite")),
-    }
-}
 
 fn monitor_at(monitors: &[Monitor], point: (f64, f64)) -> PyResult<&Monitor> {
     monitors
@@ -42,19 +34,17 @@ fn button(name: &str) -> PyResult<u32> {
     }
 }
 
-impl Input {
-    fn settle_keyboard(&mut self, py: Python<'_>) -> PyResult<()> {
-        if self.keyboard_pending {
-            // Hyprland can forward keys through an input method while delivering
-            // pointer events directly. A sync only acknowledges compositor receipt;
-            // space the switch so pointer events do not overtake modifier changes.
-            self.desktop.sync(py, true)?;
-            wait::pause(py, Duration::from_millis(20))?;
-            self.keyboard_pending = false;
-        }
-        Ok(())
+pub(super) fn button_name(code: u32) -> &'static str {
+    match code {
+        0x110 => "left",
+        0x111 => "right",
+        0x112 => "middle",
+        0x116 => "back",
+        _ => "forward",
     }
+}
 
+impl Input {
     fn pointer(&mut self, monitor: Option<&Monitor>) -> PyResult<VirtualPointer> {
         let name = monitor.map_or("", |monitor| monitor.name.as_str());
         if let Some(pointer) = self.pointers.get(name) {
@@ -91,12 +81,16 @@ impl Input {
         Ok(pointer)
     }
 
-    fn move_to(&mut self, monitors: &[Monitor], point: (f64, f64)) -> PyResult<VirtualPointer> {
+    fn move_to(
+        &mut self,
+        control: &Control,
+        monitors: &[Monitor],
+        point: (f64, f64),
+    ) -> PyResult<VirtualPointer> {
+        control.check()?;
         let monitor = monitor_at(monitors, point)?;
         let pointer = self.pointer(Some(monitor))?;
         let (x, y, width, height) = monitor.bounds();
-        // An output-bound pointer avoids relying on compositor-wide normalization,
-        // whose origin differs from desktop coordinates when monitors start negative.
         let extent = 1_000_000;
         pointer.motion_absolute(
             self.time(),
@@ -106,155 +100,145 @@ impl Input {
             extent,
         );
         pointer.frame();
+        control.event(
+            json!({"type":"pointer", "monitor":monitor.name, "x":point.0-x, "y":point.1-y}),
+        )?;
         Ok(pointer)
     }
 
-    fn button_down(&mut self, pointer: &VirtualPointer, button: u32) {
+    fn button_down(
+        &mut self,
+        control: &Control,
+        pointer: &VirtualPointer,
+        button: u32,
+    ) -> PyResult<()> {
+        control.check()?;
         pointer.button(self.time(), button, ButtonState::Pressed);
         pointer.frame();
         self.buttons.push((pointer.clone(), button));
+        control.event(json!({"type":"button", "button":button_name(button), "pressed":true}))
     }
-}
 
-/// Move in desktop logical coordinates or in the returned pixels of relative_to.
-#[pyfunction]
-#[pyo3(signature = (x, y, *, relative_to = None))]
-fn move_pointer(
-    py: Python<'_>,
-    x: f64,
-    y: f64,
-    relative_to: Option<PyRef<'_, Capture>>,
-) -> PyResult<()> {
-    let point = point(x, y, relative_to.as_deref())?;
-    let monitors = hyprland::monitors(py)?;
-    monitor_at(&monitors, point)?;
-    with_input(py, "move_pointer", |input| {
-        input.settle_keyboard(py)?;
-        input.move_to(&monitors, point).map(|_| ())
-    })
-}
-
-/// Move then click; count repeats the complete button down/up pair.
-#[pyfunction]
-#[pyo3(signature = (x, y, *, button = "left", count = 1, relative_to = None))]
-fn click(
-    py: Python<'_>,
-    x: f64,
-    y: f64,
-    button: &str,
-    count: u32,
-    relative_to: Option<PyRef<'_, Capture>>,
-) -> PyResult<()> {
-    let button = self::button(button)?;
-    if count == 0 {
-        return Err(wait::invalid("count must be greater than zero"));
+    pub(crate) fn move_pointer(
+        &mut self,
+        control: &Control,
+        target: &Target,
+        point: (f64, f64),
+    ) -> PyResult<()> {
+        let monitors = hyprland::monitors(control, target)?;
+        monitor_at(&monitors, point)?;
+        self.run(control, |input| {
+            input.settle_keyboard(control)?;
+            input.move_to(control, &monitors, point).map(|_| ())
+        })
     }
-    let point = point(x, y, relative_to.as_deref())?;
-    let monitors = hyprland::monitors(py)?;
-    monitor_at(&monitors, point)?;
-    with_input(py, "click", |input| {
-        input.settle_keyboard(py)?;
-        let pointer = input.move_to(&monitors, point)?;
-        for iteration in 0..count {
-            py.check_signals()?;
-            input.button_down(&pointer, button);
-            input.release_buttons();
-            input.desktop.sync(py, true)?;
-            if iteration + 1 < count {
-                wait::pause(py, Duration::from_millis(50))?;
-            }
+
+    pub(crate) fn click(
+        &mut self,
+        control: &Control,
+        target: &Target,
+        point: (f64, f64),
+        name: &str,
+        count: u32,
+    ) -> PyResult<()> {
+        let button = button(name)?;
+        if count == 0 {
+            return Err(wait::invalid("count must be greater than zero"));
         }
-        Ok(())
-    })
-}
+        let monitors = hyprland::monitors(control, target)?;
+        monitor_at(&monitors, point)?;
+        self.run(control, |input| {
+            input.settle_keyboard(control)?;
+            let pointer = input.move_to(control, &monitors, point)?;
+            for iteration in 0..count {
+                input.button_down(control, &pointer, button)?;
+                input.release_buttons(control);
+                input.desktop.sync(control, true)?;
+                if iteration + 1 < count {
+                    wait::pause(control, Duration::from_millis(50))?;
+                }
+            }
+            Ok(())
+        })
+    }
 
-/// Hold a button while interpolating a line between two desktop or capture image points.
-#[pyfunction]
-#[pyo3(signature = (start, end, *, button = "left", duration = 0.3, relative_to = None))]
-fn drag(
-    py: Python<'_>,
-    start: (f64, f64),
-    end: (f64, f64),
-    button: &str,
-    duration: f64,
-    relative_to: Option<PyRef<'_, Capture>>,
-) -> PyResult<()> {
-    let button = self::button(button)?;
-    let duration = wait::seconds(duration, "duration")?;
-    let start = point(start.0, start.1, relative_to.as_deref())?;
-    let end = point(end.0, end.1, relative_to.as_deref())?;
-    let monitors = hyprland::monitors(py)?;
-    monitor_at(&monitors, start)?;
-    monitor_at(&monitors, end)?;
-    with_input(py, "drag", |input| {
-        input.settle_keyboard(py)?;
-        let pointer = input.move_to(&monitors, start)?;
-        input.button_down(&pointer, button);
-        input.desktop.sync(py, true)?;
-        let began = Instant::now();
-        loop {
-            py.check_signals()?;
-            let fraction = if duration.is_zero() {
-                1.0
+    pub(crate) fn drag(
+        &mut self,
+        control: &Control,
+        target: &Target,
+        start: (f64, f64),
+        end: (f64, f64),
+        name: &str,
+        duration: f64,
+    ) -> PyResult<()> {
+        let button = button(name)?;
+        let duration = wait::seconds(duration, "duration")?;
+        let monitors = hyprland::monitors(control, target)?;
+        monitor_at(&monitors, start)?;
+        monitor_at(&monitors, end)?;
+        self.run(control, |input| {
+            input.settle_keyboard(control)?;
+            let pointer = input.move_to(control, &monitors, start)?;
+            input.button_down(control, &pointer, button)?;
+            input.desktop.sync(control, true)?;
+            let began = Instant::now();
+            loop {
+                control.check()?;
+                let fraction = if duration.is_zero() {
+                    1.0
+                } else {
+                    (began.elapsed().as_secs_f64() / duration.as_secs_f64()).min(1.0)
+                };
+                input.move_to(
+                    control,
+                    &monitors,
+                    (
+                        start.0 + (end.0 - start.0) * fraction,
+                        start.1 + (end.1 - start.1) * fraction,
+                    ),
+                )?;
+                input.desktop.sync(control, true)?;
+                if fraction >= 1.0 {
+                    break;
+                }
+                wait::pause(
+                    control,
+                    Duration::from_millis(10).min(duration.saturating_sub(began.elapsed())),
+                )?;
+            }
+            input.release_buttons(control);
+            Ok(())
+        })
+    }
+
+    pub(crate) fn scroll(
+        &mut self,
+        control: &Control,
+        amount: i32,
+        horizontal: bool,
+    ) -> PyResult<()> {
+        self.run(control, |input| {
+            input.settle_keyboard(control)?;
+            let pointer = input.pointer(None)?;
+            let axis = if horizontal {
+                Axis::HorizontalScroll
             } else {
-                (began.elapsed().as_secs_f64() / duration.as_secs_f64()).min(1.0)
+                Axis::VerticalScroll
             };
-            input.move_to(
-                &monitors,
-                (
-                    start.0 + (end.0 - start.0) * fraction,
-                    start.1 + (end.1 - start.1) * fraction,
-                ),
-            )?;
-            input.desktop.sync(py, true)?;
-            if fraction >= 1.0 {
-                break;
+            control.event(json!({"type":"scroll", "amount":amount, "horizontal":horizontal}))?;
+            for _ in 0..amount.unsigned_abs() {
+                control.check()?;
+                pointer.axis_discrete(
+                    input.time(),
+                    axis,
+                    amount.signum() as f64 * 15.0,
+                    amount.signum(),
+                );
+                pointer.axis_source(AxisSource::Wheel);
+                pointer.frame();
+                input.desktop.sync(control, true)?;
             }
-            wait::pause(
-                py,
-                Duration::from_millis(10).min(duration.saturating_sub(began.elapsed())),
-            )?;
-        }
-        input.release_buttons();
-        Ok(())
-    })
-}
-
-/// Send discrete notches at the current pointer; positive means down or right.
-#[pyfunction]
-#[pyo3(signature = (amount, *, horizontal = false))]
-fn scroll(py: Python<'_>, amount: i32, horizontal: bool) -> PyResult<()> {
-    if amount == 0 {
-        return Ok(());
+            Ok(())
+        })
     }
-    with_input(py, "scroll", |input| {
-        input.settle_keyboard(py)?;
-        let pointer = input.pointer(None)?;
-        let axis = if horizontal {
-            Axis::HorizontalScroll
-        } else {
-            Axis::VerticalScroll
-        };
-        for _ in 0..amount.unsigned_abs() {
-            py.check_signals()?;
-            pointer.axis_discrete(
-                input.time(),
-                axis,
-                amount.signum() as f64 * 15.0,
-                amount.signum(),
-            );
-            pointer.axis_source(AxisSource::Wheel);
-            pointer.frame();
-            input.desktop.sync(py, true)?;
-        }
-        Ok(())
-    })
-}
-
-pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(move_pointer, module)?)?;
-    module.add_function(wrap_pyfunction!(click, module)?)?;
-    module.add_function(wrap_pyfunction!(drag, module)?)?;
-    module.add_function(wrap_pyfunction!(scroll, module)?)?;
-    Ok(())
 }

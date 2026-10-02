@@ -63,13 +63,14 @@ interface WorkerInfo {
   environment: PythonEnvironment;
 }
 
-/** One PTY child process group owned by a worker; killing the worker's own group does not reach it. */
-interface OwnedTerminal {
+/** One SDK child process group; terminal and browser groups survive a worker SIGINT. */
+interface OwnedProcessGroup {
+  kind: "terminal" | "browser";
   id: string;
   pid: number;
 }
 
-type TerminalOwnershipMessage = Extract<WorkerMessage, { type: "terminal_ownership" }>;
+type ProcessOwnershipMessage = Extract<WorkerMessage, { type: "process_ownership" }>;
 
 type WorkerMessage =
   | (WorkerInfo & { type: "ready" })
@@ -77,7 +78,7 @@ type WorkerMessage =
   | { type: "completed"; callId: string; outcome: "completed" | "python_error" | "interrupted" }
   | (ImageFile & { type: "image"; callId: string })
   | { type: "input_cleanup_failed"; callId: string; errorType: string }
-  | { type: "terminal_ownership"; action: "opened" | "closed"; id: string; pid: number }
+  | { type: "process_ownership"; kind: "terminal" | "browser"; action: "opened" | "closed"; id: string; pid: number }
   | { type: "startup_error"; reason: string };
 
 interface PendingExecution {
@@ -107,8 +108,8 @@ interface WorkerProcess {
   resolveExited: () => void;
   info?: WorkerInfo;
   pending?: PendingExecution;
-  /** PTY child process groups reported by the terminal SDK, keyed by the ownership id it sent. */
-  ownedTerminals: Map<string, OwnedTerminal>;
+  /** Separate SDK process groups, keyed by kind and ownership id. */
+  ownedProcessGroups: Map<string, OwnedProcessGroup>;
   stopping: boolean;
   ended: boolean;
   logPath: string;
@@ -291,7 +292,7 @@ export class PythonSession {
       rejectReady,
       exited,
       resolveExited,
-      ownedTerminals: new Map(),
+      ownedProcessGroups: new Map(),
       stopping: false,
       ended: false,
       logPath,
@@ -406,11 +407,11 @@ export class PythonSession {
 
   private receive(worker: WorkerProcess, message: WorkerMessage): void {
     // Ownership arrives while user code runs, but it must never depend on a pending execution.
-    if (message.type === "terminal_ownership") {
-      this.recordTerminalOwnership(worker, message);
+    if (message.type === "process_ownership") {
+      this.recordProcessOwnership(worker, message);
       return;
     }
-    // A terminated worker only still reports terminal ownership; later control events are stale.
+    // A terminated worker only still reports process ownership; later control events are stale.
     if (worker.stopping || worker.ended) return;
     if (message.type === "startup_error") {
       if (!worker.info) {
@@ -458,26 +459,28 @@ export class PythonSession {
     }
   }
 
-  /** Track the PTY process groups that survive a worker SIGKILL so termination can reach them. */
-  private recordTerminalOwnership(worker: WorkerProcess, message: TerminalOwnershipMessage): void {
+  /** Track the SDK process groups that must be terminated even after the worker exits. */
+  private recordProcessOwnership(worker: WorkerProcess, message: ProcessOwnershipMessage): void {
+    const key = `${message.kind}:${message.id}`;
     if (message.action === "closed") {
-      worker.ownedTerminals.delete(message.id);
+      worker.ownedProcessGroups.delete(key);
     } else if (worker.stopping || worker.ended) {
-      // The worker is already being killed or gone; Python can no longer clean up a group opened now.
       this.log({
-        phase: "terminal_kill",
-        terminalId: message.id,
+        phase: "owned_process_kill",
+        resourceKind: message.kind,
+        resourceId: message.id,
         pid: message.pid,
         callId: worker.pending?.callId,
       });
       this.signalGroup(message.pid, "SIGKILL");
     } else {
-      worker.ownedTerminals.set(message.id, { id: message.id, pid: message.pid });
+      worker.ownedProcessGroups.set(key, { kind: message.kind, id: message.id, pid: message.pid });
     }
     this.log({
-      phase: "terminal_ownership",
+      phase: "process_ownership",
       action: message.action,
-      terminalId: message.id,
+      resourceKind: message.kind,
+      resourceId: message.id,
       pid: message.pid,
       callId: worker.pending?.callId,
     });
@@ -500,33 +503,34 @@ export class PythonSession {
     if (worker.ended || worker.stopping) return;
     worker.stopping = true;
     this.log({ phase: "terminate", pid: worker.info?.pid, callId: worker.pending?.callId });
-    // PTY children lead their own groups, so the worker kill below cannot reach them.
-    this.terminateOwnedTerminals(worker);
+    // SDK children lead separate groups so interrupting a cell leaves them alive.
+    this.terminateOwnedProcessGroups(worker);
     // Killing the worker group first also stops subprocesses blocked in a native call.
     if (worker.info) this.signalGroup(worker.info.pid, "SIGKILL");
     if (worker.launcher.pid) this.signalGroup(worker.launcher.pid, "SIGKILL");
   }
 
   /** Kill each owned group once from a snapshot, then forget it so a recycled pid cannot be signalled again. */
-  private terminateOwnedTerminals(worker: WorkerProcess): void {
-    const terminals = [...worker.ownedTerminals.values()];
-    worker.ownedTerminals.clear();
-    for (const terminal of terminals) {
+  private terminateOwnedProcessGroups(worker: WorkerProcess): void {
+    const groups = [...worker.ownedProcessGroups.values()];
+    worker.ownedProcessGroups.clear();
+    for (const group of groups) {
       this.log({
-        phase: "terminal_kill",
-        terminalId: terminal.id,
-        pid: terminal.pid,
+        phase: "owned_process_kill",
+        resourceKind: group.kind,
+        resourceId: group.id,
+        pid: group.pid,
         callId: worker.pending?.callId,
       });
-      this.signalGroup(terminal.pid, "SIGKILL");
+      this.signalGroup(group.pid, "SIGKILL");
     }
   }
 
   private processEnded(worker: WorkerProcess): void {
     if (worker.ended) return;
     worker.ended = true;
-    // A SIGKILLed worker never runs its Python cleanup, so its PTY groups need this pass.
-    this.terminateOwnedTerminals(worker);
+    // A SIGKILLed worker never runs Python cleanup; terminate its separate SDK groups here.
+    this.terminateOwnedProcessGroups(worker);
     if (worker.info) {
       this.signalGroup(worker.info.pid, "SIGKILL");
       if (!this.disposed) this.onStateLost();
@@ -592,7 +596,8 @@ function parseMessage(line: string): WorkerMessage {
     return message as unknown as WorkerMessage;
   }
   if (
-    message.type === "terminal_ownership" &&
+    message.type === "process_ownership" &&
+    (message.kind === "terminal" || message.kind === "browser") &&
     (message.action === "opened" || message.action === "closed") &&
     typeof message.id === "string" &&
     message.id.length > 0 &&

@@ -1,62 +1,81 @@
 # Computer Use
 
-供 Pi Agent 的 `python_repl` 使用的 Linux Hyprland 原生 SDK。Rust 通过 PyO3 直接导出 `computer_use` 模块，实现截图、虚拟输入与 Hyprland IPC。Python 3.12+，PyO3 0.29.2 的 `abi3-py312` 扩展由 maturin 构建。macOS 必须跳过此包。
+供 Pi `python_repl` 使用的 Linux Hyprland SDK。Rust/PyO3 导出 `computer_use`；每个显式桌面对象拥有固定目标和独立执行线程。支持当前桌面接管、后台桌面、原始像素捕获、虚拟键鼠与 Hyprland IPC。Python 3.12+；macOS 跳过此包。
 
 ```python
 import computer_use as computer
-from computer_use import hyprland
 
-monitors = hyprland.query("monitors")
-shot = computer.capture(rect=(100, 100, 20, 10))
-rows = shot.buffer.rgb()  # rows[y][x] = (R, G, B)，保留原生位深
-data = shot.buffer.data  # 未编码的像素字节
-display_image(shot)      # 同一帧按需编码成 PNG
+with computer.create_background(size=(1920, 1080)) as desktop:
+    desktop.launch(["kitty", "bash"])
+    print(desktop.hyprland.query("clients"))
+    shot = desktop.capture(rect=(100, 100, 20, 10))
+    rows = shot.buffer.rgb()
+    display_image(shot)
 ```
 
-完整调用约定见 [API](skills/computer-use/references/api.md)，操作示例见 [patterns](skills/computer-use/references/patterns.md)，Agent 入口见 [computer-use](skills/computer-use/SKILL.md)。`display_image` 是 Python worker 提供的全局能力，SDK 通过 `_repr_png_()` 提供图像，不依赖图像展示包。
+已有窗口使用 `computer.connect_host()`。所有捕获、输入和 compositor 操作都从对象进入，不存在隐式模块级桌面。Agent 入口见 [computer-use](skills/computer-use/SKILL.md)，完整签名见 [API](skills/computer-use/references/api.md)，示例见 [patterns](skills/computer-use/references/patterns.md)。
 
 ## 运行条件
 
-运行环境提供 `XDG_RUNTIME_DIR`、`WAYLAND_DISPLAY`、`HYPRLAND_INSTANCE_SIGNATURE`、libxkbcommon 与 xkeyboard-config。Hyprland 必须提供 `wl_output` v4、`wl_shm`、`zwlr_screencopy_manager_v1` v3、`zwlr_virtual_pointer_manager_v1` v2、`zwp_virtual_keyboard_manager_v1` v1。SDK 不调用 grim、hyprctl、剪贴板工具或提权输入设备。
+- 当前桌面：`XDG_RUNTIME_DIR`、`WAYLAND_DISPLAY`、`HYPRLAND_INSTANCE_SIGNATURE` 指向同一 Hyprland；Quickshell 配置加载仓库的 `computer-control` 服务。
+- 后台桌面：本机 PATH 上已有 `Hyprland`、`kwin_wayland`，以及有效的 `XDG_RUNTIME_DIR`。SDK 不安装系统依赖。后台禁用 XWayland，应用须支持 Wayland。
+- 两种模式均需 libxkbcommon、xkeyboard-config，以及 compositor 提供 `wl_output` v4、`wl_shm`、`zwlr_screencopy_manager_v1` v3、`zwlr_virtual_pointer_manager_v1` v2、`zwp_virtual_keyboard_manager_v1` v1。
 
-输入必须在导入模块的 Python 线程执行。导入、`held_keys()`、未使用时的释放和关闭均不连接桌面。截图使用独立的短期 Wayland 连接，不创建输入设备；输入连接和虚拟设备按需创建，并随 worker 存活。
+导入模块不连接桌面。创建对象时建立 Wayland 连接，虚拟输入设备按首次使用创建；截图使用独立的短期连接。SDK 不调用 grim、hyprctl 或剪贴板工具，也不使用提权输入设备。
 
-## 捕获、原始缓冲区与图像
+## 当前桌面接管
 
-`capture()` 从 Wayland 共享内存取得完整输出，修正旋转、镜像和协议的 Y 反转，再按原始像素裁剪。`Capture.buffer` 保留裁剪区域的 4 字节像素字、格式与位深，只移除行填充，不经过 PNG 编解码或 10-bit 到 8-bit 转换。`buffer.data` 提供字节，`buffer.rgb()` 提供原生位深的二维 RGB 元组数组。格式、字节序和尺寸约定见 [API](skills/computer-use/references/api.md#捕获与指针)。
+按 Hyprland 实例管理两个运行时文件：
 
-`display_image(shot)` 通过 `_repr_png_()` 按需生成同一帧的 8-bit RGB PNG，不重新捕获；10-bit 通道仅在此处量化。`max_size` 只限制图像最长边，绝不放大或修改 buffer；默认图像不缩放。`rect` 以完整、方向正确的输出像素为单位，越界报错。
+```text
+$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/
+  computer-use.lock    # flock 独占锁；内容为持有 worker PID，仅供诊断
+  computer-use.sock    # Quickshell 接管提示连接
+```
 
-`Capture.size` 是图像尺寸，`Capture.buffer.size` 是未缩放区域尺寸。`Capture.bounds` 是区域的桌面逻辑矩形，包含负原点与裁剪偏移；`relative_to=shot` 接受图像像素坐标并转换为桌面逻辑坐标。改变显示器布局后重新捕获。`Capture` 与 `PixelBuffer` 没有公开构造器，属性只读。
+SDK 独立打开 lockfile 并以 `LOCK_EX | LOCK_NB` 加锁，成功后写 PID；同进程或跨进程的第二个连接都立即失败。锁 FD 不传给启动的应用，文件不 unlink。锁由内核维护，不以文件存在或 PID 存活判断占用。
 
-## 输入与清理
+加锁后 SDK 发送 hello，等 Quickshell 在所有屏幕显示提示后回复 ready，才允许操作。当前桌面显示淡紫边框、顶部断开按钮、Pi 虚拟光标和键鼠状态。移动动画与实际输入独立；不监听用户物理键鼠，文本只展示字符数。覆盖层仅断开按钮可交互，不抢焦点、不占布局。
 
-键名使用 US 基础键位对应的 XKB 名称；组合键单独传参，例如 `press("ctrl", "a")`。`hold()` 在进入时获取键，在退出时倒序释放本次新获取的键。外层已按住的键不属于内层作用域，`press()` 也保留这些键。每次获取有独立标识，旧作用域不会释放显式释放后重新获取的同名键。
+用户断开、提示服务退出或重载，会使对象失效。原生执行线程在 Python 空闲和长操作期间持续检查提示连接，释放自有输入并断开；后续捕获、输入、查询和应用启动均报错，不自动重连。`status` 为 `active`、`closed`、`revoked` 或 `disconnected`；关闭保留撤销或断连原因。
 
-`type_text()` 把 Unicode 字符映射到专用虚拟键盘，支持中文、换行和制表符。调用前须释放本 worker 已按住的键；快捷键使用 `press()`。应用和输入法仍按键事件处理输入，SDK 不直接提交应用文本，也不修改剪贴板。
+`close()` 先释放输入、销毁虚拟设备，再断开提示并释放锁。host 模式不会退出用户的 Hyprland 或应用。确认完成或等待用户手动接手前立即关闭，不等待整个任务结束。
 
-`held_keys()`、`key_up()`、`release_keys()` 只涉及 worker 自己注入的虚拟键。用户实际按住的物理修饰键不会被这些 API 释放，并且仍可能影响应用接收输入的结果。
+## 后台桌面
 
-成功的 `key_down()` 可以跨 `python_repl` 调用保留。单次操作失败会释放本次新获取的键和鼠标按钮；worker 必须在 cell 失败或取消时调用 `_release_inputs()`，释放跨调用保留的全部虚拟输入。`close()` 幂等释放并关闭连接，已注册 `atexit`，之后可以重连。无法撤销已经送达应用的点击或文字。进程被强制终止时无法运行 Python 清理；当前 Hyprland 的 `input:virtualkeyboard:release_pressed_on_close` 默认关闭，因此客户端断开不保证应用收到松键事件。worker 应优先正常关闭，给原生清理留出执行时间。
+后台由无窗口的 `kwin_wayland --virtual` 承载独立 Hyprland；Hyprland 只连接这个虚拟父 compositor，不申请用户 seat、DRM master 或物理输入。KWin 使用临时 XDG 配置与缓存；Hyprland 和应用复用用户 HOME、开发环境和文件权限。它是桌面焦点分离，不是安全沙箱。
 
-键盘事件之后的首个指针操作会等待 20 ms，给输入法异步转发按键及修饰状态留出处理时间。协议确认只表示 compositor 收到了请求，操作后仍需观察应用结果。
+`desktop.launch(argv, cwd=...)` 直接启动程序，不经过 shell，并设置该桌面的连接环境。后台应用由监督进程管理；关闭桌面会终止自有 compositor 和应用。监督进程通过 worker 管道 EOF 处理正常退出和 worker 被硬杀的情况，清理半创建实例、socket 和后代进程。host 启动的应用则独立于控制连接存活。
 
-Socket 等待采用 25 ms 轮询并释放 GIL，普通请求每次最多等待 5 秒；等待期间检查 Python 信号。拖拽、文本与重复按键在事件间检查信号。图像处理在独立线程执行，等待结果时检查信号；取消后已开始的纯图像计算可能继续完成。释放输入时忽略待处理 Python 信号以完成清理，但仍有 5 秒等待上限。
+应用自身的单实例行为仍可能把请求转交给用户已打开的进程。需要专用窗口时使用应用的新实例参数或独立 profile，并通过目标桌面的 `clients` 确认。后台不点亮 host 边框；当前没有把后台桌面临时展示给用户或暂停/恢复的接口。
+
+## 捕获与输入
+
+`desktop.capture()` 同时返回原始缓冲区与图像。`Capture.buffer` 保留裁剪区域的原生像素字和 8-bit/10-bit 位深，只修正方向、裁剪并移除行填充。`_repr_png_()` 按需生成同一帧的 8-bit RGB PNG；`max_size` 只限制图像，不改变 buffer。`display_image` 由 Python worker 提供，SDK 不依赖图像展示包。
+
+`relative_to=shot` 使用图像像素坐标，自动处理裁剪和缩放；截图绑定原桌面对象，不能在另一个对象上用于输入。桌面关闭后，已有截图仍可作为不可变图像或缓冲区读取。
+
+键名采用 US 基础键位对应的 XKB 名称。`hold()` 只释放当前作用域新获取的键；嵌套作用域与重新获取的同名键用独立标识区分。`type_text()` 通过专用 Unicode 键图输入，不改剪贴板，也不绕过应用输入法。物理键盘状态不属于 SDK，不能通过释放 API 清除。
+
+每个桌面的原生线程独占 XKB/Wayland 状态。Python 等待期间释放 GIL 并检查取消；取消会等待桌面清理后传播原异常。先前有键盘输入时，切换到文字键图或执行首个指针操作前等待 20 ms，让客户端和输入法处理已发送的按键；文本逐字符保留投递时间，额外间隔由 `interval` 指定。操作后仍需观察应用结果，协议确认不等于业务完成。
+
+## worker 清理与日志
+
+worker 在 cell 失败或取消时调用 `_close_all()`，关闭所有活动桌面；模块也注册该函数到 atexit。普通 Python 变量保留不意味着旧桌面仍有效。`_release_inputs()` 是只释放虚拟输入、不关闭桌面的内部能力，不代替交还操作。
+
+单次输入失败会回滚本次新获取的键和按钮，已送达应用的动作不可回滚。清理错误写日志；compositor 已断开时无法保证其应用收到松键。worker 被强制终止时 host 依赖 Wayland 断开和 compositor 的虚拟键盘释放行为，不能承诺 Python 清理一定执行。
+
+日志写入 `COMPUTER_USE_LOG`，默认 `/tmp/computer-use-sdk.log`，到 1 MiB 后清空重写。记录操作名、PID、生命周期与成功/失败，不记录截图、坐标、键名、输入文字、窗口内容或 Lua 表达式。Quickshell 只记录连接、事件类型与固定关闭原因；其展示文案不直接使用后端错误文本。
 
 ## 构建与维护
-
-仓库根目录下运行：
 
 ```sh
 cargo fmt --manifest-path pi/src/extensions/python/native/computer-use/Cargo.toml --check
 cargo check --locked --manifest-path pi/src/extensions/python/native/computer-use/Cargo.toml
 uv build --wheel --out-dir pi/src/extensions/python/native/computer-use/target/dist pi/src/extensions/python/native/computer-use
+qmllint -I /usr/lib/qt6/qml tree/home.linux/.config/quickshell/computer-control/*.qml
 ```
 
-保留 `Cargo.lock`。构建主机需要现有 Rust 工具链、C 链接器和 libxkbcommon；本包不安装系统依赖。不要为此个人配置仓库添加测试。编译之外，验证截图和只读查询；键盘鼠标操作在隔离桌面中验证，避免影响当前应用。
+保留 `Cargo.lock`。maturin 构建 PyO3 0.29.2 的 `abi3-py312` 扩展；后台监督脚本嵌入扩展，不另装 Python 依赖。仓库不新增测试，使用编译、类型检查和真实运行验证；键鼠验证放在专用后台桌面，避免影响用户应用。
 
-操作日志写入 `COMPUTER_USE_LOG` 指定路径，默认为临时目录中的 `computer-use-sdk.log`，到 1 MiB 后清空重写。日志只记录操作名、进程、生命周期与成功/失败，不记录截图、坐标、键名、输入文字、窗口内容或 Lua 表达式。
-
-模块分工：`src/capture/` 处理原始像素、图像编码与坐标映射，`src/input/` 管理键盘、指针和所有权，`src/wayland.rs` 管理协议对象与事件，`src/hyprland.rs` 处理 JSON/Lua IPC，`src/wait.rs` 处理可中断等待，`src/logging.rs` 记录诊断。
-
-实现参考 [Wayland Rust bindings](https://github.com/Smithay/wayland-rs)、[grim 输出变换](https://github.com/emersion/grim/blob/master/render.c)、[wtype 的 Unicode 键图](https://github.com/atx/wtype/blob/master/main.c) 和 [libxkbcommon](https://xkbcommon.org/doc/current/)。Quickshell 专用 IPC 与模块集成不属于本 SDK。
+模块按职责组织：`src/desktop/` 管对象、独占锁、接管协议和后台进程；`src/input/` 管虚拟设备和按键所有权；`src/capture/` 管像素、编码和坐标；`src/wayland.rs` 管协议事件；`src/hyprland.rs` 管固定目标 IPC；`src/wait.rs` 管取消与等待；`src/logging.rs` 管诊断。

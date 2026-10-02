@@ -4,6 +4,7 @@
 compile_error!("computer-use-sdk requires Linux; skip this package on macOS");
 
 mod capture;
+mod desktop;
 mod hyprland;
 mod input;
 mod logging;
@@ -15,13 +16,11 @@ use pyo3::prelude::*;
 /// Register the native SDK without connecting to Wayland or Hyprland.
 #[pymodule]
 fn computer_use(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    input::mark_owner();
     capture::register(module)?;
-    input::register(module)?;
-    hyprland::register(module)?;
+    desktop::register(module)?;
     module
         .py()
         .import("atexit")?
-        .call_method1("register", (module.getattr("close")?,))?;
+        .call_method1("register", (module.getattr("_close_all")?,))?;
     Ok(())
 }

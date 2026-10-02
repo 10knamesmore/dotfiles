@@ -8,6 +8,7 @@ use std::os::fd::AsFd;
 use pyo3::prelude::*;
 use xkbcommon::xkb;
 
+use crate::desktop::Control;
 use crate::wait;
 use crate::wayland::VirtualKeyboard;
 
@@ -52,14 +53,14 @@ pub(super) fn keymap() -> PyResult<xkb::Keymap> {
     })
 }
 
-pub(super) fn resolve(py: Python<'_>, names: &[String]) -> PyResult<Vec<Key>> {
+pub(super) fn resolve(control: &Control, names: &[String]) -> PyResult<Vec<Key>> {
     if names.is_empty() {
         return Err(wait::invalid("at least one key is required"));
     }
     let map = keymap()?;
     let mut keys: Vec<Key> = Vec::new();
     for name in names {
-        py.check_signals()?;
+        control.check()?;
         let normalized = name.to_ascii_lowercase();
         let alias = match normalized.as_str() {
             "ctrl" => "Control_L",
@@ -189,14 +190,14 @@ pub(super) struct TextChunk {
 }
 
 /// Build every map before emitting keys, so invalid text cannot partially type.
-pub(super) fn text_chunks(py: Python<'_>, text: &str) -> PyResult<Vec<TextChunk>> {
+pub(super) fn text_chunks(control: &Control, text: &str) -> PyResult<Vec<TextChunk>> {
     let mut chunks = Vec::new();
     let mut symbols = HashMap::new();
     let mut order = Vec::new();
     let mut codes = Vec::new();
     for (index, character) in text.chars().enumerate() {
         if index % 200 == 0 {
-            py.check_signals()?;
+            control.check()?;
         }
         if character.is_control() && !matches!(character, '\n' | '\t') {
             return Err(wait::invalid(
@@ -228,7 +229,14 @@ fn text_chunk(characters: &[char], codes: Vec<u32>) -> PyResult<TextChunk> {
     for index in 0..characters.len() {
         let _ = write!(source, "<T{index:03}> = {};", index + 9);
     }
-    source.push_str("}; xkb_types \"text\" { type \"ONE_LEVEL\" { modifiers = None; map[None] = Level1; }; }; xkb_compatibility \"text\" {}; xkb_symbols \"text\" {");
+    // XWayland rejects maps without compatibility and virtual-modifier components.
+    // The catch-all must match unmodified keys so libxkbcommon retains it when serializing.
+    source.push_str(
+        "}; xkb_types \"text\" { include \"complete\" }; \
+         xkb_compatibility \"text\" { \
+         interpret Any+AnyOfOrNone(all) { action = NoAction(); }; \
+         }; xkb_symbols \"text\" {",
+    );
     for (index, character) in characters.iter().enumerate() {
         let symbol = match character {
             '\n' => "Return".into(),

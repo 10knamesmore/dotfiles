@@ -6,6 +6,7 @@ import "./bluetooth"
 import "./display"
 import "./calendar"
 import "./clipboard"
+import "./computer-control"
 import "./journal"
 import "./keybindings"
 import "./launcher"
@@ -42,6 +43,8 @@ ShellRoot {
     MonitorService {}
 
     ScreenEffectsService {}
+
+    ComputerControlService {}
 
     // ── 每个显示器生成一个 Bar ──
     Variants {

@@ -4,6 +4,7 @@ import code
 from collections.abc import Callable
 from contextlib import chdir
 from dataclasses import dataclass
+from functools import partial
 from importlib import metadata
 import io
 import json
@@ -72,24 +73,25 @@ def send_event(event: dict[str, object]) -> None:
         frame = frame[os.write(WORKER_EVENT_FD, frame):]
 
 
-def handle_terminal_ownership(event: dict[str, object]) -> None:
-    """Forward one PTY ownership change to the controller without terminal contents."""
+def handle_process_ownership(kind: Literal["terminal", "browser"], event: dict[str, object]) -> None:
+    """Forward an SDK process-group ownership change without terminal or browser content."""
     action = event.get("action")
     session_id = event.get("id")
     pid = event.get("pid")
     if action not in ("opened", "closed") or not isinstance(session_id, str) or not session_id:
-        raise ValueError(f"malformed terminal ownership event: {event!r}")
+        raise ValueError(f"malformed {kind} ownership event: {event!r}")
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-        raise ValueError(f"terminal ownership event for {session_id!r} has no positive pid")
-    send_event({"type": "terminal_ownership", "action": action, "id": session_id, "pid": pid})
+        raise ValueError(f"{kind} ownership event for {session_id!r} has no positive pid")
+    send_event({"type": "process_ownership", "kind": kind, "action": action, "id": session_id, "pid": pid})
 
 
-def install_terminal_ownership_hook() -> None:
-    """Install the SDK lifecycle hook, stopping with a clear diagnostic when it is unavailable."""
+def install_process_ownership_hooks() -> None:
+    """Register required SDK process groups with the controller before running user code."""
     try:
-        from terminal_use import _set_lifecycle_hook, _set_worker_control_fds
+        from terminal_use import _set_lifecycle_hook as terminal_hook, _set_worker_control_fds
+        from browser_use import _set_lifecycle_hook as browser_hook
     except ImportError as error:
-        reason = f"the terminal-use SDK is required but not importable: {error}"
+        reason = f"a required process-owning Python SDK is not importable: {error}"
         try:
             send_event({"type": "startup_error", "reason": reason})
         except OSError:
@@ -97,7 +99,8 @@ def install_terminal_ownership_hook() -> None:
             pass
         raise SystemExit(reason) from error
     _set_worker_control_fds((WORKER_REQUEST_FD, WORKER_EVENT_FD))
-    _set_lifecycle_hook(handle_terminal_ownership)
+    terminal_hook(partial(handle_process_ownership, "terminal"))
+    browser_hook(partial(handle_process_ownership, "browser"))
 
 
 @dataclass
@@ -111,16 +114,16 @@ class CellImageOutput:
 
 
 class CellRuntime:
-    """Bind image output and optional Linux input cleanup to the worker's active cell."""
+    """Bind image output and Linux desktop cleanup to the worker's active cell."""
 
     def __init__(self, interpreter: SessionInterpreter) -> None:
         """Load required SDKs before user imports and expose the native image function."""
-        self.release_inputs: Callable[[], None] | None = None
+        self.close_desktops: Callable[[], None] | None = None
         try:
             from pi_display_image import _set_image_sink, display_image
             if sys.platform == "linux":
-                from computer_use import _release_inputs
-                self.release_inputs = _release_inputs
+                from computer_use import _close_all
+                self.close_desktops = _close_all
         except ImportError as error:
             reason = f"a required Python worker SDK is not importable: {error}"
             send_event({"type": "startup_error", "reason": reason})
@@ -152,9 +155,9 @@ class CellRuntime:
     def finish_cell(self, failed: bool) -> str | None:
         """Forget image ownership and report cleanup failure without replacing the cell outcome."""
         self.active_cell = None
-        if failed and self.release_inputs is not None:
+        if failed and self.close_desktops is not None:
             try:
-                self.release_inputs()
+                self.close_desktops()
             except BaseException as error:
                 return type(error).__name__
         return None
@@ -245,7 +248,7 @@ def main() -> None:
     os.setpgid(0, 0)
     _ = signal.signal(signal.SIGINT, handle_sigint)
     # Resolve native SDKs before user code can shadow them from the call cwd.
-    install_terminal_ownership_hook()
+    install_process_ownership_hooks()
     interpreter = SessionInterpreter()
     runtime = CellRuntime(interpreter)
     # An empty import path follows each call's cwd instead of pinning the startup directory.

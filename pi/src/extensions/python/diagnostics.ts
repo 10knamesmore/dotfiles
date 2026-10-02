@@ -13,7 +13,8 @@ interface PythonEvent {
   reason?: string;
   logPath?: string;
   action?: string;
-  terminalId?: string;
+  resourceKind?: "terminal" | "browser";
+  resourceId?: string;
   interpreter?: { executable: string; version: string };
   packageCount?: number;
 }

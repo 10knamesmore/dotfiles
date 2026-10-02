@@ -44,13 +44,17 @@ const COMPUTER_USE_SKILL = fileURLToPath(
   new URL("./native/computer-use/skills/computer-use/SKILL.md", import.meta.url),
 );
 
+const BROWSER_USE_SKILL = fileURLToPath(
+  new URL("./native/browser-use/skills/browser-use/SKILL.md", import.meta.url),
+);
+
 const TOOL_DESCRIPTION =
   "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable. Text output is limited, larger output is saved to a file. display_image(image) sends an image to the model; accepts a file path, encoded image bytes, or an image object. No import needed.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
   pi.on("resources_discover", () => ({
-    skillPaths: process.platform === "linux" ? [TERMINAL_USE_SKILL, COMPUTER_USE_SKILL] : [TERMINAL_USE_SKILL],
+    skillPaths: [TERMINAL_USE_SKILL, BROWSER_USE_SKILL, ...(process.platform === "linux" ? [COMPUTER_USE_SKILL] : [])],
   }));
 
   let session: PythonSession | undefined;

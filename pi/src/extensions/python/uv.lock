@@ -43,6 +43,11 @@ wheels = [
 ]
 
 [[package]]
+name = "browser-use-sdk"
+version = "0.1.0"
+source = { directory = "native/browser-use" }
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -775,6 +780,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "browser-use-sdk" },
     { name = "computer-use-sdk", marker = "sys_platform == 'linux'" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -793,6 +799,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.8.0" },
+    { name = "browser-use-sdk", directory = "native/browser-use" },
     { name = "computer-use-sdk", marker = "sys_platform == 'linux'", directory = "native/computer-use" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },

@@ -8,17 +8,20 @@ use std::os::fd::AsFd;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
+use crate::desktop::{Control, Target};
 use crate::hyprland::{self, Monitor};
 use crate::wayland::{Desktop, Frame};
 use crate::{logging, wait};
 use buffer::PixelBuffer;
 
 type Bounds = (f64, f64, f64, f64);
-type Rect = (i64, i64, i64, i64);
+pub(crate) type Rect = (i64, i64, i64, i64);
 
 /// One immutable captured region, usable as native pixels or an image; create with capture().
 #[pyclass(module = "computer_use", frozen)]
 pub(crate) struct Capture {
+    /// Prevents interpreting this image's coordinates on another desktop.
+    pub(crate) desktop_id: u64,
     /// Hyprland output name at capture time.
     #[pyo3(get)]
     monitor: String,
@@ -75,10 +78,10 @@ impl Capture {
 }
 
 /// Capture native pixels from the focused or named monitor; max_size affects only the image.
-#[pyfunction]
-#[pyo3(signature = (monitor = None, *, rect = None, max_size = None))]
-fn capture(
-    py: Python<'_>,
+pub(crate) fn capture(
+    control: &Control,
+    target: &Target,
+    desktop_id: u64,
     monitor: Option<String>,
     rect: Option<Rect>,
     max_size: Option<u32>,
@@ -94,7 +97,7 @@ fn capture(
                 "rect must have non-negative x/y and positive width/height",
             ));
         }
-        let info = hyprland::monitors(py)?
+        let info = hyprland::monitors(control, target)?
             .into_iter()
             .find(|info| {
                 monitor
@@ -102,7 +105,7 @@ fn capture(
                     .map_or(info.focused, |name| *name == info.name)
             })
             .ok_or_else(|| wait::invalid("requested monitor was not found"))?;
-        let mut desktop = Desktop::connect(py)?;
+        let mut desktop = Desktop::connect(control, target)?;
         let output = desktop
             .state
             .outputs
@@ -116,7 +119,7 @@ fn capture(
             .as_ref()
             .ok_or_else(|| wait::runtime("zwlr_screencopy_manager_v1 v3 is required"))?;
         let frame = manager.capture_output(1, &output.proxy, &desktop.queue.handle(), ());
-        desktop.wait_for(py, true, |state| {
+        desktop.wait_for(control, true, |state| {
             state.frame.buffer_done || state.frame.failed
         })?;
         if desktop.state.frame.failed {
@@ -154,23 +157,26 @@ fn capture(
             (),
         );
         frame.copy(&buffer);
-        desktop.wait_for(py, true, |state| state.frame.ready || state.frame.failed)?;
+        desktop.wait_for(control, true, |state| {
+            state.frame.ready || state.frame.failed
+        })?;
         if desktop.state.frame.failed {
             return Err(wait::runtime("compositor could not copy the capture"));
         }
         frame.destroy();
         buffer.destroy();
         pool.destroy();
-        desktop.sync(py, true)?;
+        desktop.sync(control, true)?;
         let geometry = std::mem::take(&mut desktop.state.frame);
         drop(desktop);
-        wait::compute(py, move || {
-            let mut file = file;
-            file.rewind().map_err(wait::runtime)?;
-            let mut bytes = vec![0; length as usize];
-            file.read_exact(&mut bytes).map_err(wait::runtime)?;
-            prepare(bytes, geometry, transform, info, rect, max_size)
-        })
+        let mut file = file;
+        file.rewind().map_err(wait::runtime)?;
+        let mut bytes = vec![0; length as usize];
+        file.read_exact(&mut bytes).map_err(wait::runtime)?;
+        control.check()?;
+        let result = prepare(bytes, geometry, transform, info, rect, max_size, desktop_id)?;
+        control.check()?;
+        Ok(result)
     })();
     logging::result("capture", result)
 }
@@ -182,6 +188,7 @@ fn prepare(
     monitor: Monitor,
     rect: Option<Rect>,
     max_size: Option<u32>,
+    desktop_id: u64,
 ) -> PyResult<Capture> {
     let buffer = PixelBuffer::from_frame(&bytes, &frame, transform)?;
     let (full_width, full_height) = buffer.size();
@@ -206,6 +213,7 @@ fn prepare(
         );
     }
     Ok(Capture {
+        desktop_id,
         monitor: monitor.name,
         size,
         bounds,
@@ -216,6 +224,5 @@ fn prepare(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Capture>()?;
     module.add_class::<PixelBuffer>()?;
-    module.add_function(wrap_pyfunction!(capture, module)?)?;
     Ok(())
 }

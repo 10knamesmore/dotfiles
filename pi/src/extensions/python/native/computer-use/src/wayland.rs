@@ -19,6 +19,7 @@ use wayland_protocols_wlr::virtual_pointer::v1::client::{
     zwlr_virtual_pointer_manager_v1, zwlr_virtual_pointer_v1,
 };
 
+use crate::desktop::{Control, Target};
 use crate::{logging, wait};
 
 pub(crate) use zwlr_virtual_pointer_v1::ZwlrVirtualPointerV1 as VirtualPointer;
@@ -97,7 +98,7 @@ pub(crate) struct Desktop {
     /// Socket and protocol object ownership; dropping it disconnects these devices.
     pub connection: Connection,
 
-    /// Dispatches this connection's events on the calling Python thread.
+    /// Dispatches events exclusively on the owning desktop thread.
     pub queue: EventQueue<State>,
 
     /// Registry and request results populated by dispatch.
@@ -108,14 +109,10 @@ pub(crate) struct Desktop {
 }
 
 impl Desktop {
-    pub(crate) fn connect(py: Python<'_>) -> PyResult<Self> {
-        let display = std::env::var_os("WAYLAND_DISPLAY")
-            .ok_or_else(|| wait::runtime("WAYLAND_DISPLAY is not set"))?;
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
-            .ok_or_else(|| wait::runtime("XDG_RUNTIME_DIR is not set"))?;
+    pub(crate) fn connect(control: &Control, target: &Target) -> PyResult<Self> {
         let socket = crate::hyprland::socket_connect(
-            py,
-            &std::path::PathBuf::from(runtime).join(display),
+            control,
+            &target.runtime.join(&target.display),
             Instant::now() + Duration::from_secs(5),
         )?;
         let connection = Connection::from_socket(socket).map_err(wait::runtime)?;
@@ -127,22 +124,22 @@ impl Desktop {
             state: State::default(),
             next_sync: 0,
         };
-        desktop.sync(py, true)?;
-        desktop.sync(py, true)?;
+        desktop.sync(control, true)?;
+        desktop.sync(control, true)?;
         logging::event("wayland.connect", "ok");
         Ok(desktop)
     }
 
-    pub(crate) fn sync(&mut self, py: Python<'_>, signals: bool) -> PyResult<()> {
+    pub(crate) fn sync(&mut self, control: &Control, signals: bool) -> PyResult<()> {
         self.next_sync += 1;
         let token = self.next_sync;
         self.connection.display().sync(&self.queue.handle(), token);
-        self.wait_for(py, signals, |state| state.sync_completed >= token)
+        self.wait_for(control, signals, |state| state.sync_completed >= token)
     }
 
     pub(crate) fn wait_for(
         &mut self,
-        py: Python<'_>,
+        control: &Control,
         signals: bool,
         ready: impl Fn(&State) -> bool,
     ) -> PyResult<()> {
@@ -154,7 +151,7 @@ impl Desktop {
                 ));
             }
             if signals {
-                py.check_signals()?;
+                control.check()?;
             }
             self.queue
                 .dispatch_pending(&mut self.state)
@@ -176,7 +173,7 @@ impl Desktop {
             };
             let events = libc::POLLIN | if writable { libc::POLLOUT } else { 0 };
             if wait::poll(
-                py,
+                control,
                 self.connection.as_fd().as_raw_fd(),
                 events,
                 deadline,

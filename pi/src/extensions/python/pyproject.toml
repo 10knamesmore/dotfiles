@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=1.8.0",
+    "browser-use-sdk",
     "computer-use-sdk; sys_platform == 'linux'",
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
@@ -23,6 +24,7 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
+browser-use-sdk = { path = "native/browser-use" }
 computer-use-sdk = { path = "native/computer-use" }
 pi-display-image-sdk = { path = "native/pi-display-image" }
 terminal-use-sdk = { path = "native/terminal-use" }

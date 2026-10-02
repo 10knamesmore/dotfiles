@@ -19,15 +19,15 @@ pub(crate) fn seconds(value: f64, name: &str) -> PyResult<Duration> {
         .map_err(|_| invalid(format!("{name} must be finite and non-negative")))
 }
 
-pub(crate) fn pause(py: Python<'_>, duration: Duration) -> PyResult<()> {
+pub(crate) fn pause(control: &crate::desktop::Control, duration: Duration) -> PyResult<()> {
     let deadline = Instant::now()
         .checked_add(duration)
         .ok_or_else(|| invalid("duration is too large"))?;
     while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
-        py.check_signals()?;
-        py.detach(|| std::thread::sleep(remaining.min(Duration::from_millis(25))));
+        control.check()?;
+        std::thread::sleep(remaining.min(Duration::from_millis(20)));
     }
-    py.check_signals()
+    control.check()
 }
 
 /// Run pixel processing off the Python thread and check cancellation while waiting.
@@ -64,20 +64,20 @@ pub(crate) fn compute<T: Send + 'static>(
 }
 
 pub(crate) fn poll(
-    py: Python<'_>,
+    control: &crate::desktop::Control,
     fd: RawFd,
     events: i16,
     deadline: Instant,
     signals: bool,
 ) -> PyResult<bool> {
     if signals {
-        py.check_signals()?;
+        control.check()?;
     }
     let remaining = deadline
         .checked_duration_since(Instant::now())
         .ok_or_else(|| PyTimeoutError::new_err("desktop connection timed out"))?;
     let timeout = remaining.as_millis().clamp(1, 25) as i32;
-    let result = py.detach(|| {
+    let result = (|| {
         let mut descriptor = libc::pollfd {
             fd,
             events,
@@ -90,9 +90,9 @@ pub(crate) fn poll(
         } else {
             Ok((ready, descriptor.revents))
         }
-    });
+    })();
     if signals {
-        py.check_signals()?;
+        control.check()?;
     }
     match result {
         Err(error) if error.kind() == std::io::ErrorKind::Interrupted => Ok(false),

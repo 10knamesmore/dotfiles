@@ -322,6 +322,13 @@ hl.window_rule({
 -- ============================================================
 
 -- 胶囊和面板使用实色底，形变与淡入淡出由 QML 驱动。
+-- 接管边框和断开按钮必须从首帧起位于固定位置；光标动画由 QML 驱动。
+hl.layer_rule({
+  name = "computer_control",
+  match = { namespace = "^pi-computer-control$" },
+  no_anim = true,
+})
+
 hl.layer_rule({
   name = "quickshell_panels",
   match = { namespace = "^quickshell-panel$" },

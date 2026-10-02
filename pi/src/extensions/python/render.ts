@@ -28,7 +28,7 @@ export function executionText(result: PythonExecutionResult): string {
   }
   if (details.inputCleanupFailed)
     lines.push(
-      "Computer input cleanup failed. Held keys or mouse buttons may remain pressed; import computer_use and call computer_use.close() before further input.",
+      "Desktop cleanup failed. Virtual keys or mouse buttons may remain pressed; stop desktop operations and close the affected Desktop objects before proceeding.",
     );
   if (output) lines.push("", output);
   else if (details.outcome === "completed" && details.imageCount === 0)
