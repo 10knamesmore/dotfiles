@@ -524,12 +524,23 @@ impl Session {
         let writer = writer
             .as_mut()
             .ok_or_else(|| TerminalError::runtime("terminal session is closed"))?;
-        writer
+        let result = writer
             .write_all(&payload)
-            .map_err(|error| TerminalError::runtime(format!("write to PTY failed: {error}")))?;
-        writer
-            .flush()
-            .map_err(|error| TerminalError::runtime(format!("flush PTY input failed: {error}")))
+            .map_err(|error| TerminalError::runtime(format!("write to PTY failed: {error}")))
+            .and_then(|()| {
+                writer.flush().map_err(|error| {
+                    TerminalError::runtime(format!("flush PTY input failed: {error}"))
+                })
+            });
+        diagnostics::event(
+            &self.id,
+            if result.is_ok() {
+                "input.write ok"
+            } else {
+                "input.write failed"
+            },
+        );
+        result
     }
 
     pub(crate) fn resize(&self, rows: u16, cols: u16) -> TerminalResult<SessionInfo> {

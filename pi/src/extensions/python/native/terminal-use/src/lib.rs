@@ -262,10 +262,11 @@ fn send_text(session_id: String, text: String) -> PyResult<()> {
     write_input(&session_id, encode_text(&text))
 }
 
-/// Write one encoded terminal key press.
+/// Write one chord with separate modifier names and one US base key; no keys remain held.
 #[pyfunction]
-fn send_key(session_id: String, key: String) -> PyResult<()> {
-    write_input(&session_id, encode_key_input(&key)?)
+#[pyo3(signature = (session_id, *keys))]
+fn send_key(session_id: String, keys: Vec<String>) -> PyResult<()> {
+    write_input(&session_id, encode_key_input(&keys)?)
 }
 
 /// Write text wrapped in bracketed-paste markers.

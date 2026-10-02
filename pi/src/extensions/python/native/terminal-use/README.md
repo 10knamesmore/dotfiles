@@ -11,7 +11,7 @@
 
 - Rust 使用 stable 工具链，仓库不 pin 版本。
 - Rust 或 Python 源码变更后，从仓库根执行 `uv sync --project pi/src/extensions/python --locked`；worker 的 uv 项目依赖本目录，由 maturin 按 lockfile 构建扩展。不要往其他解释器单独安装。
-- `TERMINAL_USE_LOG` 指定原生日志文件路径；未设置时写入系统临时目录。日志只记录会话生命周期与错误，不记录 PTY 输入或输出内容。
+- `TERMINAL_USE_LOG` 指定原生日志文件路径；未设置时写入系统临时目录。日志记录会话生命周期、输入写入结果与错误，不记录键名或 PTY 输入、输出内容。
 
 ## 运行时模型
 
@@ -19,6 +19,7 @@
 - 会话属于创建它的 worker 进程：worker 重启或 reload 后会话丢失，终端随 worker 进程结束；没有 daemon，也没有跨进程持久化。
 - 每个会话只有一条 PTY 流，子进程的 stdout 与 stderr 合并。屏幕由 Alacritty terminal core 解析；当前 SDK 不返回 graphics、hyperlink 或剪贴板对象，也不承诺完整真实终端渲染能力。`read_raw()` 读取 bounded raw ring，默认从保留窗口的最旧字节开始，不等于直接读取最新尾部。
 - `terminal_use` 是 Rust 编译出的模块；导入时注册 `atexit` 清理，`close_all` 逐会话终止子进程并回收 PTY。screen emulator 不保留 scrollback，长输出由 bounded raw ring 提供最近原始字节。
+- `send_key(session_id, "ctrl", "c")` 使用与 computer-use 相同的分参数组合键写法和 US 基础键位含义。它只编码本次输入，不保留按住状态；字面文字使用 `send_text()`。终端不支持的组合明确报错，不模拟桌面按键事件。
 - 公开入口为 `import terminal_use as terminal`。方法签名、返回字段和交互约定见 [terminal-use skill](skills/terminal-use/references/api.md)，流程与故障处理见 [patterns](skills/terminal-use/references/patterns.md)。
 
 ## 与 worker 的集成契约

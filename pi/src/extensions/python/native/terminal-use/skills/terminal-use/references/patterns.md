@@ -28,12 +28,12 @@ terminal.input(
     session_id,
     [
         {"kind": "text", "text": "answer"},
-        {"kind": "key", "key": "Enter"},
+        {"kind": "key", "keys": ["enter"]},
     ],
     delay=50,  # 毫秒；按事件逐个发送
 )
-terminal.send_key(session_id, "C-c")   # 中断前台进程
-terminal.send_key(session_id, "Up")    # 历史或菜单导航
+terminal.send_key(session_id, "ctrl", "c")  # 中断前台进程
+terminal.send_key(session_id, "up")         # 历史或菜单导航
 ```
 
 - 多行文本或需要应用按 bracketed paste 接收的内容才用 `paste`；发送前确认 `terminal.read(session_id)["bracketed_paste"] is True`。该状态受应用和 TERM 配置影响，可能动态改变；为当前状态为 False 的应用使用 `send_text`，应用不支持 bracketed paste 时也用 `send_text` 或 `{"kind": "raw", "data": b"..."}`。`paste` 始终发送开始/结束标记，模式关闭时应用可能把标记当按键处理。
@@ -64,7 +64,7 @@ next_chunk = terminal.read_raw(session_id, since=chunk["end"])
 ## 进程结束、超时与终止
 
 - `wait` 返回后检查 `status`：`{'kind': 'exited', ...}` 才算真实退出；超时不会杀进程。
-- 卡住或需要中断：`send_key(session_id, "C-c")`，必要时 `signal(session_id, "TERM")`，最后 `close`。
+- 卡住或需要中断：`send_key(session_id, "ctrl", "c")`，必要时 `signal(session_id, "TERM")`，最后 `close`。
 - `close` 会尝试终止进程并回收 PTY；若进程组或 reader 未在最终等待窗口内结束，返回状态可能仍是 running，且该 id 之后不可用。需要保留最终屏幕时，必须在 `close` 前读取。
 - cell 被取消或超时不等于当前 cell 创建的 terminal session 已关闭；先用 `list()` 检查，再对仍在使用的 id 显式 `close()`。
 - 每个会话只有一条 PTY 流，stdout 与 stderr 合并；需要分开时在启动命令里重定向到文件或用 shell 包装。

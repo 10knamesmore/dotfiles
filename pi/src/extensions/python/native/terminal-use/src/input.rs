@@ -124,9 +124,13 @@ pub(crate) fn encode_events(events: &Bound<'_, PyAny>) -> PyResult<Vec<InputSpec
         let kind = extract_string(&mapping.get_item("kind")?, &format!("event {index} kind"))?;
         let input = match kind.as_str() {
             "key" => {
-                ensure_fields(mapping, &["kind", "key"])?;
-                let key = extract_string(&mapping.get_item("key")?, &format!("event {index} key"))?;
-                InputSpec::Key(parse_key(&key)?)
+                ensure_fields(mapping, &["kind", "keys"])?;
+                let keys: Vec<String> = mapping.get_item("keys")?.extract().map_err(|_| {
+                    type_error(format!(
+                        "event {index} keys must be a sequence of key names"
+                    ))
+                })?;
+                encode_key_input(&keys)?
             }
             "text" => {
                 ensure_fields(mapping, &["kind", "text"])?;
@@ -166,8 +170,9 @@ pub(crate) fn encode_text(text: &str) -> InputSpec {
     InputSpec::Bytes(text.as_bytes().to_vec())
 }
 
-pub(crate) fn encode_key_input(key: &str) -> PyResult<InputSpec> {
-    Ok(InputSpec::Key(parse_key(key)?))
+/// Encode one chord without retaining any pressed-key state between calls.
+pub(crate) fn encode_key_input(keys: &[String]) -> PyResult<InputSpec> {
+    Ok(InputSpec::Key(parse_chord(keys)?))
 }
 
 pub(crate) fn encode_paste(text: &str) -> InputSpec {
@@ -202,11 +207,90 @@ pub(crate) fn encode_input(input: &InputSpec, application_cursor: bool, output: 
     }
 }
 
-fn parse_key(key: &str) -> PyResult<KeySpec> {
-    if key.is_empty() {
-        return Err(value_error("key must not be empty"));
+/// Modifiers belonging only to the current chord, not to the PTY session.
+#[derive(Default)]
+struct Modifiers {
+    /// Encode the printable key as a control byte.
+    ctrl: bool,
+
+    /// Select the shifted character on a US keyboard before control encoding.
+    shift: bool,
+
+    /// Prefix the encoded character with Escape.
+    alt: bool,
+}
+
+fn parse_chord(keys: &[String]) -> PyResult<KeySpec> {
+    let mut modifiers = Modifiers::default();
+    let mut base_key = None;
+    for name in keys {
+        let name = name.to_ascii_lowercase();
+        match name.as_str() {
+            "ctrl" => modifiers.ctrl = true,
+            "shift" => modifiers.shift = true,
+            "alt" => modifiers.alt = true,
+            _ => {
+                if base_key.replace(name).is_some() {
+                    return Err(value_error(
+                        "a terminal chord requires exactly one base key",
+                    ));
+                }
+            }
+        }
     }
-    let cursor = match key.to_ascii_lowercase().as_str() {
+    let key =
+        base_key.ok_or_else(|| value_error("a terminal chord requires exactly one base key"))?;
+    if let Some((plain, shifted)) = printable_key(&key) {
+        let mut byte = if modifiers.shift { shifted } else { plain };
+        if modifiers.ctrl {
+            byte = control_code(byte)?;
+        }
+        let bytes = if modifiers.alt {
+            vec![0x1b, byte]
+        } else {
+            vec![byte]
+        };
+        return Ok(KeySpec::Bytes(bytes));
+    }
+    let key = named_key(&key)?;
+    if modifiers.ctrl || modifiers.shift || modifiers.alt {
+        return Err(value_error(
+            "modifiers on terminal function or navigation keys are not supported; use write() for explicit bytes",
+        ));
+    }
+    Ok(key)
+}
+
+/// Return the unshifted and shifted characters for a US base key, never literal text.
+fn printable_key(key: &str) -> Option<(u8, u8)> {
+    if key.len() == 1 {
+        let byte = key.as_bytes()[0];
+        if byte.is_ascii_lowercase() {
+            return Some((byte, byte.to_ascii_uppercase()));
+        }
+        if byte.is_ascii_digit() {
+            return Some((byte, b")!@#$%^&*("[(byte - b'0') as usize]));
+        }
+    }
+    Some(match key {
+        "space" | " " => (b' ', b' '),
+        "grave" | "`" => (b'`', b'~'),
+        "minus" | "-" => (b'-', b'_'),
+        "equal" | "=" => (b'=', b'+'),
+        "bracketleft" | "[" => (b'[', b'{'),
+        "bracketright" | "]" => (b']', b'}'),
+        "backslash" | "\\" => (b'\\', b'|'),
+        "semicolon" | ";" => (b';', b':'),
+        "apostrophe" | "'" => (b'\'', b'"'),
+        "comma" | "," => (b',', b'<'),
+        "period" | "." => (b'.', b'>'),
+        "slash" | "/" => (b'/', b'?'),
+        _ => return None,
+    })
+}
+
+fn named_key(key: &str) -> PyResult<KeySpec> {
+    let cursor = match key {
         "up" => Some(CursorKey::Up),
         "down" => Some(CursorKey::Down),
         "left" => Some(CursorKey::Left),
@@ -218,16 +302,15 @@ fn parse_key(key: &str) -> PyResult<KeySpec> {
     if let Some(cursor) = cursor {
         return Ok(KeySpec::Cursor(cursor));
     }
-    let named = match key.to_ascii_lowercase().as_str() {
+    let named = match key {
         "enter" | "return" => Some(b"\r".as_slice()),
         "tab" => Some(b"\t".as_slice()),
         "escape" | "esc" => Some(b"\x1b".as_slice()),
-        "backspace" | "bspace" => Some(b"\x7f".as_slice()),
-        "delete" | "dc" => Some(b"\x1b[3~".as_slice()),
-        "insert" | "ic" => Some(b"\x1b[2~".as_slice()),
-        "pageup" | "pgup" | "ppage" => Some(b"\x1b[5~".as_slice()),
-        "pagedown" | "pgdn" | "npage" => Some(b"\x1b[6~".as_slice()),
-        "space" => Some(b" ".as_slice()),
+        "backspace" => Some(b"\x7f".as_slice()),
+        "delete" => Some(b"\x1b[3~".as_slice()),
+        "insert" => Some(b"\x1b[2~".as_slice()),
+        "pageup" | "prior" | "page_up" => Some(b"\x1b[5~".as_slice()),
+        "pagedown" | "next" | "page_down" => Some(b"\x1b[6~".as_slice()),
         "f1" => Some(b"\x1bOP".as_slice()),
         "f2" => Some(b"\x1bOQ".as_slice()),
         "f3" => Some(b"\x1bOR".as_slice()),
@@ -245,44 +328,20 @@ fn parse_key(key: &str) -> PyResult<KeySpec> {
     if let Some(bytes) = named {
         return Ok(KeySpec::Bytes(bytes.to_vec()));
     }
-    if key.chars().count() == 1 {
-        return Ok(KeySpec::Bytes(key.as_bytes().to_vec()));
-    }
-    if let Some((modifier, character)) = key.split_once('-') {
-        match modifier.to_ascii_uppercase().as_str() {
-            "C" => {
-                let code = control_code(character)?;
-                return Ok(KeySpec::Bytes(vec![code]));
-            }
-            "M" if character.chars().count() == 1 => {
-                let mut bytes = vec![0x1b];
-                bytes.extend(character.as_bytes());
-                return Ok(KeySpec::Bytes(bytes));
-            }
-            _ => {}
-        }
-    }
     Err(value_error(format!(
-        "unknown key {key:?}; use a single character, a named key, C-<character>, or M-<character>"
+        "unsupported terminal base key {key:?}; pass modifiers as separate names and use send_text() for literal text"
     )))
 }
 
-fn control_code(character: &str) -> PyResult<u8> {
-    if character.eq_ignore_ascii_case("space") || character == " " {
-        return Ok(0);
+fn control_code(character: u8) -> PyResult<u8> {
+    match character.to_ascii_uppercase() {
+        b' ' => Ok(0),
+        b'?' => Ok(0x7f),
+        upper @ b'@'..=b'_' => Ok(upper & 0x1f),
+        _ => Err(value_error(
+            "this Ctrl combination has no supported terminal encoding; use write() for explicit bytes",
+        )),
     }
-    if character == "?" {
-        return Ok(0x7f);
-    }
-    if character.chars().count() == 1 {
-        let upper = character.as_bytes()[0].to_ascii_uppercase();
-        if (b'@'..=b'_').contains(&upper) {
-            return Ok(upper & 0x1f);
-        }
-    }
-    Err(value_error(format!(
-        "unsupported control key C-{character}; use a letter, Space, ?, or one of @ [ \\ ] ^ _"
-    )))
 }
 
 fn required_field<'py>(mapping: &Bound<'py, PyMapping>, name: &str) -> PyResult<Bound<'py, PyAny>> {

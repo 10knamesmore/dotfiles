@@ -20,7 +20,7 @@ display_image(shot)
 
 操作时以最近一次截图为坐标依据：`computer.click(x, y, relative_to=shot)`。截图中的坐标是返回 PNG 的像素；不传 `relative_to` 时坐标是桌面逻辑单位。`rect=(x,y,width,height)` 使用完整、方向正确的原始截图像素，先裁剪再缩放；越界会报错。默认截图保留原始像素。
 
-键名忽略大小写，采用 XKB 基础键名和简短别名：`ctrl`、`shift`、`alt`、`super`、`enter`、`escape`、`tab`、`backspace`、`delete`、方向键及 `F1` 等。一个组合键分开传参：`computer.press("ctrl", "a")`；不要传 `"ctrl+a"`。字母指 US 基础键位，大写通过 `shift`，任意 Unicode 文字通过 `type_text()` 输入。完整键名与参数见 [API](references/api.md)。
+键名忽略大小写，采用 XKB 基础键名和简短别名：`ctrl`、`shift`、`alt`、`super`、`enter`、`escape`、`tab`、`backspace`、`delete`、方向键及 `F1` 等。一个组合键分开传参：`computer.press("ctrl", "a")`；不要传 `"ctrl+a"`。与 terminal-use 一样，字母指 US 基础键位，`"A"` 不隐含 Shift，大写用 `press("shift", "a")`。字面文字通过 `type_text()` 输入。US 未加 Shift 的标点可直接作为键名，如 `"/"`；`press("shift", "/")` 表示问号。完整键名与参数见 [API](references/api.md)。
 
 ```python
 with computer.hold("ctrl"):

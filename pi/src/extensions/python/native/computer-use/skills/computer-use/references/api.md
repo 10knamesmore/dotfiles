@@ -50,7 +50,11 @@
 | `left`, `right`, `up`, `down` | `Left`, `Right`, `Up`, `Down` |
 | `pageup`, `pagedown`, `space` | `Prior`, `Next`, `space` |
 
-也接受 `Control_R`、`Shift_R`、`Alt_R`、`Super_R`、`F1` 等 US 键图基础层中存在的 XKB 名称。字母 `a` 与 `A` 指同一个未加修饰的基础键位。大写用 `press("shift", "a")`；感叹号用 `press("shift", "1")` 或 `type_text("!")`。不要把组合键写成一个字符串。所有键名在第一条键事件前完成验证，组合键按下时先处理修饰键。
+也接受 `Control_R`、`Shift_R`、`Alt_R`、`Super_R`、`F1` 等 US 键图基础层中存在的 XKB 名称。空格和 US 未加 Shift 的标点可直接作为键名：`` ` ``、`-`、`=`、`[`、`]`、`\`、`;`、`'`、`,`、`.`、`/`；也可使用对应 XKB 名称 `grave`、`minus`、`equal`、`bracketleft`、`bracketright`、`backslash`、`semicolon`、`apostrophe`、`comma`、`period`、`slash`。
+
+字母 `a` 与 `A` 指同一个未加修饰的基础键位。大写用 `press("shift", "a")`；感叹号用 `press("shift", "1")`。字面文字使用 `type_text()`，例如 `type_text("A!")`。不要把组合键写成一个字符串。所有键名在第一条键事件前完成验证，组合键按下时先处理修饰键。
+
+terminal-use 的共有键名、US 基础键位含义和分参数组合键写法相同，但支持范围不同：computer 发送按下/松开事件，可以持有键并与鼠标操作组合；terminal 只发送一次编码后的输入，不提供按住状态，也不支持所有桌面组合键。
 
 `held_keys()` 和释放 API 只跟踪 worker 虚拟设备。用户物理键盘的修饰键不能被它们释放，仍可能影响应用。调用失败会回滚该次新获取的键和按钮；worker 在 cell 错误或取消时调用内部 `_release_inputs()` 清理跨 cell 保留的全部输入。普通使用不需要直接调用这个内部函数。
 

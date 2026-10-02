@@ -174,7 +174,7 @@ WaitFor = ContainsWait | RegexWait
 
 class KeyEvent(TypedDict):
     kind: Literal['key']
-    key: str
+    keys: Sequence[str]
 
 
 class TextEvent(TypedDict):
@@ -346,7 +346,7 @@ terminal.input(
     delay: float = 0.0,
 ) -> None
 terminal.send_text(session_id: str, text: str) -> None
-terminal.send_key(session_id: str, key: str) -> None
+terminal.send_key(session_id: str, *keys: str) -> None
 terminal.paste(session_id: str, text: str) -> None
 terminal.write(session_id: str, data: bytes) -> None
 ```
@@ -355,17 +355,55 @@ terminal.write(session_id: str, data: bytes) -> None
 
 | `kind` | 必填字段 | 行为 |
 | --- | --- | --- |
-| `key` | `key: str` | 按键序列 |
+| `key` | `keys: Sequence[str]` | 一个组合键，如 `["ctrl", "c"]`；不是依次按多个键 |
 | `text` | `text: str` | UTF-8 字面输入，不自动追加回车 |
 | `paste` | `text: str` | bracketed paste 包裹 |
 | `raw` | `data: bytes` | 原样字节 |
 
-`key` 接受：
+### 键名与组合键
 
-- 单个字符按字面发送（含 Unicode）；
-- 命名键（大小写不敏感）：`Enter`/`Return`、`Tab`、`Escape`/`Esc`、`Backspace`/`BSpace`、`Delete`/`DC`、`Insert`/`IC`、`Up`、`Down`、`Left`、`Right`、`Home`、`End`、`PageUp`/`PgUp`/`PPage`、`PageDown`/`PgDn`/`NPage`、`Space`、`F1`–`F12`；
-- 控制键：`C-a`–`C-z`、`C-@`、`C-[`、`C-\\`、`C-]`、`C-^`、`C-_`、`C-Space`、`C-?`；
-- Alt 组合：`M-<单个字符>`，如 `M-x`。
+与 computer-use 一样，键名忽略大小写，字母表示 US 基础键位；修饰键分开传参，不把组合键写成单个字符串。`"a"` 与 `"A"` 都发送小写 a，大写须显式加 `shift`。输入字面文字（含 Unicode、大写和标点）使用 `send_text()`，不是 `send_key()`。
+
+```python
+terminal.send_key(session_id, "ctrl", "c")
+terminal.send_key(session_id, "alt", "x")
+terminal.send_key(session_id, "shift", "a")  # A
+terminal.send_key(session_id, "shift", "1")  # !
+terminal.send_text(session_id, "你好，A!")
+terminal.input(session_id, [{"kind": "key", "keys": ["ctrl", "c"]}])
+```
+
+支持的基础键：
+
+| 键名 | 别名 |
+| --- | --- |
+| `a`–`z`、`0`–`9` | 字母大小写等价 |
+| `enter`、`escape` | `Return`、`Esc` |
+| `tab`、`backspace`、`delete`、`insert` | — |
+| `up`、`down`、`left`、`right`、`home`、`end` | — |
+| `pageup`、`pagedown` | `Prior` / `Page_Up`、`Next` / `Page_Down` |
+| `space` | 单个空格 |
+| `F1`–`F12` | — |
+| US 未加 Shift 的标点 | 下表中的 XKB 名称 |
+
+| 标点键 | XKB 名称 | 加 `shift` 后 |
+| --- | --- | --- |
+| `` ` `` | `grave` | `~` |
+| `-` | `minus` | `_` |
+| `=` | `equal` | `+` |
+| `[`、`]` | `bracketleft`、`bracketright` | `{`、`}` |
+| `\` | `backslash` | `\|` |
+| `;` | `semicolon` | `:` |
+| `'` | `apostrophe` | `"` |
+| `,`、`.`、`/` | `comma`、`period`、`slash` | `<`、`>`、`?` |
+
+每次调用必须恰好有一个基础键，可加 `ctrl`、`shift`、`alt`，顺序不影响结果，重复修饰键无额外效果。修饰键目前只支持字母、数字、空格和上述标点键：先按 US 布局应用 Shift，再编码 Ctrl，最后为 Alt 加 Escape 前缀。
+
+Ctrl 可编码字母、空格，以及 Shift 处理后为 `@`、`[`、`\`、`]`、`^`、`_`、`?` 的字符。例如 `("ctrl", "space")` 为 NUL，`("ctrl", "shift", "2")` 也为 NUL，`("ctrl", "shift", "/")` 为 DEL。不支持的 Ctrl 组合会报错，不会忽略修饰键。
+
+PTY 不保留按键按住状态；这里只发送一次组合键对应的字节，不提供 `key_down`、`key_up` 或 `hold`。单独的修饰键、多个基础键、`super`、左右修饰键名称，以及带修饰键的功能/导航键（如 Shift+Tab、Ctrl+Left）均报错。需要指定其他终端序列时使用 `write()`；不实现 Kitty 等扩展键盘协议输入。
+
+### 粘贴与原始字节
 
 `paste` 始终发送 `ESC[200~`、文本和 `ESC[201~`，不会检查应用当前是否启用 bracketed paste。调用前应读取当前快照并确认 `bracketed_paste is True`；该字段只表示 emulator 最近解析到的应用模式，应用和 TERM 配置仍可能动态改变它。若为 `False`，使用 `send_text`；需要完全自定义字节时使用 `write`/`raw`。模式不匹配时，应用可能把标记当作普通输入或按键序列处理，导致内容丢失或误操作。
 
