@@ -31,7 +31,7 @@ local mainMod = "SUPER"
 -- ============================================================
 
 -- 优先加载 QuickShell MonitorService 回写的机器本地布局（按当前显示器组合，开机即恢复、无闪烁）。
--- 文件缺失或出错则退回安全默认。完整可视化管理见 QuickShell「显示器」面板（侧边栏打开）。
+-- 文件缺失或出错则退回安全默认。完整可视化管理见 QuickShell 控制中心的「显示器」页。
 local mlocal = HOME .. "/.local/state/hypr/monitors.local.lua"
 local chunk = loadfile(mlocal)
 local ok = chunk and pcall(chunk)
@@ -356,7 +356,7 @@ bind(mainMod .. " + R", "应用启动 · 应用启动器", hl.dsp.global("quicks
 bind(mainMod .. " + S", "布局 · 切换方向", hl.dsp.layout("togglesplit"))
 bind(mainMod .. " + P", "截图 · 区域", hl.dsp.exec_cmd("hyprshot -m region"))
 bind(mainMod .. " + SHIFT + P", "截图 · 窗口", hl.dsp.exec_cmd("hyprshot -m window"))
-bind(mainMod .. " + SHIFT + T", "面板 · 快捷设置", hl.dsp.global("quickshell:settings"))
+bind(mainMod .. " + SHIFT + T", "面板 · 控制中心", hl.dsp.global("quickshell:controlCenter"))
 bind(mainMod .. " + SHIFT + Q", "会话 · 锁屏", hl.dsp.exec_cmd("hyprlock"))
 
 -- 焦点切换（hjkl）
