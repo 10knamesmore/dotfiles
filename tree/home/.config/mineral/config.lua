@@ -110,16 +110,16 @@ return {
         exit = {},
       },
 
-      transport = { -- 播放栏操作反馈:停留与过渡时长(毫秒)
-        volume_hold_ms = 2000, -- 调节音量
-        volume_fade_out_ms = 110, -- 音量标题fade out
-        volume_fade_in_ms = 150, -- 音量标题fade in
-        mode_hold_ms = 1200, -- 切换模
-        controls_hold_ms = 4000, -- 播放控制
-        mode_reveal_ms = 220, -- 模式文字
-        mode_resize_ms = 180, -- 模式区域
-        controls_fade_ms = 220, -- 控制键fade in/out
-      },
+      -- transport = { -- 播放栏操作反馈:停留与过渡时长(毫秒)
+      --   volume_hold_ms = 2000, -- 调节音量
+      --   volume_fade_out_ms = 110, -- 音量标题fade out
+      --   volume_fade_in_ms = 150, -- 音量标题fade in
+      --   mode_hold_ms = 1200, -- 切换模
+      --   controls_hold_ms = 4000, -- 播放控制
+      --   mode_reveal_ms = 220, -- 模式文字
+      --   mode_resize_ms = 180, -- 模式区域
+      --   controls_fade_ms = 220, -- 控制键fade in/out
+      -- },
     },
     -- keys = {
     --   script = { ["my.cycle_spectrum"] = "S" },

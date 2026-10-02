@@ -1,0 +1,32 @@
+[package]
+name = "pi-display-image-sdk"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Validated image display for Pi's Python worker"
+
+[lib]
+name = "pi_display_image"
+crate-type = ["cdylib"]
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = [
+    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "png",
+    "pnm", "qoi", "tiff", "webp",
+] }
+pyo3 = { version = "=0.29.2", default-features = false, features = [
+    "macros",
+    "abi3-py312",
+] }
+
+[features]
+default = ["python-extension"]
+python-extension = ["pyo3/extension-module"]
+
+[lints.rust]
+missing_docs = "deny"
+
+[package.metadata.maturin]
+bindings = "pyo3"
+module-name = "pi_display_image"
+features = ["python-extension"]

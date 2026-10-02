@@ -17,7 +17,7 @@ const OUTCOME_LABELS: Record<PythonOutcome, string> = {
 /** Model-facing results include state availability even when an interrupted cell made partial changes. */
 export function executionText(result: PythonExecutionResult): string {
   const { details, output } = result;
-  const lines = [OUTCOME_LABELS[details.outcome]];
+  const lines = [OUTCOME_LABELS[details.outcome] + imageCountSuffix(details.imageCount)];
   if (details.environmentAvailable) {
     if (details.outcome !== "completed")
       lines.push("The Python environment is still available. Changes made before the failure remain.");
@@ -26,8 +26,13 @@ export function executionText(result: PythonExecutionResult): string {
       "No live Python environment remains. The next call starts empty; initialize any required variables again.",
     );
   }
+  if (details.inputCleanupFailed)
+    lines.push(
+      "Computer input cleanup failed. Held keys or mouse buttons may remain pressed; import computer_use and call computer_use.close() before further input.",
+    );
   if (output) lines.push("", output);
-  else if (details.outcome === "completed") lines.push("No output. Use print() to display values.");
+  else if (details.outcome === "completed" && details.imageCount === 0)
+    lines.push("No output. Use print() to display values.");
   if (details.output.truncated)
     lines.push(`\n[Output truncated to the last 2000 lines / 50 KiB. Full output: ${details.output.path}]`);
   if (details.diagnosticsPath) lines.push(`\nRuntime diagnostics: ${details.diagnosticsPath}`);
@@ -78,6 +83,7 @@ export function renderPythonResult(
     );
   const status =
     `${OUTCOME_LABELS[details.outcome]} · ${(details.durationMs / 1000).toFixed(2)}s` +
+    imageCountSuffix(details.imageCount) +
     (details.environmentAvailable ? "" : " · environment unavailable");
   const color = details.outcome === "completed" ? "success" : "error";
   const text = clean(
@@ -88,6 +94,10 @@ export function renderPythonResult(
   );
   const preview = options.expanded ? text : text.split("\n").slice(1, 9).join("\n");
   return new Text(theme.fg(color, status) + (preview ? `\n${preview}` : ""), 0, 0);
+}
+
+function imageCountSuffix(count: number): string {
+  return count > 0 ? ` · ${count} image${count === 1 ? "" : "s"}` : "";
 }
 
 function clean(text: string): string {

@@ -1,7 +1,9 @@
 """Run persistent Python cells over dedicated control and event file descriptors."""
 
 import code
+from collections.abc import Callable
 from contextlib import chdir
+from dataclasses import dataclass
 from importlib import metadata
 import io
 import json
@@ -10,6 +12,7 @@ import os
 import platform
 import signal
 import sys
+import threading
 import types
 from typing import Literal, cast, override
 
@@ -97,6 +100,66 @@ def install_terminal_ownership_hook() -> None:
     _set_lifecycle_hook(handle_terminal_ownership)
 
 
+@dataclass
+class CellImageOutput:
+    """Keep image output tied to one active cell and its executing thread."""
+
+    call_id: str
+    directory: str
+    thread_id: int
+    sequence: int = 0
+
+
+class CellRuntime:
+    """Bind image output and optional Linux input cleanup to the worker's active cell."""
+
+    def __init__(self, interpreter: SessionInterpreter) -> None:
+        """Load required SDKs before user imports and expose the native image function."""
+        self.release_inputs: Callable[[], None] | None = None
+        try:
+            from pi_display_image import _set_image_sink, display_image
+            if sys.platform == "linux":
+                from computer_use import _release_inputs
+                self.release_inputs = _release_inputs
+        except ImportError as error:
+            reason = f"a required Python worker SDK is not importable: {error}"
+            send_event({"type": "startup_error", "reason": reason})
+            raise SystemExit(reason) from error
+        self.active_cell: CellImageOutput | None = None
+        self.pid = os.getpid()
+        _set_image_sink(self.write_image)
+        interpreter.locals["display_image"] = display_image
+
+    def begin_cell(self, call_id: str, output_path: str) -> None:
+        """Start an image sequence in the controller's output directory for this cell."""
+        self.active_cell = CellImageOutput(call_id, os.path.dirname(output_path), threading.get_ident())
+
+    def write_image(self, data: bytes, mime_type: str) -> None:
+        """Store encoded bytes before announcing their path; reject background output."""
+        cell = self.active_cell
+        if cell is None or cell.thread_id != threading.get_ident() or self.pid != os.getpid():
+            raise RuntimeError("display_image() must run on the active Python cell's thread")
+        extensions = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
+        extension = extensions.get(mime_type)
+        if extension is None:
+            raise ValueError("display_image() returned an unsupported image format")
+        cell.sequence += 1
+        path = os.path.join(cell.directory, f"image-{cell.sequence}.{extension}")
+        with open(path, "xb") as image:
+            _ = image.write(data)
+        send_event({"type": "image", "callId": cell.call_id, "path": path, "mimeType": mime_type})
+
+    def finish_cell(self, failed: bool) -> str | None:
+        """Forget image ownership and report cleanup failure without replacing the cell outcome."""
+        self.active_cell = None
+        if failed and self.release_inputs is not None:
+            try:
+                self.release_inputs()
+            except BaseException as error:
+                return type(error).__name__
+        return None
+
+
 executing = False
 
 
@@ -106,14 +169,16 @@ def handle_sigint(_signum: int, _frame: types.FrameType | None) -> None:
         raise KeyboardInterrupt
 
 
-def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], number: int) -> None:
+def execute_cell(
+    interpreter: SessionInterpreter, request: dict[str, object], number: int, runtime: CellRuntime
+) -> None:
     """Capture one cell's output, restore its working directory, and report completion."""
     global executing
     call_id = request["callId"]
     source = request["code"]
     output_path = request["outputPath"]
     cwd = request["cwd"]
-    assert isinstance(source, str) and isinstance(output_path, str) and isinstance(cwd, str)
+    assert isinstance(call_id, str) and isinstance(source, str) and isinstance(output_path, str) and isinstance(cwd, str)
 
     filename = f"<python-{number}>"
     linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
@@ -129,6 +194,8 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
         stderr = io.TextIOWrapper(os.fdopen(os.dup(2), "wb", buffering=0), encoding="utf-8", errors="backslashreplace", write_through=True)
         sys.stdout, sys.stderr = stdout, stderr
         interpreter.outcome = "completed"
+        runtime.begin_cell(call_id, output_path)
+        input_cleanup_error: str | None = None
         try:
             executing = True
             send_event({"type": "started", "callId": call_id})
@@ -141,7 +208,10 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
             interpreter.showtraceback()
             interpreter.outcome = "interrupted"
         finally:
-            executing = False
+            try:
+                input_cleanup_error = runtime.finish_cell(interpreter.outcome != "completed")
+            finally:
+                executing = False
             for stream in (stdout, stderr):
                 try:
                     stream.flush()
@@ -156,6 +226,8 @@ def execute_cell(interpreter: SessionInterpreter, request: dict[str, object], nu
         os.close(saved_stdout)
         os.close(saved_stderr)
         os.close(output_fd)
+    if input_cleanup_error is not None:
+        send_event({"type": "input_cleanup_failed", "callId": call_id, "errorType": input_cleanup_error})
     send_event({"type": "completed", "callId": call_id, "outcome": interpreter.outcome})
 
 
@@ -172,16 +244,17 @@ def main() -> None:
     """Read one LF-delimited request at a time until the controller closes fd3."""
     os.setpgid(0, 0)
     _ = signal.signal(signal.SIGINT, handle_sigint)
-    # Resolve the SDK before user code can shadow it with a same-named module in the call cwd.
+    # Resolve native SDKs before user code can shadow them from the call cwd.
     install_terminal_ownership_hook()
+    interpreter = SessionInterpreter()
+    runtime = CellRuntime(interpreter)
     # An empty import path follows each call's cwd instead of pinning the startup directory.
     sys.path.insert(0, "")
-    interpreter = SessionInterpreter()
     send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})
     with os.fdopen(WORKER_REQUEST_FD, "rb") as requests:
         for number, frame in enumerate(requests, start=1):
             request = cast(dict[str, object], json.loads(frame.decode("utf-8")))
-            execute_cell(interpreter, request, number)
+            execute_cell(interpreter, request, number, runtime)
 
 
 if __name__ == "__main__":

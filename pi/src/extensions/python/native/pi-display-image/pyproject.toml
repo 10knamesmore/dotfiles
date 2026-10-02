@@ -1,0 +1,32 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pi-display-image-sdk"
+version = "0.1.0"
+description = "Validated image display for Pi's Python worker"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "pi_display_image"
+features = ["python-extension"]
+locked = true
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "src/**/*.rs" },
+    { file = "pi_display_image.pyi" },
+    { file = "README.md" },
+]

@@ -2,6 +2,7 @@ import "../theme"
 import "../state"
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
@@ -20,6 +21,7 @@ PanelWindow {
     margins.right: 10
     exclusionMode: ExclusionMode.Ignore
     focusable: false
+    WlrLayershell.namespace: "quickshell-toast"
     color: "transparent"
     visible: toastModel.count > 0
 
@@ -55,6 +57,7 @@ PanelWindow {
         anchors.margins: 0
         width: 340
         spacing: 6
+        clip: true
 
         Repeater {
             model: toastModel
@@ -67,14 +70,12 @@ PanelWindow {
                 property real _remainingTime: 0
 
                 function dismissToast() {
-                    if (model.dismissed)
+                    if (exiting)
                         return;
-                    toastModel.setProperty(index, "dismissed", true);
                     exiting = true;
-                    toast.opacity = 0;
-                    toast.x = 50;
-                    toast.scale = 0.92;
-                    toast.height = 0;
+                    dismissTimer.stop();
+                    progressAnim.stop();
+                    toast.x = toast.width;
                     removeTimer.start();
                 }
 
@@ -82,17 +83,11 @@ PanelWindow {
                 height: toastContent.implicitHeight + 16
                 radius: Tokens.radiusM
                 color: Colors.withAlpha(Colors.base, Tokens.toastAlpha)
-                border.color: Colors.overlay(Tokens.borderAlpha)
-                border.width: 1
-                opacity: 0
-                x: 50
-                scale: 0.92
+                x: width
                 clip: true
 
                 Component.onCompleted: {
-                    opacity = 1;
                     x = 0;
-                    scale = 1.0;
                     toast._startTime = Date.now();
                     dismissTimer.interval = model.timeout;
                     dismissTimer.start();
@@ -109,8 +104,11 @@ PanelWindow {
                 Timer {
                     id: removeTimer
 
-                    interval: 250
+                    interval: Tokens.animNormal
                     onTriggered: {
+                        // 水平滑出后才腾出位置，避免卡片在离场时向上收缩。
+                        toast.height = 0;
+                        toastModel.setProperty(index, "dismissed", true);
                         // 等全部 toast 都消失后一次性清空，避免索引漂移
                         for (let i = 0; i < toastModel.count; i++) {
                             if (!toastModel.get(i).dismissed)
@@ -161,22 +159,70 @@ PanelWindow {
                     }
                 }
 
-                // 进度条 — 底部渐缩显示剩余时间
-                Rectangle {
-                    id: progressBar
+                // 倒计时只淡去边框：左上先消失，右下最后消失。
+                Shape {
+                    id: countdownBorder
 
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    height: 2
-                    width: 340
-                    radius: 1
-                    color: Colors.withAlpha(Colors.blue, 0.5)
+                    property real elapsedFraction: 0 // 已用时间，0～1
+                    readonly property real borderThickness: 2
+                    readonly property real fadeSoftness: 0.24
+                    readonly property real fadeFront: elapsedFraction * (1 + 2 * fadeSoftness) - fadeSoftness
 
-                    NumberAnimation on width {
+                    anchors.fill: parent
+                    preferredRendererType: Shape.CurveRenderer
+
+                    ShapePath {
+                        strokeColor: "transparent"
+                        fillRule: ShapePath.OddEvenFill
+                        // 归一到卡片宽高，让右上与左下同时渐隐，不受长宽比影响。
+                        fillTransform: Qt.matrix4x4(countdownBorder.width, 0, 0, 0, 0, countdownBorder.height, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
+                        fillGradient: LinearGradient {
+                            x1: countdownBorder.fadeFront - countdownBorder.fadeSoftness
+                            y1: x1
+                            x2: countdownBorder.fadeFront + countdownBorder.fadeSoftness
+                            y2: x2
+
+                            GradientStop {
+                                position: 0
+                                color: Colors.withAlpha(Colors.blue, 0)
+                            }
+                            GradientStop {
+                                position: 0.25
+                                color: Colors.withAlpha(Colors.blue, 0.08)
+                            }
+                            GradientStop {
+                                position: 0.5
+                                color: Colors.withAlpha(Colors.blue, 0.25)
+                            }
+                            GradientStop {
+                                position: 0.75
+                                color: Colors.withAlpha(Colors.blue, 0.42)
+                            }
+                            GradientStop {
+                                position: 1
+                                color: Colors.withAlpha(Colors.blue, 0.5)
+                            }
+                        }
+
+                        PathRectangle {
+                            width: countdownBorder.width
+                            height: countdownBorder.height
+                            radius: toast.radius
+                        }
+                        PathRectangle {
+                            x: countdownBorder.borderThickness
+                            y: countdownBorder.borderThickness
+                            width: Math.max(0, countdownBorder.width - 2 * countdownBorder.borderThickness)
+                            height: Math.max(0, countdownBorder.height - 2 * countdownBorder.borderThickness)
+                            radius: toast.radius - countdownBorder.borderThickness
+                        }
+                    }
+
+                    NumberAnimation on elapsedFraction {
                         id: progressAnim
 
-                        from: 340
-                        to: 0
+                        from: 0
+                        to: 1
                         duration: 5000
                         running: false
                     }
@@ -188,43 +234,25 @@ PanelWindow {
                     hoverEnabled: true
                     onClicked: toast.dismissToast()
                     onEntered: {
+                        if (toast.exiting)
+                            return;
                         toast._remainingTime = Math.max(500, dismissTimer.interval - (Date.now() - toast._startTime));
                         dismissTimer.stop();
-                        progressAnim.pause();
+                        if (progressAnim.running)
+                            progressAnim.pause();
                     }
                     onExited: {
+                        if (toast.exiting)
+                            return;
                         dismissTimer.interval = toast._remainingTime;
                         toast._startTime = Date.now();
                         dismissTimer.start();
-                        progressAnim.resume();
-                    }
-                }
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Tokens.animNormal
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
+                        if (progressAnim.running)
+                            progressAnim.resume();
                     }
                 }
 
                 Behavior on x {
-                    NumberAnimation {
-                        duration: Tokens.animNormal
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
-                    }
-                }
-
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: Tokens.animNormal
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: toast.exiting ? Anim.accelerate : Anim.decelerate
-                    }
-                }
-
-                Behavior on height {
                     NumberAnimation {
                         duration: Tokens.animNormal
                         easing.type: Easing.BezierSpline

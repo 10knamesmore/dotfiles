@@ -40,12 +40,18 @@ const TERMINAL_USE_SKILL = fileURLToPath(
   new URL("./native/terminal-use/skills/terminal-use/SKILL.md", import.meta.url),
 );
 
+const COMPUTER_USE_SKILL = fileURLToPath(
+  new URL("./native/computer-use/skills/computer-use/SKILL.md", import.meta.url),
+);
+
 const TOOL_DESCRIPTION =
-  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable. Output is limited, larger output is saved to a file.";
+  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable. Text output is limited, larger output is saved to a file. display_image(image) sends an image to the model; accepts a file path, encoded image bytes, or an image object. No import needed.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
-  pi.on("resources_discover", () => ({ skillPaths: [TERMINAL_USE_SKILL] }));
+  pi.on("resources_discover", () => ({
+    skillPaths: process.platform === "linux" ? [TERMINAL_USE_SKILL, COMPUTER_USE_SKILL] : [TERMINAL_USE_SKILL],
+  }));
 
   let session: PythonSession | undefined;
   const inspectionController = new AbortController();
@@ -132,7 +138,7 @@ export function registerPython(pi: ExtensionAPI): void {
         });
       });
       return {
-        content: [{ type: "text", text: executionText(result) }],
+        content: [{ type: "text", text: executionText(result) }, ...result.images],
         details: result.details,
       };
     },

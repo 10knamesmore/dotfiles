@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
-import { mkdtemp, open, rm } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail } from "@earendil-works/pi-coding-agent";
 import { logPythonEvent } from "./diagnostics.js";
 import {
@@ -27,13 +28,34 @@ export interface PythonToolDetails {
   /** A surviving environment can contain changes made before an error or interruption. */
   environmentAvailable: boolean;
   output: { truncated: boolean; path?: string };
+  /** Number of complete image attachments returned with this call. */
+  imageCount: number;
+  /** Held keys or buttons may remain pressed when failure cleanup did not complete. */
+  inputCleanupFailed: boolean;
   /** uv and worker infrastructure diagnostics, separate from user code output. */
   diagnosticsPath?: string;
 }
 
+/** Captured text and complete image attachments, including output emitted before a cell failed. */
 export interface PythonExecutionResult {
   output: string;
+  images: ImageContent[];
   details: PythonToolDetails;
+}
+
+/** A completed image file in the current call's temporary output directory. */
+interface ImageFile {
+  /** Absolute path sent only after the worker has closed the file. */
+  path: string;
+
+  /** Native image output supports these encoded formats without resizing. */
+  mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+}
+
+interface SubmittedResult {
+  outcome: PythonOutcome;
+  images: ImageFile[];
+  inputCleanupFailed: boolean;
 }
 
 interface WorkerInfo {
@@ -53,6 +75,8 @@ type WorkerMessage =
   | (WorkerInfo & { type: "ready" })
   | { type: "started"; callId: string }
   | { type: "completed"; callId: string; outcome: "completed" | "python_error" | "interrupted" }
+  | (ImageFile & { type: "image"; callId: string })
+  | { type: "input_cleanup_failed"; callId: string; errorType: string }
   | { type: "terminal_ownership"; action: "opened" | "closed"; id: string; pid: number }
   | { type: "startup_error"; reason: string };
 
@@ -60,6 +84,10 @@ interface PendingExecution {
   callId: string;
   started: boolean;
   timeoutSeconds: number;
+  /** Files are collected synchronously from fd4 and read after completion, before directory cleanup. */
+  images: ImageFile[];
+  outputDirectory: string;
+  inputCleanupFailed: boolean;
   stopReason?: "interrupted" | "timed_out";
   timer?: ReturnType<typeof setTimeout>;
   forceTimer?: ReturnType<typeof setTimeout>;
@@ -107,7 +135,7 @@ export class PythonSession {
   ) {}
 
   public get available(): boolean {
-    return this.worker?.info !== undefined && !this.worker.stopping && !this.worker.ended;
+    return !this.disposed && this.worker?.info !== undefined && !this.worker.stopping && !this.worker.ended;
   }
 
   /** Execute a complete block in the supplied absolute cwd for this call, preserving partial output on failure. */
@@ -128,6 +156,9 @@ export class PythonSession {
     let worker: WorkerProcess | undefined;
     let outcome: PythonOutcome = "startup_error";
     let output = "";
+    const images: ImageContent[] = [];
+    let imageFiles: ImageFile[] = [];
+    let inputCleanupFailed = false;
     let truncated = false;
     let outputPath: string | undefined;
     this.log({ phase: "execute_start", callId, cwd });
@@ -142,7 +173,28 @@ export class PythonSession {
           // Create before dispatch so even an immediate process exit has a readable output file.
           const file = await open(path, "wx", 0o600);
           await file.close();
-          outcome = await this.submit(worker, code, timeoutSeconds, callId, cwd, path, signal, onStarted);
+          const submitted = await this.submit(worker, code, timeoutSeconds, callId, cwd, path, signal, onStarted);
+          outcome = submitted.outcome;
+          imageFiles = submitted.images;
+          inputCleanupFailed = submitted.inputCleanupFailed;
+          const imageReadStarted = Date.now();
+          for (const image of imageFiles) {
+            try {
+              const bytes = await readFile(image.path);
+              images.push({ type: "image", data: bytes.toString("base64"), mimeType: image.mimeType });
+            } catch (error) {
+              outcome = "output_error";
+              this.log({ phase: "image_read_failed", callId, reason: errorMessage(error) });
+            }
+          }
+          if (imageFiles.length > 0) {
+            this.log({
+              phase: "images_read",
+              callId,
+              imageCount: images.length,
+              durationMs: Date.now() - imageReadStarted,
+            });
+          }
           const preview = await readOutput(path);
           output = preview.text;
           truncated = preview.truncated;
@@ -153,10 +205,14 @@ export class PythonSession {
       outcome = signal?.aborted || this.disposed ? "interrupted" : worker ? "output_error" : "startup_error";
       this.log({ phase: "execution_failure", callId, outcome, reason: errorMessage(error) });
     } finally {
-      if (directory && !outputPath) {
-        await rm(directory, { recursive: true, force: true }).catch((error: unknown) => {
-          this.log({ phase: "output_cleanup_failed", callId, reason: errorMessage(error) });
-        });
+      if (directory) {
+        // Truncated text remains readable, but its already attached image files can be removed.
+        const paths = outputPath ? imageFiles.map((image) => image.path) : [directory];
+        for (const path of paths) {
+          await rm(path, { recursive: !outputPath, force: true }).catch((error: unknown) => {
+            this.log({ phase: "output_cleanup_failed", callId, reason: errorMessage(error) });
+          });
+        }
       }
       this.running = false;
     }
@@ -165,23 +221,35 @@ export class PythonSession {
       durationMs: Date.now() - started,
       environmentAvailable: this.available,
       output: { truncated, path: outputPath },
+      imageCount: images.length,
+      inputCleanupFailed,
       diagnosticsPath:
         outcome === "startup_error" || outcome === "process_exited" || outcome === "output_error"
           ? (worker ?? this.worker)?.logPath
           : undefined,
     };
-    this.log({ phase: "execute_end", callId, outcome, durationMs: details.durationMs });
-    return { output, details };
+    this.log({ phase: "execute_end", callId, outcome, imageCount: images.length, durationMs: details.durationMs });
+    return { output, images, details };
   }
 
-  /** Stop both process groups, including subprocesses still in those groups, before session replacement. */
+  /** Let the worker release virtual input and PTYs before enforcing a bounded shutdown. */
   public async close(): Promise<void> {
     this.disposed = true;
     const worker = this.worker;
-    if (!worker) return;
+    if (!worker || worker.ended) return;
     this.log({ phase: "shutdown", pid: worker.info?.pid });
-    this.terminate(worker);
-    await worker.exited;
+    if (!worker.stopping) {
+      if (worker.pending) this.interrupt(worker, "interrupted");
+      // EOF leaves the request loop and runs native atexit cleanup. Disconnecting
+      // a virtual keyboard alone does not make Hyprland release its pressed keys.
+      worker.requests.end();
+    }
+    const timeout = setTimeout(() => this.terminate(worker), INTERRUPT_GRACE_MS);
+    try {
+      await worker.exited;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async ensureWorker(signal?: AbortSignal): Promise<WorkerProcess> {
@@ -294,15 +362,20 @@ export class PythonSession {
     outputPath: string,
     signal?: AbortSignal,
     onStarted?: () => void,
-  ): Promise<PythonOutcome> {
-    if (signal?.aborted || this.disposed) return Promise.resolve("interrupted");
-    if (worker.ended || worker.stopping) return Promise.resolve("process_exited");
+  ): Promise<SubmittedResult> {
+    if (signal?.aborted || this.disposed)
+      return Promise.resolve({ outcome: "interrupted", images: [], inputCleanupFailed: false });
+    if (worker.ended || worker.stopping)
+      return Promise.resolve({ outcome: "process_exited", images: [], inputCleanupFailed: false });
     return new Promise((resolve) => {
       const abort = (): void => this.interrupt(worker, "interrupted");
       const pending: PendingExecution = {
         callId,
         started: false,
         timeoutSeconds,
+        images: [],
+        outputDirectory: dirname(outputPath),
+        inputCleanupFailed: false,
         onStarted,
         finish: (outcome) => {
           if (worker.pending !== pending) return;
@@ -310,7 +383,11 @@ export class PythonSession {
           clearTimeout(pending.timer);
           clearTimeout(pending.forceTimer);
           signal?.removeEventListener("abort", abort);
-          resolve(pending.stopReason ?? outcome);
+          resolve({
+            outcome: pending.stopReason ?? outcome,
+            images: pending.images,
+            inputCleanupFailed: pending.inputCleanupFailed,
+          });
         },
       };
       worker.pending = pending;
@@ -366,6 +443,15 @@ export class PythonSession {
       this.log({ phase: "code_started", callId: pending.callId, pid: worker.info?.pid });
       if (pending.stopReason) this.sendInterrupt(worker);
       pending.onStarted?.();
+    } else if (message.type === "image") {
+      if (!pending.started) throw new Error("Python emitted an image before starting its call.");
+      if (dirname(message.path) !== pending.outputDirectory)
+        throw new Error("Python image is outside the active call's output directory.");
+      pending.images.push({ path: message.path, mimeType: message.mimeType });
+    } else if (message.type === "input_cleanup_failed") {
+      if (!pending.started) throw new Error("Python reported input cleanup before starting its call.");
+      pending.inputCleanupFailed = true;
+      this.log({ phase: "input_cleanup_failed", callId: pending.callId, reason: message.errorType });
     } else {
       if (!pending.started) throw new Error("Python completed a call before starting it.");
       pending.finish(message.outcome);
@@ -463,12 +549,13 @@ export class PythonSession {
     }
   }
 
-  private log(event: Omit<Parameters<typeof logPythonEvent>[0], "sessionId">): void {
+  private log(event: Omit<Parameters<typeof logPythonEvent>[0], "sessionId"> & { imageCount?: number }): void {
     logPythonEvent({ sessionId: this.sessionId, ...event });
   }
 }
 
 function parseMessage(line: string): WorkerMessage {
+  if (Buffer.byteLength(line) > 64 * 1024) throw new Error("Python control frame exceeded 64 KiB.");
   const value: unknown = JSON.parse(line);
   if (!value || typeof value !== "object") throw new Error("Invalid Python control message.");
   const message = value as Record<string, unknown>;
@@ -483,6 +570,24 @@ function parseMessage(line: string): WorkerMessage {
     typeof message.callId === "string" &&
     (message.type === "started" ||
       (message.type === "completed" && ["completed", "python_error", "interrupted"].includes(String(message.outcome))))
+  ) {
+    return message as unknown as WorkerMessage;
+  }
+  if (
+    message.type === "image" &&
+    typeof message.callId === "string" &&
+    typeof message.path === "string" &&
+    isAbsolute(message.path) &&
+    typeof message.mimeType === "string" &&
+    ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(message.mimeType)
+  ) {
+    return message as unknown as WorkerMessage;
+  }
+  if (
+    message.type === "input_cleanup_failed" &&
+    typeof message.callId === "string" &&
+    typeof message.errorType === "string" &&
+    message.errorType.length > 0
   ) {
     return message as unknown as WorkerMessage;
   }

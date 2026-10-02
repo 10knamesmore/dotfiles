@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "computer-use-sdk"
+version = "0.1.0"
+description = "Linux Hyprland computer-use SDK for Pi's Python worker"
+requires-python = ">=3.12"
+classifiers = ["Operating System :: POSIX :: Linux", "Programming Language :: Rust"]
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "computer_use"
+locked = true
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "src/**/*.rs" },
+]

@@ -183,6 +183,11 @@ wheels = [
 ]
 
 [[package]]
+name = "computer-use-sdk"
+version = "0.1.0"
+source = { directory = "native/computer-use" }
+
+[[package]]
 name = "contourpy"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -760,14 +765,21 @@ wheels = [
 ]
 
 [[package]]
+name = "pi-display-image-sdk"
+version = "0.1.0"
+source = { directory = "native/pi-display-image" }
+
+[[package]]
 name = "pi-python-worker"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "computer-use-sdk", marker = "sys_platform == 'linux'" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "openai" },
+    { name = "pi-display-image-sdk" },
     { name = "pillow" },
     { name = "psutil" },
     { name = "rapidfuzz" },
@@ -781,9 +793,11 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.8.0" },
+    { name = "computer-use-sdk", marker = "sys_platform == 'linux'", directory = "native/computer-use" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "openai", specifier = ">=3.19.2" },
+    { name = "pi-display-image-sdk", directory = "native/pi-display-image" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "rapidfuzz", specifier = ">=3.14.6" },

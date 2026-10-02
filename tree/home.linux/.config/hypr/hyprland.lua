@@ -329,6 +329,14 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
+  name = "quickshell_toasts",
+  match = { namespace = "^quickshell-toast$" },
+  no_anim = true,
+  blur = true,
+  ignore_alpha = 0.1,
+})
+
+hl.layer_rule({
   name = "quickshell_blur",
   match = { namespace = "^quickshell$" },
   blur = true,
