@@ -541,31 +541,31 @@ PanelOverlay {
         }
 
         // ── 蓝牙关闭提示 ──
-        ColumnLayout {
+        Item {
             visible: !root.btPowered
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: Tokens.spaceS
 
-            Item { Layout.fillHeight: true }
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: Tokens.spaceS
 
-            Text {
-                text: "󰂲"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.display2
-                Layout.alignment: Qt.AlignHCenter
+                Text {
+                    text: "󰂲"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.display2
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Text {
+                    text: "蓝牙已关闭"
+                    color: Colors.overlay0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.bodyLarge
+                    Layout.alignment: Qt.AlignHCenter
+                }
             }
-
-            Text {
-                text: "蓝牙已关闭"
-                color: Colors.overlay0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.bodyLarge
-                Layout.alignment: Qt.AlignHCenter
-            }
-
-            Item { Layout.fillHeight: true }
         }
 
         // ── 空状态 ──
