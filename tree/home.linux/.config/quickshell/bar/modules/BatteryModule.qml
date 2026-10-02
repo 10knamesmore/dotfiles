@@ -3,168 +3,85 @@ import "../components"
 import QtQuick
 import Quickshell.Services.UPower
 
+// 电池轮廓常驻，内部显示电量填充、百分比与充电闪电。
 BarModule {
     id: root
 
-    property var dev: UPower.displayDevice
-    property int pct: dev ? Math.round(dev.percentage * 100) : 0
-    property bool charging: dev ? dev.state === UPowerDeviceState.Charging : false
-    property bool full: dev ? dev.state === UPowerDeviceState.FullyCharged : false
+    property var batteryDevice: UPower.displayDevice
+    readonly property int percentage: batteryDevice ? Math.round(batteryDevice.percentage * 100) : 0
+    readonly property bool charging: batteryDevice ? batteryDevice.state === UPowerDeviceState.Charging : false
+    readonly property bool fullyCharged: batteryDevice ? batteryDevice.state === UPowerDeviceState.FullyCharged : false
 
-    // Waybar: format-charging "⚡", format-full "✔", format-icons 5 levels
-    function batteryIcon() {
-        if (full)
-            return "✔";
+    clickable: false
+    backgroundOnlyHover: true
+    implicitWidth: batteryContent.implicitWidth + 32
+    Accessible.role: Accessible.Indicator
+    Accessible.name: "电池 " + percentage + "%"
+    Accessible.description: fullyCharged ? "已充满" : (charging ? "充电中" : "放电中")
+    accentColor: percentage <= 10 ? Colors.red : Colors.overlay(0.85)
 
-        if (charging)
-            return "⚡";
+    Item {
+        id: batteryContent
 
-        if (pct >= 90)
-            return "";
-
-        if (pct >= 60)
-            return "";
-
-        if (pct >= 40)
-            return "";
-
-        if (pct >= 20)
-            return "";
-
-        return "";
-    }
-
-    function statusText() {
-        if (full)
-            return "已充满";
-        if (charging)
-            return "充电中";
-        return "放电中";
-    }
-
-    function formatTime(secs) {
-        if (!secs || secs <= 0)
-            return "";
-        let h = Math.floor(secs / 3600);
-        let m = Math.floor((secs % 3600) / 60);
-        if (h > 0)
-            return h + "h " + m + "m";
-        return m + "m";
-    }
-
-    function timeRemaining() {
-        if (full)
-            return "";
-        if (charging && dev.timeToFull > 0)
-            return formatTime(dev.timeToFull);
-        if (!charging && dev.timeToEmpty > 0)
-            return formatTime(dev.timeToEmpty);
-        return "";
-    }
-
-    readonly property real compactWidth: batteryIconText.implicitWidth + 5 + percentageText.implicitWidth + 32
-    readonly property real detailsWidth: statusLabel.implicitWidth + 16
-        + (remainingTime.text !== "" ? remainingTime.implicitWidth + 6 : 0)
-    implicitWidth: compactWidth + (hovered ? detailsWidth : 0)
-    // 状态底色
-    tintColor: {
-        if (charging || full)
-            return Colors.withAlpha(Colors.teal, 0.08);
-        if (pct <= 10)
-            return Colors.withAlpha(Colors.red, 0.18);
-        if (pct <= 30)
-            return Colors.withAlpha(Colors.yellow, 0.12);
-        return "transparent";
-    }
-    // 根据电量/状态动态调整颜色
-    accentColor: {
-        if (charging || full)
-            return Colors.green;
-        if (pct <= 10)
-            return Colors.red;
-        if (pct <= 30)
-            return Colors.peach;
-        return Colors.green;
-    }
-
-    // 图标和百分比始终保留；状态与剩余时间随 hover 展开。
-    Row {
         anchors.centerIn: parent
-        spacing: 0
-
-        Text {
-            id: batteryIconText
-            text: root.batteryIcon()
-            color: root.accentColor
-            font.family: Fonts.family
-            font.pixelSize: Fonts.icon
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Item {
-            width: 5
-            height: 1
-        }
-
-        Text {
-            id: percentageText
-            text: root.pct + "%"
-            color: root.hovered ? root.accentColor
-                : (root.pct <= 10 ? Colors.red : (root.pct <= 30 ? Colors.peach : Colors.text))
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
-
-            Behavior on color {
-                ColorAnimation { duration: 300 }
-            }
-        }
-
-        Item {
-            width: 6 * root.hoverReveal
-            height: 1
-        }
+        implicitWidth: batteryBody.width + 3
+        implicitHeight: batteryBody.height
 
         Rectangle {
-            visible: root.hoverDetailsVisible
-            color: Colors.withAlpha(root.accentColor, 0.2)
-            radius: 4
-            width: (statusLabel.implicitWidth + 10) * root.hoverReveal
-            height: statusLabel.implicitHeight + 4
-            opacity: root.hoverReveal
-            clip: true
-            anchors.verticalCenter: parent.verticalCenter
+            id: batteryBody
+
+            width: batteryLabel.implicitWidth + 10
+            height: 18
+            radius: 3
+            color: Colors.overlay(0.12)
+            border.width: 1
+            border.color: Colors.withAlpha(root.accentColor, 0.45)
 
             Text {
-                id: statusLabel
+                id: batteryLabel
+
                 anchors.centerIn: parent
-                text: root.statusText()
-                color: root.accentColor
+                text: (root.charging ? " " : "") + root.percentage + "%"
+                color: Colors.overlay(0.9)
                 font.family: Fonts.family
                 font.pixelSize: Fonts.caption
                 font.weight: Font.DemiBold
+                Accessible.ignored: true
+            }
+
+            Rectangle {
+                id: batteryFill
+
+                anchors.left: parent.left
+                anchors.leftMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
+                width: (parent.width - 4) * root.percentage / 100
+                height: parent.height - 4
+                radius: 1
+                color: root.accentColor
+                clip: true
+
+                // 填充区域使用深色文字，未填充区域保留浅色，避免电量变化时文字失去对比度。
+                Text {
+                    x: batteryLabel.x - batteryFill.x
+                    y: batteryLabel.y - batteryFill.y
+                    text: batteryLabel.text
+                    font: batteryLabel.font
+                    color: Colors.base
+                    Accessible.ignored: true
+                }
             }
         }
 
-        Item {
-            width: remainingTime.text !== "" ? 6 * root.hoverReveal : 0
-            height: 1
-        }
-
-        Text {
-            id: remainingTime
-            visible: root.hoverDetailsVisible && text !== ""
-            text: root.timeRemaining()
-            width: implicitWidth * root.hoverReveal
-            opacity: root.hoverReveal
-            clip: true
-            color: Colors.subtext0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.caption
-            font.weight: Font.Normal
+        Rectangle {
+            anchors.left: batteryBody.right
+            anchors.leftMargin: 1
             anchors.verticalCenter: parent.verticalCenter
+            width: 2
+            height: 6
+            radius: 1
+            color: batteryBody.border.color
         }
     }
+
 }

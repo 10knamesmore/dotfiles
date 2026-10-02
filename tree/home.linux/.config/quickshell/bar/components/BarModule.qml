@@ -11,6 +11,7 @@ Rectangle {
     property real backgroundAlpha: Tokens.panelAlpha
     property bool flat: false
     property bool clickable: true
+    property bool backgroundOnlyHover: false
     property real expansion: 0
     property real panelProgress: 0
     property bool hovered: !headerInPanel && hoverArea.containsMouse
@@ -34,16 +35,16 @@ Rectangle {
     color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5)
         : (root.hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08))
             : Colors.withAlpha(root.backgroundColor, root.backgroundAlpha))
-    border.color: hovered ? Colors.withAlpha(root.accentColor, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
+    border.color: hovered && !root.backgroundOnlyHover ? Colors.withAlpha(root.accentColor, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: root.flat ? 0 : Tokens.borderWidth
     implicitHeight: 36
-    scale: hovered ? 1.03 : 1
+    scale: hovered && !root.backgroundOnlyHover ? 1.03 : 1
 
     SoftShadow {
         anchors.fill: parent
         radius: root.radius
         shadowColor: "#000000"
-        strength: root.hovered ? Tokens.shadowHoverOpacity : Tokens.shadowOpacity
+        strength: root.hovered && !root.backgroundOnlyHover ? Tokens.shadowHoverOpacity : Tokens.shadowOpacity
         visible: !root.flat
     }
 
