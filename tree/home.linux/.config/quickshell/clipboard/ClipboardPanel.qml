@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import "../components"
 import "../theme"
 import "../state"
@@ -12,15 +14,24 @@ PanelOverlay {
     id: root
 
     property string searchQuery: ""
+    property int removingItems: 0
+
+    // 搜索与重新加载不是删除；同步处理 model 变化，避免触发退场。
+    function resetFilteredModel() {
+        clipList.animateRemovals = false;
+        filteredModel.clear();
+        clipList.forceLayout();
+        clipList.animateRemovals = true;
+    }
 
     function loadClipboard() {
         clipModel.clear();
-        filteredModel.clear();
+        resetFilteredModel();
         clipListProc.running = true;
     }
 
     function applyFilter() {
-        filteredModel.clear();
+        resetFilteredModel();
         let q = searchQuery.toLowerCase();
         for (let i = 0; i < clipModel.count; i++) {
             let item = clipModel.get(i);
@@ -37,7 +48,9 @@ PanelOverlay {
     }
 
     function deleteItem(clipId) {
-        deleteProc.command = ["cliphist", "delete-query", clipId];
+        console.info("[clipboard] delete requested", clipId);
+        // delete-query 按内容匹配；删除单条必须把 ID 送给 delete。
+        deleteProc.command = ["sh", "-c", "printf '%s\\n' \"$1\" | cliphist delete", "cliphist-delete", clipId];
         deleteProc.running = true;
         // 从两个 model 中移除
         for (let i = filteredModel.count - 1; i >= 0; i--) {
@@ -140,6 +153,7 @@ PanelOverlay {
         // 标题栏
         RowLayout {
             Layout.fillWidth: true
+            Layout.minimumHeight: 26
 
             Text {
                 visible: !root.hasMorphSource
@@ -195,7 +209,10 @@ PanelOverlay {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: wipeProc.running = true
+                    onClicked: {
+                        console.info("[clipboard] clear requested", clipModel.count);
+                        wipeProc.running = true;
+                    }
                 }
 
                 Behavior on color {
@@ -266,33 +283,41 @@ PanelOverlay {
             color: Colors.surface1
         }
 
-        // 空状态
-        Text {
-            visible: filteredModel.count === 0
-            text: clipModel.count === 0 ? "剪贴板为空" : "未找到匹配项"
-            color: Colors.overlay0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 20
-            Layout.bottomMargin: 20
-        }
-
         // 列表
         ListView {
+            id: clipList
+            property bool animateRemovals: true
+
             Layout.fillWidth: true
             Layout.fillHeight: true
             model: filteredModel
-            spacing: Tokens.spaceXS
             clip: true
 
-            delegate: Rectangle {
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 20
+                visible: opacity > 0
+                opacity: clipList.count === 0 && root.removingItems === 0 ? 1 : 0
+                text: clipModel.count === 0 ? "剪贴板为空" : "未找到匹配项"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.bodyLarge
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+            }
+
+            delegate: FadeOutListItem {
+                id: clipItem
                 required property int index
                 required property string clipId
                 required property string preview
 
-                width: ListView.view.width
-                height: 40
+                width: clipList.width
+                implicitHeight: 40
+                itemSpacing: Tokens.spaceXS
+                animateRemoval: root.showing && clipList.animateRemovals
+                onRemovalStarted: root.removingItems++
+                onRemovalFinished: root.removingItems--
                 radius: Tokens.radiusS
                 color: itemHover.containsMouse ? Colors.surface1 : "transparent"
 
@@ -303,7 +328,7 @@ PanelOverlay {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton
-                    onClicked: root.selectItem(clipId)
+                    onClicked: root.selectItem(clipItem.clipId)
                 }
 
                 RowLayout {
@@ -313,7 +338,7 @@ PanelOverlay {
                     spacing: Tokens.spaceS
 
                     Text {
-                        text: preview
+                        text: clipItem.preview
                         color: Colors.text
                         font.family: Fonts.family
                         font.pixelSize: Fonts.body
@@ -353,7 +378,7 @@ PanelOverlay {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.deleteItem(clipId)
+                            onClicked: root.deleteItem(clipItem.clipId)
                         }
 
                         Behavior on color {

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import "../components"
 import "../theme"
 import "../state"
@@ -13,6 +15,7 @@ PanelOverlay {
     id: root
 
     required property var notifServer
+    property int removingItems: 0
 
     showing: PanelState.notificationOpen
     panelWidth: 380
@@ -36,7 +39,8 @@ PanelOverlay {
         // ── 标题栏 ──
         RowLayout {
             Layout.fillWidth: true
-            visible: !root.hasMorphSource || SystemState.notificationCount > 0
+            // 清空时保留工具栏高度，避免条目退场前整个列表先向上跳。
+            Layout.minimumHeight: 26
 
             Text {
                 visible: !root.hasMorphSource
@@ -100,7 +104,10 @@ PanelOverlay {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: SystemState.clearAllNotifications()
+                    onClicked: {
+                        console.info("[notifications] clear requested", SystemState.notificationCount);
+                        SystemState.clearAllNotifications();
+                    }
                 }
 
                 Behavior on color {
@@ -120,34 +127,47 @@ PanelOverlay {
             color: Colors.surface1
         }
 
-        // 空状态
-        Text {
-            visible: SystemState.notificationCount === 0
-            text: "暂无通知"
-            color: Colors.overlay0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 30
-            Layout.bottomMargin: 30
-        }
-
         // ── 通知列表 ──
         ListView {
+            id: notifList
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: contentHeight
+            Layout.preferredHeight: Math.max(contentHeight, emptyLabel.implicitHeight + 60)
             model: root.notifServer.trackedNotifications
-            spacing: 6
             clip: true
 
-            delegate: Rectangle {
+            Text {
+                id: emptyLabel
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 30
+                visible: opacity > 0
+                opacity: notifList.count === 0 && root.removingItems === 0 ? 1 : 0
+                text: "暂无通知"
+                color: Colors.overlay0
+                font.family: Fonts.family
+                font.pixelSize: Fonts.bodyLarge
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+            }
+
+            delegate: FadeOutListItem {
+                id: notifItem
                 required property var modelData
 
-                width: ListView.view.width
-                height: notifRow.implicitHeight + 16
+                width: notifList.width
+                implicitHeight: notifRow.implicitHeight + 16
+                itemSpacing: 6
+                animateRemoval: root.showing
+                onRemovalStarted: root.removingItems++
+                onRemovalFinished: root.removingItems--
                 radius: Tokens.radiusMS
                 color: notifHover.containsMouse ? Colors.surface2 : Colors.surface1
+
+                // dismiss 会销毁通知对象；保留到 delegate 退场完成，文字才不会提前消失。
+                RetainableLock {
+                    object: notifItem.modelData
+                    locked: true
+                }
 
                 // hover 检测（底层）
                 MouseArea {
@@ -176,14 +196,14 @@ PanelOverlay {
                         spacing: 2
 
                         Text {
-                            text: modelData.appName || "未知"
+                            text: notifItem.modelData.appName || "未知"
                             color: Colors.subtext0
                             font.family: Fonts.family
                             font.pixelSize: Fonts.caption
                         }
 
                         Text {
-                            text: modelData.summary || ""
+                            text: notifItem.modelData.summary || ""
                             color: Colors.text
                             font.family: Fonts.family
                             font.pixelSize: Fonts.body
@@ -193,8 +213,8 @@ PanelOverlay {
                         }
 
                         Text {
-                            visible: (modelData.body || "") !== ""
-                            text: modelData.body || ""
+                            visible: (notifItem.modelData.body || "") !== ""
+                            text: notifItem.modelData.body || ""
                             color: Colors.subtext1
                             font.family: Fonts.family
                             font.pixelSize: Fonts.small
@@ -236,7 +256,7 @@ PanelOverlay {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                let text = modelData.summary + (modelData.body ? "\n" + modelData.body : "");
+                                let text = notifItem.modelData.summary + (notifItem.modelData.body ? "\n" + notifItem.modelData.body : "");
                                 copyProc.command = ["wl-copy", text];
                                 copyProc.running = true;
                             }
@@ -280,7 +300,10 @@ PanelOverlay {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: modelData.dismiss()
+                            onClicked: {
+                                console.info("[notifications] dismiss requested", notifItem.modelData.id);
+                                notifItem.modelData.dismiss();
+                            }
                         }
 
                         Behavior on color {
