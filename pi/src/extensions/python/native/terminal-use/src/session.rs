@@ -253,7 +253,7 @@ impl Session {
 
     fn start_reader(self: &Arc<Self>, mut reader: Box<dyn Read + Send>) -> TerminalResult<()> {
         let session = Arc::clone(self);
-        let name = format!("pi-terminal-reader-{}", session.id);
+        let name = format!("terminal-use-reader-{}", session.id);
         thread::Builder::new()
             .name(name)
             .spawn(move || {
@@ -302,7 +302,7 @@ impl Session {
         mut child: Box<dyn Child + Send + Sync>,
     ) -> TerminalResult<()> {
         let session = Arc::clone(self);
-        let name = format!("pi-terminal-waiter-{}", session.id);
+        let name = format!("terminal-use-waiter-{}", session.id);
         thread::Builder::new()
             .name(name)
             .spawn(move || {

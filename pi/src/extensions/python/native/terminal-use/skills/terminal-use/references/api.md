@@ -1,7 +1,7 @@
-# Terminal API
+# Terminal Use API
 
 ```python
-import pi_terminal as terminal
+import terminal_use as terminal
 ```
 
 所有方法使用 `terminal.start(...)['id']`（或 `list()`）返回的字符串会话 id。会话不存在、已关闭或 PTY 操作失败时抛 `RuntimeError`，参数不合法时抛 `ValueError`/`TypeError`。注册了 lifecycle hook 后，`start`、`close`、`close_all` 只能在注册 hook 的线程调用；跨线程调用会在产生副作用前抛 `RuntimeError`。未注册 hook 时不附加线程限制，其他方法没有此限制。

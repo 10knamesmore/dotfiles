@@ -84,9 +84,9 @@ def handle_terminal_ownership(event: dict[str, object]) -> None:
 def install_terminal_ownership_hook() -> None:
     """Install the SDK lifecycle hook, stopping with a clear diagnostic when it is unavailable."""
     try:
-        from pi_terminal import _set_lifecycle_hook, _set_worker_control_fds
+        from terminal_use import _set_lifecycle_hook, _set_worker_control_fds
     except ImportError as error:
-        reason = f"the pi-terminal SDK is required but not importable: {error}"
+        reason = f"the terminal-use SDK is required but not importable: {error}"
         try:
             send_event({"type": "startup_error", "reason": reason})
         except OSError:

@@ -36,8 +36,8 @@ const PYTHON_TOOL_NAME = "python_repl";
 const EMPTY_ENVIRONMENT_NOTICE =
   "The previous Python environment was cleared; its variables, functions, and imports were lost. Python calls executed after that reset use a new environment. Earlier tool results are history only and do not restore lost state; reinitialize any data you still need from before the reset.";
 
-const TERMINAL_SESSION_SKILL = fileURLToPath(
-  new URL("./native/pi-terminal/skills/terminal-session/SKILL.md", import.meta.url),
+const TERMINAL_USE_SKILL = fileURLToPath(
+  new URL("./native/terminal-use/skills/terminal-use/SKILL.md", import.meta.url),
 );
 
 const TOOL_DESCRIPTION =
@@ -45,7 +45,7 @@ const TOOL_DESCRIPTION =
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
-  pi.on("resources_discover", () => ({ skillPaths: [TERMINAL_SESSION_SKILL] }));
+  pi.on("resources_discover", () => ({ skillPaths: [TERMINAL_USE_SKILL] }));
 
   let session: PythonSession | undefined;
   const inspectionController = new AbortController();

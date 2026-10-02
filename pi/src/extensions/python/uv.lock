@@ -768,12 +768,12 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "openai" },
-    { name = "pi-terminal-sdk" },
     { name = "pillow" },
     { name = "psutil" },
     { name = "rapidfuzz" },
     { name = "regex" },
     { name = "requests" },
+    { name = "terminal-use-sdk" },
     { name = "tiktoken" },
     { name = "tree-sitter-language-pack" },
 ]
@@ -784,20 +784,15 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "openai", specifier = ">=3.19.2" },
-    { name = "pi-terminal-sdk", directory = "native/pi-terminal" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "rapidfuzz", specifier = ">=3.14.6" },
     { name = "regex", specifier = ">=2026.9.10" },
     { name = "requests", specifier = ">=2.34.2" },
+    { name = "terminal-use-sdk", directory = "native/terminal-use" },
     { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "tree-sitter-language-pack", specifier = ">=1.20.0" },
 ]
-
-[[package]]
-name = "pi-terminal-sdk"
-version = "0.1.0"
-source = { directory = "native/pi-terminal" }
 
 [[package]]
 name = "pillow"
@@ -1235,6 +1230,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e0
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
 ]
+
+[[package]]
+name = "terminal-use-sdk"
+version = "0.1.0"
+source = { directory = "native/terminal-use" }
 
 [[package]]
 name = "tiktoken"

@@ -1,12 +1,12 @@
 [package]
-name = "pi-terminal-sdk"
+name = "terminal-use-sdk"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Unix PTY and terminal screen SDK for Pi's Python worker"
 
 [lib]
-name = "pi_terminal"
+name = "terminal_use"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
@@ -40,5 +40,5 @@ missing_docs = "deny"
 
 [package.metadata.maturin]
 bindings = "pyo3"
-module-name = "pi_terminal"
+module-name = "terminal_use"
 features = ["python-extension"]

@@ -32,9 +32,9 @@ const DEFAULT_WORKER_CONTROL_FDS: [i32; 2] = [3, 4];
 static LIFECYCLE_HOOK: OnceLock<Mutex<Option<Py<PyAny>>>> = OnceLock::new();
 static LIFECYCLE_THREAD: OnceLock<Mutex<Option<ThreadId>>> = OnceLock::new();
 
-/// Register the public `pi_terminal` module.
+/// Register the public `terminal_use` module.
 #[pymodule]
-fn pi_terminal(module: &Bound<'_, PyModule>) -> PyResult<()> {
+fn terminal_use(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mark_worker_control_fds_cloexec(&DEFAULT_WORKER_CONTROL_FDS);
     module.add_class::<PyRect>()?;
     module.add_function(wrap_pyfunction!(start, module)?)?;

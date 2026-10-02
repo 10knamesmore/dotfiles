@@ -6,7 +6,7 @@
 
 运行依赖由本目录的 `pyproject.toml` 和 `uv.lock` 管理，`.venv/` 是本地产物。需要 uv 和符合 `requires-python` 的解释器；uv 按自身配置查找或准备解释器。
 
-`native/pi-terminal/` 放的是rust构建的原生python模块，Python worker 通过本目录的 path dependency 构建它。
+`native/terminal-use/` 提供 Rust 构建的原生 Python 模块 `terminal_use`，Python worker 通过本目录的 path dependency 构建它。使用方式见 [terminal-use skill](native/terminal-use/skills/terminal-use/SKILL.md)。
 工具参数：
 
 ```ts

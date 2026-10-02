@@ -1,0 +1,6 @@
+interface:
+  display_name: "Terminal Use"
+  short_description: "用 python_repl 驱动交互式 Unix 终端程序"
+  default_prompt: "使用 $terminal-use，通过 python_repl 的 terminal_use 启动 PTY、等待提示并发送按键或文本。"
+policy:
+  allow_implicit_invocation: true

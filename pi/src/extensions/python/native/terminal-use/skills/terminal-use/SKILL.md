@@ -1,11 +1,11 @@
 ---
-name: terminal-session
-description: 用 python_repl 的 pi_terminal 驱动交互式 Unix 终端程序：启动 PTY、等待提示、发送按键与文本、读取屏幕或原始输出。适用于安装器、REPL、TUI 等需要真实终端交互的任务；一次性命令用 bash。
+name: terminal-use
+description: 用 python_repl 的 terminal_use 驱动交互式 Unix 终端程序：启动 PTY、等待提示、发送按键与文本、读取屏幕或原始输出。适用于安装器、REPL、TUI 等需要真实终端交互的任务；一次性命令用 bash。
 ---
 
-# Terminal Session
+# Terminal Use
 
-需要与真实终端交互时使用本 skill：用 `python_repl` 运行 Python 并 `import pi_terminal as terminal`。不要改用 `python`/`python3`、bash 管道或新增工具。
+需要与真实终端交互时使用本 skill：用 `python_repl` 运行 Python 并 `import terminal_use as terminal`。不要改用 `python`/`python3`、bash 管道或新增工具。
 
 会话绑定当前 Python worker：worker 重启或 reload 会关闭并丢失全部会话，没有守护进程或跨会话持久化。运行时由 SDK 负责清理：解释器退出时自动关闭所有会话；cell 被取消或超时不等于当前 cell 创建的会话已经关闭。完成一个工作流后显式 `terminal.close(session_id)`，取消后用 `terminal.list()` 检查仍存活的会话。
 

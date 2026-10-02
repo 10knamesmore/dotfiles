@@ -3,7 +3,7 @@
 ## 标准流程
 
 ```python
-import pi_terminal as terminal
+import terminal_use as terminal
 
 info = terminal.start(["python3", "-i"])
 session_id = info["id"]

@@ -50,10 +50,10 @@ pub(crate) fn event(session_id: &str, message: &str) {
 }
 
 fn log_path() -> PathBuf {
-    if let Some(path) = std::env::var_os("PI_TERMINAL_LOG")
+    if let Some(path) = std::env::var_os("TERMINAL_USE_LOG")
         && !path.is_empty()
     {
         return PathBuf::from(path);
     }
-    std::env::temp_dir().join("pi-terminal-sdk.log")
+    std::env::temp_dir().join("terminal-use-sdk.log")
 }

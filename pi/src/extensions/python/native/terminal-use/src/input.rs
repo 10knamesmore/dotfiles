@@ -8,7 +8,7 @@ use pyo3::types::{PyByteArray, PyString};
 use crate::model::{CursorKey, InputSpec, KeySpec, Rect, WaitSpec};
 
 /// A zero-based terminal-cell rectangle accepted by the Python API.
-#[pyclass(name = "Rect", frozen, module = "pi_terminal", from_py_object)]
+#[pyclass(name = "Rect", frozen, module = "terminal_use", from_py_object)]
 #[derive(Clone, Copy)]
 pub(crate) struct PyRect {
     #[pyo3(get)]

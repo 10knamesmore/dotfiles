@@ -272,22 +272,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pi-terminal-sdk"
-version = "0.1.0"
-dependencies = [
- "alacritty_terminal",
- "libc",
- "nix 0.30.1",
- "portable-pty",
- "pyo3",
- "pythonize",
- "regex",
- "rustc-hash",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -624,6 +608,22 @@ name = "target-lexicon"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
+
+[[package]]
+name = "terminal-use-sdk"
+version = "0.1.0"
+dependencies = [
+ "alacritty_terminal",
+ "libc",
+ "nix 0.30.1",
+ "portable-pty",
+ "pyo3",
+ "pythonize",
+ "regex",
+ "rustc-hash",
+ "serde",
+ "serde_bytes",
+]
 
 [[package]]
 name = "thiserror"
