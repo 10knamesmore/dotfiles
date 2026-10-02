@@ -5,11 +5,10 @@ import "lib/monitorModel.js" as MM
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 
-// 显示器管理面板：左侧可拖拽画布、右侧参数控件、底部应用与回滚。
+// 控制中心的显示器子页：左侧可拖拽画布、右侧参数控件、底部应用与回滚。
 // 状态/IPC 在 MonitorService(常驻) + MonitorState(单例)；本面板只持有编辑态 draft。
-PanelOverlay {
+Item {
     id: root
 
     // draft：MonitorState.monitors 的可编辑深拷贝；应用前不回写 live 状态
@@ -117,14 +116,7 @@ PanelOverlay {
         MonitorState.requestApply(layouts, primary);
     }
 
-    showing: PanelState.displayOpen
-    entrance: PanelOverlay.Slide
-    panelWidth: 720
-    panelHeight: root.height * 0.7
-    panelTargetX: (root.width - 720) / 2
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.displayOpen = false
+    required property bool showing
     onShowingChanged: {
         if (showing) {
             MonitorState.refresh();

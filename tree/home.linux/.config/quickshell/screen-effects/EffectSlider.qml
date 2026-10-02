@@ -57,6 +57,7 @@ RowLayout {
 
     Slider {
         id: slider
+        Accessible.name: root.label
 
         Layout.fillWidth: true
         from: 0

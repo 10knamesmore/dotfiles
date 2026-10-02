@@ -1,7 +1,7 @@
 pragma Singleton
 import QtQuick
 
-// 显示器状态单例 —— MonitorService 写入、UI（DisplayPanel）读取的中枢。
+// 显示器状态单例 —— MonitorService 写入、UI（DisplayPage）读取的中枢。
 // 仿 SystemStats(单例) ← SystemStatsService(常驻服务) 的分工：数据容器在此，
 // 逻辑/IPC 在 services/MonitorService.qml。UI 通过下方意图信号回调 Service。
 QtObject {

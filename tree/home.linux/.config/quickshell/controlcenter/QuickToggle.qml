@@ -10,6 +10,15 @@ Rectangle {
     property string label: ""
     property string status: ""
     property bool toggled: false
+    property bool checkable: false
+
+    Accessible.role: checkable ? Accessible.CheckBox : Accessible.Button
+    Accessible.name: root.label
+    Accessible.description: root.status
+    Accessible.checkable: root.checkable
+    Accessible.checked: root.checkable && root.toggled
+    Accessible.onPressAction: root.clicked()
+    Accessible.onToggleAction: root.clicked()
 
     signal clicked
     signal rightClicked

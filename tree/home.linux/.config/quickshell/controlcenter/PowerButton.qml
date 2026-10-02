@@ -2,23 +2,31 @@ import "../theme"
 import "../state"
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import Quickshell.Io
 
-// 工具按钮 — 截图/录屏/显示器切换等
+// 电源操作按钮
 Rectangle {
     id: root
 
     property string icon: ""
     property string label: ""
     property string command: ""
-    property bool closeOnClick: true
-    signal clicked
+
+    Accessible.role: Accessible.Button
+    Accessible.name: root.label
+    Accessible.onPressAction: activate()
+
+    function activate() {
+        console.info("[control-center] power action", root.label);
+        PanelState.controlCenterOpen = false;
+        proc.command = ["sh", "-c", root.command];
+        proc.running = true;
+    }
 
     Layout.fillWidth: true
     implicitHeight: 48
     radius: Tokens.radiusMS
-    color: toolHover.containsMouse ? Colors.surface1 : Colors.surface0
+    color: pwrHover.containsMouse ? Colors.surface1 : Colors.surface0
 
     Process {
         id: proc
@@ -30,9 +38,9 @@ Rectangle {
 
         Text {
             text: root.icon
-            color: Colors.overlay1
+            color: Colors.text
             font.family: Fonts.family
-            font.pixelSize: Fonts.heading
+            font.pixelSize: Fonts.iconLarge
             anchors.horizontalCenter: parent.horizontalCenter
         }
 
@@ -46,22 +54,12 @@ Rectangle {
     }
 
     MouseArea {
-        id: toolHover
+        id: pwrHover
 
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: {
-            if (root.closeOnClick)
-                PanelState.settingsOpen = false;
-
-            root.clicked();
-
-            if (root.command !== "") {
-                proc.command = ["sh", "-c", root.command];
-                proc.running = true;
-            }
-        }
+        onClicked: root.activate()
     }
 
     Behavior on color {

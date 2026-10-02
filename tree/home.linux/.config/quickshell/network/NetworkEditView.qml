@@ -2,11 +2,11 @@ import "../theme"
 import QtQuick
 import QtQuick.Layouts
 
-// WiFi 连接编辑视图 — 由 NetworkPanel 实例化
+// Wi-Fi 连接编辑视图，由控制中心的 NetworkPage 持有编辑状态。
 Flickable {
     id: editView
 
-    required property var panel // NetworkPanel 引用
+    required property var panel // NetworkPage 引用
 
     contentHeight: editCol.implicitHeight
     clip: true

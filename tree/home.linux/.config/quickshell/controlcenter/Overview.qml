@@ -1,19 +1,23 @@
-import "../components"
 import "../theme"
 import "../state"
+import "../services"
+import "../screen-effects"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
+import Quickshell.Bluetooth
 
-// Quick Settings — 左侧滑出面板
-PanelOverlay {
+// 控制中心首页：连接状态、屏幕效果、性能模式、系统信息与电源操作。
+Item {
     id: root
 
     // ── 系统状态 ──
     // 电源档位（power-profiles-daemon 的 ActiveProfile），由面板开关切换，daemon 自己持久化
+    required property bool showing
     property string powerProfile: "balanced"
+    property bool powerProfileFailed: false
+    implicitHeight: mainCol.implicitHeight + Tokens.spaceL * 2
 
     function refreshStatus() {
         powerProfileProc.running = true;
@@ -23,26 +27,13 @@ PanelOverlay {
     function togglePerformanceMode() {
         let target = root.powerProfile === "performance" ? "balanced" : "performance";
         powerProfileSetProc.command = ["busctl", "--system", "set-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles", "net.hadess.PowerProfiles", "ActiveProfile", "s", target];
+        powerProfileFailed = false;
+        console.info("[control-center] power profile requested", target);
         powerProfileSetProc.running = true;
     }
-
-    showing: PanelState.settingsOpen
-    entrance: PanelOverlay.Slide
-    panelWidth: 340
-    panelHeight: root.height - 64
-    panelTargetX: 10
-    panelTargetY: 54
-    closedOffsetX: -360
-    closedOffsetY: 0
-    onCloseRequested: PanelState.settingsOpen = false
     onShowingChanged: {
         if (showing)
             refreshStatus();
-    }
-
-    // ── 进程 ──
-    Process {
-        id: actionProc
     }
 
     // 电源档位：power-profiles-daemon，D-Bus property 读写等价 powerprofilesctl get/set
@@ -65,7 +56,10 @@ PanelOverlay {
         id: powerProfileSetProc
 
         // 无论成败都回读，以 daemon 的实际状态为准
-        onExited: {
+        onExited: (exitCode, exitStatus) => {
+            root.powerProfileFailed = exitCode !== 0 || exitStatus !== 0;
+            if (root.powerProfileFailed)
+                console.warn("[control-center] power profile change failed", exitCode, exitStatus);
             powerProfileProc.running = false;
             powerProfileProc.running = true;
         }
@@ -96,11 +90,6 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
-            // ── 开关区 ──
-            SectionLabel {
-                text: "快捷开关"
-            }
-
             GridLayout {
                 Layout.fillWidth: true
                 columns: 2
@@ -108,61 +97,63 @@ PanelOverlay {
                 columnSpacing: 8
 
                 QuickToggle {
+                    icon: NetworkService.disconnected ? "󰤮" : NetworkService.connectionType === "wifi" ? "󰤨" : "󰈀"
+                    label: "网络"
+                    status: NetworkService.disconnected ? "未连接" : NetworkService.connectionType === "wifi" ? NetworkService.ssid : "有线连接"
+                    toggled: !NetworkService.disconnected
+                    onClicked: PanelState.openControlCenter("network")
+                }
+
+                QuickToggle {
+                    icon: "󰂯"
+                    label: "蓝牙"
+                    status: Bluetooth.defaultAdapter?.enabled ? "已开启" : "已关闭"
+                    toggled: Bluetooth.defaultAdapter?.enabled ?? false
+                    onClicked: PanelState.openControlCenter("bluetooth")
+                }
+
+                QuickToggle {
+                    icon: "󰂚"
+                    label: "通知"
+                    status: SystemState.notificationCount > 0 ? SystemState.notificationCount + " 条通知" : "暂无通知"
+                    toggled: SystemState.notificationCount > 0
+                    onClicked: PanelState.openControlCenter("notifications")
+                }
+
+                QuickToggle {
+                    icon: "󰅍"
+                    label: "剪贴板"
+                    status: "搜索与管理历史"
+                    onClicked: PanelState.openControlCenter("clipboard")
+                }
+
+                QuickToggle {
                     icon: "󰓅"
                     label: "性能"
-                    status: root.powerProfile === "performance" ? "性能模式" : "均衡模式"
+                    status: root.powerProfileFailed ? "切换失败，请重试" : root.powerProfile === "performance" ? "性能模式" : "均衡模式"
                     toggled: root.powerProfile === "performance"
+                    checkable: true
                     onClicked: root.togglePerformanceMode()
                 }
 
                 QuickToggle {
-                    icon: "󰈋"
-                    label: "取色器"
-                    status: "hyprpicker"
-                    toggled: false
-                    onClicked: {
-                        PanelState.settingsOpen = false;
-                        actionProc.command = ["hyprpicker", "-a"];
-                        actionProc.running = true;
-                    }
-                }
-            }
-
-            Divider {
-                Layout.fillWidth: true
-            }
-
-            // ── 截图 ──
-            SectionLabel {
-                text: "工具"
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.spaceS
-
-                ToolButton {
-                    icon: "󰹑"
-                    label: "区域截图"
-                    command: "hyprshot -m region"
-                }
-
-                ToolButton {
-                    icon: "󰖯"
-                    label: "窗口截图"
-                    command: "hyprshot -m window"
-                }
-            }
-
-            // ── 显示器设置 ──（打开可视化显示器管理面板）
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.spaceS
-
-                ToolButton {
                     icon: "󰍹"
-                    label: "显示器设置"
-                    onClicked: PanelState.toggleDisplay()
+                    label: "显示器"
+                    status: MonitorState.monitors.length + " 台显示器"
+                    onClicked: PanelState.openControlCenter("display")
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: effects.implicitHeight
+                radius: Tokens.radiusM
+                color: Colors.withAlpha(Colors.surface1, Tokens.cardAlpha)
+
+                ScreenEffectsControls {
+                    id: effects
+                    anchors.fill: parent
+                    showing: root.showing
                 }
             }
 
@@ -250,8 +241,8 @@ PanelOverlay {
 
                         // 重载按钮（阻止点击穿透到卡片）
                         Rectangle {
-                            width: 28
-                            height: 28
+                            implicitWidth: 28
+                            implicitHeight: 28
                             radius: Tokens.radiusFull
                             color: reloadHover.containsMouse ? Colors.surface2 : "transparent"
 
@@ -286,7 +277,7 @@ PanelOverlay {
                     // 折叠的系统信息
                     SystemInfo {
                         Layout.fillWidth: true
-                        expanded: mainCol.infoExpanded
+                        expanded: root.showing && mainCol.infoExpanded
                     }
                 }
 

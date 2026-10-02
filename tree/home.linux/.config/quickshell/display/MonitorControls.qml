@@ -5,7 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// 右栏显示选中显示器的参数；自身不修改 draft，只向 DisplayPanel 发射信号。
+// 右栏显示选中显示器的参数；自身不修改 draft，只向 DisplayPage 发射信号。
 ColumnLayout {
     id: root
 

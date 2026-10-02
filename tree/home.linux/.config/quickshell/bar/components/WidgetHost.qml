@@ -34,16 +34,8 @@ Loader {
             return cCpu;
         case "memory":
             return cMemory;
-        case "network":
-            return cNetwork;
-        case "bluetooth":
-            return cBluetooth;
-        case "clipboard":
-            return cClipboard;
-        case "notification":
-            return cNotification;
-        case "screeneffects":
-            return cScreenEffects;
+        case "controlCenter":
+            return cControlCenter;
         case "battery":
             return cBattery;
         default:
@@ -99,32 +91,8 @@ Loader {
         }
     }
     Component {
-        id: cNetwork
-        NetworkModule {
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cBluetooth
-        BluetoothModule {
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cClipboard
-        ClipboardModule {
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cNotification
-        NotificationModule {
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cScreenEffects
-        ScreenEffectsModule {
+        id: cControlCenter
+        ControlCenterModule {
             flat: host.flat
         }
     }

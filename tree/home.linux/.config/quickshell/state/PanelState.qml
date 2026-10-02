@@ -1,24 +1,37 @@
 pragma Singleton
 import QtQuick
 
-// 全局面板状态单例 — 用于 bar 模块与弹出面板之间的跨组件通信
+// 顶栏、快捷键与面板共享开合状态。控制中心内部只切换页面，不创建额外窗口。
 QtObject {
-    // ── 面板 ──
-    property bool screenEffectsOpen: false
     property bool calendarOpen: false
     property bool mediaOpen: false
-    property bool notificationOpen: false
     property bool powerMenuOpen: false
     property bool launcherOpen: false
-    property bool settingsOpen: false
-    property bool clipboardOpen: false
-    property bool networkOpen: false
-    property bool bluetoothOpen: false
-    property bool displayOpen: false
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || networkOpen || bluetoothOpen || displayOpen
+    property bool controlCenterOpen: false
+    property string controlCenterPage: "home"
+    readonly property bool anyPanelOpen: calendarOpen || mediaOpen || powerMenuOpen || launcherOpen || controlCenterOpen
 
-    function toggleScreenEffects() {
-        screenEffectsOpen = !screenEffectsOpen;
+    onControlCenterOpenChanged: console.info("[control-center]", controlCenterOpen ? "opened" : "closed", controlCenterPage)
+    onControlCenterPageChanged: console.info("[control-center] page", controlCenterPage)
+
+    function openControlCenter(page = "home", capsule = null) {
+        if (controlCenterOpen) {
+            controlCenterPage = page;
+            return;
+        }
+        closeAll();
+        controlCenterPage = page;
+        if (capsule)
+            MorphState.openFrom(capsule, () => controlCenterOpen = true);
+        else
+            controlCenterOpen = true;
+    }
+
+    function toggleControlCenter(capsule = null) {
+        if (controlCenterOpen)
+            controlCenterOpen = false;
+        else
+            openControlCenter("home", capsule);
     }
 
     function toggleCalendar() {
@@ -29,10 +42,6 @@ QtObject {
         mediaOpen = !mediaOpen;
     }
 
-    function toggleNotification() {
-        notificationOpen = !notificationOpen;
-    }
-
     function togglePowerMenu() {
         powerMenuOpen = !powerMenuOpen;
     }
@@ -41,39 +50,12 @@ QtObject {
         launcherOpen = !launcherOpen;
     }
 
-    function toggleSettings() {
-        settingsOpen = !settingsOpen;
-    }
-
-    function toggleClipboard() {
-        clipboardOpen = !clipboardOpen;
-    }
-
-    function toggleNetwork() {
-        networkOpen = !networkOpen;
-    }
-
-    function toggleBluetooth() {
-        bluetoothOpen = !bluetoothOpen;
-    }
-
-    function toggleDisplay() {
-        displayOpen = !displayOpen;
-    }
-
-    // 关闭所有面板（互斥：打开一个时关闭其他）
     function closeAll() {
         MorphState.reset();
-        screenEffectsOpen = false;
         calendarOpen = false;
         mediaOpen = false;
-        notificationOpen = false;
         powerMenuOpen = false;
         launcherOpen = false;
-        settingsOpen = false;
-        clipboardOpen = false;
-        networkOpen = false;
-        bluetoothOpen = false;
-        displayOpen = false;
+        controlCenterOpen = false;
     }
 }

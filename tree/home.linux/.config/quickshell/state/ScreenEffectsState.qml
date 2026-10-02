@@ -1,13 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// 屏幕效果状态单例 —— ScreenEffectsService 写入、UI（ScreenEffectsPanel、bar 的
-// ScreenEffectsModule）读取的中枢。仿 MonitorState ← MonitorService 的分工：
-// 数据容器在此，读写文件/生成 shader/hyprctl IPC 全在 services/ScreenEffectsService.qml。
-//
-// bar 模块过去是 inotify 监听状态文件来更新图标 —— 可它和面板本来就在同一个
-// quickshell 进程里，等于「自己写文件 → 内核通知自己 → 自己读回来」。收口到本单例后
-// 直接属性绑定即可。
+// 屏幕效果状态由 ScreenEffectsService 写入，控制中心及其顶栏胶囊读取。
+// 本单例只保存数据和发出操作请求；文件读写、shader 生成与 Hyprland IPC 由服务执行。
 QtObject {
     id: root
 

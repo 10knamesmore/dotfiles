@@ -2,20 +2,15 @@
 //@ pragma UseQApplication
 
 import "./bar"
-import "./bluetooth"
-import "./display"
 import "./calendar"
-import "./clipboard"
 import "./computer-control"
+import "./controlcenter"
 import "./launcher"
 import "./media"
-import "./network"
 import "./notifications"
 import "./osd"
 import "./power"
-import "./screen-effects"
 import "./services"
-import "./settings"
 import "./state"
 import QtQuick
 import Quickshell
@@ -69,17 +64,6 @@ ShellRoot {
 
     GlobalShortcut {
         appid: "quickshell"
-        name: "screenEffects"
-        description: "Toggle screen effects panel"
-        onPressed: {
-            PanelState.calendarOpen = false;
-            PanelState.mediaOpen = false;
-            PanelState.toggleScreenEffects();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
         name: "powerMenu"
         description: "Toggle power menu"
         onPressed: {
@@ -107,37 +91,12 @@ ShellRoot {
 
     GlobalShortcut {
         appid: "quickshell"
-        name: "settings"
-        description: "Toggle quick settings"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleSettings();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "bluetooth"
-        description: "Toggle bluetooth panel"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleBluetooth();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "display"
-        description: "Toggle display management panel"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleDisplay();
-        }
+        name: "controlCenter"
+        description: "Toggle control center"
+        onPressed: PanelState.toggleControlCenter()
     }
 
     // ── 全局面板（唯一实例）──
-    ScreenEffectsPanel {}
-
     CalendarPanel {}
 
     MediaPanel {}
@@ -146,7 +105,7 @@ ShellRoot {
 
     OsdPanel {}
 
-    NotificationPanel {
+    ControlCenter {
         notifServer: notifService.server
     }
 
@@ -155,20 +114,4 @@ ShellRoot {
     }
 
     AppLauncher {}
-
-    QuickSettings {}
-
-    Variants {
-        model: Quickshell.screens
-
-        delegate: HotEdge {}
-    }
-
-    ClipboardPanel {}
-
-    NetworkPanel {}
-
-    BluetoothPanel {}
-
-    DisplayPanel {}
 }

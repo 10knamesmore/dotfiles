@@ -3,8 +3,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
 
-// 通知服务 — DBus 通知服务端 + 跟踪计数同步到 PanelState + 响应清空请求。
-// server 暴露给 NotificationPanel / NotificationToast 渲染。
+// 通知服务：DBus 通知服务端，向 SystemState 同步计数并响应清空请求。
+// server 供控制中心的 NotificationPage 与 NotificationToast 渲染。
 Scope {
     id: root
 

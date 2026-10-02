@@ -5,10 +5,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
-// 蓝牙面板 — 右侧弹出，扫描/连接/断开/配对/忘记
-PanelOverlay {
+// 控制中心的蓝牙子页，负责扫描、配对与设备连接管理。
+FocusScope {
     id: root
 
     // ── 状态 ──
@@ -141,13 +140,9 @@ PanelOverlay {
         infoProc.running = true;
     }
 
-    showing: PanelState.bluetoothOpen
-    panelWidth: 400
-    panelHeight: root.height * 0.6
-    panelTargetX: root.width - 410
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.bluetoothOpen = false
+    required property bool showing
+    signal closeRequested
+    focus: showing
     onShowingChanged: {
         if (showing) {
             searchQuery = "";
@@ -170,7 +165,10 @@ PanelOverlay {
     Timer {
         id: focusTimer
         interval: 50
-        onTriggered: searchInput.forceActiveFocus()
+        onTriggered: {
+            if (root.showing)
+                searchInput.forceActiveFocus();
+        }
     }
 
     // 面板打开时定时刷新设备列表
@@ -192,7 +190,7 @@ PanelOverlay {
             }
         }
         onExited: {
-            if (root.btPowered) {
+            if (root.showing && root.btPowered) {
                 refreshDevices();
                 startScan();
                 focusTimer.start();
@@ -393,7 +391,6 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
-                visible: !root.hasMorphSource
                 text: root.btPowered ? "󰂯" : "󰂲"
                 color: root.btPowered ? Colors.blue : Colors.overlay1
                 font.family: Fonts.family
@@ -401,7 +398,6 @@ PanelOverlay {
             }
 
             Text {
-                visible: !root.hasMorphSource
                 text: "蓝牙"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -562,7 +558,7 @@ PanelOverlay {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: PanelState.bluetoothOpen = false
+                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent

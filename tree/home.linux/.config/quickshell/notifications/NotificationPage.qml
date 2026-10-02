@@ -8,22 +8,15 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
-import Quickshell.Wayland
 
-// 通知历史面板 — 右上角弹出，对齐 ClipboardPanel 交互风格
-PanelOverlay {
+// 控制中心的通知历史子页，与通知服务共享同一份通知列表。
+Item {
     id: root
 
     required property var notifServer
     property int removingItems: 0
 
-    showing: PanelState.notificationOpen
-    panelWidth: 380
-    panelHeight: Math.min(col.implicitHeight + 32, root.height - 80)
-    panelTargetX: root.width - 390
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.notificationOpen = false
+    required property bool showing
 
     Process {
         id: copyProc
@@ -43,7 +36,6 @@ PanelOverlay {
             Layout.minimumHeight: 26
 
             Text {
-                visible: !root.hasMorphSource
                 text: "󰂚"
                 color: Colors.overlay1
                 font.family: Fonts.family
@@ -51,7 +43,6 @@ PanelOverlay {
             }
 
             Text {
-                visible: !root.hasMorphSource
                 text: "通知"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -65,7 +56,7 @@ PanelOverlay {
 
             // 通知计数
             Text {
-                visible: !root.hasMorphSource && SystemState.notificationCount > 0
+                visible: SystemState.notificationCount > 0
                 text: SystemState.notificationCount + " 条"
                 color: Colors.subtext0
                 font.family: Fonts.family

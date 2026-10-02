@@ -5,10 +5,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
-// WiFi 网络面板 — 右上角弹出，扫描/连接/断开/编辑
-PanelOverlay {
+// 控制中心的 Wi-Fi 子页，负责扫描、连接与连接配置编辑。
+FocusScope {
     id: root
 
     // ── 状态 ──
@@ -178,13 +177,9 @@ PanelOverlay {
         return Colors.red;
     }
 
-    showing: PanelState.networkOpen
-    panelWidth: 400
-    panelHeight: root.height * 0.7
-    panelTargetX: root.width - 410
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.networkOpen = false
+    required property bool showing
+    signal closeRequested
+    focus: showing
     onShowingChanged: {
         if (showing) {
             searchQuery = "";
@@ -211,7 +206,10 @@ PanelOverlay {
         id: focusTimer
 
         interval: 50
-        onTriggered: searchInput.forceActiveFocus()
+        onTriggered: {
+            if (root.showing)
+                searchInput.forceActiveFocus();
+        }
     }
 
     Timer {
@@ -489,7 +487,6 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
-                visible: !root.hasMorphSource
                 text: root.wifiEnabled ? "󰤨" : "󰤭"
                 color: root.wifiEnabled ? Colors.blue : Colors.overlay1
                 font.family: Fonts.family
@@ -497,8 +494,7 @@ PanelOverlay {
             }
 
             Text {
-                visible: !root.hasMorphSource
-                text: "WiFi"
+                text: "Wi-Fi"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
                 font.bold: true
@@ -620,7 +616,7 @@ PanelOverlay {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: PanelState.networkOpen = false
+                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent

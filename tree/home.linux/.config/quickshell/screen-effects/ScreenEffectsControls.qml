@@ -3,29 +3,13 @@ import "../theme"
 import "../state"
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
-import Quickshell.Wayland
 
-// 屏幕效果控制面板 — 作为 layer-shell overlay 显示在右上角。
-//
-// 纯 UI：状态一律读 ScreenEffectsState，操作一律发意图信号，落地逻辑（状态持久化、
-// GLSL 生成、hyprctl 热加载、背光调节）全在 services/ScreenEffectsService.qml。
-PanelOverlay {
+// 控制中心首页的屏幕效果控件；状态与应用操作由 ScreenEffectsState / Service 承担。
+Item {
     id: root
 
-    function togglePanel() {
-        PanelState.calendarOpen = false;
-        PanelState.mediaOpen = false;
-        PanelState.toggleScreenEffects();
-    }
-
-    showing: PanelState.screenEffectsOpen
-    panelWidth: 320
-    panelHeight: col.implicitHeight + 32
-    panelTargetX: root.width - 330
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.screenEffectsOpen = false
+    required property bool showing
+    implicitHeight: col.implicitHeight + Tokens.spaceL * 2
     onShowingChanged: {
         if (showing)
             ScreenEffectsState.refresh(); // 回读背光实际值（可能被亮度键改过）
@@ -43,7 +27,6 @@ PanelOverlay {
             Layout.fillWidth: true
 
             Text {
-                visible: !root.hasMorphSource
                 text: "屏幕效果"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -56,6 +39,11 @@ PanelOverlay {
             }
 
             ToggleSwitch {
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "屏幕效果"
+                Accessible.checkable: true
+                Accessible.checked: checked
+                Accessible.onToggleAction: ScreenEffectsState.toggle()
                 checked: ScreenEffectsState.effectsActive
                 onToggled: ScreenEffectsState.toggle()
             }

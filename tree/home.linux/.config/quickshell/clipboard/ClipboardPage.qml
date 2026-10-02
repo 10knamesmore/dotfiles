@@ -7,10 +7,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
-// 剪贴板历史面板 — 右上角弹出
-PanelOverlay {
+// 控制中心的剪贴板历史子页；选中条目后复制并关闭控制中心。
+FocusScope {
     id: root
 
     property string searchQuery: ""
@@ -43,7 +42,7 @@ PanelOverlay {
     function selectItem(clipId) {
         copyProc.command = ["sh", "-c", "cliphist decode " + clipId + " | wl-copy"];
         copyProc.running = true;
-        PanelState.clipboardOpen = false;
+        root.closeRequested();
     }
 
     function deleteItem(clipId) {
@@ -66,13 +65,9 @@ PanelOverlay {
         }
     }
 
-    showing: PanelState.clipboardOpen
-    panelWidth: 400
-    panelHeight: root.height * 0.6
-    panelTargetX: root.width - 410
-    panelTargetY: 54
-    closedOffsetY: -20
-    onCloseRequested: PanelState.clipboardOpen = false
+    required property bool showing
+    signal closeRequested
+    focus: showing
     onShowingChanged: {
         if (showing) {
             searchQuery = "";
@@ -93,7 +88,10 @@ PanelOverlay {
         id: focusTimer
 
         interval: 50
-        onTriggered: searchInput.forceActiveFocus()
+        onTriggered: {
+            if (root.showing)
+                searchInput.forceActiveFocus();
+        }
     }
 
     // ── 进程 ──
@@ -153,7 +151,6 @@ PanelOverlay {
             Layout.minimumHeight: 26
 
             Text {
-                visible: !root.hasMorphSource
                 text: "󰅍 剪贴板"
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -253,7 +250,7 @@ PanelOverlay {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: PanelState.clipboardOpen = false
+                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent
