@@ -13,10 +13,11 @@ PanelWindow {
 
     required property var notifServer
 
+    // 固定窗口高度，避免补位结束时整组闪烁；空白区由 mask 穿透。
     anchors.top: true
+    anchors.bottom: true
     anchors.right: true
     implicitWidth: 360
-    implicitHeight: Math.max(1, toastCol.implicitHeight + 20)
     margins.top: 54
     margins.right: 10
     exclusionMode: ExclusionMode.Ignore
@@ -24,6 +25,10 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-toast"
     color: "transparent"
     visible: toastModel.count > 0
+
+    mask: Region {
+        item: toastCol
+    }
 
     ListModel {
         id: toastModel
@@ -57,7 +62,15 @@ PanelWindow {
         anchors.margins: 0
         width: 340
         spacing: 6
-        clip: true
+
+        move: Transition {
+            NumberAnimation {
+                properties: "y"
+                duration: Tokens.animNormal
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Anim.standard
+            }
+        }
 
         Repeater {
             model: toastModel
