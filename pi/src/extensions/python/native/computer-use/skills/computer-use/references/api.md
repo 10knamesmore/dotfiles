@@ -2,11 +2,11 @@
 
 所有函数通过 `import computer_use as computer` 使用。输入在导入模块的 worker 线程执行。
 
-## 截图与指针
+## 捕获与指针
 
 | 调用 | 约定 |
 | --- | --- |
-| `screenshot(monitor=None, *, rect=None, max_size=None)` | 默认捕获焦点显示器。完整输出先修正方向，再裁剪并缩小；默认保留原始像素。 |
+| `capture(monitor=None, *, rect=None, max_size=None)` | 默认捕获焦点显示器，返回同一帧的原始像素缓冲区与按需生成的图像。`max_size` 只影响图像。 |
 | `move_pointer(x, y, *, relative_to=None)` | 默认桌面逻辑坐标；指定截图后使用其返回 PNG 的像素坐标。 |
 | `click(x, y, *, button="left", count=1, relative_to=None)` | 移动后点击；`count` 为正整数，每次重复完整按下/松开。 |
 | `drag(start, end, *, button="left", duration=0.3, relative_to=None)` | `start/end` 为 `(x,y)`，`duration` 为非负秒数；直线移动，失败也释放按钮。路径须经过有效显示器区域。 |
@@ -14,16 +14,32 @@
 
 `button` 为 `left`、`right`、`middle`、`back` 或 `forward`。
 
-`rect=(x,y,width,height)` 使用完整、方向正确的原始截图像素。x/y 非负，宽高为正整数，整个矩形须在图像内；越界不裁掉溢出部分。`max_size` 为正整数，限制返回图像最长边，不放大小图。裁剪偏移和缩放保存在截图中，供 `relative_to` 转换。改变显示器布局后重新截图。
+`rect=(x,y,width,height)` 使用指定显示器内、方向正确的原始输出像素，不是桌面逻辑坐标。x/y 非负，宽高为正整数，整个矩形须在输出内；越界不裁掉溢出部分。`max_size` 为正整数，只限制图像最长边，不放大小图，也不缩放 buffer。裁剪偏移和图像缩放供 `relative_to` 转换；它接受图像像素坐标，不是 buffer 像素坐标。改变显示器布局后重新捕获。
 
-`Screenshot` 由 `screenshot()` 返回，不能直接构造：
+`Capture` 由 `capture()` 返回，不能直接构造：
 
 | 只读成员 | 含义 |
 | --- | --- |
 | `monitor: str` | 捕获的 Hyprland 显示器名称。 |
-| `size: tuple[int,int]` | 返回 PNG 的像素宽高。 |
+| `size: tuple[int,int]` | 图像的像素宽高，受 `max_size` 影响。 |
 | `bounds: tuple[float,float,float,float]` | 捕获区域的桌面逻辑 `(x,y,width,height)`，含裁剪偏移，可有负原点。 |
-| `_repr_png_() -> bytes` | 编码 PNG，用于 `display_image(shot)` 或写文件；不重新截图。 |
+| `buffer: PixelBuffer` | 同一区域的未缩放像素缓冲区，保留 compositor 的像素格式和位深。 |
+| `_repr_png_() -> bytes` | 按需生成 8-bit RGB PNG，用于 `display_image(shot)` 或写文件；不重新捕获、不修改 buffer。10-bit 通道映射到 0–255，缩小时使用 Lanczos3。 |
+
+`PixelBuffer` 不能直接构造，成员只读：
+
+| 成员 | 含义 |
+| --- | --- |
+| `data: bytes` | 未编码像素字节；每个像素占 4 字节，保留原始通道、alpha 与未使用位。每次访问复制成 Python bytes。 |
+| `size: tuple[int,int]` | 裁剪区域的原始像素宽高，不受 `max_size` 影响。 |
+| `stride: int` | 相邻行的字节距离，等于 `size[0] * 4`；无行填充。 |
+| `format: str` | compositor 提供的 `wl_shm` 格式：`argb8888`、`xrgb8888`、`abgr8888`、`xbgr8888`、`argb2101010`、`xrgb2101010`、`abgr2101010` 或 `xbgr2101010`。 |
+| `channel_bits: int` | RGB 每个通道的位数，8 或 10。 |
+| `rgb() -> list[list[tuple[int,int,int]]]` | `rows[y][x] = (R,G,B)`，保留原生整数值：8-bit 为 0–255，10-bit 为 0–1023；忽略 alpha，不缩放、不经过 PNG。 |
+
+buffer 来自 Wayland 共享内存捕获。SDK 只重排方向、裁剪和去除行填充，不改写保留像素的 4 字节；它不是包含原始行填充和方向的整块共享内存副本。格式名称描述本机字节序的 32-bit 整数位布局，不是内存字节顺序。这里的原始值指 compositor 导出的值，不保证等同于应用源颜色或显示器最终颜色。当前捕获包含鼠标指针。
+
+小区域颜色调试直接读取 `shot.buffer.rgb()`；大区域优先在 Python 内分析，避免把整个数组打印给模型。示例见 [读取区域 RGB 与原始字节](patterns.md#读取区域-rgb-与原始字节)。
 
 ## 键盘
 

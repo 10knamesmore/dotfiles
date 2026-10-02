@@ -16,8 +16,7 @@ use pyo3::prelude::*;
 #[pymodule]
 fn computer_use(module: &Bound<'_, PyModule>) -> PyResult<()> {
     input::mark_owner();
-    module.add_class::<capture::Screenshot>()?;
-    module.add_function(wrap_pyfunction!(capture::screenshot, module)?)?;
+    capture::register(module)?;
     input::register(module)?;
     hyprland::register(module)?;
     module

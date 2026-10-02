@@ -49,7 +49,25 @@ terminal.send_key(session_id, "up")         # 历史或菜单导航
 - 布局依赖窗口尺寸：换行或截断异常时先 `terminal.resize(session_id, cols=..., rows=...)` 再读。
 - `start(cwd=...)` 会同步子进程的 `PWD`，除非 `env` 显式覆盖 `PWD`。其余环境变量默认从 worker 透传，`env` 是覆盖层而不是隔离环境。
 - 需要颜色、样式或逐列布局判断时传 `cells=True`；普通文本和 `contains`/`regex` 匹配使用 `lines`/`text`。宽字符在 `lines`/`text` 中只出现一次，continuation cell 仍保留在 `cells` 中；组合字符附加在 base cell 文本后。Python 字符索引不等于终端列坐标。
-- `foreground` / `background` 是原始 cell 属性；`inverse=True` 时，渲染器需要自行交换可见前景和背景。SDK 会回答 OSC 颜色查询和字符尺寸查询，但没有 GUI 像素 surface，CSI `14t` 的像素尺寸为 `0×0`。
+- `foreground` / `background` 是原始 cell 属性；`inverse=True` 时，渲染器需要自行交换可见前景和背景。SDK 会回答 OSC 颜色查询和尺寸查询；像素尺寸由 `start(cell_size=(8, 16))` 的虚拟单元格几何计算，不是实际字体尺寸。
+
+## 观察 Kitty 图片
+
+等应用准备好后，再请求图片快照：
+
+```python
+screen = terminal.read(session_id, images=True)
+print(screen["text"])
+for image in screen["images"]:
+    print(image.image_id, image.size, image.placements)
+    display_image(image)
+```
+
+- 图片对象包含源图和放置元数据；`display_image()` 展示源图，不绘制终端文字，也不模拟裁剪或遮挡。
+- 同一次读取中的文字与图片状态来自同一次快照；返回后 TUI 继续运行不改变已有图片。需要新画面时重新 `read(images=True)`。
+- `images=[]` 表示当前活动屏幕没有可返回的、被 placement 引用的图片；不等于应用从未上传图片。只有上传而没有 placement 的图片不返回，主屏图片也不会出现在备用屏快照中。
+- 虚拟 placement 表示 Unicode 占位符模式；它不提供具体占位字符的屏幕位置，不能用来断言最终图文布局。普通文字 `rect` 不过滤图片列表。
+- 图片问题先检查虚拟 `cell_size` 和终端行列，再检查源图、placement 与原始协议输出。只有需要核对最终合成画面时，才改用真实 Kitty 窗口截图。
 
 ## 原始输出增量读取
 

@@ -14,6 +14,7 @@ import terminal_use as terminal
 from typing import Literal, Mapping, NotRequired, Sequence, TypedDict
 
 Rect = terminal.Rect
+TerminalImage = terminal.TerminalImage
 
 
 class RunningStatus(TypedDict):
@@ -29,11 +30,17 @@ class ExitedStatus(TypedDict):
 ProcessStatus = RunningStatus | ExitedStatus
 
 
+class PixelSize(TypedDict):
+    width: int
+    height: int
+
+
 class SessionInfo(TypedDict):
     id: str
     pid: int
     rows: int
     cols: int
+    cell_size: PixelSize
     status: ProcessStatus
     generation: int
     reader_done: bool
@@ -109,6 +116,7 @@ class CellInfo(TypedDict):
 class ScreenSnapshot(TypedDict):
     session_id: str
     full_size: Size
+    cell_size: PixelSize
     rect: RectResult
     lines: list[str]
     text: str
@@ -117,6 +125,7 @@ class ScreenSnapshot(TypedDict):
     application_cursor: bool
     bracketed_paste: bool
     cells: list[list[CellInfo]] | None
+    images: list[TerminalImage] | None
     status: ProcessStatus
     generation: int
     raw_dropped_bytes: int
@@ -195,7 +204,7 @@ class RawEvent(TypedDict):
 TerminalEvent = KeyEvent | TextEvent | PasteEvent | RawEvent
 ```
 
-`WaitFor` 要求且只要求 `contains` 或 `regex` 其中一个字段；`source` 默认是 `'screen'`。`cells` 未请求时仍有这个字段，但值为 `None`。
+`WaitFor` 要求且只要求 `contains` 或 `regex` 其中一个字段；`source` 默认是 `'screen'`。`cells` 和 `images` 未请求时仍有对应字段，但值为 `None`。
 
 ## start
 
@@ -207,12 +216,14 @@ terminal.start(
     env: Mapping[str, str] | None = None,
     cols: int = 80,
     rows: int = 24,
+    cell_size: tuple[int, int] | None = None,
 ) -> SessionInfo
 ```
 
 - `argv`：程序与参数列表，`argv[0]` 按 `PATH` 查找；空列表、空程序名或非字符串参数报错。
 - `cwd`：已存在的目录，默认继承 worker 当前目录。指定后，SDK 会把子进程的 `PWD` 同步为这个值；如果 `env` 显式提供 `PWD`，则以显式值为准。这是因为部分 TUI 会优先读取 `PWD` 决定初始目录，而不是调用 `getcwd()`。
 - `env`：在 worker 环境之上添加或覆盖变量，不是隔离环境；未提供的变量（如 `PATH`、`HOME`）继续透传。当前没有清空继承环境或删除单个继承变量的参数。未在 `env` 中提供 `TERM` 时，SDK 会设置为 `xterm-256color`。
+- `cell_size`：虚拟单元格的 `(宽, 高)`，单位为像素；省略或传 `None` 时使用 `(8, 16)`。两个值都必须大于 0，`cols × 宽` 与 `rows × 高` 不得超过 65535。PTY ioctl、终端尺寸查询和图片布局使用相同几何；这不是实际字体大小。`resize` 保留单元格大小。
 - 返回完整的 `SessionInfo`。
 
 ## list / inspect
@@ -229,6 +240,7 @@ terminal.inspect(session_id: str) -> SessionInfo
 | `id` | `str` | 稳定会话 id，worker 生命周期内不变 |
 | `pid` | `int` | 子进程 pid |
 | `rows` / `cols` | `int` | 当前屏幕尺寸 |
+| `cell_size` | `PixelSize` | 虚拟单元格的像素宽高 |
 | `status` | `ProcessStatus` | `{'kind': 'running'}` 或退出状态 |
 | `generation` | `int` | 屏幕状态版本号；每次 PTY reader 成功读取一个输出 chunk、resize 或 reader 完成时递增。不表示输出事件数量、字节数或渲染帧数 |
 | `reader_done` | `bool` | PTY 读取线程已结束，输出流不再变化 |
@@ -252,6 +264,7 @@ terminal.read(
     timeout: float = 0.0,
     trim_trailing_spaces: bool = True,
     cells: bool = False,
+    images: bool = False,
 ) -> ScreenSnapshot
 ```
 
@@ -269,6 +282,7 @@ terminal.read(
   空 pattern 报错。`wait` 始终存在，结构为 `WaitOutcome`。无等待条件时 `pattern_supplied` 为 `False`、`matched` 为 `True`、`timed_out` 为 `False`。raw 模式判断 bounded raw ring 当前保留窗口是否包含 pattern，不提供“本次调用之后的新出现”语义；二进制内容用 `read_raw` 精确判断。需要增量判断时，先记录 `read_raw()` 的 `end`，再用 `read_raw(since=end)` 自己维护偏移。
 - `trim_trailing_spaces=False`：保留行尾空格；screen 来源的 `contains`/`regex` 匹配也使用这个设置。默认为 `True` 时，匹配和返回值都会去掉每行末尾的空格。
 - `cells=True`：额外请求原生的逐单元格样式数据；否则 `cells` 为 `None`。
+- `images=True`：额外请求当前活动屏幕的图片快照；否则 `images` 为 `None`。图片不按文字 `rect` 过滤或裁剪，详见[图片快照](#图片快照)。
 
 `ScreenSnapshot` 字段：
 
@@ -276,6 +290,7 @@ terminal.read(
 | --- | --- | --- |
 | `session_id` | `str` | 会话 id |
 | `full_size` | `Size` | 完整终端尺寸 |
+| `cell_size` | `PixelSize` | 虚拟单元格的像素宽高 |
 | `rect` | `RectResult` | 请求区域与裁剪后的有效区域 |
 | `lines` | `list[str]` | rect 每行的逻辑文本，自顶向下，不足的行补空串；宽字符 continuation cell 不重复插入占位空格 |
 | `text` | `str` | `\n`.join(`lines`) |
@@ -284,6 +299,7 @@ terminal.read(
 | `application_cursor` | `bool` | 是否启用 application cursor mode |
 | `bracketed_paste` | `bool` | 是否启用 bracketed paste mode |
 | `cells` | `list[list[CellInfo]] \| None` | 请求样式数据时的逐单元格信息 |
+| `images` | `list[TerminalImage] \| None` | 请求图片时的独立源图快照；无图片时为空列表 |
 | `status` | `ProcessStatus` | 读取时的进程状态 |
 | `generation` | `int` | 快照对应的屏幕版本号；按 PTY reader chunk、resize 或 reader 完成递增，不是帧号或输出事件计数 |
 | `raw_dropped_bytes` | `int` | 原始环形缓冲累计丢弃的字节数 |
@@ -304,9 +320,48 @@ terminal.read(
 颜色查询和像素尺寸查询：
 
 - OSC 4/10/11/12 查询会收到 SDK 提供的 xterm-256color 默认 palette；OSC 设置过的动态颜色优先于默认值。
-- CSI `18t` 返回当前字符行列；CSI `14t` 返回 `0×0` 像素尺寸，因为 SDK 没有 GUI surface 或真实 cell 像素大小。
+- CSI `18t` 返回当前字符行列；CSI `14t` 返回由行列和 `cell_size` 计算出的虚拟像素尺寸，CSI `16t` 返回单元格像素尺寸。
 - `foreground` / `background` 是 cell 的原始颜色属性，不是应用 inverse 后的最终显示颜色。`inverse=True` 时，渲染器自行交换或重算可见前景和背景。`indexed` 只表示调色板索引，不代表已经转换为 RGB。
-- clipboard、graphics、hyperlink 和其他 GUI 事件仍不提供对象；clipboard 查询不会得到内容。
+- clipboard、hyperlink 和其他 GUI 事件不提供对象；clipboard 查询不会得到内容。Kitty 源图可通过 `images=True` 读取，不提供 Sixel 或整屏截图。
+
+## 图片快照
+
+```python
+screen = terminal.read(session_id, images=True)
+print(screen["text"])
+for image in screen["images"]:
+    print(image.image_id, image.size, image.placements)
+    display_image(image)
+```
+
+图片由 Kitty graphics 协议上传和放置。SDK 使用 Ghostty 维护协议状态，`read(images=True)` 返回当前活动屏幕中 placement 引用的源图；仅上传、尚无 placement 的图片不返回。同一个 image id 的多个 placement 归在一个图片对象下。主屏与备用屏的图片状态分开。
+
+`TerminalImage` 是只读快照，不是指向终端内部存储的实时句柄：
+
+| 属性或方法 | 含义 |
+| --- | --- |
+| `image_id` | Kitty 协议 image id |
+| `size` | 源图 `(宽, 高)`，单位为像素 |
+| `placements` | 图片的放置元数据；普通与虚拟 placement 均可能出现 |
+| `_repr_png_()` | 返回该快照的 PNG bytes；`display_image(image)` 自动调用，无需自行解码 |
+
+`placements` 是 list，每项为下列字段组成的 dict；`image_id` 升序排列图片，`placement_id` 升序排列每张图片的放置记录：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `placement_id` | `int` | 当前源图下的 placement id |
+| `is_virtual` | `bool` | 是否为 Unicode placeholder 使用的虚拟 placement |
+| `cell_columns` / `cell_rows` | `int` | 指令请求的列数／行数；0 表示由终端根据图片和单元格几何计算 |
+| `pixel_offset` | `{'x': int, 'y': int}` | 相对锚定单元格左上角的像素偏移 |
+| `source_rect` | `{'x': int, 'y': int, 'width': int, 'height': int}` | 按协议默认值解析并限制在源图内的像素裁剪区域 |
+| `z_index` | `int` | 相对文字、背景和其他图片的叠放层级 |
+| `viewport_position` | `{'col': int, 'row': int} \| None` | 普通、至少部分可见的 placement 左上角，单位为单元格；部分滚出顶部时 `row` 可为负。完全离屏或虚拟 placement 为 `None` |
+
+Ghostty 的图片存储上限为每个屏幕 64 MiB；达到上限时由核心按协议处理拒绝或淘汰。支持 Kitty 直接传输的 RGB、RGBA、PNG，以及文件、临时文件和共享内存传输；临时文件和共享内存的读取、释放按协议由核心处理。
+
+图片像素与元数据在读取时固定。同 id 被替换、图片被删除、会话关闭后，已有快照仍可展示。普通 `repr` 不输出图片字节。SDK 不会因 TUI 重绘自动调用 `display_image()`，也不会把图片 payload 塞进 `text`。
+
+**源图不是屏幕截图。** PNG 不应用 placement 的缩放、裁剪、层级或遮挡，也不按 `read(rect=...)` 裁剪。placement 存在不等于图片当前可见；Unicode placeholder 使用的虚拟 placement 没有已解析的屏幕位置，不能拿它判断图片是否覆盖菜单或是否正确滚动。需要核对最终图文布局时，应在真实图形终端中截图。
 
 ## read_raw
 
@@ -431,5 +486,4 @@ terminal.close_all(*, grace_ms: int = 500) -> None
 ```
 
 - `close` 先发 `SIGTERM`，等待 `grace_ms` 毫秒后升级为 `SIGKILL`；`grace_ms` 最大按 30 秒处理。它随后尝试回收子进程并释放 PTY，但如果进程组或 reader 未能在最终等待窗口内结束，返回的 `SessionInfo.status` 仍可能是 `running`，而 id 之后不可再使用。需要保留最终屏幕时必须在 `close` 前调用 `read`。线程限制会在关闭前检查，因此跨线程失败不会销毁 session。
-- `close_all` 关闭 worker 的全部会话，逐个关闭；某个会话失败也继续，最后抛出第一个错误。解释器退出时 SDK 已自动调用，正常流程只需显式关闭正在使用的会话。
 - `close_all` 关闭 worker 的全部会话，逐个关闭；某个会话失败也继续，最后抛出第一个错误。解释器退出时 SDK 已自动调用，正常流程只需显式关闭正在使用的会话。

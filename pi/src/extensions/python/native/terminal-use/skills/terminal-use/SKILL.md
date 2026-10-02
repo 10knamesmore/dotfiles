@@ -13,7 +13,7 @@ description: 用 python_repl 的 terminal_use 驱动交互式 Unix 终端程序�
 
 `python_repl` 工具本身的 `timeout` 是整次 Python 调用的硬上限。`terminal.read(..., timeout=...)`、`terminal.wait(..., timeout=...)` 等方法级 timeout 只能占用外层调用的剩余时间，不能延长它；应为后续读取、收尾和异常处理预留时间，不要把方法级 timeout 设得等于或大于外层 timeout。
 
-仅支持 macOS 与 Linux。每个会话只有一条 PTY 流：子进程的 stdout 与 stderr 合并，没有独立通道；屏幕由 Alacritty terminal core 解析。当前接口不返回 graphics、hyperlink 或剪贴板对象，不要把它当作完整图形终端。
+仅支持 macOS 与 Linux。每个会话只有一条 PTY 流：子进程的 stdout 与 stderr 合并，没有独立通道；文字与 Kitty 图片协议由 Ghostty 核心解析，不启动 GUI。用 `terminal.read(session_id, images=True)` 取得源图快照，再显式 `display_image(image)`；普通文本读取不会自动展示图片。图片不是整屏图文截图，placement 也不保证当前可见，尤其不能用虚拟 placement 推断 Unicode 占位符的屏幕位置。完整字段见 [API](references/api.md#图片快照)。
 
 ## 路由
 

@@ -1,4 +1,4 @@
-//! Map screenshot pixels to monitor-local pointer events and discrete wheel notches.
+//! Map capture image pixels to monitor-local pointer events and discrete wheel notches.
 
 use std::time::{Duration, Instant};
 
@@ -6,12 +6,12 @@ use pyo3::prelude::*;
 use wayland_client::protocol::wl_pointer::{Axis, AxisSource, ButtonState};
 
 use super::{Input, with_input};
-use crate::capture::Screenshot;
+use crate::capture::Capture;
 use crate::hyprland::{self, Monitor};
 use crate::wait;
 use crate::wayland::VirtualPointer;
 
-fn point(x: f64, y: f64, relative_to: Option<&Screenshot>) -> PyResult<(f64, f64)> {
+fn point(x: f64, y: f64, relative_to: Option<&Capture>) -> PyResult<(f64, f64)> {
     match relative_to {
         Some(shot) => shot.desktop_point(x, y),
         None if x.is_finite() && y.is_finite() => Ok((x, y)),
@@ -123,7 +123,7 @@ fn move_pointer(
     py: Python<'_>,
     x: f64,
     y: f64,
-    relative_to: Option<PyRef<'_, Screenshot>>,
+    relative_to: Option<PyRef<'_, Capture>>,
 ) -> PyResult<()> {
     let point = point(x, y, relative_to.as_deref())?;
     let monitors = hyprland::monitors(py)?;
@@ -143,7 +143,7 @@ fn click(
     y: f64,
     button: &str,
     count: u32,
-    relative_to: Option<PyRef<'_, Screenshot>>,
+    relative_to: Option<PyRef<'_, Capture>>,
 ) -> PyResult<()> {
     let button = self::button(button)?;
     if count == 0 {
@@ -168,7 +168,7 @@ fn click(
     })
 }
 
-/// Hold a button while interpolating a line between two desktop or screenshot points.
+/// Hold a button while interpolating a line between two desktop or capture image points.
 #[pyfunction]
 #[pyo3(signature = (start, end, *, button = "left", duration = 0.3, relative_to = None))]
 fn drag(
@@ -177,7 +177,7 @@ fn drag(
     end: (f64, f64),
     button: &str,
     duration: f64,
-    relative_to: Option<PyRef<'_, Screenshot>>,
+    relative_to: Option<PyRef<'_, Capture>>,
 ) -> PyResult<()> {
     let button = self::button(button)?;
     let duration = wait::seconds(duration, "duration")?;

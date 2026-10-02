@@ -1,6 +1,7 @@
 [build-system]
-requires = ["maturin"]
-build-backend = "maturin"
+requires = ["maturin>=1,<2", "ziglang==0.15.2"]
+build-backend = "build_backend"
+backend-path = ["."]
 
 [project]
 name = "terminal-use-sdk"
@@ -13,10 +14,12 @@ bindings = "pyo3"
 module-name = "terminal_use"
 features = ["python-extension"]
 locked = true
+include = [{ path = "build_backend.py", format = "sdist" }]
 
 [tool.uv]
 cache-keys = [
     { file = "pyproject.toml" },
+    { file = "build_backend.py" },
     { file = "Cargo.toml" },
     { file = "Cargo.lock" },
     { file = "src/**/*.rs" },

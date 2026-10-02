@@ -4,6 +4,7 @@
 
 mod diagnostics;
 mod error;
+mod images;
 mod input;
 mod manager;
 mod model;
@@ -17,15 +18,17 @@ use std::time::{Duration, Instant};
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyDict, PyModule, PySequence, PyString};
+use pyo3::types::{PyAny, PyBool, PyDict, PyList, PyModule, PySequence, PyString};
 use pythonize::pythonize;
 
 use crate::error::TerminalError;
+use crate::images::{ImageSnapshot, encode_png};
 use crate::input::{
-    PyRect, encode_events, encode_key_input, encode_paste, encode_text, parse_rect, parse_wait,
+    PyRect, encode_events, encode_key_input, encode_paste, encode_text, parse_cell_size,
+    parse_rect, parse_wait,
 };
 use crate::manager::global_manager;
-use crate::model::InputSpec;
+use crate::model::{InputSpec, ScreenSnapshot};
 
 const DEFAULT_WORKER_CONTROL_FDS: [i32; 2] = [3, 4];
 
@@ -37,6 +40,7 @@ static LIFECYCLE_THREAD: OnceLock<Mutex<Option<ThreadId>>> = OnceLock::new();
 fn terminal_use(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mark_worker_control_fds_cloexec(&DEFAULT_WORKER_CONTROL_FDS);
     module.add_class::<PyRect>()?;
+    module.add_class::<crate::images::PyTerminalImage>()?;
     module.add_function(wrap_pyfunction!(start, module)?)?;
     module.add_function(wrap_pyfunction!(list, module)?)?;
     module.add_function(wrap_pyfunction!(inspect, module)?)?;
@@ -93,7 +97,7 @@ fn _set_worker_control_fds(fds: Option<Bound<'_, PyAny>>) -> PyResult<()> {
 
 /// Start a program attached to a new Unix PTY.
 #[pyfunction]
-#[pyo3(signature = (argv, *, cwd = None, env = None, cols = 80, rows = 24))]
+#[pyo3(signature = (argv, *, cwd = None, env = None, cols = 80, rows = 24, cell_size = None))]
 fn start(
     py: Python<'_>,
     argv: Vec<String>,
@@ -101,10 +105,12 @@ fn start(
     env: Option<HashMap<String, String>>,
     cols: u16,
     rows: u16,
+    cell_size: Option<Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
     ensure_lifecycle_thread()?;
+    let cell_size = parse_cell_size(cell_size.as_ref())?;
     let info = global_manager()
-        .start(argv, cwd, env, rows, cols)
+        .start(argv, cwd, env, rows, cols, cell_size)
         .map_err(terminal_error)?;
     if let Err(error) = emit_ownership(py, "opened", &info.id, info.pid) {
         let _ = global_manager().close(&info.id, 500);
@@ -129,8 +135,9 @@ fn inspect(py: Python<'_>, session_id: String) -> PyResult<Py<PyAny>> {
 }
 
 /// Read a screen snapshot, optionally waiting for a screen or raw-output pattern.
+#[allow(clippy::too_many_arguments)] // Keep Python keyword options explicit and discoverable.
 #[pyfunction]
-#[pyo3(signature = (session_id, *, rect = None, wait_for = None, timeout = 0.0, trim_trailing_spaces = true, cells = false))]
+#[pyo3(signature = (session_id, *, rect = None, wait_for = None, timeout = 0.0, trim_trailing_spaces = true, cells = false, images = false))]
 fn read(
     py: Python<'_>,
     session_id: String,
@@ -139,6 +146,7 @@ fn read(
     timeout: f64,
     trim_trailing_spaces: bool,
     cells: bool,
+    images: bool,
 ) -> PyResult<Py<PyAny>> {
     let rect = parse_rect(rect.as_ref())?;
     let wait_for = parse_wait(wait_for.as_ref())?;
@@ -156,30 +164,44 @@ fn read(
     let deadline = Instant::now()
         .checked_add(Duration::from_secs_f64(timeout))
         .ok_or_else(|| value_error("timeout is too large"))?;
-    let has_wait = !wait_for.is_empty();
     loop {
-        let remaining = deadline
-            .checked_duration_since(Instant::now())
-            .unwrap_or_default();
-        let slice = if has_wait {
-            remaining.min(Duration::from_millis(50))
-        } else {
-            Duration::ZERO
-        };
-        let snapshot = py.detach(|| {
-            global_manager().read(
-                &session_id,
-                rect,
-                wait_for.clone(),
-                slice.as_secs_f64(),
-                trim_trailing_spaces,
-                cells,
-            )
-        });
-        let snapshot = snapshot.map_err(terminal_error)?;
-        if !has_wait || snapshot.wait.matched || remaining.is_zero() {
-            return to_python(py, &snapshot);
+        if !wait_for.is_empty() {
+            loop {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                let matched = py.detach(|| {
+                    global_manager().wait_screen(
+                        &session_id,
+                        rect,
+                        &wait_for,
+                        remaining.min(Duration::from_millis(50)).as_secs_f64(),
+                        trim_trailing_spaces,
+                    )
+                });
+                if matched.map_err(terminal_error)? {
+                    break;
+                }
+                py.check_signals()?;
+            }
         }
+        let mut snapshot = py
+            .detach(|| {
+                global_manager().read(
+                    &session_id,
+                    rect,
+                    &wait_for,
+                    trim_trailing_spaces,
+                    cells,
+                    images,
+                )
+            })
+            .map_err(terminal_error)?;
+        if wait_for.is_empty() || snapshot.wait.matched || Instant::now() >= deadline {
+            return snapshot_to_python(py, &mut snapshot, images);
+        }
+        // A redraw can remove the match between the wait and the snapshot request.
         py.check_signals()?;
     }
 }
@@ -445,6 +467,40 @@ fn to_python<T: serde::Serialize>(py: Python<'_>, value: &T) -> PyResult<Py<PyAn
     pythonize(py, value).map(Bound::unbind).map_err(|error| {
         PyRuntimeError::new_err(format!("convert terminal result failed: {error}"))
     })
+}
+
+/// Convert a screen snapshot to Python, replacing the skipped image field with frozen objects.
+///
+/// Source pixels are captured before this function runs; PNG encoding happens with the GIL
+/// released because it is the expensive part of an image read.
+fn snapshot_to_python(
+    py: Python<'_>,
+    snapshot: &mut ScreenSnapshot,
+    include_images: bool,
+) -> PyResult<Py<PyAny>> {
+    let images = snapshot.images.take();
+    let object = to_python(py, snapshot)?;
+    let dict = object.bind(py).cast::<PyDict>()?;
+    if !include_images {
+        dict.set_item("images", py.None())?;
+        return Ok(object);
+    }
+
+    let images = images.unwrap_or_default();
+    let encoded: Result<Vec<(ImageSnapshot, Vec<u8>)>, String> = py.detach(|| {
+        images
+            .into_iter()
+            .map(|image| encode_png(&image).map(|png| (image, png)))
+            .collect()
+    });
+    let encoded =
+        encoded.map_err(|error| runtime_error(format!("encode source image failed: {error}")))?;
+    let list = PyList::empty(py);
+    for (image, png) in encoded {
+        list.append(Py::new(py, images::PyTerminalImage::new(image, png))?)?;
+    }
+    dict.set_item("images", list)?;
+    Ok(object)
 }
 
 fn terminal_error(error: TerminalError) -> PyErr {

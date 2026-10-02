@@ -3,6 +3,8 @@
 use regex::{Regex, bytes::Regex as BytesRegex};
 use serde::Serialize;
 
+use crate::images::ImageSnapshot;
+
 /// A rectangular terminal region measured in zero-based cells.
 #[derive(Clone, Copy, Debug, Serialize)]
 pub(crate) struct Rect {
@@ -103,6 +105,7 @@ pub(crate) struct SessionInfo {
     pub(crate) pid: u32,
     pub(crate) rows: u16,
     pub(crate) cols: u16,
+    pub(crate) cell_size: PixelSize,
     pub(crate) status: ProcessStatus,
     pub(crate) generation: u64,
     pub(crate) reader_done: bool,
@@ -124,6 +127,7 @@ pub(crate) struct WaitOutcome {
 pub(crate) struct ScreenSnapshot {
     pub(crate) session_id: String,
     pub(crate) full_size: Size,
+    pub(crate) cell_size: PixelSize,
     pub(crate) rect: RectResult,
     pub(crate) lines: Vec<String>,
     pub(crate) text: String,
@@ -132,6 +136,10 @@ pub(crate) struct ScreenSnapshot {
     pub(crate) application_cursor: bool,
     pub(crate) bracketed_paste: bool,
     pub(crate) cells: Option<Vec<Vec<CellInfo>>>,
+    /// Source images referenced by placements on the active screen; serialized by the Python
+    /// boundary as `TerminalImage` objects instead of this Rust form.
+    #[serde(skip)]
+    pub(crate) images: Option<Vec<ImageSnapshot>>,
     pub(crate) status: ProcessStatus,
     pub(crate) generation: u64,
     pub(crate) raw_dropped_bytes: u64,
@@ -165,10 +173,23 @@ pub(crate) enum CellColor {
 }
 
 /// The dimensions of the complete terminal screen.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub(crate) struct Size {
     pub(crate) rows: u16,
     pub(crate) cols: u16,
+}
+
+/// The pixel size assigned to one terminal cell.
+///
+/// This is headless geometry used for size reports, Kitty image scaling, and the PTY window size;
+/// it does not describe real font rendering.
+#[derive(Clone, Copy, Debug, Serialize)]
+pub(crate) struct PixelSize {
+    /// Width of one virtual cell in pixels.
+    pub(crate) width: u16,
+
+    /// Height of one virtual cell in pixels.
+    pub(crate) height: u16,
 }
 
 /// Both the requested and effective screen rectangle.

@@ -7,11 +7,13 @@ import computer_use as computer
 from computer_use import hyprland
 
 monitors = hyprland.query("monitors")
-shot = computer.screenshot(max_size=1600)
-display_image(shot)
+shot = computer.capture(rect=(100, 100, 20, 10))
+rows = shot.buffer.rgb()  # rows[y][x] = (R, G, B)，保留原生位深
+data = shot.buffer.data  # 未编码的像素字节
+display_image(shot)      # 同一帧按需编码成 PNG
 ```
 
-完整调用约定见 [API](skills/computer-use/references/api.md)，操作示例见 [patterns](skills/computer-use/references/patterns.md)，Agent 入口见 [computer-use](skills/computer-use/SKILL.md)。`display_image` 是 Python worker 提供的全局能力，SDK 仅提供 `_repr_png_()`，不依赖图像展示包。
+完整调用约定见 [API](skills/computer-use/references/api.md)，操作示例见 [patterns](skills/computer-use/references/patterns.md)，Agent 入口见 [computer-use](skills/computer-use/SKILL.md)。`display_image` 是 Python worker 提供的全局能力，SDK 通过 `_repr_png_()` 提供图像，不依赖图像展示包。
 
 ## 运行条件
 
@@ -19,11 +21,13 @@ display_image(shot)
 
 输入必须在导入模块的 Python 线程执行。导入、`held_keys()`、未使用时的释放和关闭均不连接桌面。截图使用独立的短期 Wayland 连接，不创建输入设备；输入连接和虚拟设备按需创建，并随 worker 存活。
 
-## 截图与坐标
+## 捕获、原始缓冲区与图像
 
-每次先捕获完整输出缓冲区，修正输出旋转、镜像和协议的 Y 反转，再执行精确整数像素裁剪，最后按需缩小。`rect` 以完整、方向正确的截图像素为单位，越界时报错。`max_size=None` 保留像素；指定值只限制最长边，绝不放大。
+`capture()` 从 Wayland 共享内存取得完整输出，修正旋转、镜像和协议的 Y 反转，再按原始像素裁剪。`Capture.buffer` 保留裁剪区域的 4 字节像素字、格式与位深，只移除行填充，不经过 PNG 编解码或 10-bit 到 8-bit 转换。`buffer.data` 提供字节，`buffer.rgb()` 提供原生位深的二维 RGB 元组数组。格式、字节序和尺寸约定见 [API](skills/computer-use/references/api.md#捕获与指针)。
 
-`Screenshot.bounds` 表示所捕获区域在桌面上的逻辑矩形，包含负原点与裁剪偏移。`relative_to=shot` 把返回图像中的像素坐标转换为该逻辑矩形中的点。坐标映射保留截图时的显示器布局；改变布局后应重新截图。`Screenshot` 没有公开构造器，属性只读。
+`display_image(shot)` 通过 `_repr_png_()` 按需生成同一帧的 8-bit RGB PNG，不重新捕获；10-bit 通道仅在此处量化。`max_size` 只限制图像最长边，绝不放大或修改 buffer；默认图像不缩放。`rect` 以完整、方向正确的输出像素为单位，越界报错。
+
+`Capture.size` 是图像尺寸，`Capture.buffer.size` 是未缩放区域尺寸。`Capture.bounds` 是区域的桌面逻辑矩形，包含负原点与裁剪偏移；`relative_to=shot` 接受图像像素坐标并转换为桌面逻辑坐标。改变显示器布局后重新捕获。`Capture` 与 `PixelBuffer` 没有公开构造器，属性只读。
 
 ## 输入与清理
 
@@ -53,6 +57,6 @@ uv build --wheel --out-dir pi/src/extensions/python/native/computer-use/target/d
 
 操作日志写入 `COMPUTER_USE_LOG` 指定路径，默认为临时目录中的 `computer-use-sdk.log`，到 1 MiB 后清空重写。日志只记录操作名、进程、生命周期与成功/失败，不记录截图、坐标、键名、输入文字、窗口内容或 Lua 表达式。
 
-模块分工：`src/capture.rs` 处理像素与截图映射，`src/input/` 管理键盘、指针和所有权，`src/wayland.rs` 管理协议对象与事件，`src/hyprland.rs` 处理 JSON/Lua IPC，`src/wait.rs` 处理可中断等待，`src/logging.rs` 记录诊断。
+模块分工：`src/capture/` 处理原始像素、图像编码与坐标映射，`src/input/` 管理键盘、指针和所有权，`src/wayland.rs` 管理协议对象与事件，`src/hyprland.rs` 处理 JSON/Lua IPC，`src/wait.rs` 处理可中断等待，`src/logging.rs` 记录诊断。
 
 实现参考 [Wayland Rust bindings](https://github.com/Smithay/wayland-rs)、[grim 输出变换](https://github.com/emersion/grim/blob/master/render.c)、[wtype 的 Unicode 键图](https://github.com/atx/wtype/blob/master/main.c) 和 [libxkbcommon](https://xkbcommon.org/doc/current/)。Quickshell 专用 IPC 与模块集成不属于本 SDK。

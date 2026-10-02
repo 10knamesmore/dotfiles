@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyBytes, PyMapping, PyMemoryView, PySequence};
 use pyo3::types::{PyByteArray, PyString};
 
-use crate::model::{CursorKey, InputSpec, KeySpec, Rect, WaitSpec};
+use crate::model::{CursorKey, InputSpec, KeySpec, PixelSize, Rect, WaitSpec};
 
 /// A zero-based terminal-cell rectangle accepted by the Python API.
 #[pyclass(name = "Rect", frozen, module = "terminal_use", from_py_object)]
@@ -71,6 +71,37 @@ pub(crate) fn parse_rect(value: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Re
         extract_u16(&required_field(mapping, "height")?, "rect height")?,
     );
     Rect::from_tuple(values).map(Some).map_err(value_error)
+}
+
+/// Parse the optional `(width, height)` pixel size assigned to one terminal cell.
+///
+/// A missing value keeps the headless default of 8x16 pixels per cell.
+pub(crate) fn parse_cell_size(value: Option<&Bound<'_, PyAny>>) -> PyResult<PixelSize> {
+    let Some(value) = value else {
+        return Ok(PixelSize {
+            width: 8,
+            height: 16,
+        });
+    };
+    if value.is_instance_of::<PyString>() || value.is_instance_of::<PyBytes>() {
+        return Err(type_error(
+            "cell_size must be a (width, height) pair of positive ints",
+        ));
+    }
+    let sequence = value
+        .cast::<PySequence>()
+        .map_err(|_| type_error("cell_size must be a (width, height) pair of positive ints"))?;
+    if sequence.len()? != 2 {
+        return Err(value_error(
+            "cell_size must have exactly two items: width and height",
+        ));
+    }
+    let width = extract_u16(&sequence.get_item(0)?, "cell_size width")?;
+    let height = extract_u16(&sequence.get_item(1)?, "cell_size height")?;
+    if width == 0 || height == 0 {
+        return Err(value_error("cell_size width and height must be positive"));
+    }
+    Ok(PixelSize { width, height })
 }
 
 pub(crate) fn parse_wait(value: Option<&Bound<'_, PyAny>>) -> PyResult<WaitSpec> {

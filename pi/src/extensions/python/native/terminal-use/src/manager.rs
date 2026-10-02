@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use nix::sys::signal::Signal;
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
@@ -13,9 +13,10 @@ use rustc_hash::FxHashMap;
 use crate::diagnostics;
 use crate::error::{TerminalError, TerminalResult};
 use crate::model::{
-    DrainOutcome, InputSpec, RawOutput, Rect, ScreenSnapshot, SessionInfo, WaitSpec,
+    DrainOutcome, InputSpec, PixelSize, RawOutput, Rect, ScreenSnapshot, SessionInfo, Size,
+    WaitSpec,
 };
-use crate::session::Session;
+use crate::session::{ScreenGeometry, Session, pty_pixel_size};
 
 /// A worker-local registry of child PTY sessions.
 pub(crate) struct Manager {
@@ -38,6 +39,7 @@ impl Manager {
         env: Option<HashMap<String, String>>,
         rows: u16,
         cols: u16,
+        cell_size: PixelSize,
     ) -> TerminalResult<SessionInfo> {
         if argv.is_empty() || argv[0].is_empty() {
             return Err(TerminalError::invalid(
@@ -47,6 +49,12 @@ impl Manager {
         if rows == 0 || cols == 0 {
             return Err(TerminalError::invalid("rows and cols must be positive"));
         }
+        if cell_size.width == 0 || cell_size.height == 0 {
+            return Err(TerminalError::invalid(
+                "cell_size width and height must be positive",
+            ));
+        }
+        let (pixel_width, pixel_height) = pty_pixel_size(cols, rows, cell_size)?;
         if let Some(cwd) = cwd.as_deref()
             && !Path::new(cwd).is_dir()
         {
@@ -60,8 +68,8 @@ impl Manager {
             .openpty(PtySize {
                 rows,
                 cols,
-                pixel_width: 0,
-                pixel_height: 0,
+                pixel_width,
+                pixel_height,
             })
             .map_err(|error| TerminalError::runtime(format!("open PTY failed: {error}")))?;
 
@@ -102,13 +110,29 @@ impl Manager {
             .spawn_command(command)
             .map_err(|error| TerminalError::runtime(format!("spawn PTY child failed: {error}")))?;
         let id = format!("term-{}", self.next_id.fetch_add(1, Ordering::Relaxed));
-        let session = Session::new(id.clone(), pair.master, writer, child, reader, rows, cols)?;
+        let session = Session::new(
+            id.clone(),
+            pair.master,
+            writer,
+            child,
+            reader,
+            ScreenGeometry {
+                size: Size { rows, cols },
+                cell_size,
+            },
+        )?;
         let info = session.info();
         self.sessions
             .lock()
             .map_err(|_| TerminalError::runtime("terminal session registry mutex poisoned"))?
             .insert(id.clone(), Arc::clone(&session));
-        diagnostics::event(&id, &format!("opened pid={}", info.pid));
+        diagnostics::event(
+            &id,
+            &format!(
+                "opened pid={} cols={cols} rows={rows} cell_width={} cell_height={}",
+                info.pid, cell_size.width, cell_size.height
+            ),
+        );
         Ok(info)
     }
 
@@ -132,23 +156,43 @@ impl Manager {
         &self,
         session_id: &str,
         rect: Option<Rect>,
-        wait_for: WaitSpec,
-        timeout: f64,
+        wait_for: &WaitSpec,
         trim_trailing_spaces: bool,
         include_cells: bool,
+        include_images: bool,
     ) -> TerminalResult<ScreenSnapshot> {
+        self.session(session_id)?.read(
+            rect,
+            wait_for,
+            trim_trailing_spaces,
+            include_cells,
+            include_images,
+        )
+    }
+
+    /// Wait for a screen or raw pattern for up to `timeout` and report whether it matched.
+    pub(crate) fn wait_screen(
+        &self,
+        session_id: &str,
+        rect: Option<Rect>,
+        wait_for: &WaitSpec,
+        timeout: f64,
+        trim_trailing_spaces: bool,
+    ) -> TerminalResult<bool> {
         if !timeout.is_finite() || timeout < 0.0 {
             return Err(TerminalError::invalid(
                 "timeout must be a finite non-negative number",
             ));
         }
-        Ok(self.session(session_id)?.read(
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs_f64(timeout))
+            .ok_or_else(|| TerminalError::invalid("timeout is too large"))?;
+        self.session(session_id)?.wait_screen(
             rect,
-            &wait_for,
-            Duration::from_secs_f64(timeout),
+            wait_for,
+            deadline.saturating_duration_since(Instant::now()),
             trim_trailing_spaces,
-            include_cells,
-        ))
+        )
     }
 
     pub(crate) fn read_raw(
