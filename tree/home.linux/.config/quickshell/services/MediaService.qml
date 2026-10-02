@@ -34,6 +34,9 @@ Singleton {
         return ps.length > 0 ? ps[0] : null;
     }
 
+    // 播放器实例与其原生曲目标识共同区分切歌；标题、歌词两端使用同一标识。
+    readonly property string activeTrackKey: activePlayer ? activePlayer.dbusName + "#" + activePlayer.uniqueId : ""
+
     // MPRIS position 默认不响应式（省 CPU），需播放时周期 emit positionChanged()
     // 才能让进度条/时间绑定刷新。收口在此，bar 与面板的进度一处驱动。
     Timer {

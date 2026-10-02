@@ -41,7 +41,7 @@ BarModule {
         }
         Text {
             id: secondsText
-            text: Qt.formatTime(clock.date, ":ss") + " "
+            text: Qt.formatTime(clock.date, ":ss")
             visible: !root.showDate
             width: implicitWidth * (1 - root.detailProgress)
             opacity: 1 - root.detailProgress

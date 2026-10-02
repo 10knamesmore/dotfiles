@@ -34,8 +34,6 @@ Loader {
             return cCpu;
         case "memory":
             return cMemory;
-        case "audio":
-            return cAudio;
         case "network":
             return cNetwork;
         case "bluetooth":
@@ -97,12 +95,6 @@ Loader {
     Component {
         id: cMemory
         MemoryModule {
-            flat: host.flat
-        }
-    }
-    Component {
-        id: cAudio
-        AudioModule {
             flat: host.flat
         }
     }

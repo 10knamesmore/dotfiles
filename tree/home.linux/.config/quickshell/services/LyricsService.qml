@@ -1,44 +1,58 @@
 import "../state"
 import QtQuick
 import Quickshell
-import Quickshell.Io
 
-// 歌词服务 — 跟随 MediaService.activePlayer，一次 playerctl --format 取多路歌词：
-//   mineral:words(逐字 JSON) / xesam:asText(行级原文) / mineral:translation / mineral:romanization
-// 渐进降级：有逐字用逐字，无则回退行级 asText；翻译/罗马音按时间轴合并为附加层。
-// 解析结果写入 LyricsState.*（bar 模块 / 媒体面板读取）。
+// 读取当前播放器的 MPRIS 歌词元数据，合并原文、逐字、翻译与罗马音到 LyricsState。
+// 播放时按帧同步歌词时间；暂停、跳转和偏移变化立即同步，不另起进程查询歌词。
 Scope {
     id: root
 
-    // 多 key 一次取，自定义 key 缺失时为空串（不报错）；分隔符取歌词内容不会出现的串
-    readonly property string _sep: "@@MFS@@"
-    readonly property string _fmt: "{{mineral:words}}" + _sep + "{{xesam:asText}}" + _sep + "{{mineral:translation}}" + _sep + "{{mineral:romanization}}"
+    readonly property var player: MediaService.activePlayer
+    property string lastLyrics: ""
 
-    readonly property var _lyricsPlayer: MediaService.activePlayer
-    property string _lyricsTrackKey: _lyricsPlayer ? (_lyricsPlayer.identity + "|" + _lyricsPlayer.trackTitle) : ""
-    property string _lastRaw: "" // 上一次成功的原始多路文本，双缓冲比较
+    function refreshLyrics() {
+        const metadata = player ? player.metadata : {};
+        const raw = [metadata["mineral:words"] || "", metadata["xesam:asText"] || "",
+            metadata["mineral:translation"] || "", metadata["mineral:romanization"] || ""];
+        const serialized = JSON.stringify(raw);
+        if (LyricsState.lyricsTrackId === MediaService.activeTrackKey && lastLyrics === serialized)
+            return;
 
-    on_LyricsTrackKeyChanged: {
-        if (_lyricsTrackKey && _lyricsPlayer) {
-            _resetLyrics();
-            LyricsState.lyricsTrackId = _lyricsTrackKey;
-            _pollTimer._attempts = 0;
-            _pollTimer.restart();
-        } else {
-            _pollTimer.stop();
-            _resetLyrics();
-            LyricsState.lyricsTrackId = "";
-        }
-    }
-
-    function _resetLyrics() {
-        _lastRaw = ""; // 双缓冲比较只在单曲内有效——切歌必须重置，否则回放旧曲会命中残留 raw 而永不重填
-        LyricsState.lyricsLines = [];
+        lastLyrics = serialized;
+        const built = _buildLines(raw[0], raw[1], raw[2], raw[3]);
+        LyricsState.lyricsTrackId = MediaService.activeTrackKey;
+        LyricsState.lyricsLines = built.lines;
+        LyricsState.hasWords = built.hasWords;
+        LyricsState.hasTranslation = built.lines.some(line => line.translation.length > 0);
+        LyricsState.hasRomanization = built.lines.some(line => line.romanization.length > 0);
         LyricsState.currentLyricIndex = -1;
         LyricsState.currentLyric = "";
-        LyricsState.hasWords = false;
-        LyricsState.hasTranslation = false;
-        LyricsState.hasRomanization = false;
+        syncPosition();
+        console.info("[lyrics] metadata updated:", MediaService.activeTrackKey,
+            "lines:", built.lines.length, "word timing:", built.hasWords);
+    }
+
+    function syncPosition() {
+        _syncLyric(player ? player.position + LyricsState.lyricsOffset : 0);
+    }
+
+    Component.onCompleted: refreshLyrics()
+
+    Connections {
+        target: MediaService
+        function onActiveTrackKeyChanged() { Qt.callLater(root.refreshLyrics); }
+    }
+
+    Connections {
+        target: root.player
+        function onMetadataChanged() { Qt.callLater(root.refreshLyrics); }
+        function onPositionChanged() { root.syncPosition(); }
+        function onIsPlayingChanged() { root.syncPosition(); }
+    }
+
+    Connections {
+        target: LyricsState
+        function onLyricsOffsetChanged() { root.syncPosition(); }
     }
 
     // ── 解析：行级 LRC [mm:ss.xx]text → [{time(秒), text}] ──
@@ -103,49 +117,6 @@ Scope {
         return { "lines": lines, "hasWords": hasWords };
     }
 
-    Timer {
-        id: _pollTimer
-        interval: 500
-        repeat: true
-        property int _attempts: 0
-        readonly property int _maxAttempts: 20 // 约 10 秒，避免无歌词曲目无限轮询
-        onTriggered: {
-            if (!root._lyricsPlayer || _attempts >= _maxAttempts) {
-                stop();
-                return;
-            }
-            _attempts++;
-            _pollProc.command = ["playerctl", "-p", root._lyricsPlayer.identity, "metadata", "--format", root._fmt];
-            _pollProc.running = true;
-        }
-    }
-
-    Process {
-        id: _pollProc
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let raw = this.text;
-                if (!raw || raw.trim().length === 0)
-                    return;
-                if (raw === root._lastRaw)
-                    return; // 内容没变，继续轮询等待数据
-                let parts = raw.split(root._sep);
-                let built = root._buildLines(parts[0] || "", parts[1] || "", parts[2] || "", parts[3] || "");
-                if (built.lines.length === 0)
-                    return; // 还没拿到任何歌词，继续轮询
-                root._lastRaw = raw;
-                LyricsState.lyricsLines = built.lines;
-                LyricsState.hasWords = built.hasWords;
-                LyricsState.hasTranslation = built.lines.some(l => l.translation && l.translation.length > 0);
-                LyricsState.hasRomanization = built.lines.some(l => l.romanization && l.romanization.length > 0);
-                LyricsState.currentLyricIndex = -1;
-                LyricsState.currentLyric = "";
-                _pollTimer.stop();
-            }
-        }
-    }
-
     // ── 同步当前行 + 当前时间（逐字 wipe 用）──
     function _syncLyric(positionSec) {
         LyricsState.currentTimeMs = positionSec * 1000;
@@ -168,16 +139,9 @@ Scope {
         }
     }
 
-    // 100ms 直接读 position 实时值（getter 总返回当前值，不依赖 positionChanged），
-    // 逐字高亮要够细，故比行级歌词更快。
-    Timer {
-        interval: 100
-        // 暂停时 position 不动，无需 10Hz 重算（暂停瞬间的最后一 tick 已定住 currentLyric）
-        running: root._lyricsPlayer !== null && root._lyricsPlayer.isPlaying && LyricsState.lyricsLines.length > 0
-        repeat: true
-        onTriggered: {
-            if (root._lyricsPlayer)
-                root._syncLyric(root._lyricsPlayer.position + LyricsState.lyricsOffset);
-        }
+    // position getter 在本地计算播放位置；逐字扫亮直接跟随渲染帧，不用定时器插值。
+    FrameAnimation {
+        running: root.player !== null && root.player.isPlaying && LyricsState.lyricsLines.length > 0
+        onTriggered: root.syncPosition()
     }
 }

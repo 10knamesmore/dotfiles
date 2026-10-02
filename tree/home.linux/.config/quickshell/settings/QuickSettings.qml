@@ -140,15 +140,6 @@ PanelOverlay {
                 Layout.fillWidth: true
             }
 
-            // ── 天气卡片 ──
-            WeatherCard {
-                Layout.fillWidth: true
-            }
-
-            Divider {
-                Layout.fillWidth: true
-            }
-
             // ── 截图 ──
             SectionLabel {
                 text: "工具"

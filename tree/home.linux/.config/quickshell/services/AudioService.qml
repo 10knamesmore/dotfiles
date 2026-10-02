@@ -39,9 +39,21 @@ Singleton {
 
     Process {
         id: _setProc
+        onExited: exitCode => {
+            if (exitCode === 0)
+                console.info("[audio] set-volume completed:", command[5]);
+            else
+                console.warn("[audio] set-volume failed, exit:", exitCode);
+        }
     }
 
     Process {
         id: _muteProc
+        onExited: exitCode => {
+            if (exitCode === 0)
+                console.info("[audio] mute toggle completed");
+            else
+                console.warn("[audio] mute toggle failed, exit:", exitCode);
+        }
     }
 }
