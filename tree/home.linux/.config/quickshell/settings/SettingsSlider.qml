@@ -32,7 +32,6 @@ ColumnLayout {
             font.family: Fonts.family
             font.pixelSize: Fonts.small
         }
-
     }
 
     Slider {
@@ -74,18 +73,14 @@ ColumnLayout {
                         position: 1
                         color: root.accentColor
                     }
-
                 }
 
                 Behavior on width {
                     NumberAnimation {
                         duration: 80
                     }
-
                 }
-
             }
-
         }
 
         handle: Rectangle {
@@ -115,9 +110,7 @@ ColumnLayout {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.standard
                     }
-
                 }
-
             }
 
             Behavior on scale {
@@ -126,7 +119,6 @@ ColumnLayout {
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Anim.elastic
                 }
-
             }
 
             Behavior on color {
@@ -135,11 +127,7 @@ ColumnLayout {
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Anim.standard
                 }
-
             }
-
         }
-
     }
-
 }

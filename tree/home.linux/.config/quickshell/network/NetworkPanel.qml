@@ -37,11 +37,9 @@ PanelOverlay {
     property bool editProxyBrowserOnly: false
     property bool editLoading: false
     property string editSaveMsg: ""
-    property var savedNetworks: ({
-    })
+    property var savedNetworks: ({})
     property var _scanBuf: []
-    property var _savedBuf: ({
-    })
+    property var _savedBuf: ({})
 
     // ── 数据获取 ──
     function checkWifiRadio() {
@@ -50,7 +48,7 @@ PanelOverlay {
 
     function scanNetworks() {
         if (!root.wifiEnabled)
-            return ;
+            return;
 
         scanProc.running = true;
     }
@@ -66,7 +64,6 @@ PanelOverlay {
             let item = networkModel.get(i);
             if (q.length === 0 || item.ssid.toLowerCase().includes(q))
                 filteredModel.append(item);
-
         }
     }
 
@@ -126,7 +123,6 @@ PanelOverlay {
 
             if (root.editGateway)
                 args = args.concat(["ipv4.gateway", root.editGateway]);
-
         }
         if (root.editDns)
             args = args.concat(["ipv4.dns", root.editDns]);
@@ -233,15 +229,13 @@ PanelOverlay {
         onExited: {
             if (root.wifiEnabled)
                 ifaceProc.running = true;
-
         }
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 return root.wifiEnabled = data.trim() === "enabled";
             }
         }
-
     }
 
     // 获取无线接口名
@@ -251,14 +245,12 @@ PanelOverlay {
         command: ["sh", "-c", "ip route 2>/dev/null | awk '/^default/ {print $5; exit}'"]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let iface = data.trim();
                 if (iface)
                     root._wifiIface = iface;
-
             }
         }
-
     }
 
     // 扫描 WiFi 列表
@@ -268,8 +260,7 @@ PanelOverlay {
         command: ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,IN-USE", "dev", "wifi", "list", "--rescan", "auto"]
         onStarted: root._scanBuf = []
         onExited: {
-            let map = {
-            };
+            let map = {};
             for (let item of root._scanBuf) {
                 if (!map[item.ssid] || item.signal > map[item.ssid].signal || item.inUse) {
                     if (map[item.ssid] && map[item.ssid].inUse)
@@ -290,15 +281,16 @@ PanelOverlay {
                 return b.signal - a.signal;
             });
             networkModel.clear();
-            for (let item of sorted) networkModel.append(item)
+            for (let item of sorted)
+                networkModel.append(item);
             applyFilter();
         }
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let raw = data.trim();
                 if (!raw)
-                    return ;
+                    return;
 
                 let inUse = raw.endsWith(":*");
                 if (inUse)
@@ -312,7 +304,7 @@ PanelOverlay {
                 let signal = parseInt(raw.substring(lastColon + 1)) || 0;
                 let ssid = raw.substring(0, lastColon).replace(/\\:/g, ":");
                 if (!ssid)
-                    return ;
+                    return;
 
                 root._scanBuf.push({
                     "ssid": ssid,
@@ -323,7 +315,6 @@ PanelOverlay {
                 });
             }
         }
-
     }
 
     // 已保存网络列表
@@ -331,22 +322,19 @@ PanelOverlay {
         id: savedProc
 
         command: ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"]
-        onStarted: root._savedBuf = {
-        }
+        onStarted: root._savedBuf = {}
         onExited: {
             root.savedNetworks = root._savedBuf;
             scanNetworks();
         }
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let parts = data.split(":");
                 if (parts.length >= 2 && parts[parts.length - 1] === "802-11-wireless")
                     root._savedBuf[parts.slice(0, -1).join(":")] = true;
-
             }
         }
-
     }
 
     // WiFi 开关
@@ -378,11 +366,10 @@ PanelOverlay {
         }
 
         stderr: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 return connectProc._errBuf += data;
             }
         }
-
     }
 
     // 断开连接
@@ -404,7 +391,7 @@ PanelOverlay {
                 return (v === "--" || v === "") ? "" : v;
             }
 
-            onRead: (data) => {
+            onRead: data => {
                 let d = data.trim();
                 if (d.startsWith("connection.autoconnect:"))
                     root.editAutoConnect = d.split(":")[1].trim() === "yes";
@@ -438,7 +425,6 @@ PanelOverlay {
                     root.editProxyBrowserOnly = d.split(":")[1].trim() === "yes";
             }
         }
-
     }
 
     Process {
@@ -462,11 +448,10 @@ PanelOverlay {
         }
 
         stderr: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 return editSaveProc._errBuf += data;
             }
         }
-
     }
 
     Process {
@@ -542,9 +527,7 @@ PanelOverlay {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -560,9 +543,7 @@ PanelOverlay {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
 
             // WiFi 开关
@@ -585,9 +566,7 @@ PanelOverlay {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -603,11 +582,8 @@ PanelOverlay {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
-
         }
 
         // ── 搜索框 ──
@@ -653,11 +629,8 @@ PanelOverlay {
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
                     }
-
                 }
-
             }
-
         }
 
         Rectangle {
@@ -696,7 +669,6 @@ PanelOverlay {
             Item {
                 Layout.fillHeight: true
             }
-
         }
 
         // ── 空状态 ──
@@ -744,12 +716,11 @@ PanelOverlay {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: (mouse) => {
+                    onClicked: mouse => {
                         if (mouse.button === Qt.RightButton) {
                             // 右键：仅已保存网络可编辑
                             if (saved || inUse)
                                 root.openEditView(ssid);
-
                         } else {
                             if (inUse) {
                                 root.disconnectNetwork();
@@ -825,9 +796,7 @@ PanelOverlay {
                                 font.family: Fonts.family
                                 font.pixelSize: Fonts.caption
                             }
-
                         }
-
                     }
 
                     Text {
@@ -837,18 +806,14 @@ PanelOverlay {
                         font.pixelSize: Fonts.small
                         font.weight: Font.DemiBold
                     }
-
                 }
 
                 Behavior on color {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
-
         }
 
         // ── 错误提示 ──
@@ -911,7 +876,6 @@ PanelOverlay {
                             onAccepted: {
                                 if (text.length > 0)
                                     root.connectToNetwork(root.selectedSsid, text);
-
                             }
                             Keys.onEscapePressed: root.selectedSsid = ""
 
@@ -923,9 +887,7 @@ PanelOverlay {
                                 font: parent.font
                                 visible: !parent.text && !parent.activeFocus
                             }
-
                         }
-
                     }
 
                     Rectangle {
@@ -955,7 +917,6 @@ PanelOverlay {
                             onClicked: {
                                 if (passwordInput.text.length > 0)
                                     root.connectToNetwork(root.selectedSsid, passwordInput.text);
-
                             }
                         }
 
@@ -963,9 +924,7 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
 
                     Rectangle {
@@ -985,9 +944,7 @@ PanelOverlay {
                                 ColorAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
 
                         MouseArea {
@@ -1003,17 +960,11 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
     // ── 编辑视图 ──
@@ -1023,5 +974,4 @@ PanelOverlay {
         visible: root.editingSsid !== ""
         panel: root
     }
-
 }

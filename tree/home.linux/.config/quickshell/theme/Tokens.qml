@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 设计令牌 — 集中管理视觉常量，一处修改全局生效
 QtObject {

@@ -18,7 +18,10 @@ Scope {
     readonly property string _luaPath: _home + "/.local/state/hypr/monitors.local.lua"
     readonly property int _revertSeconds: 15
 
-    property var _store: ({ version: 1, profiles: {} })
+    property var _store: ({
+            version: 1,
+            profiles: {}
+        })
     property var _lastIpc: []           // 最近一次 hyprctl monitors -j 的原始数组
     property var _snapshot: []          // 应用前的布局快照（供回滚）
     property var _pending: []           // 待确认的 pending 布局
@@ -31,7 +34,17 @@ Scope {
     // ── 当前显示器（state 形态）→ 布局列表 ──
     function _monitorsToLayouts(mons) {
         return mons.map(function (m) {
-            return { name: m.name, enabled: m.enabled, mode: m.mode, x: m.x, y: m.y, scale: m.scale, transform: m.transform || 0, mirror: m.mirror || null, color: MM.colorOf(m) };
+            return {
+                name: m.name,
+                enabled: m.enabled,
+                mode: m.mode,
+                x: m.x,
+                y: m.y,
+                scale: m.scale,
+                transform: m.transform || 0,
+                mirror: m.mirror || null,
+                color: MM.colorOf(m)
+            };
         });
     }
 
@@ -105,10 +118,14 @@ Scope {
             return;
         root._hdrProbe = [];
         var byName = {};
-        arr.forEach(function (ipc) { byName[ipc.name] = ipc; });
+        arr.forEach(function (ipc) {
+            byName[ipc.name] = ipc;
+        });
         var rejected = [];
         var next = {};
-        Object.keys(MonitorState.hdrUnsupported).forEach(function (k) { next[k] = MonitorState.hdrUnsupported[k]; });
+        Object.keys(MonitorState.hdrUnsupported).forEach(function (k) {
+            next[k] = MonitorState.hdrUnsupported[k];
+        });
         want.forEach(function (l) {
             var ipc = byName[l.name];
             if (!ipc)
@@ -136,8 +153,9 @@ Scope {
         if (layouts.length === 0)
             return;
         if (_differsFromCurrent(layouts, arr))
-            _applyLayouts(layouts, false); // 已知良配，直接恢复，不走回滚条
+            _applyLayouts(layouts, false);
         else
+            // 已知良配，直接恢复，不走回滚条
             _writeLua(layouts);            // 已一致，仅确保开机文件最新
     }
 
@@ -155,7 +173,9 @@ Scope {
 
     // ── 应用 ──
     function _applyLayouts(layouts, withRevert) {
-        var anyEnabled = layouts.some(function (l) { return l.enabled; });
+        var anyEnabled = layouts.some(function (l) {
+            return l.enabled;
+        });
         if (!anyEnabled) {
             MonitorState.errorMsg = "不能禁用全部显示器";
             return;
@@ -164,7 +184,9 @@ Scope {
         // Hyprland lua 模式（non-legacy parser）禁用了运行时 hyprctl keyword（会报
         // "keyword can't work with non-legacy parsers. Use eval."）。须用 hyprctl eval
         // 跑 hl.monitor(...)。chunk 作为单个 argv 直传，无需 shell 转义。
-        var chunk = layouts.map(function (l) { return MM.monitorLuaLine(l); }).join("\n");
+        var chunk = layouts.map(function (l) {
+            return MM.monitorLuaLine(l);
+        }).join("\n");
         applyProc._withRevert = withRevert;
         applyProc._layouts = layouts;
         applyProc.command = ["hyprctl", "eval", chunk];
@@ -269,7 +291,9 @@ Scope {
                 if (text.indexOf("error") < 0 && text.indexOf("Error") < 0) {
                     MonitorState.errorMsg = "";
                     // 请求了 HDR 的屏留待下一次查询回读验证（hyprctl eval 对不支持的屏不报错）
-                    root._hdrProbe = (applyProc._layouts || []).filter(function (l) { return MM.isHdr(l); });
+                    root._hdrProbe = (applyProc._layouts || []).filter(function (l) {
+                        return MM.isHdr(l);
+                    });
                     root.queryMonitors(false); // 只刷新显示，跳过 reconciliation
                     if (applyProc._withRevert) {
                         MonitorState.revertSecs = root._revertSeconds;
@@ -297,8 +321,12 @@ Scope {
         }
     }
 
-    Process { id: notifyProc }
-    Process { id: mkdirProc }
+    Process {
+        id: notifyProc
+    }
+    Process {
+        id: mkdirProc
+    }
 
     // ── 文件写入（FileView：正确处理 UTF-8 + 原子写）──
     // 仅用于写（setText）。printErrors:false 抑制「文件首次不存在」的读取告警。

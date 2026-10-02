@@ -20,7 +20,10 @@ PanelWindow {
     property real closedOffsetX: 0
     property real closedOffsetY: 20
 
-    enum Entrance { Morph, Slide }
+    enum Entrance {
+        Morph,
+        Slide
+    }
     property int entrance: PanelOverlay.Morph
     property var _source: null
     property rect _returnBounds: Qt.rect(0, 0, 0, 0)
@@ -36,12 +39,9 @@ PanelWindow {
     property bool _keepVisible: false
     property bool _atTarget: false
     property bool _waitingForSize: false
-    readonly property bool _sizeReady: root.width > 0 && root.height > 0
-        && (hasMorphSource
-            ? root.width === _source.screen.width && root.height === _source.screen.height
-            : _matchesAnyScreen(root.width, root.height))
+    readonly property bool _sizeReady: root.width > 0 && root.height > 0 && (hasMorphSource ? root.width === _source.screen.width && root.height === _source.screen.height : _matchesAnyScreen(root.width, root.height))
 
-    signal closeRequested()
+    signal closeRequested
 
     function _matchesAnyScreen(w, h) {
         for (const screen of Quickshell.screens) {
@@ -78,8 +78,7 @@ PanelWindow {
         motion.stop();
         motion.from = panel.progress;
         motion.to = opening ? 1 : 0;
-        motion.duration = (hasMorphSource ? (opening ? 520 : 200) : Tokens.animElaborate)
-            * Math.abs(motion.to - motion.from);
+        motion.duration = (hasMorphSource ? (opening ? 520 : 200) : Tokens.animElaborate) * Math.abs(motion.to - motion.from);
         _atTarget = opening;
         motion.start();
     }
@@ -141,8 +140,7 @@ PanelWindow {
                 root._source.header.parent = headerDock;
                 MorphState.hold(root._source.item);
                 root._sourceHeld = true;
-                console.info("[panel-morph] live header on", root.screen.name,
-                    panel.targetX, panel.targetY, root.panelWidth, panel.targetHeight);
+                console.info("[panel-morph] live header on", root.screen.name, panel.targetX, panel.targetY, root.panelWidth, panel.targetHeight);
             }
             root._animate(true);
         }
@@ -152,9 +150,7 @@ PanelWindow {
         id: motion
         target: panel
         property: "progress"
-        easing.type: root.hasMorphSource
-            ? (root._atTarget ? Easing.OutBack : Easing.OutCubic)
-            : Easing.OutQuint
+        easing.type: root.hasMorphSource ? (root._atTarget ? Easing.OutBack : Easing.OutCubic) : Easing.OutQuint
         easing.overshoot: 0.9
         onFinished: {
             if (!root.showing && root.hasMorphSource)
@@ -171,11 +167,7 @@ PanelWindow {
     Binding {
         target: root._source ? root._source.item : null
         property: "expansion"
-        value: Math.max(0, Math.min(1, !root.hasMorphSource ? 0 : root._atTarget
-            ? (root._openingProgress < 1
-                ? root._openingDetails + (1 - root._openingDetails) * (panel.progress - root._openingProgress) / (1 - root._openingProgress)
-                : 1)
-            : (root._closingProgress > 0 ? root._closingDetails * panel.progress / root._closingProgress : 0)))
+        value: Math.max(0, Math.min(1, !root.hasMorphSource ? 0 : root._atTarget ? (root._openingProgress < 1 ? root._openingDetails + (1 - root._openingDetails) * (panel.progress - root._openingProgress) / (1 - root._openingProgress) : 1) : (root._closingProgress > 0 ? root._closingDetails * panel.progress / root._closingProgress : 0)))
         when: root.hasMorphSource
     }
 
@@ -206,7 +198,10 @@ PanelWindow {
         color: "#000000"
         opacity: root._atTarget && !root.hasMorphSource ? root.backdropOpacity : 0
         Behavior on opacity {
-            NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: Tokens.animNormal
+                easing.type: Easing.OutCubic
+            }
         }
     }
 
@@ -225,17 +220,11 @@ PanelWindow {
         property real progress: 0
         readonly property real revealProgress: Math.max(0, Math.min(1, progress))
         // 横向略微领先，纵向的回弹稍明显；两轴从第一帧同时运动。
-        readonly property real widthProgress: root.hasMorphSource
-            ? progress + 0.14 * Math.sin(Math.PI * progress) : progress
+        readonly property real widthProgress: root.hasMorphSource ? progress + 0.14 * Math.sin(Math.PI * progress) : progress
         readonly property real headerHeight: root.hasMorphSource ? root._source.bounds.height : 0
-        readonly property real targetHeight: Math.min(root.panelHeight + headerHeight,
-            root.hasMorphSource ? root.height - targetY - 10 : root.panelHeight)
-        readonly property real targetX: root.hasMorphSource
-            ? Math.max(10, Math.min(root.width - root.panelWidth - 10,
-                root._source.bounds.x + (root._source.bounds.width - root.panelWidth) / 2))
-            : (root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2)
-        readonly property real targetY: root.hasMorphSource ? root._source.bounds.y
-            : (root.panelTargetY >= 0 ? root.panelTargetY : (root.height - root.panelHeight) / 2)
+        readonly property real targetHeight: Math.min(root.panelHeight + headerHeight, root.hasMorphSource ? root.height - targetY - 10 : root.panelHeight)
+        readonly property real targetX: root.hasMorphSource ? Math.max(10, Math.min(root.width - root.panelWidth - 10, root._source.bounds.x + (root._source.bounds.width - root.panelWidth) / 2)) : (root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2)
+        readonly property real targetY: root.hasMorphSource ? root._source.bounds.y : (root.panelTargetY >= 0 ? root.panelTargetY : (root.height - root.panelHeight) / 2)
         readonly property real sourceX: root.hasMorphSource ? root._returnBounds.x : targetX + root.closedOffsetX
         readonly property real sourceY: root.hasMorphSource ? root._returnBounds.y : targetY + root.closedOffsetY
         readonly property real sourceWidth: root.hasMorphSource ? root._returnBounds.width : root.panelWidth
@@ -245,15 +234,10 @@ PanelWindow {
         y: sourceY + (targetY - sourceY) * progress
         width: sourceWidth + (root.panelWidth - sourceWidth) * widthProgress
         height: sourceHeight + (targetHeight - sourceHeight) * progress
-        radius: root.hasMorphSource
-            ? root._source.item.radius + (root.panelRadius - root._source.item.radius) * progress
-            : root.panelRadius
-        color: root.hasMorphSource
-            ? Qt.tint(root._source.item.color, Colors.withAlpha(Colors.surface0, revealProgress))
-            : Colors.surface0
+        radius: root.hasMorphSource ? root._source.item.radius + (root.panelRadius - root._source.item.radius) * progress : root.panelRadius
+        color: root.hasMorphSource ? Qt.tint(root._source.item.color, Colors.withAlpha(Colors.surface0, revealProgress)) : Colors.surface0
         border.color: Colors.overlay(Tokens.borderAlpha)
-        border.width: root.hasMorphSource
-            ? root._source.item.border.width + (1 - root._source.item.border.width) * revealProgress : 1
+        border.width: root.hasMorphSource ? root._source.item.border.width + (1 - root._source.item.border.width) * revealProgress : 1
         opacity: root.hasMorphSource ? (root._sourceHeld ? 1 : 0) : (root._atTarget ? 1 : 0)
         clip: true
 
@@ -324,7 +308,10 @@ PanelWindow {
 
         Behavior on opacity {
             enabled: !root.hasMorphSource
-            NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: Tokens.animNormal
+                easing.type: Easing.OutCubic
+            }
         }
     }
 }

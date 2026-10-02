@@ -12,7 +12,12 @@ PanelWindow {
     property bool presented: false
     readonly property ControlConnection connection: service.currentConnection
 
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
     visible: service.controlling
     color: "transparent"
     focusable: false
@@ -20,7 +25,9 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     WlrLayershell.namespace: "pi-computer-control"
-    mask: Region { item: disconnectButton }
+    mask: Region {
+        item: disconnectButton
+    }
 
     onVisibleChanged: {
         if (!visible)

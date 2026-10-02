@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 顶栏资源统计 — SystemStatsService 每秒更新，Cpu/Memory/NetSpeed 胶囊读取；不保存历史曲线。
 QtObject {

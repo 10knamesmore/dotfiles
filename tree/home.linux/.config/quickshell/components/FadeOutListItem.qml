@@ -16,8 +16,8 @@ Item {
     property real _heightProgress: 1
 
     // 用于宿主等待全部退场结束后显示空态；提前销毁也会配对发射。
-    signal removalStarted()
-    signal removalFinished()
+    signal removalStarted
+    signal removalFinished
 
     height: (implicitHeight + itemSpacing) * _heightProgress
     enabled: !removing
@@ -63,7 +63,9 @@ Item {
         }
 
         SequentialAnimation {
-            PauseAnimation { duration: 40 }
+            PauseAnimation {
+                duration: 40
+            }
             NumberAnimation {
                 target: root
                 property: "_heightProgress"

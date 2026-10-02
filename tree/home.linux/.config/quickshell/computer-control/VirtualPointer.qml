@@ -7,11 +7,19 @@ Item {
 
     property ControlConnection connection: null
     required property string screenName
-    readonly property bool onThisScreen: connection !== null && connection.pointer !== null
-        && connection.pointer.monitor === screenName
+    readonly property bool onThisScreen: connection !== null && connection.pointer !== null && connection.pointer.monitor === screenName
     property bool positioned: false
     property real progress: 1
-    property var curve: ({ startX: 0, startY: 0, control1X: 0, control1Y: 0, control2X: 0, control2Y: 0, endX: 0, endY: 0 })
+    property var curve: ({
+            startX: 0,
+            startY: 0,
+            control1X: 0,
+            control1Y: 0,
+            control2X: 0,
+            control2Y: 0,
+            endX: 0,
+            endY: 0
+        })
     readonly property real cursorX: bezier(curve.startX, curve.control1X, curve.control2X, curve.endX)
     readonly property real cursorY: bezier(curve.startY, curve.control1Y, curve.control2Y, curve.endY)
     readonly property bool pressed: connection !== null && (connection.input.clickFeedback || connection.input.buttons.length > 0)
@@ -42,12 +50,14 @@ Item {
         const normalY = distance ? dx / distance : 0;
         motion.stop();
         curve = {
-            startX: fromX, startY: fromY,
+            startX: fromX,
+            startY: fromY,
             control1X: fromX + dx * 0.26 + normalX * bend,
             control1Y: fromY + dy * 0.26 + normalY * bend,
             control2X: fromX + dx * 0.72 + normalX * bend * 0.65,
             control2Y: fromY + dy * 0.72 + normalY * bend * 0.65,
-            endX: target.x, endY: target.y
+            endX: target.x,
+            endY: target.y
         };
         positioned = true;
         progress = 0;
@@ -62,7 +72,9 @@ Item {
     onScreenNameChanged: movePointer()
     Connections {
         target: root.connection
-        function onPointerChanged() { root.movePointer(); }
+        function onPointerChanged() {
+            root.movePointer();
+        }
     }
 
     NumberAnimation {
@@ -89,22 +101,42 @@ Item {
             transformOrigin: Item.TopLeft
             preferredRendererType: Shape.CurveRenderer
             Accessible.ignored: true
-            Behavior on scale { NumberAnimation { duration: 70; easing.type: Easing.OutCubic } }
+            Behavior on scale {
+                NumberAnimation {
+                    duration: 70
+                    easing.type: Easing.OutCubic
+                }
+            }
             ShapePath {
                 strokeColor: "#181825"
                 strokeWidth: 1.6
                 fillColor: root.pressed ? "#e4e8ff" : "#b4befe"
                 joinStyle: ShapePath.RoundJoin
-                startX: 1; startY: 1
-                PathLine { x: 24; y: 20 }
-                PathLine { x: 14; y: 21 }
-                PathLine { x: 10; y: 32 }
-                PathLine { x: 1; y: 1 }
+                startX: 1
+                startY: 1
+                PathLine {
+                    x: 24
+                    y: 20
+                }
+                PathLine {
+                    x: 14
+                    y: 21
+                }
+                PathLine {
+                    x: 10
+                    y: 32
+                }
+                PathLine {
+                    x: 1
+                    y: 1
+                }
             }
         }
         Rectangle {
-            x: 21; y: 28
-            width: 28; height: 19
+            x: 21
+            y: 28
+            width: 28
+            height: 19
             radius: 6
             topLeftRadius: 2
             color: "#b4befe"

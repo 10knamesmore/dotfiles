@@ -39,9 +39,7 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
-
     }
 
     // 点击遮罩关闭
@@ -110,7 +108,6 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
 
         Behavior on scale {
@@ -119,9 +116,7 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.decelerate
             }
-
         }
-
     }
 
     component PowerButton: Rectangle {
@@ -160,7 +155,6 @@ PanelWindow {
                 font.pixelSize: Fonts.body
                 anchors.horizontalCenter: parent.horizontalCenter
             }
-
         }
 
         MouseArea {
@@ -183,7 +177,6 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
 
         Behavior on border.color {
@@ -192,9 +185,6 @@ PanelWindow {
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Anim.standard
             }
-
         }
-
     }
-
 }

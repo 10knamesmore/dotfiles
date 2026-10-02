@@ -11,8 +11,8 @@ Rectangle {
     property string status: ""
     property bool toggled: false
 
-    signal clicked()
-    signal rightClicked()
+    signal clicked
+    signal rightClicked
 
     Layout.fillWidth: true
     // 拉伸到行高：不同图标字形的 bounding box 高度有差异，
@@ -44,9 +44,7 @@ Rectangle {
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Anim.standard
                 }
-
             }
-
         }
 
         Text {
@@ -65,7 +63,6 @@ Rectangle {
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
-
     }
 
     MouseArea {
@@ -75,7 +72,7 @@ Rectangle {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: (mouse) => {
+        onClicked: mouse => {
             if (mouse.button === Qt.RightButton)
                 root.rightClicked();
             else
@@ -89,7 +86,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on border.color {
@@ -98,7 +94,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on scale {
@@ -107,7 +102,5 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.elastic
         }
-
     }
-
 }

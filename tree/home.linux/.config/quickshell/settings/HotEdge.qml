@@ -35,5 +35,4 @@ PanelWindow {
             PanelState.settingsOpen = true;
         }
     }
-
 }

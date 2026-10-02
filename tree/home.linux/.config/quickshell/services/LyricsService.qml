@@ -12,8 +12,7 @@ Scope {
 
     function refreshLyrics() {
         const metadata = player ? player.metadata : {};
-        const raw = [metadata["mineral:words"] || "", metadata["xesam:asText"] || "",
-            metadata["mineral:translation"] || "", metadata["mineral:romanization"] || ""];
+        const raw = [metadata["mineral:words"] || "", metadata["xesam:asText"] || "", metadata["mineral:translation"] || "", metadata["mineral:romanization"] || ""];
         const serialized = JSON.stringify(raw);
         if (LyricsState.lyricsTrackId === MediaService.activeTrackKey && lastLyrics === serialized)
             return;
@@ -28,8 +27,7 @@ Scope {
         LyricsState.currentLyricIndex = -1;
         LyricsState.currentLyric = "";
         syncPosition();
-        console.info("[lyrics] metadata updated:", MediaService.activeTrackKey,
-            "lines:", built.lines.length, "word timing:", built.hasWords);
+        console.info("[lyrics] metadata updated:", MediaService.activeTrackKey, "lines:", built.lines.length, "word timing:", built.hasWords);
     }
 
     function syncPosition() {
@@ -40,19 +38,29 @@ Scope {
 
     Connections {
         target: MediaService
-        function onActiveTrackKeyChanged() { Qt.callLater(root.refreshLyrics); }
+        function onActiveTrackKeyChanged() {
+            Qt.callLater(root.refreshLyrics);
+        }
     }
 
     Connections {
         target: root.player
-        function onMetadataChanged() { Qt.callLater(root.refreshLyrics); }
-        function onPositionChanged() { root.syncPosition(); }
-        function onIsPlayingChanged() { root.syncPosition(); }
+        function onMetadataChanged() {
+            Qt.callLater(root.refreshLyrics);
+        }
+        function onPositionChanged() {
+            root.syncPosition();
+        }
+        function onIsPlayingChanged() {
+            root.syncPosition();
+        }
     }
 
     Connections {
         target: LyricsState
-        function onLyricsOffsetChanged() { root.syncPosition(); }
+        function onLyricsOffsetChanged() {
+            root.syncPosition();
+        }
     }
 
     // ── 解析：行级 LRC [mm:ss.xx]text → [{time(秒), text}] ──
@@ -64,7 +72,10 @@ Scope {
                 let time = parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3]) / (m[3].length === 3 ? 1000 : 100);
                 let text = m[4].trim();
                 if (text.length > 0)
-                    result.push({ "time": time, "text": text });
+                    result.push({
+                        "time": time,
+                        "text": text
+                    });
             }
         }
         result.sort((a, b) => a.time - b.time);
@@ -80,8 +91,16 @@ Scope {
             if (!Array.isArray(arr))
                 return [];
             return arr.map(line => {
-                let words = (line.words || []).map(w => ({ "start": w.start, "duration": w.duration, "text": w.text }));
-                return { "start": line.start, "words": words, "text": words.map(w => w.text).join("") };
+                let words = (line.words || []).map(w => ({
+                            "start": w.start,
+                            "duration": w.duration,
+                            "text": w.text
+                        }));
+                return {
+                    "start": line.start,
+                    "words": words,
+                    "text": words.map(w => w.text).join("")
+                };
             });
         } catch (e) {
             return [];
@@ -94,7 +113,10 @@ Scope {
             let best = -1, bestDiff = 1e9;
             for (let i = 0; i < lines.length; i++) {
                 let d = Math.abs(lines[i].time - a.time);
-                if (d < bestDiff) { bestDiff = d; best = i; }
+                if (d < bestDiff) {
+                    bestDiff = d;
+                    best = i;
+                }
             }
             if (best >= 0 && bestDiff < 0.5)
                 lines[best][field] = a.text;
@@ -107,14 +129,29 @@ Scope {
         let wl = _parseWords(wordsJson);
         if (wl.length > 0) {
             hasWords = true;
-            lines = wl.map(w => ({ "time": w.start / 1000, "text": w.text, "words": w.words, "translation": "", "romanization": "" }));
+            lines = wl.map(w => ({
+                        "time": w.start / 1000,
+                        "text": w.text,
+                        "words": w.words,
+                        "translation": "",
+                        "romanization": ""
+                    }));
         } else {
             hasWords = false;
-            lines = _parseLrc(asText).map(l => ({ "time": l.time, "text": l.text, "words": [], "translation": "", "romanization": "" }));
+            lines = _parseLrc(asText).map(l => ({
+                        "time": l.time,
+                        "text": l.text,
+                        "words": [],
+                        "translation": "",
+                        "romanization": ""
+                    }));
         }
         _mergeAux(lines, _parseLrc(translation), "translation");
         _mergeAux(lines, _parseLrc(romanization), "romanization");
-        return { "lines": lines, "hasWords": hasWords };
+        return {
+            "lines": lines,
+            "hasWords": hasWords
+        };
     }
 
     // ── 同步当前行 + 当前时间（逐字 wipe 用）──

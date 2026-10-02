@@ -9,9 +9,9 @@ Loader {
     id: host
 
     property var item: ({
-        "id": "",
-        "props": {}
-    })
+            "id": "",
+            "props": {}
+        })
     property var barScreen: null
     property var barWindow: null
     property bool flat: false

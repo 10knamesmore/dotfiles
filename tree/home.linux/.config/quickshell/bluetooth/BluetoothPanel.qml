@@ -160,8 +160,12 @@ PanelOverlay {
         }
     }
 
-    ListModel { id: deviceModel }
-    ListModel { id: filteredModel }
+    ListModel {
+        id: deviceModel
+    }
+    ListModel {
+        id: filteredModel
+    }
 
     Timer {
         id: focusTimer
@@ -182,7 +186,7 @@ PanelOverlay {
         id: adapterProc
         command: ["bluetoothctl", "show"]
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 if (data.includes("Powered:"))
                     root.btPowered = data.includes("yes");
             }
@@ -211,10 +215,13 @@ PanelOverlay {
             root._infoIdx = 0;
         }
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let m = data.match(/^Device\s+([0-9A-Fa-f:]{17})\s+(.+)$/);
                 if (m)
-                    root._infoQueue.push({ "mac": m[1], "name": m[2].trim() });
+                    root._infoQueue.push({
+                        "mac": m[1],
+                        "name": m[2].trim()
+                    });
             }
         }
         onExited: {
@@ -234,14 +241,17 @@ PanelOverlay {
                 _pairedMacs[d.mac] = true;
         }
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let m = data.match(/^Device\s+([0-9A-Fa-f:]{17})\s+(.+)$/);
                 if (m) {
                     let mac = m[1], name = m[2].trim();
                     // 跳过已在列表中的、以及名称是 MAC 的未解析设备
                     if (discoveredProc._pairedMacs[mac] || root._isMacName(name))
                         return;
-                    root._infoQueue.push({ "mac": mac, "name": name });
+                    root._infoQueue.push({
+                        "mac": mac,
+                        "name": name
+                    });
                 }
             }
         }
@@ -262,7 +272,7 @@ PanelOverlay {
         property int _battery: -1
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let d = data.trim();
                 if (d.startsWith("Connected:"))
                     infoProc._connected = d.includes("yes");
@@ -292,14 +302,19 @@ PanelOverlay {
     }
 
     // ── 操作进程 ──
-    Process { id: powerProc }
+    Process {
+        id: powerProc
+    }
 
     Process {
         id: scanProc
         onExited: root.scanning = false
     }
 
-    Process { id: scanStopProc; command: ["bluetoothctl", "scan", "off"] }
+    Process {
+        id: scanStopProc
+        command: ["bluetoothctl", "scan", "off"]
+    }
 
     Process {
         id: connectProc
@@ -315,7 +330,9 @@ PanelOverlay {
             }
         }
         stderr: SplitParser {
-            onRead: (data) => { connectProc._errBuf += data; }
+            onRead: data => {
+                connectProc._errBuf += data;
+            }
         }
     }
 
@@ -341,7 +358,9 @@ PanelOverlay {
             }
         }
         stderr: SplitParser {
-            onRead: (data) => { pairProc._errBuf += data; }
+            onRead: data => {
+                pairProc._errBuf += data;
+            }
         }
     }
 
@@ -390,7 +409,9 @@ PanelOverlay {
                 color: Colors.text
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             // 扫描按钮
             Rectangle {
@@ -398,9 +419,7 @@ PanelOverlay {
                 height: 26
                 radius: Tokens.radiusFull
                 visible: root.btPowered
-                color: root.scanning
-                    ? Colors.withAlpha(Colors.blue, 0.15)
-                    : (scanBtnArea.containsMouse ? Colors.surface2 : "transparent")
+                color: root.scanning ? Colors.withAlpha(Colors.blue, 0.15) : (scanBtnArea.containsMouse ? Colors.surface2 : "transparent")
 
                 Text {
                     id: scanBtnText
@@ -410,7 +429,11 @@ PanelOverlay {
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small
 
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -426,7 +449,11 @@ PanelOverlay {
                     }
                 }
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
             }
 
             // 刷新
@@ -443,7 +470,11 @@ PanelOverlay {
                     color: refreshArea.containsMouse ? Colors.blue : Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.icon
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -454,7 +485,11 @@ PanelOverlay {
                     onClicked: root.refreshDevices()
                 }
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
             }
 
             // 电源开关
@@ -462,9 +497,7 @@ PanelOverlay {
                 width: powerToggleText.implicitWidth + 16
                 height: 26
                 radius: Tokens.radiusFull
-                color: root.btPowered
-                    ? (powerToggleArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15))
-                    : (powerToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
+                color: root.btPowered ? (powerToggleArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.25) : Colors.withAlpha(Colors.blue, 0.15)) : (powerToggleArea.containsMouse ? Colors.surface2 : Colors.surface1)
 
                 Text {
                     id: powerToggleText
@@ -473,7 +506,11 @@ PanelOverlay {
                     color: root.btPowered ? Colors.blue : Colors.subtext0
                     font.family: Fonts.family
                     font.pixelSize: Fonts.small
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -484,7 +521,11 @@ PanelOverlay {
                     onClicked: root.togglePower()
                 }
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
             }
         }
 
@@ -603,12 +644,8 @@ PanelOverlay {
                 width: ListView.view.width
                 height: devRow.implicitHeight + 12
                 radius: Tokens.radiusMS
-                color: connected
-                    ? Colors.withAlpha(Colors.green, devHover.containsMouse ? 0.2 : 0.1)
-                    : (devHover.containsMouse ? Colors.surface1 : "transparent")
-                border.color: connected
-                    ? Colors.withAlpha(Colors.green, Tokens.borderHoverAlpha)
-                    : "transparent"
+                color: connected ? Colors.withAlpha(Colors.green, devHover.containsMouse ? 0.2 : 0.1) : (devHover.containsMouse ? Colors.surface1 : "transparent")
+                border.color: connected ? Colors.withAlpha(Colors.green, Tokens.borderHoverAlpha) : "transparent"
                 border.width: connected ? 1 : 0
 
                 MouseArea {
@@ -617,7 +654,7 @@ PanelOverlay {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: (mouse) => {
+                    onClicked: mouse => {
                         if (mouse.button === Qt.RightButton) {
                             // 右键菜单区域
                             if (paired)
@@ -655,7 +692,11 @@ PanelOverlay {
                             font.pixelSize: Fonts.heading
 
                             Behavior on color {
-                                ColorAnimation { duration: Tokens.animFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.standard }
+                                ColorAnimation {
+                                    duration: Tokens.animFast
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: Anim.standard
+                                }
                             }
                         }
 
@@ -725,7 +766,11 @@ PanelOverlay {
                             font.pixelSize: Fonts.xs
                             visible: devHover.containsMouse
                             opacity: devHover.containsMouse ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: Tokens.animNormal } }
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Tokens.animNormal
+                                }
+                            }
                         }
                     }
 
@@ -743,9 +788,26 @@ PanelOverlay {
                             radius: Tokens.radiusS
                             color: actConnArea.containsMouse ? Colors.withAlpha(Colors.blue, 0.2) : Colors.withAlpha(Colors.blue, 0.1)
 
-                            Text { id: actConnText; anchors.centerIn: parent; text: "连接"; color: Colors.blue; font.family: Fonts.family; font.pixelSize: Fonts.caption }
-                            MouseArea { id: actConnArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.connectDevice(mac) }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: actConnText
+                                anchors.centerIn: parent
+                                text: "连接"
+                                color: Colors.blue
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+                            MouseArea {
+                                id: actConnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.connectDevice(mac)
+                            }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -755,9 +817,26 @@ PanelOverlay {
                             radius: Tokens.radiusS
                             color: actDiscArea.containsMouse ? Colors.withAlpha(Colors.yellow, 0.2) : Colors.withAlpha(Colors.yellow, 0.1)
 
-                            Text { id: actDiscText; anchors.centerIn: parent; text: "断开"; color: Colors.yellow; font.family: Fonts.family; font.pixelSize: Fonts.caption }
-                            MouseArea { id: actDiscArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.disconnectDevice(mac) }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: actDiscText
+                                anchors.centerIn: parent
+                                text: "断开"
+                                color: Colors.yellow
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+                            MouseArea {
+                                id: actDiscArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.disconnectDevice(mac)
+                            }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -767,9 +846,26 @@ PanelOverlay {
                             radius: Tokens.radiusS
                             color: actTrustArea.containsMouse ? Colors.withAlpha(Colors.teal, 0.2) : Colors.withAlpha(Colors.teal, 0.1)
 
-                            Text { id: actTrustText; anchors.centerIn: parent; text: "信任"; color: Colors.teal; font.family: Fonts.family; font.pixelSize: Fonts.caption }
-                            MouseArea { id: actTrustArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.trustDevice(mac) }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: actTrustText
+                                anchors.centerIn: parent
+                                text: "信任"
+                                color: Colors.teal
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+                            MouseArea {
+                                id: actTrustArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.trustDevice(mac)
+                            }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -779,16 +875,39 @@ PanelOverlay {
                             radius: Tokens.radiusS
                             color: actRemoveArea.containsMouse ? Colors.withAlpha(Colors.red, 0.2) : Colors.withAlpha(Colors.red, 0.1)
 
-                            Text { id: actRemoveText; anchors.centerIn: parent; text: "忘记"; color: Colors.red; font.family: Fonts.family; font.pixelSize: Fonts.caption }
-                            MouseArea { id: actRemoveArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.removeDevice(mac) }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: actRemoveText
+                                anchors.centerIn: parent
+                                text: "忘记"
+                                color: Colors.red
+                                font.family: Fonts.family
+                                font.pixelSize: Fonts.caption
+                            }
+                            MouseArea {
+                                id: actRemoveArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.removeDevice(mac)
+                            }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
-                        Item { Layout.fillWidth: true }
+                        Item {
+                            Layout.fillWidth: true
+                        }
                     }
                 }
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
             }
         }
 

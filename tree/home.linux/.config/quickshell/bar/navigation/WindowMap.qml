@@ -33,11 +33,9 @@ Item {
             width: 24
             height: placement ? placement.height : 28
             radius: 3
-            color: hover.containsMouse ? Colors.withAlpha(Colors.mauve, 0.23)
-                : active ? Colors.withAlpha(Colors.mauve, 0.14) : Colors.withAlpha(Colors.surface2, 0.25)
+            color: hover.containsMouse ? Colors.withAlpha(Colors.mauve, 0.23) : active ? Colors.withAlpha(Colors.mauve, 0.14) : Colors.withAlpha(Colors.surface2, 0.25)
             border.width: 1
-            border.color: hover.containsMouse ? Colors.lavender
-                : active ? Colors.mauve : Colors.withAlpha(Colors.overlay1, 0.35)
+            border.color: hover.containsMouse ? Colors.lavender : active ? Colors.mauve : Colors.withAlpha(Colors.overlay1, 0.35)
 
             Image {
                 anchors.centerIn: parent
@@ -45,8 +43,7 @@ Item {
                 height: width
                 sourceSize.width: 32
                 sourceSize.height: 32
-                source: tile.desktopEntry && tile.desktopEntry.icon
-                    ? Quickshell.iconPath(tile.desktopEntry.icon, true) : ""
+                source: tile.desktopEntry && tile.desktopEntry.icon ? Quickshell.iconPath(tile.desktopEntry.icon, true) : ""
                 fillMode: Image.PreserveAspectFit
                 smooth: true
             }
@@ -57,8 +54,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    console.info("[navigation] focus window", tile.modelData.address,
-                        "on", root.context.barScreen.name);
+                    console.info("[navigation] focus window", tile.modelData.address, "on", root.context.barScreen.name);
                     Hyprland.dispatch('hl.dsp.focus({ window = "address:0x' + tile.modelData.address + '" })');
                 }
                 onWheel: wheel => {
@@ -70,11 +66,21 @@ Item {
                 }
             }
 
-            Behavior on x { BarMoveAnimation {} }
-            Behavior on y { BarMoveAnimation {} }
-            Behavior on height { BarMoveAnimation {} }
-            Behavior on color { BarColorAnimation {} }
-            Behavior on border.color { BarColorAnimation {} }
+            Behavior on x {
+                BarMoveAnimation {}
+            }
+            Behavior on y {
+                BarMoveAnimation {}
+            }
+            Behavior on height {
+                BarMoveAnimation {}
+            }
+            Behavior on color {
+                BarColorAnimation {}
+            }
+            Behavior on border.color {
+                BarColorAnimation {}
+            }
         }
     }
 

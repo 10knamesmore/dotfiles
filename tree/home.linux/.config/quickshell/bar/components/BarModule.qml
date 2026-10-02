@@ -32,9 +32,7 @@ Rectangle {
 
     clip: true
     radius: Tokens.radiusL
-    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5)
-        : (root.hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08))
-            : Colors.withAlpha(root.backgroundColor, root.backgroundAlpha))
+    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5) : (root.hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08)) : Colors.withAlpha(root.backgroundColor, root.backgroundAlpha))
     border.color: hovered && !root.backgroundOnlyHover ? Colors.withAlpha(root.accentColor, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: root.flat ? 0 : Tokens.borderWidth
     implicitHeight: 36
@@ -59,7 +57,10 @@ Rectangle {
             color: root.tintColor
             visible: root.tintColor !== Qt.rgba(0, 0, 0, 0)
             Behavior on color {
-                ColorAnimation { duration: Tokens.animElaborate; easing.type: Easing.OutCubic }
+                ColorAnimation {
+                    duration: Tokens.animElaborate
+                    easing.type: Easing.OutCubic
+                }
             }
         }
 
@@ -73,7 +74,10 @@ Rectangle {
             clip: true
 
             Behavior on displayedProgress {
-                NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    duration: Tokens.animNormal
+                    easing.type: Easing.OutCubic
+                }
             }
 
             Rectangle {
@@ -86,7 +90,9 @@ Rectangle {
                 opacity: 0.27 + 0.15 * (root.headerInPanel ? root.expansion : (root.hovered ? 1 : 0))
                 Behavior on opacity {
                     enabled: !root.headerInPanel
-                    NumberAnimation { duration: Tokens.animFast }
+                    NumberAnimation {
+                        duration: Tokens.animFast
+                    }
                 }
             }
         }
@@ -138,7 +144,10 @@ Rectangle {
     }
     Behavior on hoverReveal {
         enabled: !root.headerInPanel
-        NumberAnimation { duration: Tokens.animSlow; easing.type: Easing.OutCubic }
+        NumberAnimation {
+            duration: Tokens.animSlow
+            easing.type: Easing.OutCubic
+        }
     }
     Behavior on implicitWidth {
         enabled: !root.headerInPanel

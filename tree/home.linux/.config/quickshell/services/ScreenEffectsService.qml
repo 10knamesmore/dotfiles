@@ -22,7 +22,12 @@ Scope {
 
     // toggle 关闭时的备份值，随状态一起持久化 —— 否则重启后第一次 toggle 只能
     // 回到硬编码默认值，把用户调好的参数丢了。
-    property var _bak: ({ warmth: 60, grain: 0, grainSize: 50, shadowBoost: 40 })
+    property var _bak: ({
+            warmth: 60,
+            grain: 0,
+            grainSize: 50,
+            shadowBoost: 40
+        })
 
     function _current() {
         return {
@@ -109,13 +114,23 @@ Scope {
         target: ScreenEffectsState
 
         function onApplyRequested(warmth, grain, grainSize, shadowBoost) {
-            root._apply({ warmth: warmth, grain: grain, grainSize: grainSize, shadowBoost: shadowBoost });
+            root._apply({
+                warmth: warmth,
+                grain: grain,
+                grainSize: grainSize,
+                shadowBoost: shadowBoost
+            });
         }
 
         function onToggleRequested() {
             if (ScreenEffectsState.effectsActive) {
                 root._bak = root._current();
-                root._apply({ warmth: 0, grain: 0, grainSize: ScreenEffectsState.grainSize, shadowBoost: ScreenEffectsState.shadowBoost });
+                root._apply({
+                    warmth: 0,
+                    grain: 0,
+                    grainSize: ScreenEffectsState.grainSize,
+                    shadowBoost: ScreenEffectsState.shadowBoost
+                });
             } else {
                 root._apply(root._bak);
             }

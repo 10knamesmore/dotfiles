@@ -39,9 +39,7 @@ Flickable {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -57,9 +55,7 @@ Flickable {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
 
             Text {
@@ -71,7 +67,6 @@ Flickable {
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
-
         }
 
         Rectangle {
@@ -145,27 +140,21 @@ Flickable {
                                     duration: 200
                                     easing.type: Easing.OutCubic
                                 }
-
                             }
 
                             Behavior on color {
                                 ColorAnimation {
                                     duration: 200
                                 }
-
                             }
-
                         }
 
                         Behavior on color {
                             ColorAnimation {
                                 duration: 200
                             }
-
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -181,9 +170,7 @@ Flickable {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
 
             Rectangle {
@@ -209,13 +196,16 @@ Flickable {
                 spacing: 6
 
                 Repeater {
-                    model: [{
-                        "value": "auto",
-                        "label": "DHCP"
-                    }, {
-                        "value": "manual",
-                        "label": "手动"
-                    }]
+                    model: [
+                        {
+                            "value": "auto",
+                            "label": "DHCP"
+                        },
+                        {
+                            "value": "manual",
+                            "label": "手动"
+                        }
+                    ]
 
                     delegate: Rectangle {
                         required property var modelData
@@ -238,9 +228,7 @@ Flickable {
                                 ColorAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
 
                         MouseArea {
@@ -256,13 +244,9 @@ Flickable {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
-
                 }
-
             }
 
             // 手动 IP 字段
@@ -275,7 +259,7 @@ Flickable {
                     label: "IP 地址 (CIDR)"
                     placeholder: "192.168.1.100/24"
                     text: editView.panel.editIpAddr
-                    onEdited: (t) => {
+                    onEdited: t => {
                         return editView.panel.editIpAddr = t;
                     }
                 }
@@ -284,18 +268,17 @@ Flickable {
                     label: "网关"
                     placeholder: "192.168.1.1"
                     text: editView.panel.editGateway
-                    onEdited: (t) => {
+                    onEdited: t => {
                         return editView.panel.editGateway = t;
                     }
                 }
-
             }
 
             EditField {
                 label: "DNS"
                 placeholder: "8.8.8.8, 8.8.4.4"
                 text: editView.panel.editDns
-                onEdited: (t) => {
+                onEdited: t => {
                     return editView.panel.editDns = t;
                 }
             }
@@ -319,18 +302,22 @@ Flickable {
 
             OptionRow {
                 Layout.fillWidth: true
-                model: [{
-                    "value": "auto",
-                    "label": "自动"
-                }, {
-                    "value": "dhcp",
-                    "label": "DHCP"
-                }, {
-                    "value": "disabled",
-                    "label": "禁用"
-                }]
+                model: [
+                    {
+                        "value": "auto",
+                        "label": "自动"
+                    },
+                    {
+                        "value": "dhcp",
+                        "label": "DHCP"
+                    },
+                    {
+                        "value": "disabled",
+                        "label": "禁用"
+                    }
+                ]
                 current: editView.panel.editIp6Method
-                onSelected: (v) => {
+                onSelected: v => {
                     return editView.panel.editIp6Method = v;
                 }
             }
@@ -340,7 +327,7 @@ Flickable {
                 label: "IPv6 DNS"
                 placeholder: "2001:4860:4860::8888"
                 text: editView.panel.editIp6Dns
-                onEdited: (t) => {
+                onEdited: t => {
                     return editView.panel.editIp6Dns = t;
                 }
             }
@@ -378,29 +365,32 @@ Flickable {
                 OptionRow {
                     Layout.fillWidth: true
                     compact: true
-                    model: [{
-                        "value": "",
-                        "label": "自动"
-                    }, {
-                        "value": "a",
-                        "label": "5 GHz"
-                    }, {
-                        "value": "bg",
-                        "label": "2.4 GHz"
-                    }]
+                    model: [
+                        {
+                            "value": "",
+                            "label": "自动"
+                        },
+                        {
+                            "value": "a",
+                            "label": "5 GHz"
+                        },
+                        {
+                            "value": "bg",
+                            "label": "2.4 GHz"
+                        }
+                    ]
                     current: editView.panel.editBand
-                    onSelected: (v) => {
+                    onSelected: v => {
                         return editView.panel.editBand = v;
                     }
                 }
-
             }
 
             EditField {
                 label: "MAC 地址克隆"
                 placeholder: "留空使用真实 MAC"
                 text: editView.panel.editMac
-                onEdited: (t) => {
+                onEdited: t => {
                     return editView.panel.editMac = t;
                 }
             }
@@ -409,7 +399,7 @@ Flickable {
                 label: "MTU"
                 placeholder: "auto"
                 text: editView.panel.editMtu
-                onEdited: (t) => {
+                onEdited: t => {
                     return editView.panel.editMtu = t;
                 }
             }
@@ -439,22 +429,25 @@ Flickable {
                 OptionRow {
                     Layout.fillWidth: true
                     compact: true
-                    model: [{
-                        "value": "unknown",
-                        "label": "自动"
-                    }, {
-                        "value": "yes",
-                        "label": "是"
-                    }, {
-                        "value": "no",
-                        "label": "否"
-                    }]
+                    model: [
+                        {
+                            "value": "unknown",
+                            "label": "自动"
+                        },
+                        {
+                            "value": "yes",
+                            "label": "是"
+                        },
+                        {
+                            "value": "no",
+                            "label": "否"
+                        }
+                    ]
                     current: editView.panel.editMetered
-                    onSelected: (v) => {
+                    onSelected: v => {
                         return editView.panel.editMetered = v;
                     }
                 }
-
             }
 
             Rectangle {
@@ -476,15 +469,18 @@ Flickable {
 
             OptionRow {
                 Layout.fillWidth: true
-                model: [{
-                    "value": "none",
-                    "label": "无"
-                }, {
-                    "value": "auto",
-                    "label": "PAC"
-                }]
+                model: [
+                    {
+                        "value": "none",
+                        "label": "无"
+                    },
+                    {
+                        "value": "auto",
+                        "label": "PAC"
+                    }
+                ]
                 current: editView.panel.editProxyMethod
-                onSelected: (v) => {
+                onSelected: v => {
                     return editView.panel.editProxyMethod = v;
                 }
             }
@@ -494,7 +490,7 @@ Flickable {
                 label: "PAC URL"
                 placeholder: "file:///etc/proxy.pac"
                 text: editView.panel.editProxyPacUrl
-                onEdited: (t) => {
+                onEdited: t => {
                     return editView.panel.editProxyPacUrl = t;
                 }
             }
@@ -558,9 +554,7 @@ Flickable {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
 
                 Rectangle {
@@ -591,15 +585,9 @@ Flickable {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
-
 }

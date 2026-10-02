@@ -38,9 +38,7 @@ RowLayout {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
 
             MouseArea {
@@ -56,11 +54,7 @@ RowLayout {
                 ColorAnimation {
                     duration: 150
                 }
-
             }
-
         }
-
     }
-
 }

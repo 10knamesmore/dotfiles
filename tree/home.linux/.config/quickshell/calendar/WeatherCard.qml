@@ -14,21 +14,32 @@ Rectangle {
     readonly property color cond: condColor(WeatherService.weatherCode, WeatherService.isDay)
 
     function condColor(code, day) {
-        if (code <= 3) return day ? Colors.yellow : Colors.lavender;
-        if (code <= 49) return Colors.overlay1; // 雾
-        if (code <= 69) return Colors.blue; // 雨
-        if (code <= 79) return Colors.sky; // 雪
-        if (code <= 84) return Colors.blue; // 阵雨
-        if (code <= 86) return Colors.sky; // 阵雪
+        if (code <= 3)
+            return day ? Colors.yellow : Colors.lavender;
+        if (code <= 49)
+            return Colors.overlay1; // 雾
+        if (code <= 69)
+            return Colors.blue; // 雨
+        if (code <= 79)
+            return Colors.sky; // 雪
+        if (code <= 84)
+            return Colors.blue; // 阵雨
+        if (code <= 86)
+            return Colors.sky; // 阵雪
         return Colors.mauve; // 雷暴
     }
 
     function aqiColor(v) {
-        if (v <= 50) return Colors.green;
-        if (v <= 100) return Colors.yellow;
-        if (v <= 150) return Colors.peach;
-        if (v <= 200) return Colors.red;
-        if (v <= 300) return Colors.maroon;
+        if (v <= 50)
+            return Colors.green;
+        if (v <= 100)
+            return Colors.yellow;
+        if (v <= 150)
+            return Colors.peach;
+        if (v <= 200)
+            return Colors.red;
+        if (v <= 300)
+            return Colors.maroon;
         return Colors.mauve;
     }
 
@@ -55,10 +66,15 @@ Rectangle {
         radius: parent.radius
 
         gradient: Gradient {
-            GradientStop { position: 0; color: Qt.rgba(root.cond.r, root.cond.g, root.cond.b, 0.1) }
-            GradientStop { position: 0.55; color: "transparent" }
+            GradientStop {
+                position: 0
+                color: Qt.rgba(root.cond.r, root.cond.g, root.cond.b, 0.1)
+            }
+            GradientStop {
+                position: 0.55
+                color: "transparent"
+            }
         }
-
     }
 
     MouseArea {
@@ -115,7 +131,6 @@ Rectangle {
                         font.pixelSize: Fonts.small
                         font.weight: Font.DemiBold
                     }
-
                 }
 
                 Text {
@@ -125,7 +140,6 @@ Rectangle {
                     font.family: Fonts.family
                     font.pixelSize: Fonts.caption
                 }
-
             }
 
             // 弹性间隔：把 AQI + 箭头推到卡片右缘
@@ -163,9 +177,7 @@ Rectangle {
                         font.pixelSize: Fonts.xs
                         font.weight: Font.DemiBold
                     }
-
                 }
-
             }
 
             // 展开提示箭头（垂直居中于 hero 行最右）
@@ -182,18 +194,14 @@ Rectangle {
                         duration: Tokens.animFast
                         easing.type: Easing.OutCubic
                     }
-
                 }
 
                 Behavior on color {
                     ColorAnimation {
                         duration: Tokens.animFast
                     }
-
                 }
-
             }
-
         }
 
         // ── 指标 chips：湿度 / 风速 / 当前降水概率 ──
@@ -221,7 +229,6 @@ Rectangle {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.caption
             }
-
         }
 
         // ── 展开区域 ──
@@ -247,7 +254,8 @@ Rectangle {
 
                     // 当前时刻在昼间的进度 0~1（夜间钳到端点）
                     readonly property real frac: {
-                        if (!WeatherService.sunrise || !WeatherService.sunset) return 0;
+                        if (!WeatherService.sunrise || !WeatherService.sunset)
+                            return 0;
                         let toMin = s => parseInt(s.substring(0, 2)) * 60 + parseInt(s.substring(3, 5));
                         let rise = toMin(WeatherService.sunrise);
                         let set = toMin(WeatherService.sunset);
@@ -257,7 +265,8 @@ Rectangle {
 
                     anchors.fill: parent
                     onFracChanged: requestPaint()
-                    onVisibleChanged: if (visible) requestPaint()
+                    onVisibleChanged: if (visible)
+                        requestPaint()
 
                     onPaint: {
                         let ctx = getContext("2d");
@@ -269,8 +278,12 @@ Rectangle {
                         let topY = 6;
                         // 二次贝塞尔弧：P0(左) C(顶) P1(右)
                         let p0x = pad, p1x = w - pad, cx = w / 2;
-                        function bx(t) { return (1 - t) * (1 - t) * p0x + 2 * (1 - t) * t * cx + t * t * p1x; }
-                        function by(t) { return (1 - t) * (1 - t) * baseY + 2 * (1 - t) * t * topY + t * t * baseY; }
+                        function bx(t) {
+                            return (1 - t) * (1 - t) * p0x + 2 * (1 - t) * t * cx + t * t * p1x;
+                        }
+                        function by(t) {
+                            return (1 - t) * (1 - t) * baseY + 2 * (1 - t) * t * topY + t * t * baseY;
+                        }
 
                         // 地平线
                         ctx.beginPath();
@@ -335,7 +348,6 @@ Rectangle {
                     font.family: Fonts.family
                     font.pixelSize: Fonts.xs
                 }
-
             }
 
             Rectangle {
@@ -408,13 +420,9 @@ Rectangle {
                                 font.pixelSize: Fonts.xs
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
-
                         }
-
                     }
-
                 }
-
             }
 
             Rectangle {
@@ -503,7 +511,8 @@ Rectangle {
                             }
                             property real allMin: {
                                 let m = 100;
-                                for (let d of WeatherService.dailyData) m = Math.min(m, d.minTemp)
+                                for (let d of WeatherService.dailyData)
+                                    m = Math.min(m, d.minTemp);
                                 return m;
                             }
 
@@ -513,7 +522,6 @@ Rectangle {
                             radius: 2
                             color: Colors.peach
                         }
-
                     }
 
                     Text {
@@ -522,13 +530,9 @@ Rectangle {
                         font.family: Fonts.family
                         font.pixelSize: Fonts.small
                     }
-
                 }
-
             }
-
         }
-
     }
 
     Behavior on color {
@@ -537,7 +541,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on border.color {
@@ -546,7 +549,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on implicitHeight {
@@ -554,7 +556,5 @@ Rectangle {
             duration: 200
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

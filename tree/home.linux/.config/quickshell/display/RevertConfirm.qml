@@ -51,7 +51,11 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: MonitorState.revert()
             }
-            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
         }
 
         // 保留（提交并记入当前组合）
@@ -76,9 +80,18 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: MonitorState.keep()
             }
-            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
         }
     }
 
-    Behavior on implicitHeight { NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic } }
+    Behavior on implicitHeight {
+        NumberAnimation {
+            duration: Tokens.animNormal
+            easing.type: Easing.OutCubic
+        }
+    }
 }

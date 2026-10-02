@@ -12,21 +12,33 @@ QtObject {
     // widget 项支持：字符串 id / {id, props} / {group: [...]}
     readonly property var leftWidgets: ["navigation", "tray"]
     readonly property var centerWidgets: ["media"]
-    readonly property var centerLeftWidgets: [{
-        "id": "netspeed",
-        "props": { "direction": "up" }
-    }]
-    readonly property var centerRightWidgets: [{
-        "id": "netspeed",
-        "props": { "direction": "down" }
-    }]
-    readonly property var rightWidgets: [{
-        "group": ["cpu", "memory"]
-    }, {
-        "group": ["network", "bluetooth"]
-    }, {
-        "group": ["clipboard", "notification", "screeneffects"]
-    }, "battery", "clock"]
+    readonly property var centerLeftWidgets: [
+        {
+            "id": "netspeed",
+            "props": {
+                "direction": "up"
+            }
+        }
+    ]
+    readonly property var centerRightWidgets: [
+        {
+            "id": "netspeed",
+            "props": {
+                "direction": "down"
+            }
+        }
+    ]
+    readonly property var rightWidgets: [
+        {
+            "group": ["cpu", "memory"]
+        },
+        {
+            "group": ["network", "bluetooth"]
+        },
+        {
+            "group": ["clipboard", "notification", "screeneffects"]
+        },
+        "battery", "clock"]
 
     // 归一化 widget 项 → {id, props}
     function normalize(item) {

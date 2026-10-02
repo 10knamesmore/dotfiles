@@ -19,12 +19,18 @@ Rectangle {
     border.color: Colors.overlay(0.06)
     clip: true
 
-    function _logW(m) { return Math.round(m.width / m.scale); }
-    function _logH(m) { return Math.round(m.height / m.scale); }
+    function _logW(m) {
+        return Math.round(m.width / m.scale);
+    }
+    function _logH(m) {
+        return Math.round(m.height / m.scale);
+    }
 
     // 仅排布启用的屏（禁用的不占位）
     function _enabled() {
-        return (monitors || []).filter(function (m) { return m.enabled; });
+        return (monitors || []).filter(function (m) {
+            return m.enabled;
+        });
     }
 
     // ── 缩放/偏移：把所有屏装进画布并居中 ──
@@ -39,7 +45,9 @@ Rectangle {
     property string _fitKey: ""
     function _maybeFit() {
         var en = _enabled();
-        var key = en.map(function (m) { return m.name + ":" + _logW(m) + "x" + _logH(m); }).sort().join("|") + "@" + width + "x" + height;
+        var key = en.map(function (m) {
+            return m.name + ":" + _logW(m) + "x" + _logH(m);
+        }).sort().join("|") + "@" + width + "x" + height;
         if (key === _fitKey)
             return;
         _fitKey = key;
@@ -69,10 +77,18 @@ Rectangle {
         canvas._offY = (height - spanH * sf) / 2;
     }
 
-    function _toPxX(lx) { return _offX + (lx - _minX) * _sf; }
-    function _toPxY(ly) { return _offY + (ly - _minY) * _sf; }
-    function _toLogX(px) { return Math.round((px - _offX) / _sf + _minX); }
-    function _toLogY(py) { return Math.round((py - _offY) / _sf + _minY); }
+    function _toPxX(lx) {
+        return _offX + (lx - _minX) * _sf;
+    }
+    function _toPxY(ly) {
+        return _offY + (ly - _minY) * _sf;
+    }
+    function _toLogX(px) {
+        return Math.round((px - _offX) / _sf + _minX);
+    }
+    function _toLogY(py) {
+        return Math.round((py - _offY) / _sf + _minY);
+    }
 
     // 松手吸附：对齐其它屏的边/角，及原点
     function _snap(index, lx, ly) {
@@ -84,17 +100,34 @@ Rectangle {
                 continue;
             var o = monitors[i], ow = _logW(o), oh = _logH(o);
             // 水平贴边
-            if (Math.abs(lx - (o.x + ow)) < t) lx = o.x + ow;        // 我在它右边
-            else if (Math.abs((lx + w) - o.x) < t) lx = o.x - w;     // 我在它左边
-            else if (Math.abs(lx - o.x) < t) lx = o.x;               // 左边对齐
-            else if (Math.abs((lx + w) - (o.x + ow)) < t) lx = o.x + ow - w; // 右边对齐
+            if (Math.abs(lx - (o.x + ow)) < t)
+                lx = o.x + ow;
+            else
+            // 我在它右边
+            if (Math.abs((lx + w) - o.x) < t)
+                lx = o.x - w;
+            else
+            // 我在它左边
+            if (Math.abs(lx - o.x) < t)
+                lx = o.x;
+            else
+            // 左边对齐
+            if (Math.abs((lx + w) - (o.x + ow)) < t)
+                lx = o.x + ow - w; // 右边对齐
             // 垂直贴边
-            if (Math.abs(ly - (o.y + oh)) < t) ly = o.y + oh;
-            else if (Math.abs((ly + h) - o.y) < t) ly = o.y - h;
-            else if (Math.abs(ly - o.y) < t) ly = o.y;
-            else if (Math.abs((ly + h) - (o.y + oh)) < t) ly = o.y + oh - h;
+            if (Math.abs(ly - (o.y + oh)) < t)
+                ly = o.y + oh;
+            else if (Math.abs((ly + h) - o.y) < t)
+                ly = o.y - h;
+            else if (Math.abs(ly - o.y) < t)
+                ly = o.y;
+            else if (Math.abs((ly + h) - (o.y + oh)) < t)
+                ly = o.y + oh - h;
         }
-        return { "x": lx, "y": ly };
+        return {
+            "x": lx,
+            "y": ly
+        };
     }
 
     onWidthChanged: _maybeFit()
@@ -125,8 +158,16 @@ Rectangle {
             // restoreMode 必须是 RestoreNone：另两种模式在 when 转 false（按下开始拖）时会把
             // x/y 恢复成「绑定生效前的原始值」，而这里从没显式赋过 x/y，原始值就是 0
             // ——结果一按下矩形就瞬移到画布左上角，松手还会把这个假坐标写回 draft。
-            Binding on x { value: canvas._toPxX(modelData.x); when: !tile.dragging; restoreMode: Binding.RestoreNone }
-            Binding on y { value: canvas._toPxY(modelData.y); when: !tile.dragging; restoreMode: Binding.RestoreNone }
+            Binding on x {
+                value: canvas._toPxX(modelData.x)
+                when: !tile.dragging
+                restoreMode: Binding.RestoreNone
+            }
+            Binding on y {
+                value: canvas._toPxY(modelData.y)
+                when: !tile.dragging
+                restoreMode: Binding.RestoreNone
+            }
 
             Column {
                 anchors.centerIn: parent
@@ -158,7 +199,15 @@ Rectangle {
                 height: pri.implicitHeight + 2
                 radius: Tokens.radiusXS
                 color: Colors.green
-                Text { id: pri; anchors.centerIn: parent; text: "主"; color: Colors.base; font.family: Fonts.family; font.pixelSize: Fonts.xs - 1; font.bold: true }
+                Text {
+                    id: pri
+                    anchors.centerIn: parent
+                    text: "主"
+                    color: Colors.base
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs - 1
+                    font.bold: true
+                }
             }
 
             MouseArea {
@@ -192,8 +241,16 @@ Rectangle {
                 }
             }
 
-            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
-            Behavior on border.color { ColorAnimation { duration: Tokens.animFast } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
+            Behavior on border.color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
         }
     }
 

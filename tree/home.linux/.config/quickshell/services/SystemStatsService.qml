@@ -15,9 +15,27 @@ Scope {
     property real _prevNetTx: -1
 
     // /proc 是动态伪文件：blockAllReads 让 reload() 同步重读，watchChanges 关闭是因为 /proc 不触发 inotify。
-    FileView { id: statFile; path: "/proc/stat"; blockAllReads: true; watchChanges: false; printErrors: false }
-    FileView { id: memFile; path: "/proc/meminfo"; blockAllReads: true; watchChanges: false; printErrors: false }
-    FileView { id: netFile; path: "/proc/net/dev"; blockAllReads: true; watchChanges: false; printErrors: false }
+    FileView {
+        id: statFile
+        path: "/proc/stat"
+        blockAllReads: true
+        watchChanges: false
+        printErrors: false
+    }
+    FileView {
+        id: memFile
+        path: "/proc/meminfo"
+        blockAllReads: true
+        watchChanges: false
+        printErrors: false
+    }
+    FileView {
+        id: netFile
+        path: "/proc/net/dev"
+        blockAllReads: true
+        watchChanges: false
+        printErrors: false
+    }
 
     // parser 自行筛选所需行，因此直接接收完整 /proc 文件内容。
     function _tick() {

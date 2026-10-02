@@ -19,9 +19,9 @@ ColumnLayout {
     signal modeEdited(string mode)
     signal scaleEdited(real scale)
     signal transformEdited(int transform)
-    signal primaryToggled()
-    signal enabledToggled()
-    signal hdrToggled()
+    signal primaryToggled
+    signal enabledToggled
+    signal hdrToggled
     signal sdrMaxLuminanceEdited(real v)
     signal sdrBrightnessEdited(real v)
     signal sdrSaturationEdited(real v)
@@ -110,13 +110,22 @@ ColumnLayout {
     }
 
     // ── 分辨率 ──
-    Text { text: "分辨率"; color: Colors.overlay0; font.family: Fonts.family; font.pixelSize: Fonts.xs; font.letterSpacing: 1; Layout.topMargin: Tokens.spaceS }
+    Text {
+        text: "分辨率"
+        color: Colors.overlay0
+        font.family: Fonts.family
+        font.pixelSize: Fonts.xs
+        font.letterSpacing: 1
+        Layout.topMargin: Tokens.spaceS
+    }
     Dropdown {
         Layout.fillWidth: true
         enabled: root.monitor && root.monitor.enabled
-        model: root._resGroups.map(function (g) { return g.res; })
+        model: root._resGroups.map(function (g) {
+            return g.res;
+        })
         currentText: root._curRes
-        onActivated: (value) => {
+        onActivated: value => {
             // 换分辨率时，取该分辨率下最高刷新率
             for (var i = 0; i < root._resGroups.length; i++) {
                 if (root._resGroups[i].res === value) {
@@ -128,13 +137,22 @@ ColumnLayout {
     }
 
     // ── 刷新率 ──
-    Text { text: "刷新率"; color: Colors.overlay0; font.family: Fonts.family; font.pixelSize: Fonts.xs; font.letterSpacing: 1; Layout.topMargin: Tokens.spaceXS }
+    Text {
+        text: "刷新率"
+        color: Colors.overlay0
+        font.family: Fonts.family
+        font.pixelSize: Fonts.xs
+        font.letterSpacing: 1
+        Layout.topMargin: Tokens.spaceXS
+    }
     Dropdown {
         Layout.fillWidth: true
         enabled: root.monitor && root.monitor.enabled
-        model: root._curRates.map(function (r) { return r + " Hz"; })
+        model: root._curRates.map(function (r) {
+            return r + " Hz";
+        })
         currentText: root._curRate ? (root._curRate + " Hz") : ""
-        onActivated: (value) => root.modeEdited(root._curRes + "@" + value.replace(" Hz", ""))
+        onActivated: value => root.modeEdited(root._curRes + "@" + value.replace(" Hz", ""))
     }
 
     // ── 缩放 ──
@@ -157,12 +175,36 @@ ColumnLayout {
     }
 
     // ── 旋转 ──
-    Text { text: "旋转"; color: Colors.overlay0; font.family: Fonts.family; font.pixelSize: Fonts.xs; font.letterSpacing: 1; Layout.topMargin: Tokens.spaceXS }
+    Text {
+        text: "旋转"
+        color: Colors.overlay0
+        font.family: Fonts.family
+        font.pixelSize: Fonts.xs
+        font.letterSpacing: 1
+        Layout.topMargin: Tokens.spaceXS
+    }
     RowLayout {
         Layout.fillWidth: true
         spacing: Tokens.spaceXS
         Repeater {
-            model: [{ "l": "0°", "v": 0 }, { "l": "90°", "v": 1 }, { "l": "180°", "v": 2 }, { "l": "270°", "v": 3 }]
+            model: [
+                {
+                    "l": "0°",
+                    "v": 0
+                },
+                {
+                    "l": "90°",
+                    "v": 1
+                },
+                {
+                    "l": "180°",
+                    "v": 2
+                },
+                {
+                    "l": "270°",
+                    "v": 3
+                }
+            ]
             delegate: Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 28
@@ -185,7 +227,11 @@ ColumnLayout {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.transformEdited(modelData.v)
                 }
-                Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
             }
         }
     }
@@ -194,7 +240,13 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         Layout.topMargin: Tokens.spaceS
-        Text { text: "设为主显示器"; Layout.fillWidth: true; color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.small }
+        Text {
+            text: "设为主显示器"
+            Layout.fillWidth: true
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.small
+        }
         ToggleSwitch {
             small: true
             checked: root.monitor && root.monitor.primary
@@ -203,7 +255,13 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true
-        Text { text: "启用此显示器"; Layout.fillWidth: true; color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.small }
+        Text {
+            text: "启用此显示器"
+            Layout.fillWidth: true
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.small
+        }
         ToggleSwitch {
             small: true
             checked: root.monitor && root.monitor.enabled
@@ -234,7 +292,12 @@ ColumnLayout {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
-                    Text { text: "HDR"; color: Colors.text; font.family: Fonts.family; font.pixelSize: Fonts.small }
+                    Text {
+                        text: "HDR"
+                        color: Colors.text
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.small
+                    }
                     Text {
                         visible: root.hdrUnsupported
                         text: "此显示器不支持"

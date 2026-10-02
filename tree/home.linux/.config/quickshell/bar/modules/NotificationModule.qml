@@ -54,5 +54,4 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
         }
     }
-
 }

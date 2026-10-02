@@ -7,11 +7,9 @@ QtObject {
 
     required property var barScreen
     readonly property var monitor: barScreen ? Hyprland.monitorFor(barScreen) : null
-    readonly property int workspaceId: monitor
-        ? (monitor.lastIpcObject.specialWorkspace?.id || monitor.activeWorkspace?.id || 0) : 0
+    readonly property int workspaceId: monitor ? (monitor.lastIpcObject.specialWorkspace?.id || monitor.activeWorkspace?.id || 0) : 0
     readonly property bool focused: monitor ? monitor.focused : false
-    readonly property var windows: WindowUpdates.toplevels.values.filter(window =>
-        window.workspace && window.workspace.id === root.workspaceId && window.lastIpcObject.mapped)
+    readonly property var windows: WindowUpdates.toplevels.values.filter(window => window.workspace && window.workspace.id === root.workspaceId && window.lastIpcObject.mapped)
 
     // 非焦点屏仍显示该屏最近操作的窗口，不跟随另一屏的全局焦点。
     readonly property var activeWindow: {
@@ -30,8 +28,7 @@ QtObject {
     // 平铺窗口按实际列与纵向位置排列；浮动窗口作为独立入口接在最后。
     readonly property var layout: {
         const tiled = windows.filter(window => !window.lastIpcObject.floating);
-        tiled.sort((a, b) => a.lastIpcObject.at[0] - b.lastIpcObject.at[0]
-            || a.lastIpcObject.at[1] - b.lastIpcObject.at[1]);
+        tiled.sort((a, b) => a.lastIpcObject.at[0] - b.lastIpcObject.at[0] || a.lastIpcObject.at[1] - b.lastIpcObject.at[1]);
         const columns = [];
         let lastX = null;
         for (const window of tiled) {
@@ -59,6 +56,9 @@ QtObject {
                 };
             });
         });
-        return { positions: positions, columns: columns.length };
+        return {
+            positions: positions,
+            columns: columns.length
+        };
     }
 }

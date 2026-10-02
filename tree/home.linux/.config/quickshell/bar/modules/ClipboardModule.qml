@@ -39,7 +39,5 @@ BarModule {
             font.pixelSize: Fonts.body
             anchors.verticalCenter: parent.verticalCenter
         }
-
     }
-
 }

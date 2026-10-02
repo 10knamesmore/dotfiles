@@ -45,7 +45,6 @@ ColumnLayout {
             onTextChanged: {
                 if (text !== root.text)
                     root.edited(text);
-
             }
 
             Text {
@@ -56,9 +55,6 @@ ColumnLayout {
                 font: parent.font
                 visible: !parent.text && !parent.activeFocus
             }
-
         }
-
     }
-
 }

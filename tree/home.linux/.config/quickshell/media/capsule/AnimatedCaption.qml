@@ -23,16 +23,21 @@ StackView {
             return;
         const line = currentItem as CaptionLine;
         if (empty) {
-            pushItem(lineComponent, { caption: root.caption }, StackView.Immediate);
+            pushItem(lineComponent, {
+                caption: root.caption
+            }, StackView.Immediate);
         } else if (line.caption.key !== caption.key) {
-            replaceCurrentItem(lineComponent, { caption: root.caption }, StackView.ReplaceTransition);
+            replaceCurrentItem(lineComponent, {
+                caption: root.caption
+            }, StackView.ReplaceTransition);
         } else {
             line.caption = caption;
         }
     }
 
     onCaptionChanged: Qt.callLater(updateCaption)
-    onBusyChanged: if (!busy) Qt.callLater(updateCaption)
+    onBusyChanged: if (!busy)
+        Qt.callLater(updateCaption)
     Component.onCompleted: updateCaption()
 
     Component {
@@ -43,11 +48,35 @@ StackView {
     }
 
     replaceEnter: Transition {
-        NumberAnimation { property: "y"; from: 12; to: 0; duration: 260; easing.type: Easing.OutCubic }
-        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic }
+        NumberAnimation {
+            property: "y"
+            from: 12
+            to: 0
+            duration: 260
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            property: "opacity"
+            from: 0
+            to: 1
+            duration: 220
+            easing.type: Easing.OutCubic
+        }
     }
     replaceExit: Transition {
-        NumberAnimation { property: "y"; from: 0; to: -12; duration: 220; easing.type: Easing.OutCubic }
-        NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 180; easing.type: Easing.OutCubic }
+        NumberAnimation {
+            property: "y"
+            from: 0
+            to: -12
+            duration: 220
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            property: "opacity"
+            from: 1
+            to: 0
+            duration: 180
+            easing.type: Easing.OutCubic
+        }
     }
 }

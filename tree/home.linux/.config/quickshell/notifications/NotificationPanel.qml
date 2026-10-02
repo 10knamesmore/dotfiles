@@ -93,9 +93,7 @@ PanelOverlay {
                         ColorAnimation {
                             duration: 150
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -114,11 +112,8 @@ PanelOverlay {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
-
         }
 
         Rectangle {
@@ -147,7 +142,11 @@ PanelOverlay {
                 color: Colors.overlay0
                 font.family: Fonts.family
                 font.pixelSize: Fonts.bodyLarge
-                Behavior on opacity { NumberAnimation { duration: 120 } }
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 120
+                    }
+                }
             }
 
             delegate: FadeOutListItem {
@@ -223,7 +222,6 @@ PanelOverlay {
                             maximumLineCount: 3
                             elide: Text.ElideRight
                         }
-
                     }
 
                     // 复制按钮
@@ -244,9 +242,7 @@ PanelOverlay {
                                 ColorAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
 
                         MouseArea {
@@ -266,9 +262,7 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
 
                     // 删除按钮
@@ -289,9 +283,7 @@ PanelOverlay {
                                 ColorAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
 
                         MouseArea {
@@ -310,24 +302,16 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
-
                 }
 
                 Behavior on color {
                     ColorAnimation {
                         duration: 150
                     }
-
                 }
-
             }
-
         }
-
     }
-
 }

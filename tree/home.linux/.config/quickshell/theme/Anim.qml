@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 动画曲线常量 — 用于 easing.bezierCurve 属性
 // 用法：easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.decelerate

@@ -37,7 +37,6 @@ PanelOverlay {
             let item = clipModel.get(i);
             if (q.length === 0 || item.preview.toLowerCase().includes(q))
                 filteredModel.append(item);
-
         }
     }
 
@@ -105,23 +104,21 @@ PanelOverlay {
         onExited: root.applyFilter()
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 // 格式: "id\tpreview text"
                 let tab = data.indexOf("\t");
                 if (tab < 0)
-                    return ;
+                    return;
 
                 let id = data.substring(0, tab).trim();
                 let preview = data.substring(tab + 1).trim();
                 if (preview.length > 0)
                     clipModel.append({
-                    "clipId": id,
-                    "preview": preview
-                });
-
+                        "clipId": id,
+                        "preview": preview
+                    });
             }
         }
-
     }
 
     Process {
@@ -198,9 +195,7 @@ PanelOverlay {
                             easing.type: Easing.BezierSpline
                             easing.bezierCurve: Anim.standard
                         }
-
                     }
-
                 }
 
                 MouseArea {
@@ -221,11 +216,8 @@ PanelOverlay {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.standard
                     }
-
                 }
-
             }
-
         }
 
         // 搜索框
@@ -270,11 +262,8 @@ PanelOverlay {
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
                     }
-
                 }
-
             }
-
         }
 
         Rectangle {
@@ -303,7 +292,11 @@ PanelOverlay {
                 color: Colors.overlay0
                 font.family: Fonts.family
                 font.pixelSize: Fonts.bodyLarge
-                Behavior on opacity { NumberAnimation { duration: 120 } }
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 120
+                    }
+                }
             }
 
             delegate: FadeOutListItem {
@@ -367,9 +360,7 @@ PanelOverlay {
                                     easing.type: Easing.BezierSpline
                                     easing.bezierCurve: Anim.standard
                                 }
-
                             }
-
                         }
 
                         MouseArea {
@@ -387,24 +378,16 @@ PanelOverlay {
                                 easing.type: Easing.BezierSpline
                                 easing.bezierCurve: Anim.standard
                             }
-
                         }
-
                     }
-
                 }
 
                 Behavior on color {
                     ColorAnimation {
                         duration: Tokens.animFast
                     }
-
                 }
-
             }
-
         }
-
     }
-
 }

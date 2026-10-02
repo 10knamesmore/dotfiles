@@ -96,57 +96,80 @@ Singleton {
     // day 为 false 时晴/多云用夜间字形
     function wmoIcon(code, day) {
         let isDay = day === undefined ? true : day;
-        if (code === 0) return isDay ? "󰖙" : "󰖔"; // 晴 / 晴夜
-        if (code <= 3) return isDay ? "󰖕" : "󰼱"; // 多云 / 夜云
-        if (code <= 49) return "󰖑"; // 雾
-        if (code <= 59) return "󰖗"; // 毛毛雨
-        if (code <= 69) return "󰖗"; // 雨
-        if (code <= 79) return "󰖘"; // 雪
-        if (code <= 84) return "󰖗"; // 阵雨
-        if (code <= 86) return "󰖘"; // 阵雪
-        if (code <= 99) return "󰖖"; // 雷暴
+        if (code === 0)
+            return isDay ? "󰖙" : "󰖔"; // 晴 / 晴夜
+        if (code <= 3)
+            return isDay ? "󰖕" : "󰼱"; // 多云 / 夜云
+        if (code <= 49)
+            return "󰖑"; // 雾
+        if (code <= 59)
+            return "󰖗"; // 毛毛雨
+        if (code <= 69)
+            return "󰖗"; // 雨
+        if (code <= 79)
+            return "󰖘"; // 雪
+        if (code <= 84)
+            return "󰖗"; // 阵雨
+        if (code <= 86)
+            return "󰖘"; // 阵雪
+        if (code <= 99)
+            return "󰖖"; // 雷暴
         return "󰖐";
     }
 
     // US AQI → 等级描述
     function aqiDesc(v) {
-        if (v <= 50) return "优";
-        if (v <= 100) return "良";
-        if (v <= 150) return "轻度";
-        if (v <= 200) return "中度";
-        if (v <= 300) return "重度";
+        if (v <= 50)
+            return "优";
+        if (v <= 100)
+            return "良";
+        if (v <= 150)
+            return "轻度";
+        if (v <= 200)
+            return "中度";
+        if (v <= 300)
+            return "重度";
         return "严重";
     }
 
     function wmoDesc(code) {
-        if (code === 0) return "晴";
-        if (code === 1) return "大部晴";
-        if (code === 2) return "多云";
-        if (code === 3) return "阴";
-        if (code <= 49) return "雾";
-        if (code <= 55) return "毛毛雨";
-        if (code <= 59) return "冻雨";
-        if (code <= 65) return "雨";
-        if (code <= 69) return "冻雨";
-        if (code <= 75) return "雪";
-        if (code <= 79) return "冰粒";
-        if (code <= 82) return "阵雨";
-        if (code <= 86) return "阵雪";
-        if (code === 95) return "雷暴";
-        if (code <= 99) return "雷暴+冰雹";
+        if (code === 0)
+            return "晴";
+        if (code === 1)
+            return "大部晴";
+        if (code === 2)
+            return "多云";
+        if (code === 3)
+            return "阴";
+        if (code <= 49)
+            return "雾";
+        if (code <= 55)
+            return "毛毛雨";
+        if (code <= 59)
+            return "冻雨";
+        if (code <= 65)
+            return "雨";
+        if (code <= 69)
+            return "冻雨";
+        if (code <= 75)
+            return "雪";
+        if (code <= 79)
+            return "冰粒";
+        if (code <= 82)
+            return "阵雨";
+        if (code <= 86)
+            return "阵雪";
+        if (code === 95)
+            return "雷暴";
+        if (code <= 99)
+            return "雷暴+冰雹";
         return "未知";
     }
 
     Process {
         id: fetchProc
 
-        command: ["curl", "-s", "--noproxy", "*", "--max-time", "8",
-            "https://api.open-meteo.com/v1/forecast?latitude=" + root.latitude
-            + "&longitude=" + root.longitude
-            + "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,is_day"
-            + "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=24"
-            + "&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,sunrise,sunset&forecast_days=7"
-            + "&timezone=Asia/Shanghai"]
+        command: ["curl", "-s", "--noproxy", "*", "--max-time", "8", "https://api.open-meteo.com/v1/forecast?latitude=" + root.latitude + "&longitude=" + root.longitude + "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,is_day" + "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=24" + "&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,sunrise,sunset&forecast_days=7" + "&timezone=Asia/Shanghai"]
 
         stdout: StdioCollector {
             onStreamFinished: root._parse(text)
@@ -156,10 +179,7 @@ Singleton {
     Process {
         id: aqiProc
 
-        command: ["curl", "-s", "--noproxy", "*", "--max-time", "8",
-            "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=" + root.latitude
-            + "&longitude=" + root.longitude
-            + "&current=pm2_5,us_aqi&timezone=Asia/Shanghai"]
+        command: ["curl", "-s", "--noproxy", "*", "--max-time", "8", "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=" + root.latitude + "&longitude=" + root.longitude + "&current=pm2_5,us_aqi&timezone=Asia/Shanghai"]
 
         stdout: StdioCollector {
             onStreamFinished: {

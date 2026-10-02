@@ -60,8 +60,16 @@ Item {
             }
         }
 
-        Behavior on color { ColorAnimation { duration: Tokens.animFast } }
-        Behavior on border.color { ColorAnimation { duration: Tokens.animFast } }
+        Behavior on color {
+            ColorAnimation {
+                duration: Tokens.animFast
+            }
+        }
+        Behavior on border.color {
+            ColorAnimation {
+                duration: Tokens.animFast
+            }
+        }
     }
 
     Popup {

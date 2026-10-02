@@ -78,7 +78,9 @@ PanelWindow {
                 }
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
         }
 
         // 网速独立贴在媒体两侧，宽度变化不推偏屏幕正中的媒体胶囊。

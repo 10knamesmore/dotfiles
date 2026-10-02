@@ -116,7 +116,6 @@ InfoCard {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.small
             }
-
         }
 
         // 进度条
@@ -137,11 +136,8 @@ InfoCard {
                         duration: 300
                         easing.type: Easing.OutCubic
                     }
-
                 }
-
             }
-
         }
 
         // 剩余时间
@@ -152,7 +148,5 @@ InfoCard {
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
         }
-
     }
-
 }

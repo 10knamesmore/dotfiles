@@ -16,8 +16,12 @@ Item {
         for (const word of caption.words) {
             const left = textMetrics.advanceWidth(prefix);
             prefix += word.text;
-            ranges.push({ start: word.start, duration: word.duration,
-                left: left, right: textMetrics.advanceWidth(prefix) });
+            ranges.push({
+                start: word.start,
+                duration: word.duration,
+                left: left,
+                right: textMetrics.advanceWidth(prefix)
+            });
         }
         return ranges;
     }
@@ -31,8 +35,7 @@ Item {
         }
         return wordTimed ? implicitWidth : 0;
     }
-    readonly property real scrollOffset: wordTimed
-        ? Math.max(0, Math.min(implicitWidth - width, sungWidth - width * 0.6)) : 0
+    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(implicitWidth - width, sungWidth - width * 0.6)) : 0
 
     implicitWidth: textMetrics.advanceWidth(caption.text)
     implicitHeight: 28
@@ -59,7 +62,11 @@ Item {
             font: textMetrics.font
             color: root.wordTimed ? Colors.overlay1 : (root.caption.lyric ? Colors.mauve : root.textColor)
             elide: root.wordTimed ? Text.ElideNone : Text.ElideRight
-            Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.animFast
+                }
+            }
         }
 
         Item {

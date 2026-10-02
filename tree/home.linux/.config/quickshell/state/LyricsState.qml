@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 歌词状态 — LyricsService 写入，bar 歌词模块 / 媒体面板读取。
 // 行模型 lyricsLines 每行：

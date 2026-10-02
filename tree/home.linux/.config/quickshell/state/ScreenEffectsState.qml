@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 屏幕效果状态单例 —— ScreenEffectsService 写入、UI（ScreenEffectsPanel、bar 的
 // ScreenEffectsModule）读取的中枢。仿 MonitorState ← MonitorService 的分工：
@@ -23,10 +23,10 @@ QtObject {
 
     // ── 意图信号（UI 发出 → ScreenEffectsService 接收）──
     signal applyRequested(int warmth, int grain, int grainSize, int shadowBoost)
-    signal toggleRequested()
+    signal toggleRequested
     signal brightnessRequested(int value)
     // 面板打开时回读背光实际值 —— 亮度可能被其他工具改过，State 不是唯一真相源
-    signal refreshRequested()
+    signal refreshRequested
 
     // 单参数便捷入口：滑块只改一项，其余沿用当前值
     function setWarmth(v) {

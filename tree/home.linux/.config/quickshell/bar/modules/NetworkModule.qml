@@ -8,14 +8,9 @@ BarModule {
     id: root
 
     readonly property bool wifi: NetworkService.connectionType === "wifi"
-    readonly property string iconText: disconnected ? "󰤮" : wifi
-        ? ["󰤟", "󰤢", "󰤥", "󰤨"][Math.min(3, Math.floor(NetworkService.signalStrength / 25))]
-        : "󰈁"
-    readonly property string valueText: disconnected ? "Disconnected"
-        : wifi ? NetworkService.ssid : NetworkService.interfaceName
-    readonly property string detailText: disconnected ? "" : wifi
-        ? "信号: " + NetworkService.signalStrength + "% · IP: " + NetworkService.address
-        : "IP: " + NetworkService.address
+    readonly property string iconText: disconnected ? "󰤮" : wifi ? ["󰤟", "󰤢", "󰤥", "󰤨"][Math.min(3, Math.floor(NetworkService.signalStrength / 25))] : "󰈁"
+    readonly property string valueText: disconnected ? "Disconnected" : wifi ? NetworkService.ssid : NetworkService.interfaceName
+    readonly property string detailText: disconnected ? "" : wifi ? "信号: " + NetworkService.signalStrength + "% · IP: " + NetworkService.address : "IP: " + NetworkService.address
     readonly property bool disconnected: NetworkService.disconnected
 
     accentColor: Colors.sky
@@ -65,9 +60,7 @@ BarModule {
                 ColorAnimation {
                     duration: 300
                 }
-
             }
-
         }
 
         Text {
@@ -83,5 +76,4 @@ BarModule {
             opacity: root.detailProgress
         }
     }
-
 }

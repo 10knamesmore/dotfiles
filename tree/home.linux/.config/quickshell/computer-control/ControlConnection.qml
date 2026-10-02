@@ -96,7 +96,11 @@ Socket {
                 closeConnection("invalid-pointer");
                 return;
             }
-            pointer = { monitor: event.monitor, x: event.x, y: event.y };
+            pointer = {
+                monitor: event.monitor,
+                x: event.x,
+                y: event.y
+            };
             break;
         case "button":
             if (["left", "right", "middle", "back", "forward"].indexOf(event.button) < 0 || typeof event.pressed !== "boolean") {

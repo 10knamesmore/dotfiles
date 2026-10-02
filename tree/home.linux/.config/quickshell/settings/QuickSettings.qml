@@ -22,9 +22,7 @@ PanelOverlay {
     // 均衡 ↔ 性能：只动 PPD 的 ActiveProfile，它会把 platform_profile 和 EPP 一起切
     function togglePerformanceMode() {
         let target = root.powerProfile === "performance" ? "balanced" : "performance";
-        powerProfileSetProc.command = ["busctl", "--system", "set-property",
-            "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles",
-            "net.hadess.PowerProfiles", "ActiveProfile", "s", target];
+        powerProfileSetProc.command = ["busctl", "--system", "set-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles", "net.hadess.PowerProfiles", "ActiveProfile", "s", target];
         powerProfileSetProc.running = true;
     }
 
@@ -40,7 +38,6 @@ PanelOverlay {
     onShowingChanged: {
         if (showing)
             refreshStatus();
-
     }
 
     // ── 进程 ──
@@ -53,18 +50,15 @@ PanelOverlay {
     Process {
         id: powerProfileProc
 
-        command: ["busctl", "--system", "get-property",
-            "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles",
-            "net.hadess.PowerProfiles", "ActiveProfile"]
+        command: ["busctl", "--system", "get-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles", "net.hadess.PowerProfiles", "ActiveProfile"]
 
         stdout: SplitParser {
-            onRead: (data) => {
+            onRead: data => {
                 let m = data.match(/"([^"]+)"/);
                 if (m)
                     root.powerProfile = m[1];
             }
         }
-
     }
 
     Process {
@@ -75,7 +69,6 @@ PanelOverlay {
             powerProfileProc.running = false;
             powerProfileProc.running = true;
         }
-
     }
 
     // ── UI ──
@@ -133,7 +126,6 @@ PanelOverlay {
                         actionProc.running = true;
                     }
                 }
-
             }
 
             Divider {
@@ -160,7 +152,6 @@ PanelOverlay {
                     label: "窗口截图"
                     command: "hyprshot -m window"
                 }
-
             }
 
             // ── 显示器设置 ──（打开可视化显示器管理面板）
@@ -239,13 +230,11 @@ PanelOverlay {
                                 command: ["sh", "-c", "uptime -p | sed 's/up //'"]
 
                                 stdout: SplitParser {
-                                    onRead: (data) => {
+                                    onRead: data => {
                                         return uptimeText.text = data;
                                     }
                                 }
-
                             }
-
                         }
 
                         Item {
@@ -280,7 +269,7 @@ PanelOverlay {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: (mouse) => {
+                                onClicked: mouse => {
                                     mouse.accepted = true;
                                     Quickshell.reload(true);
                                 }
@@ -290,11 +279,8 @@ PanelOverlay {
                                 ColorAnimation {
                                     duration: 150
                                 }
-
                             }
-
                         }
-
                     }
 
                     // 折叠的系统信息
@@ -302,7 +288,6 @@ PanelOverlay {
                         Layout.fillWidth: true
                         expanded: mainCol.infoExpanded
                     }
-
                 }
 
                 Behavior on color {
@@ -310,7 +295,6 @@ PanelOverlay {
                         duration: 200
                         easing.type: Easing.OutCubic
                     }
-
                 }
 
                 Behavior on border.color {
@@ -318,7 +302,6 @@ PanelOverlay {
                         duration: 200
                         easing.type: Easing.OutCubic
                     }
-
                 }
 
                 Behavior on implicitHeight {
@@ -326,9 +309,7 @@ PanelOverlay {
                         duration: 200
                         easing.type: Easing.OutCubic
                     }
-
                 }
-
             }
 
             Divider {
@@ -373,11 +354,7 @@ PanelOverlay {
                     label: "关机"
                     command: "systemctl poweroff"
                 }
-
             }
-
         }
-
     }
-
 }

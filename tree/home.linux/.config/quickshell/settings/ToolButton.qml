@@ -13,7 +13,7 @@ Rectangle {
     property string label: ""
     property string command: ""
     property bool closeOnClick: true
-    signal clicked()
+    signal clicked
 
     Layout.fillWidth: true
     implicitHeight: 48
@@ -43,7 +43,6 @@ Rectangle {
             font.pixelSize: Fonts.xs
             anchors.horizontalCenter: parent.horizontalCenter
         }
-
     }
 
     MouseArea {
@@ -69,7 +68,5 @@ Rectangle {
         ColorAnimation {
             duration: 150
         }
-
     }
-
 }

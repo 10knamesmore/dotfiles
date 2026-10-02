@@ -51,7 +51,5 @@ Item {
             duration: Tokens.animNormal
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

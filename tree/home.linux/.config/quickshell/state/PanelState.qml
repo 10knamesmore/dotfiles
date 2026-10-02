@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 全局面板状态单例 — 用于 bar 模块与弹出面板之间的跨组件通信
 QtObject {
@@ -76,5 +76,4 @@ QtObject {
         bluetoothOpen = false;
         displayOpen = false;
     }
-
 }

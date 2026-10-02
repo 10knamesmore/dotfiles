@@ -10,7 +10,7 @@ Rectangle {
     property string label: ""
     property bool toggled: false
 
-    signal clicked()
+    signal clicked
 
     Layout.fillWidth: true
     height: 40
@@ -56,7 +56,6 @@ Rectangle {
                         duration: 200
                         easing.type: Easing.OutCubic
                     }
-
                 }
 
                 Behavior on color {
@@ -65,9 +64,7 @@ Rectangle {
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Anim.standard
                     }
-
                 }
-
             }
 
             Behavior on color {
@@ -76,11 +73,8 @@ Rectangle {
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Anim.standard
                 }
-
             }
-
         }
-
     }
 
     MouseArea {
@@ -98,7 +92,5 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
-
 }

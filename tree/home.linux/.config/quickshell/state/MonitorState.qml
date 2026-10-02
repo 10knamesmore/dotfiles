@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 显示器状态单例 —— MonitorService 写入、UI（DisplayPanel）读取的中枢。
 // 仿 SystemStats(单例) ← SystemStatsService(常驻服务) 的分工：数据容器在此，
@@ -25,9 +25,9 @@ QtObject {
 
     // ── 意图信号（UI 发出 → MonitorService 接收）──
     signal applyRequested(var layouts, string primary)
-    signal keepRequested()
-    signal revertRequested()
-    signal refreshRequested()
+    signal keepRequested
+    signal revertRequested
+    signal refreshRequested
 
     function requestApply(layouts, primary) {
         applyRequested(layouts, primary);

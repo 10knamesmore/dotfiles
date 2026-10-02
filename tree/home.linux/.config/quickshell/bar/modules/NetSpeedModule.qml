@@ -33,12 +33,9 @@ BarModule {
 
     property string displayText: (direction === "up" ? "󰕒" : "󰁅") + " " + formatSpeed(speed)
 
-    readonly property real expandedContentWidth: speedLabel.implicitWidth + totalLabel.implicitWidth + 6
-        + (ifaceName !== "" ? ifaceText.implicitWidth + 16 : 0)
+    readonly property real expandedContentWidth: speedLabel.implicitWidth + totalLabel.implicitWidth + 6 + (ifaceName !== "" ? ifaceText.implicitWidth + 16 : 0)
     accentColor: Colors.teal
-    implicitWidth: root.hovered
-        ? Math.max(expandedContentWidth + 32, 180)
-        : Math.max(speedLabel.implicitWidth + 32, 120)
+    implicitWidth: root.hovered ? Math.max(expandedContentWidth + 32, 180) : Math.max(speedLabel.implicitWidth + 32, 120)
     clickable: false
 
     // 方向与网速始终使用同一组件；只有两侧的补充信息渐变显隐。

@@ -40,7 +40,6 @@ Rectangle {
             font.pixelSize: Fonts.xs
             anchors.horizontalCenter: parent.horizontalCenter
         }
-
     }
 
     MouseArea {
@@ -60,7 +59,5 @@ Rectangle {
         ColorAnimation {
             duration: 150
         }
-
     }
-
 }

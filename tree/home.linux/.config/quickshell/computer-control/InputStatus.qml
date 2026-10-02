@@ -8,10 +8,15 @@ Rectangle {
     property ControlConnection connection: null
     readonly property var heldKeys: connection ? connection.input.keys : []
     readonly property var heldButtons: connection ? connection.input.buttons : []
-    readonly property var buttonNames: ({ left: "左键", right: "右键", middle: "中键", back: "后退键", forward: "前进键" })
+    readonly property var buttonNames: ({
+            left: "左键",
+            right: "右键",
+            middle: "中键",
+            back: "后退键",
+            forward: "前进键"
+        })
     readonly property string keysDescription: heldKeys.length ? "按住的键：" + heldKeys.join(" + ") : "没有按住的键"
-    readonly property string buttonsDescription: heldButtons.length
-        ? "按住的按钮：" + heldButtons.map(button => buttonNames[button]).join("、") : "鼠标按钮已松开"
+    readonly property string buttonsDescription: heldButtons.length ? "按住的按钮：" + heldButtons.map(button => buttonNames[button]).join("、") : "鼠标按钮已松开"
     readonly property string recentDescription: {
         if (!connection || !connection.input.transientKind)
             return "仅显示 agent 的虚拟输入";
@@ -45,37 +50,90 @@ Rectangle {
             ShapePath {
                 strokeColor: "transparent"
                 fillColor: root.heldButtons.indexOf("left") >= 0 ? "#b4befe" : "#313244"
-                startX: 3; startY: 16
-                PathLine { x: 3; y: 11 }
-                PathQuad { x: 12; y: 2; controlX: 3; controlY: 2 }
-                PathLine { x: 12; y: 16 }
-                PathLine { x: 3; y: 16 }
+                startX: 3
+                startY: 16
+                PathLine {
+                    x: 3
+                    y: 11
+                }
+                PathQuad {
+                    x: 12
+                    y: 2
+                    controlX: 3
+                    controlY: 2
+                }
+                PathLine {
+                    x: 12
+                    y: 16
+                }
+                PathLine {
+                    x: 3
+                    y: 16
+                }
             }
             ShapePath {
                 strokeColor: "transparent"
                 fillColor: root.heldButtons.indexOf("right") >= 0 ? "#b4befe" : "#313244"
-                startX: 14; startY: 2
-                PathQuad { x: 23; y: 11; controlX: 23; controlY: 2 }
-                PathLine { x: 23; y: 16 }
-                PathLine { x: 14; y: 16 }
-                PathLine { x: 14; y: 2 }
+                startX: 14
+                startY: 2
+                PathQuad {
+                    x: 23
+                    y: 11
+                    controlX: 23
+                    controlY: 2
+                }
+                PathLine {
+                    x: 23
+                    y: 16
+                }
+                PathLine {
+                    x: 14
+                    y: 16
+                }
+                PathLine {
+                    x: 14
+                    y: 2
+                }
             }
             ShapePath {
                 strokeColor: "#7f849c"
                 strokeWidth: 1.2
                 fillColor: "transparent"
-                startX: 3; startY: 12
-                PathCubic { x: 23; y: 12; control1X: 3; control1Y: -2; control2X: 23; control2Y: -2 }
-                PathLine { x: 23; y: 26 }
-                PathCubic { x: 3; y: 26; control1X: 23; control1Y: 40; control2X: 3; control2Y: 40 }
-                PathLine { x: 3; y: 12 }
+                startX: 3
+                startY: 12
+                PathCubic {
+                    x: 23
+                    y: 12
+                    control1X: 3
+                    control1Y: -2
+                    control2X: 23
+                    control2Y: -2
+                }
+                PathLine {
+                    x: 23
+                    y: 26
+                }
+                PathCubic {
+                    x: 3
+                    y: 26
+                    control1X: 23
+                    control1Y: 40
+                    control2X: 3
+                    control2Y: 40
+                }
+                PathLine {
+                    x: 3
+                    y: 12
+                }
             }
         }
         Rectangle {
-            x: 11; y: 8
-            width: 4; height: 7; radius: 2
-            color: root.connection && root.connection.input.transientKind === "scroll" ? "#89dceb"
-                : root.heldButtons.indexOf("middle") >= 0 ? "#b4befe" : "#585b70"
+            x: 11
+            y: 8
+            width: 4
+            height: 7
+            radius: 2
+            color: root.connection && root.connection.input.transientKind === "scroll" ? "#89dceb" : root.heldButtons.indexOf("middle") >= 0 ? "#b4befe" : "#585b70"
         }
     }
 

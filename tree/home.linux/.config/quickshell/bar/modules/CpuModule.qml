@@ -33,8 +33,7 @@ BarModule {
     }
 
     accentColor: Colors.blue
-    implicitWidth: compactLabel.implicitWidth + 32
-        + (hovered && chartHtml !== "" ? coreChart.implicitWidth + label.spacing : 0)
+    implicitWidth: compactLabel.implicitWidth + 32 + (hovered && chartHtml !== "" ? coreChart.implicitWidth + label.spacing : 0)
     clickable: false
 
     // 紧凑模式宽度参考
@@ -42,8 +41,16 @@ BarModule {
         id: compactLabel
         visible: false
         spacing: 5
-        Text { text: cpuIcon.text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
-        Text { text: SystemStats.cpuUsage + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
+        Text {
+            text: cpuIcon.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.icon
+        }
+        Text {
+            text: SystemStats.cpuUsage + "%"
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+        }
     }
 
     Row {
@@ -74,9 +81,7 @@ BarModule {
                 ColorAnimation {
                     duration: 300
                 }
-
             }
-
         }
 
         // Per-core bar chart — hover 时展开显示
@@ -93,7 +98,5 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
             opacity: root.hoverReveal
         }
-
     }
-
 }

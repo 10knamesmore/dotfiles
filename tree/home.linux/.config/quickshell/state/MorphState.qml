@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // 顶栏写入来源几何与真实头部组件；PanelOverlay 暂时接管头部，收起后归还。
 // heldItems 只隐藏原胶囊的外壳，保留其布局位置和数据更新；本单例不采集系统数据。
@@ -22,8 +22,7 @@ QtObject {
     function boundsFor(item, barWindow) {
         const origin = item.mapToItem(null, 0, 0);
         const corner = item.mapToItem(null, item.width, item.height);
-        return Qt.rect(origin.x + barWindow.margins.left,
-            origin.y + barWindow.margins.top, corner.x - origin.x, corner.y - origin.y);
+        return Qt.rect(origin.x + barWindow.margins.left, origin.y + barWindow.margins.top, corner.x - origin.x, corner.y - origin.y);
     }
 
     function openFrom(item, openPanel) {

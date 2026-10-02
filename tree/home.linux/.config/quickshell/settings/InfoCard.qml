@@ -42,7 +42,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on border.color {
@@ -51,7 +50,6 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.standard
         }
-
     }
 
     Behavior on scale {
@@ -60,7 +58,5 @@ Rectangle {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.elastic
         }
-
     }
-
 }

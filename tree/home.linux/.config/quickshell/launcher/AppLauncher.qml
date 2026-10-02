@@ -270,7 +270,10 @@ PanelOverlay {
                     State {
                         name: "selected"
                         when: item.isSelected
-                        PropertyChanges { target: item; color: Colors.surface1 }
+                        PropertyChanges {
+                            target: item
+                            color: Colors.surface1
+                        }
                     },
                     State {
                         name: "hovered"
@@ -285,12 +288,18 @@ PanelOverlay {
                 // 只为 hover 进出添加过渡；selected 切换立即生效，避免键盘选择触发连续动画。
                 transitions: [
                     Transition {
-                        from: ""; to: "hovered"
-                        ColorAnimation { duration: Tokens.animFast }
+                        from: ""
+                        to: "hovered"
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
                     },
                     Transition {
-                        from: "hovered"; to: ""
-                        ColorAnimation { duration: Tokens.animFast }
+                        from: "hovered"
+                        to: ""
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
                     }
                 ]
 

@@ -19,10 +19,16 @@ Rectangle {
     implicitHeight: 36
     radius: Tokens.radiusS
     color: Colors.withAlpha(Colors.surface0, railHover.hovered ? 0.82 : 0.68)
-    Behavior on color { BarColorAnimation {} }
-    Behavior on implicitWidth { BarWidthAnimation {} }
+    Behavior on color {
+        BarColorAnimation {}
+    }
+    Behavior on implicitWidth {
+        BarWidthAnimation {}
+    }
 
-    HoverHandler { id: railHover }
+    HoverHandler {
+        id: railHover
+    }
 
     WindowContext {
         id: windowContext
@@ -42,7 +48,11 @@ Rectangle {
         spacing: 11
         opacity: windowContext.focused ? 1 : 0.7
         clip: true
-        Behavior on opacity { NumberAnimation { duration: Tokens.animFast } }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Tokens.animFast
+            }
+        }
 
         WorkspaceStrip {
             context: windowContext
@@ -75,7 +85,9 @@ Rectangle {
             Layout.preferredHeight: 30
             radius: Tokens.radiusXS
             color: titleHover.containsMouse ? Colors.overlay(0.04) : "transparent"
-            Behavior on color { BarColorAnimation {} }
+            Behavior on color {
+                BarColorAnimation {}
+            }
 
             Text {
                 id: titleText
@@ -89,9 +101,10 @@ Rectangle {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.body
                 font.weight: Font.Medium
-                color: root.copied ? Colors.green : root.copyFailed ? Colors.red
-                    : titleHover.containsMouse ? Colors.lavender : Colors.text
-                Behavior on color { BarColorAnimation {} }
+                color: root.copied ? Colors.green : root.copyFailed ? Colors.red : titleHover.containsMouse ? Colors.lavender : Colors.text
+                Behavior on color {
+                    BarColorAnimation {}
+                }
             }
 
             MouseArea {

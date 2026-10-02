@@ -83,5 +83,4 @@ BarModule {
             color: batteryBody.border.color
         }
     }
-
 }

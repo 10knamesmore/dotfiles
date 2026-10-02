@@ -16,8 +16,7 @@ Scope {
         function onRawEvent(event) {
             if (event.name === "activespecial" || event.name === "activespecialv2")
                 Hyprland.refreshMonitors();
-            if (event.name === "windowtitle" || event.name === "windowtitlev2"
-                || event.name === "activelayout" || event.name === "submap")
+            if (event.name === "windowtitle" || event.name === "windowtitlev2" || event.name === "activelayout" || event.name === "submap")
                 return;
             requestRefresh();
         }

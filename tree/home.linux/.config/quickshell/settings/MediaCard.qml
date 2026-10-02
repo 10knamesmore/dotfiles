@@ -14,25 +14,30 @@ Rectangle {
     Layout.fillWidth: true
     implicitHeight: mainCol.implicitHeight + 20
     radius: Tokens.radiusM
-    color: cardArea.containsMouse
-        ? Colors.withAlpha(Colors.surface1, Tokens.cardAlpha)
-        : Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
-    border.color: cardArea.containsMouse
-        ? Colors.withAlpha(Colors.mauve, Tokens.borderHoverAlpha)
-        : Colors.overlay(0.06)
+    color: cardArea.containsMouse ? Colors.withAlpha(Colors.surface1, Tokens.cardAlpha) : Colors.withAlpha(Colors.surface0, Tokens.cardAlpha)
+    border.color: cardArea.containsMouse ? Colors.withAlpha(Colors.mauve, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
     border.width: 1
     clip: true
 
     Behavior on implicitHeight {
-        NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+        NumberAnimation {
+            duration: Tokens.animNormal
+            easing.type: Easing.OutCubic
+        }
     }
 
     Behavior on color {
-        ColorAnimation { duration: Tokens.animFast; easing.type: Easing.OutCubic }
+        ColorAnimation {
+            duration: Tokens.animFast
+            easing.type: Easing.OutCubic
+        }
     }
 
     Behavior on border.color {
-        ColorAnimation { duration: Tokens.animFast; easing.type: Easing.OutCubic }
+        ColorAnimation {
+            duration: Tokens.animFast
+            easing.type: Easing.OutCubic
+        }
     }
 
     MouseArea {
@@ -125,9 +130,21 @@ Rectangle {
 
             Repeater {
                 model: [
-                    { "icon": "󰒮", "action": "prev", "size": 18 },
-                    { "icon": root.player && root.player.isPlaying ? "󰏤" : "󰐊", "action": "toggle", "size": 24 },
-                    { "icon": "󰒭", "action": "next", "size": 18 }
+                    {
+                        "icon": "󰒮",
+                        "action": "prev",
+                        "size": 18
+                    },
+                    {
+                        "icon": root.player && root.player.isPlaying ? "󰏤" : "󰐊",
+                        "action": "toggle",
+                        "size": 24
+                    },
+                    {
+                        "icon": "󰒭",
+                        "action": "next",
+                        "size": 18
+                    }
                 ]
 
                 delegate: Rectangle {
@@ -136,9 +153,7 @@ Rectangle {
                     width: 36
                     height: 36
                     radius: Tokens.radiusFull
-                    color: mediaBtnArea.containsMouse
-                        ? Colors.withAlpha(Colors.mauve, 0.15)
-                        : "transparent"
+                    color: mediaBtnArea.containsMouse ? Colors.withAlpha(Colors.mauve, 0.15) : "transparent"
 
                     Text {
                         anchors.centerIn: parent
@@ -147,7 +162,11 @@ Rectangle {
                         font.family: Fonts.family
                         font.pixelSize: modelData.size
 
-                        Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Tokens.animFast
+                            }
+                        }
                     }
 
                     MouseArea {
@@ -156,7 +175,8 @@ Rectangle {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            if (!root.player) return;
+                            if (!root.player)
+                                return;
                             if (modelData.action === "prev")
                                 root.player.previous();
                             else if (modelData.action === "toggle")
@@ -166,7 +186,11 @@ Rectangle {
                         }
                     }
 
-                    Behavior on color { ColorAnimation { duration: Tokens.animFast } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Tokens.animFast
+                        }
+                    }
                 }
             }
         }
@@ -179,7 +203,10 @@ Rectangle {
             opacity: root.expanded ? 1 : 0
 
             Behavior on opacity {
-                NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    duration: Tokens.animNormal
+                    easing.type: Easing.OutCubic
+                }
             }
 
             // 专辑名
@@ -212,7 +239,10 @@ Rectangle {
                     color: Colors.mauve
 
                     Behavior on width {
-                        NumberAnimation { duration: 500; easing.type: Easing.Linear }
+                        NumberAnimation {
+                            duration: 500
+                            easing.type: Easing.Linear
+                        }
                     }
                 }
             }
@@ -223,7 +253,8 @@ Rectangle {
 
                 Text {
                     text: {
-                        if (!root.player) return "0:00";
+                        if (!root.player)
+                            return "0:00";
                         let s = Math.floor(root.player.position);
                         let m = Math.floor(s / 60);
                         s = s % 60;
@@ -234,11 +265,14 @@ Rectangle {
                     font.pixelSize: Fonts.xs
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 Text {
                     text: {
-                        if (!root.player || !root.player.length) return "0:00";
+                        if (!root.player || !root.player.length)
+                            return "0:00";
                         let s = Math.floor(root.player.length);
                         let m = Math.floor(s / 60);
                         s = s % 60;
@@ -273,7 +307,8 @@ Rectangle {
                     id: lyricFadeIn
                     target: cardLyric
                     property: "opacity"
-                    from: 0; to: 1
+                    from: 0
+                    to: 1
                     duration: 250
                     easing.type: Easing.OutCubic
                 }

@@ -8,16 +8,23 @@ BarModule {
 
     // 数据来自 SystemStats（SystemStatsService 每秒更新）
     accentColor: Colors.mauve
-    implicitWidth: compactLabel.implicitWidth + 32
-        + (hovered && SystemStats.memTooltipText !== "" ? memoryDetails.implicitWidth + label.spacing : 0)
+    implicitWidth: compactLabel.implicitWidth + 32 + (hovered && SystemStats.memTooltipText !== "" ? memoryDetails.implicitWidth + label.spacing : 0)
     clickable: false
 
     Row {
         id: compactLabel
         visible: false
         spacing: 5
-        Text { text: memoryIcon.text; font.family: Fonts.family; font.pixelSize: Fonts.icon }
-        Text { text: SystemStats.memUsagePct + "%"; font.family: Fonts.family; font.pixelSize: Fonts.bodyLarge }
+        Text {
+            text: memoryIcon.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.icon
+        }
+        Text {
+            text: SystemStats.memUsagePct + "%"
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+        }
     }
 
     Row {
@@ -48,9 +55,7 @@ BarModule {
                 ColorAnimation {
                     duration: 300
                 }
-
             }
-
         }
 
         // hover 展开显示详细内存（RAM + Swap，memTooltipText 折成一行）
@@ -67,5 +72,4 @@ BarModule {
             opacity: root.hoverReveal
         }
     }
-
 }

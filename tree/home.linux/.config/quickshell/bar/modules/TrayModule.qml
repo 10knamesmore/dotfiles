@@ -44,7 +44,6 @@ Rectangle {
             color: Colors.overlay1
             opacity: 0.6
         }
-
     }
 
     RowLayout {
@@ -80,11 +79,10 @@ Rectangle {
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
+                    onClicked: mouse => {
                         if (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu) {
                             if (trayItem.modelData.hasMenu)
                                 menuAnchor.open();
-
                         } else {
                             trayItem.modelData.activate();
                         }
@@ -98,11 +96,7 @@ Rectangle {
                     anchor.window: root.barWindow
                     anchor.item: trayItem
                 }
-
             }
-
         }
-
     }
-
 }

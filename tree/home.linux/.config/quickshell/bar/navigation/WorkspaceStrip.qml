@@ -10,9 +10,7 @@ Item {
     id: root
 
     required property WindowContext context
-    readonly property var workspaces: Hyprland.workspaces.values.filter(workspace =>
-        workspace.monitor && root.context.monitor && workspace.monitor.name === root.context.monitor.name
-        && workspace.id > 0).sort((a, b) => a.id - b.id)
+    readonly property var workspaces: Hyprland.workspaces.values.filter(workspace => workspace.monitor && root.context.monitor && workspace.monitor.name === root.context.monitor.name && workspace.id > 0).sort((a, b) => a.id - b.id)
     readonly property int activeIndex: workspaces.findIndex(workspace => workspace.id === context.workspaceId)
 
     implicitWidth: workspaceRow.width
@@ -40,12 +38,13 @@ Item {
                     anchors.centerIn: parent
                     text: workspaceButton.modelData.name
                     textFormat: Text.PlainText
-                    color: workspaceButton.active ? Colors.mauve
-                        : hover.containsMouse ? Colors.text : Colors.overlay1
+                    color: workspaceButton.active ? Colors.mauve : hover.containsMouse ? Colors.text : Colors.overlay1
                     font.family: Fonts.family
                     font.pixelSize: Fonts.body
                     font.weight: workspaceButton.active ? Font.DemiBold : Font.Normal
-                    Behavior on color { BarColorAnimation {} }
+                    Behavior on color {
+                        BarColorAnimation {}
+                    }
                 }
 
                 MouseArea {
@@ -54,13 +53,14 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        console.info("[navigation] activate workspace", workspaceButton.modelData.id,
-                            "on", root.context.barScreen.name);
+                        console.info("[navigation] activate workspace", workspaceButton.modelData.id, "on", root.context.barScreen.name);
                         workspaceButton.modelData.activate();
                     }
                 }
 
-                Behavior on color { BarColorAnimation {} }
+                Behavior on color {
+                    BarColorAnimation {}
+                }
             }
         }
     }
@@ -74,7 +74,10 @@ Item {
         visible: root.activeIndex >= 0
         color: Colors.mauve
         Behavior on x {
-            NumberAnimation { duration: Tokens.animNormal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: Tokens.animNormal
+                easing.type: Easing.OutCubic
+            }
         }
     }
 }

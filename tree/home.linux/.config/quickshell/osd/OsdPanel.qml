@@ -83,7 +83,6 @@ PanelWindow {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.decelerate
         }
-
     }
 
     ParallelAnimation {
@@ -106,7 +105,6 @@ PanelWindow {
             easing.type: Easing.BezierSpline
             easing.bezierCurve: Anim.accelerate
         }
-
     }
 
     // OSD 主体
@@ -161,11 +159,8 @@ PanelWindow {
                             NumberAnimation {
                                 duration: 100
                             }
-
                         }
-
                     }
-
                 }
 
                 Text {
@@ -175,11 +170,7 @@ PanelWindow {
                     font.pixelSize: Fonts.small
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
-
             }
-
         }
-
     }
-
 }

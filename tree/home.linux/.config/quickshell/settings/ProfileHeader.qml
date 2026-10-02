@@ -37,7 +37,6 @@ RowLayout {
             font.pixelSize: Fonts.h2
             visible: avatar.status !== Image.Ready
         }
-
     }
 
     // 用户名 + 签名
@@ -61,7 +60,5 @@ RowLayout {
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
-
     }
-
 }

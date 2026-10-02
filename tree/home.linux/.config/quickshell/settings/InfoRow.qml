@@ -38,5 +38,4 @@ RowLayout {
         font.pixelSize: Fonts.small
         font.weight: Font.DemiBold
     }
-
 }

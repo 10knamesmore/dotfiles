@@ -31,7 +31,5 @@ Rectangle {
             position: 1
             color: "transparent"
         }
-
     }
-
 }

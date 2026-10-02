@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // Catppuccin Mocha 调色板 — 固定口味
 QtObject {

@@ -23,11 +23,9 @@ BarModule {
         const artist = player.trackArtist || "";
         return title ? (artist ? title + " - " + artist : title) : player.identity;
     }
-    readonly property var currentLine: LyricsState.currentLyricIndex >= 0
-        ? LyricsState.lyricsLines[LyricsState.currentLyricIndex] : null
+    readonly property var currentLine: LyricsState.currentLyricIndex >= 0 ? LyricsState.lyricsLines[LyricsState.currentLyricIndex] : null
     // 展开面板已有完整歌词区，头部保留歌名，避免曲目信息被歌词替掉。
-    readonly property bool showingLyrics: autoLyrics && !titleHold.running && !headerInPanel
-        && LyricsState.lyricsTrackId === trackKey && currentLine && currentLine.text.length > 0
+    readonly property bool showingLyrics: autoLyrics && !titleHold.running && !headerInPanel && LyricsState.lyricsTrackId === trackKey && currentLine && currentLine.text.length > 0
     readonly property string fullContent: showingLyrics ? currentLine.text : songTitle
     readonly property string compactContent: {
         const limit = showingLyrics ? 40 : 35;
@@ -55,9 +53,7 @@ BarModule {
     accentColor: Colors.pink
     progress: player && player.lengthSupported && player.length > 0 ? player.position / player.length : -1
     readonly property real compactWidth: Math.max(compactMeasure.implicitWidth + coverWidth + 38, 160)
-    readonly property real hoverWidth: Math.max(compactWidth, Math.min(600,
-        fullMeasure.implicitWidth + coverWidth + 38
-        + (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6))
+    readonly property real hoverWidth: Math.max(compactWidth, Math.min(600, fullMeasure.implicitWidth + coverWidth + 38 + (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6))
     implicitWidth: showDetails ? hoverWidth : compactWidth
     hoverReveal: showDetails ? 1 : 0
     onClicked: mouse => {
@@ -79,8 +75,14 @@ BarModule {
     Accessible.description: root.fullContent
     Accessible.onPressAction: root.openMedia()
 
-    Timer { id: titleHold; interval: 3000 }
-    Timer { id: volumeFeedback; interval: 1400 }
+    Timer {
+        id: titleHold
+        interval: 3000
+    }
+    Timer {
+        id: volumeFeedback
+        interval: 1400
+    }
 
     Text {
         id: compactMeasure
@@ -162,18 +164,16 @@ BarModule {
         }
 
         AnimatedCaption {
-            width: Math.max(0, row.width - identityTag.width - root.coverWidth
-                - volumeText.width - root.volumeReveal * 6
-                - root.detailProgress * 6 * (root.player ? 1 : 0))
+            width: Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0))
             height: 28
             anchors.verticalCenter: parent.verticalCenter
             textColor: root.detailProgress > 0 ? Colors.pink : Colors.text
             caption: ({
-                key: root.trackKey + (root.showingLyrics ? ":lyric:" + LyricsState.currentLyricIndex : ":title:" + root.songTitle),
-                text: root.fullContent,
-                lyric: root.showingLyrics,
-                words: root.showingLyrics ? root.currentLine.words : []
-            })
+                    key: root.trackKey + (root.showingLyrics ? ":lyric:" + LyricsState.currentLyricIndex : ":title:" + root.songTitle),
+                    text: root.fullContent,
+                    lyric: root.showingLyrics,
+                    words: root.showingLyrics ? root.currentLine.words : []
+                })
         }
 
         Item {
@@ -187,8 +187,7 @@ BarModule {
             width: implicitWidth * root.volumeReveal
             opacity: root.volumeReveal
             clip: true
-            text: (AudioService.muted ? "󰝟" : (AudioService.volume < 50 ? "󰖀" : "󰕾"))
-                + " " + (AudioService.muted ? "静音" : AudioService.volume + "%")
+            text: (AudioService.muted ? "󰝟" : (AudioService.volume < 50 ? "󰖀" : "󰕾")) + " " + (AudioService.muted ? "静音" : AudioService.volume + "%")
             color: AudioService.muted ? Colors.overlay1 : Colors.peach
             font.family: Fonts.family
             font.pixelSize: Fonts.small

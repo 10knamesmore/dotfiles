@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // Bar 显隐状态 — 固定显示 / hover 临时唤出（按显示器）
 QtObject {

@@ -56,7 +56,9 @@ Scope {
         id: server
         path: root.socketPath
         active: root.runtimeDirectory !== "" && root.instanceSignature !== ""
-        handler: ControlConnection { service: root }
+        handler: ControlConnection {
+            service: root
+        }
         onActiveChanged: console.info("[computer-control] listening=" + active)
     }
 
