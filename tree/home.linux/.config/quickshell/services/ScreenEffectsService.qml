@@ -12,7 +12,7 @@ Scope {
     id: root
 
     readonly property string _home: Quickshell.env("HOME")
-    // 状态落 ~/.local/state 而非 ~/.cache：预设选择要跨重启保留，是配置不是缓存，
+    // 状态落 ~/.local/state 而非 ~/.cache：效果参数要跨重启保留，是配置不是缓存，
     // cache 随时可能被清理。与 MonitorService 的 monitors.local.lua 同目录。
     readonly property string _statePath: _home + "/.local/state/hypr/screen-effects.json"
     // 生成的 GLSL 是纯派生物，留在 cache 合适。
@@ -61,9 +61,12 @@ Scope {
             console.warn("ScreenEffectsService: 读不到 shader 主体", root._bodyPath);
             return;
         }
-        // setText 是异步的（FileView.blockWrites 默认 false），所以 hyprctl 必须挂在
-        // onSaved 上 —— 紧跟在 setText 后面调会让 Hyprland 读到上一版文件。
-        shaderWriter.setText(SG.buildShader(p, body));
+        var source = SG.buildShader(p, body);
+        shaderWriter.setText(source);
+        // 相同内容会被 FileView 跳过，不触发 saved；重新开启仍需加载现有文件。
+        // 内容尚未写完时，text() 仍是旧值，交给 onSaved 加载。
+        if (shaderWriter.text() === source)
+            root._setShader(root._shaderPath);
     }
 
     // 写 decoration:screen_shader。空串 = 卸载（渲染侧对空串和哨兵 [[EMPTY]] 都走
@@ -76,6 +79,7 @@ Scope {
     // 路径没变时重设也会重新读盘：hl.config 解析成功后无条件 scheduleRefresh，
     // 所以重写同名文件再 eval 一次就能热更新，不需要先清空再设置。
     function _setShader(path) {
+        console.info("[screen-effects] 请求加载 shader:", path || "关闭");
         applyProc.command = ["hyprctl", "eval", 'hl.config({ decoration = { screen_shader = "' + path + '" } })'];
         applyProc.running = true;
     }
@@ -150,13 +154,18 @@ Scope {
         path: root._statePath
         atomicWrites: true
         printErrors: false
+        onSaveFailed: err => console.warn("[screen-effects] 状态保存失败", err)
     }
     FileView {
         id: shaderWriter
         path: root._shaderPath
         atomicWrites: true
         printErrors: false
-        onSaved: root._setShader(root._shaderPath)
+        onSaved: {
+            // 写入期间可能已关闭效果，完成回调不能把它重新打开。
+            if (ScreenEffectsState.effectsActive)
+                root._setShader(root._shaderPath);
+        }
         onSaveFailed: err => console.warn("ScreenEffectsService: shader 写入失败", err)
     }
 

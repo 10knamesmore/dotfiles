@@ -12,14 +12,10 @@ QtObject {
     property bool launcherOpen: false
     property bool settingsOpen: false
     property bool clipboardOpen: false
-    property bool keybindingsOpen: false
     property bool networkOpen: false
-    // ── 新面板 ──
-    property bool notesOpen: false
-    property bool journalOpen: false
     property bool bluetoothOpen: false
     property bool displayOpen: false
-    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || keybindingsOpen || networkOpen || notesOpen || journalOpen || bluetoothOpen || displayOpen
+    readonly property bool anyPanelOpen: screenEffectsOpen || calendarOpen || mediaOpen || notificationOpen || powerMenuOpen || launcherOpen || settingsOpen || clipboardOpen || networkOpen || bluetoothOpen || displayOpen
 
     function toggleScreenEffects() {
         screenEffectsOpen = !screenEffectsOpen;
@@ -53,20 +49,8 @@ QtObject {
         clipboardOpen = !clipboardOpen;
     }
 
-    function toggleKeybindings() {
-        keybindingsOpen = !keybindingsOpen;
-    }
-
     function toggleNetwork() {
         networkOpen = !networkOpen;
-    }
-
-    function toggleNotes() {
-        notesOpen = !notesOpen;
-    }
-
-    function toggleJournal() {
-        journalOpen = !journalOpen;
     }
 
     function toggleBluetooth() {
@@ -88,10 +72,7 @@ QtObject {
         launcherOpen = false;
         settingsOpen = false;
         clipboardOpen = false;
-        keybindingsOpen = false;
         networkOpen = false;
-        notesOpen = false;
-        journalOpen = false;
         bluetoothOpen = false;
         displayOpen = false;
     }

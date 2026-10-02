@@ -7,12 +7,9 @@ import "./display"
 import "./calendar"
 import "./clipboard"
 import "./computer-control"
-import "./journal"
-import "./keybindings"
 import "./launcher"
 import "./media"
 import "./network"
-import "./notes"
 import "./notifications"
 import "./osd"
 import "./power"
@@ -120,36 +117,6 @@ ShellRoot {
 
     GlobalShortcut {
         appid: "quickshell"
-        name: "keybindings"
-        description: "Toggle keybindings cheat sheet"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleKeybindings();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "notes"
-        description: "Toggle notes panel"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleNotes();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "journal"
-        description: "Toggle journal log panel"
-        onPressed: {
-            PanelState.closeAll();
-            PanelState.toggleJournal();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
         name: "bluetooth"
         description: "Toggle bluetooth panel"
         onPressed: {
@@ -199,16 +166,9 @@ ShellRoot {
 
     ClipboardPanel {}
 
-    KeybindingsPanel {}
-
     NetworkPanel {}
 
     BluetoothPanel {}
 
     DisplayPanel {}
-
-    // ── 新增面板 ──
-    JournalPanel {}
-
-    NotesPanel {}
 }

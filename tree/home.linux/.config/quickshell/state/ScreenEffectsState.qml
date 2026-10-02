@@ -28,9 +28,6 @@ QtObject {
     // 面板打开时回读背光实际值 —— 亮度可能被其他工具改过，State 不是唯一真相源
     signal refreshRequested()
 
-    function requestApply(w, g, gs, sb) {
-        applyRequested(w, g, gs, sb);
-    }
     // 单参数便捷入口：滑块只改一项，其余沿用当前值
     function setWarmth(v) {
         applyRequested(v, root.grain, root.grainSize, root.shadowBoost);

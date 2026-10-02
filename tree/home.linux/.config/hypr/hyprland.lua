@@ -275,24 +275,6 @@ hl.window_rule({
   no_focus = true,
 })
 
-hl.window_rule({
-  name = "keybindings-cheatsheet",
-  match = { class = "^(keybindings-cheatsheet)$" },
-  float = true,
-  size = "45% 70%",
-  center = true,
-  animation = "popin",
-})
-
-hl.window_rule({
-  name = "quick-note-float",
-  match = { class = "^(quick-note)$" },
-  float = true,
-  size = "50% 60%",
-  center = true,
-  animation = "popin",
-})
-
 -- HDR 屏上 Chrome 整窗发暗的解药。
 -- Chrome 会给自己的 surface 声明 BT2020+PQ 且 set_luminances(0, 1000, 203)——不管显示器
 -- 实际峰值多少都报 1000 nits。DP-3 峰值只有 417，于是 Hyprland 判定需要色调映射
@@ -353,9 +335,7 @@ hl.layer_rule({
 -- ============================================================
 -- Keybindings
 --
--- 统一走本地 bind()：description 会进 Hyprland 的 bind 记录，
--- 速查面板（Super + /）直接读 `hyprctl binds`，不再解析配置文件。
--- 约定格式「分组 · 标签」，前半段是面板里的卡片标题。
+-- 统一走本地 bind()：description 以「分组 · 标签」写入 Hyprland 的 bind 记录。
 -- ============================================================
 
 local function bind(keys, desc, dispatcher, opts)
@@ -434,15 +414,8 @@ bind(mainMod .. " + G", "分组 · 切换分组", hl.dsp.group.toggle())
 bind(mainMod .. " + TAB", "分组 · 下一个标签", hl.dsp.group.next())
 bind(mainMod .. " + SHIFT + TAB", "分组 · 上一个标签", hl.dsp.group.next({ reverse = true }))
 
--- QuickShell 全局触发
-bind(mainMod .. " + slash", "面板 · 快捷键速查", hl.dsp.global("quickshell:keybindings"))
-bind(mainMod .. " + N", "面板 · 快速笔记", hl.dsp.global("quickshell:notes"))
-bind(mainMod .. " + SHIFT + apostrophe", "面板 · 系统日志", hl.dsp.global("quickshell:journal"))
-
 -- 自定义脚本
 bind(mainMod .. " + O", "脚本 · 透明度切换", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
-bind(mainMod .. " + SHIFT + S", "脚本 · 保存工作区", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_save.sh"))
-bind(mainMod .. " + CONTROL + SHIFT + S", "脚本 · 恢复工作区", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/workspace_restore.sh"))
 
 -- 鼠标拖动 / 调整大小（bindm 等价：mouse = true）
 bind(mainMod .. " + mouse:272", "鼠标 · 拖动窗口", hl.dsp.window.drag(), { mouse = true })

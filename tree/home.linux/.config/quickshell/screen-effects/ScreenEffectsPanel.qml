@@ -97,39 +97,5 @@ PanelOverlay {
             value: ScreenEffectsState.shadowBoost
             onMoved: val => ScreenEffectsState.setShadowBoost(val)
         }
-
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: Colors.surface1
-        }
-
-        // ── 预设（warmth, grain, grainSize, shadowBoost）──
-        // warmth 的档位对应色温：0=6500K 中性、35≈5100K、60=4100K。
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 6
-
-            PresetButton {
-                text: "关闭"
-                onClicked: ScreenEffectsState.requestApply(0, 0, 50, 40)
-            }
-
-            PresetButton {
-                text: "阅读"
-                onClicked: ScreenEffectsState.requestApply(60, 85, 10, 40)
-            }
-
-            PresetButton {
-                text: "Portra"
-                onClicked: ScreenEffectsState.requestApply(35, 35, 45, 50)
-            }
-
-            PresetButton {
-                text: "Tri-X"
-                onClicked: ScreenEffectsState.requestApply(0, 60, 55, 70)
-            }
-        }
     }
-
 }

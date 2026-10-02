@@ -34,7 +34,7 @@ QtObject {
     readonly property real backdropDim: 0.2
     // 遮罩层
     readonly property real backdropMedium: 0.35
-    // launcher、keybindings
+    // launcher
     readonly property real backdropDark: 0.55 // 深色遮罩（power menu）
     // ── 边框 ──
     readonly property real borderAlpha: 0.12
