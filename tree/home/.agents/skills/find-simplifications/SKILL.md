@@ -7,11 +7,11 @@ description: 调查并证明值得删除、合并或简化的代码与依赖，�
 
 把宽泛的 simplify 请求转成少量、证据充分、可以独立决定和验收的 proposal。目标是删除、合并、降级或重新归属真实 surface area，而不是制造 cleanup inventory。本 Skill 是 guidance，不是 dead-code 工具的包装或候选数量清单。
 
-本 Skill 负责发现和证明候选。用户只要求 audit、review 或 proposal 时，不修改实现；用户批准实施后，单次会话可完成的明确工作直接实现；已有 Spec 使用 [`implement`](../implement/SKILL.md)，需要跨会话组织的目标使用 [`wayfinder`](../wayfinder/SKILL.md)。
+本 Skill 负责发现和证明候选。用户只要求 audit、review 或 proposal 时，不修改实现；用户批准实施后直接实现和验证，需要澄清取舍或跨会话续做时使用 [wayfinder](../wayfinder/SKILL.md)，不把写文档设为实施前提。
 
 ## Start with repository context
 
-1. 读取 repo instructions 和候选附近的代码、调用方与验证入口；涉及领域约定、跨模块结构或持久化行为时，再查对应 glossary、架构文档、ADR 或活动 Spec。
+1. 读取 repo instructions 和候选附近的代码、调用方与验证入口；涉及领域约定、跨模块结构或持久化行为时，再查对应 glossary、架构文档、ADR 或当前任务说明。
 2. 先识别项目明确保护的 seam、兼容承诺、durable format、安全边界和产品能力。不能因为实现复杂就把有 owner 的能力当成 cleanup。
 3. 检查项目已有依赖、标准库和 runtime floor，再考虑新增 dependency 或自写替代。
 4. 明确 scope。用户未给范围但当前 diff 或目标模块形成自然边界时使用该边界；不要自行扩成全仓库重构。
@@ -69,7 +69,7 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 先分类 consumer：
 
 - **Production:** application/library source、真实入口、runtime script、loader、config 和部署路径；
-- **Non-production:** tests、README、docs、Spec、ADR、snapshot、generated expected output 和 comments；
+- **Non-production:** tests、README、docs、Brief、ADR、snapshot、generated expected output 和 comments；
 - **Ambiguous:** example、benchmark、migration 和 smoke script。阅读调用方式后再分类。
 
 每个 proposal 至少回答：
@@ -84,29 +84,18 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 遇到下列情况时拒绝或降级：
 
 - 存在 production caller，删除属于 feature decision 而不是 cleanup；
-- 现有 ADR、Spec resolution 或 hard-won defensive pattern 已说明理由，新证据没有推翻它；
+- 现有 ADR、已确认的任务约束或 hard-won defensive pattern 已说明理由，新证据没有推翻它；
 - 需要大量无关 churn，却不减少 public API、state 或 required behavior；
 - idea 正确但太局部，不值得形成 durable proposal；只有用户授权写入时才添加 actionable TODO/FIXME；
 - 证据只来自 tests。passing test 证明当前行为存在，不单独证明它仍值得保留或删除。
 
-## Route the proposal into the workflow
+## Present and retain the proposal
 
-持久 design proposal 与本地 Spec 的信息模型接近，但 persistence 和粒度不同：proposal 都需要 problem、solution、alternatives、acceptance criteria 与 risk；Spec 还组织跨 session 的 dependency 和 implementation frontier。
+默认在回复中简短说明：当前成本、建议删除或合并的内容、会保留或失去的行为、证据与验证方式。源码片段或小 diff 更清楚时直接展示；不为每个候选填完整设计模板。只有真实取舍需要比较时才展开替代方案，不编造陪衬。
 
-- **已有活动 Spec，且候选属于同一 destination:** 按当前未知量写入 `research`、`decision` 或 `implementation` Subspec，不固定塞进某一种 kind。
-- **没有活动 Spec，候选需要跨 session:** 每个 cohesive destination 交给 Wayfinder 创建一个独立 Spec。多个互不相关候选不能只因来自同一次 audit 就塞进一个 umbrella Spec。
-- **候选已清晰且一个 session 可完成:** 在 response 中给出完整 proposal，用户确认后直接实现；不要为了模仿 durable design note 强制创建 Spec。
-- **候选只是后续 decision 的证据:** 放进 owning decision Subspec 的 Context、Resolution 或 Evidence，不另建重复文档。
-- **完成后的 rationale 需要长期提交进仓库:** 只有满足 [grill-with-docs 的 ADR 条件](../grill-with-docs/SKILL.md#领域术语与-adr)时才创建 ADR；本地 complete Spec 不是 committed decision record。
+用户要求保存，或获批实施后需要跨会话推进时，用 [wayfinder](../wayfinder/SKILL.md) 保存简短 Brief。已有同目标的 Brief 就更新它；互不相关的候选不要合成一个大任务。只保留理解目标所需的结论、约束和关键证据入口，不复制整份审计。
 
-proposal 应包含：
-
-- **Problem:** 当前 API/state/mechanism、production 与 non-production consumer 证据，以及实际维护成本；
-- **Proposal:** 精确说明 remove、fold、demote 或 rehome 的内容；
-- **Alternatives considered:** 只写真实考虑过的 alternative 和未采用原因，不编造陪衬；
-- **Acceptance criteria:** 可观察 end state、调用面、状态和文档变化；
-- **Risks and consequences:** behavior/API change、失去的能力、未来重新引入条件和为什么 trade-off 仍成立；
-- **Evidence:** 精确源码路径、symbol、搜索结果、文档、dependency source 和实际验证。
+确实需要长期保留的理由，遵循 [wayfinder 的长期文档规则](../wayfinder/SKILL.md#长期文档)。
 
 ## Validation and report
 
@@ -115,7 +104,6 @@ proposal 应包含：
 - inspected scope 和刻意排除范围；
 - retained、rejected、downgraded 与推荐候选；
 - 每个推荐候选的 production/non-production consumer 证据；
-- 建议的 Spec/Subspec 路由；
 - 实际运行的 read-only checks。
 
-实施获批后，验证范围由目标 repo instructions 和 accepted Spec 决定。运行 formatter、type/lint、已有最窄 behavior checks 和 `git diff --check`；没有实际运行的步骤不能声称通过。
+实施获批后，验证范围由目标 repo instructions 和已确认的要求决定。运行 formatter、type/lint、已有最窄 behavior checks 和 `git diff --check`；没有实际运行的步骤不能声称通过。
