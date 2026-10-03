@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import "../../theme"
 import QtQuick
 import QtQuick.Layouts
@@ -11,7 +13,7 @@ Item {
 
     property var barWindow: null
 
-    implicitWidth: Math.max(trayRow.implicitWidth + 24, 36)
+    implicitWidth: trayRow.implicitWidth
     implicitHeight: 36
     visible: trayRepeater.count > 0
 
@@ -19,26 +21,78 @@ Item {
         id: trayRow
 
         anchors.centerIn: parent
-        spacing: 8
+        spacing: BarLayout.spacing
 
         Repeater {
             id: trayRepeater
 
             model: SystemTray.items
 
-            delegate: Item {
+            delegate: Rectangle {
                 id: trayItem
 
-                required property var modelData
+                required property SystemTrayItem modelData
+                readonly property bool highlighted: trayArea.containsMouse || activeFocus || menuAnchor.visible
 
-                width: 22
-                height: 22
+                function openMenu() {
+                    if (!modelData.hasMenu)
+                        return;
+                    console.info("[tray] open-menu", modelData.id);
+                    menuAnchor.open();
+                }
+
+                function activate() {
+                    if (modelData.onlyMenu) {
+                        openMenu();
+                    } else {
+                        console.info("[tray] activate", modelData.id);
+                        modelData.activate();
+                    }
+                }
+
+                width: 36
+                height: root.implicitHeight
+                radius: Tokens.radiusXS
+                color: trayArea.pressed ? Colors.withAlpha(Colors.lavender, 0.3) : highlighted ? Colors.withAlpha(Colors.lavender, 0.17) : "transparent"
+                border.width: 1
+                border.color: highlighted ? Colors.withAlpha(Colors.lavender, activeFocus ? 0.8 : 0.4) : "transparent"
                 Layout.alignment: Qt.AlignVCenter
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.title || modelData.id
+                Accessible.description: modelData.tooltipDescription
+                Accessible.pressed: trayArea.pressed
+                Accessible.onPressAction: activate()
+                Keys.onReturnPressed: activate()
+                Keys.onSpacePressed: activate()
+                Keys.onMenuPressed: openMenu()
+
+                Behavior on border.color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
 
                 IconImage {
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: 22
+                    height: 22
                     source: trayItem.modelData.icon
                     implicitSize: 22
+                    scale: trayArea.pressed ? 0.9 : trayItem.highlighted ? 1.08 : 1
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: Tokens.animFast
+                            easing.type: Easing.OutCubic
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -49,12 +103,10 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: mouse => {
-                        if (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu) {
-                            if (trayItem.modelData.hasMenu)
-                                menuAnchor.open();
-                        } else {
-                            trayItem.modelData.activate();
-                        }
+                        if (mouse.button === Qt.RightButton)
+                            trayItem.openMenu();
+                        else
+                            trayItem.activate();
                     }
                 }
 
@@ -62,8 +114,10 @@ Item {
                     id: menuAnchor
 
                     menu: trayItem.modelData.menu
-                    anchor.window: root.barWindow
                     anchor.item: trayItem
+                    anchor.edges: Edges.Bottom | Edges.Left
+                    anchor.gravity: Edges.Bottom | Edges.Right
+                    anchor.margins.bottom: -Tokens.spaceXS
                 }
             }
         }

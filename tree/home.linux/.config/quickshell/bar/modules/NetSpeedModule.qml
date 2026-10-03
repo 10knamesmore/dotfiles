@@ -21,7 +21,7 @@ BarModule {
     Accessible.role: Accessible.Button
     accentColor: Colors.teal
     activeFocusOnTab: true
-    implicitWidth: download.compactWidth + 30 + (hovered ? totalWidth + 6 : 0)
+    implicitWidth: download.compactWidth + horizontalPadding * 2 + (hovered ? totalWidth + 6 : 0)
 
     Accessible.onPressAction: PanelState.toggleResourcePanel("network", root)
     Keys.onReturnPressed: PanelState.toggleResourcePanel("network", root)

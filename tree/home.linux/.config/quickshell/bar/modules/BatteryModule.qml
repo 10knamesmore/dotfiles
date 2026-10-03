@@ -13,7 +13,7 @@ BarModule {
     readonly property bool fullyCharged: batteryDevice ? batteryDevice.state === UPowerDeviceState.FullyCharged : false
 
     clickable: false
-    implicitWidth: batteryContent.implicitWidth + 32
+    implicitWidth: batteryContent.implicitWidth + horizontalPadding * 2
     Accessible.role: Accessible.Indicator
     Accessible.name: "电池 " + percentage + "%"
     Accessible.description: fullyCharged ? "已充满" : (charging ? "充电中" : "放电中")

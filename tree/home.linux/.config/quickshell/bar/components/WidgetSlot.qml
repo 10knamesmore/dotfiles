@@ -28,14 +28,14 @@ Loader {
         id: groupComp
 
         Item {
-            implicitWidth: groupRow.implicitWidth + 12
+            implicitWidth: groupRow.implicitWidth
             implicitHeight: 36
 
             RowLayout {
                 id: groupRow
 
                 anchors.centerIn: parent
-                spacing: 3
+                spacing: BarLayout.spacing
 
                 Repeater {
                     model: slot.widgetItem.group

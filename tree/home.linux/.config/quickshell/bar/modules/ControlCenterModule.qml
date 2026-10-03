@@ -13,13 +13,14 @@ BarModule {
 
     clickable: false
     hovered: false
-    implicitWidth: entries.implicitWidth + 32
+    horizontalPadding: Tokens.spaceXS
+    implicitWidth: entries.implicitWidth + horizontalPadding * 2
 
     Row {
         id: entries
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: 0
 
         EntryButton {
             page: "network"
@@ -84,13 +85,15 @@ BarModule {
         property int count: 0
         readonly property bool selected: PanelState.controlCenterOpen && PanelState.controlCenterPage === page
 
-        width: labelRow.implicitWidth + 14
-        height: 28
-        radius: Tokens.radiusM
+        width: labelRow.implicitWidth + 18
+        height: root.implicitHeight
+        radius: Tokens.radiusXS
         color: hover.containsMouse ? Colors.withAlpha(Colors.blue, 0.22) : selected ? Colors.withAlpha(Colors.blue, 0.12) : "transparent"
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: label
+        Accessible.checkable: true
+        Accessible.checked: selected
         Accessible.description: count > 0 ? count + " 条通知" : ""
         Accessible.onPressAction: PanelState.openControlCenter(page, root)
         Keys.onReturnPressed: PanelState.openControlCenter(page, root)

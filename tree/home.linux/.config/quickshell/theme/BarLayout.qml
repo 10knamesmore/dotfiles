@@ -4,7 +4,9 @@ import QtQuick
 
 // 顶栏布局：左侧导航信息带，中部独立模块，右侧按功能分组。
 QtObject {
-    readonly property int spacing: 8
+    // 模块热区相接；内容用内边距留白，分组不再额外占宽。
+    readonly property int spacing: 0
+    readonly property int modulePadding: 10
 
     // widget 项支持：字符串 id / {id, props} / {group: [...]}
     readonly property var leftWidgets: ["navigation", "tray"]

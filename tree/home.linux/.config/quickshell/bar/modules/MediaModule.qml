@@ -52,8 +52,8 @@ BarModule {
 
     accentColor: Colors.pink
     progress: player && player.lengthSupported && player.length > 0 ? player.position / player.length : -1
-    readonly property real compactWidth: Math.max(compactMeasure.implicitWidth + coverWidth + 38, 160)
-    readonly property real hoverWidth: Math.max(compactWidth, Math.min(600, fullMeasure.implicitWidth + coverWidth + 38 + (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6))
+    readonly property real compactWidth: Math.max(compactMeasure.implicitWidth + coverWidth + horizontalPadding * 2, 160)
+    readonly property real hoverWidth: Math.max(compactWidth, Math.min(600, fullMeasure.implicitWidth + coverWidth + horizontalPadding * 2 + (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6))
     implicitWidth: showDetails ? hoverWidth : compactWidth
     hoverReveal: showDetails ? 1 : 0
     onClicked: mouse => {

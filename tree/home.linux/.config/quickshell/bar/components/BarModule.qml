@@ -9,6 +9,9 @@ Rectangle {
     property bool clickable: true
     property real expansion: 0
     property real panelProgress: 0
+    property real horizontalPadding: BarLayout.modulePadding
+    // 顶栏保持紧凑；头部移入面板时，内边距随展开进度对齐面板内容。
+    readonly property real headerHorizontalPadding: horizontalPadding + (Tokens.spaceL - horizontalPadding) * panelProgress
     property bool hovered: !headerInPanel && hoverArea.containsMouse
     readonly property bool headerInPanel: header.parent !== root
     property real hoverReveal: hovered ? 1 : 0
@@ -26,7 +29,7 @@ Rectangle {
     signal moved(var mouse)
 
     clip: true
-    radius: Tokens.radiusS
+    radius: Tokens.radiusXS
     color: root.hovered ? Colors.overlay(0.07) : "transparent"
     implicitHeight: 36
 
@@ -42,8 +45,8 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 15
-            anchors.rightMargin: 15
+            anchors.leftMargin: root.headerHorizontalPadding
+            anchors.rightMargin: root.headerHorizontalPadding
             anchors.bottomMargin: 1
             height: 2
             radius: 1
@@ -67,8 +70,8 @@ Rectangle {
         Item {
             id: inner
             anchors.fill: parent
-            anchors.leftMargin: 15
-            anchors.rightMargin: 15 + root.panelProgress * 28
+            anchors.leftMargin: root.headerHorizontalPadding
+            anchors.rightMargin: root.headerHorizontalPadding + root.panelProgress * 28
             anchors.topMargin: 4
             anchors.bottomMargin: 4
         }

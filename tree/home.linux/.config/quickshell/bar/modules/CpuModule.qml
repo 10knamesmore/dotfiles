@@ -22,7 +22,7 @@ BarModule {
     Accessible.role: Accessible.Button
     accentColor: Colors.blue
     activeFocusOnTab: true
-    implicitWidth: summary.implicitWidth + 30 + (hovered ? previewWidth + 5 : 0)
+    implicitWidth: summary.implicitWidth + horizontalPadding * 2 + (hovered ? previewWidth + 5 : 0)
 
     Accessible.onPressAction: PanelState.toggleResourcePanel("cpu", root)
     Keys.onReturnPressed: PanelState.toggleResourcePanel("cpu", root)

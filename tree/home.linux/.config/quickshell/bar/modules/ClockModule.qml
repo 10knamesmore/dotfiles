@@ -9,16 +9,26 @@ BarModule {
     id: root
 
     property bool showDate: false
-    readonly property real compactWidth: timeText.implicitWidth + (showDate ? 0 : secondsText.implicitWidth) + 36
-    readonly property real hoverWidth: timeText.implicitWidth + (showDate ? 0 : dateText.implicitWidth) + 36
+    readonly property real compactWidth: timeText.implicitWidth + (showDate ? 0 : secondsText.implicitWidth) + horizontalPadding * 2
+    readonly property real hoverWidth: timeText.implicitWidth + (showDate ? 0 : dateText.implicitWidth) + horizontalPadding * 2
 
-    radius: 20
-    accentColor: Colors.blue
-    implicitWidth: hovered ? hoverWidth : compactWidth
-    onClicked: {
+    function openCalendar() {
         PanelState.closeAll();
         MorphState.openFrom(root, () => PanelState.toggleCalendar());
     }
+
+    accentColor: Colors.blue
+    implicitWidth: hovered ? hoverWidth : compactWidth
+    activeFocusOnTab: true
+    Accessible.role: Accessible.Button
+    Accessible.name: "日历"
+    Accessible.description: Qt.formatDateTime(clock.date, "yyyy/MM/dd ddd HH:mm:ss")
+    Accessible.checkable: true
+    Accessible.checked: PanelState.calendarOpen
+    Accessible.onPressAction: root.openCalendar()
+    Keys.onReturnPressed: root.openCalendar()
+    Keys.onSpacePressed: root.openCalendar()
+    onClicked: root.openCalendar()
     onRightClicked: root.showDate = !root.showDate
 
     SystemClock {
