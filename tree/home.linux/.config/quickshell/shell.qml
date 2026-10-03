@@ -1,6 +1,7 @@
 //@ pragma IconTheme breeze-dark
 //@ pragma UseQApplication
 
+import "./ai-usage"
 import "./bar"
 import "./calendar"
 import "./computer-control"
@@ -100,6 +101,8 @@ ShellRoot {
     }
 
     // ── 全局面板（唯一实例）──
+    AiUsagePanel {}
+
     CalendarPanel {}
 
     MediaPanel {}

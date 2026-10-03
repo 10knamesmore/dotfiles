@@ -15,7 +15,7 @@ QtObject {
         {
             "group": ["cpu", "memory", "netspeed"]
         },
-        "controlCenter", "battery", "clock"]
+        "aiUsage", "controlCenter", "battery", "clock"]
 
     // 归一化 widget 项 → {id, props}
     function normalize(item) {

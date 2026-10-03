@@ -1,0 +1,3 @@
+singleton AiUsageService 1.0 AiUsageService.qml
+AiUsageModule 1.0 AiUsageModule.qml
+AiUsagePanel 1.0 AiUsagePanel.qml

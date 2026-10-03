@@ -5,7 +5,8 @@ import QtQuick
 QtObject {
     id: root
 
-    readonly property bool anyPanelOpen: calendarOpen || mediaOpen || powerMenuOpen || launcherOpen || controlCenterOpen || cpuOpen || memoryOpen || networkStatsOpen
+    readonly property bool anyPanelOpen: calendarOpen || mediaOpen || powerMenuOpen || launcherOpen || controlCenterOpen || cpuOpen || memoryOpen || networkStatsOpen || aiUsageOpen
+    property bool aiUsageOpen: false
     property bool calendarOpen: false
     property bool controlCenterOpen: false
     property string controlCenterPage: "home"
@@ -27,6 +28,7 @@ QtObject {
         cpuOpen = false;
         memoryOpen = false;
         networkStatsOpen = false;
+        aiUsageOpen = false;
     }
     function openControlCenter(page = "home", capsule = null) {
         if (controlCenterOpen) {
@@ -61,6 +63,14 @@ QtObject {
     function togglePowerMenu() {
         powerMenuOpen = !powerMenuOpen;
     }
+    function toggleAiUsage(capsule) {
+        if (aiUsageOpen) {
+            aiUsageOpen = false;
+            return;
+        }
+        closeAll();
+        MorphState.openFrom(capsule, () => aiUsageOpen = true);
+    }
     function toggleResourcePanel(resource, capsule) {
         const field = resource === "network" ? "networkStatsOpen" : resource + "Open";
         if (root[field]) {
@@ -71,6 +81,7 @@ QtObject {
         MorphState.openFrom(capsule, () => root[field] = true);
     }
 
+    onAiUsageOpenChanged: console.info("[ai-usage] panel", aiUsageOpen ? "opened" : "closed")
     onControlCenterOpenChanged: console.info("[control-center]", controlCenterOpen ? "opened" : "closed", controlCenterPage)
     onControlCenterPageChanged: console.info("[control-center] page", controlCenterPage)
 }

@@ -1,6 +1,7 @@
 import "../modules"
 import "../navigation"
 import "../../state"
+import "../../ai-usage"
 import QtQuick
 
 // id → bar module 工厂。barScreen / barWindow 在此集中注入。
@@ -29,6 +30,8 @@ Loader {
             return cMedia;
         case "clock":
             return cClock;
+        case "aiUsage":
+            return cAiUsage;
         case "cpu":
             return cCpu;
         case "memory":
@@ -69,6 +72,11 @@ Loader {
     Component {
         id: cClock
         ClockModule {
+        }
+    }
+    Component {
+        id: cAiUsage
+        AiUsageModule {
         }
     }
     Component {
