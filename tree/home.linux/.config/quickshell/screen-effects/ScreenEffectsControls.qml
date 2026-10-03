@@ -4,7 +4,7 @@ import "../state"
 import QtQuick
 import QtQuick.Layouts
 
-// 控制中心首页的屏幕效果控件；状态与应用操作由 ScreenEffectsState / Service 承担。
+// 控制中心详情页中的完整屏幕效果调节；状态与应用操作由 ScreenEffectsState / Service 承担。
 Item {
     id: root
 

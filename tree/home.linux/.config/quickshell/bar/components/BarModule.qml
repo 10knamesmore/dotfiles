@@ -100,8 +100,8 @@ Rectangle {
         Item {
             id: inner
             anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 14 + root.panelProgress * 28
+            anchors.leftMargin: 15
+            anchors.rightMargin: 15 + root.panelProgress * 28
             anchors.topMargin: 4
             anchors.bottomMargin: 4
         }

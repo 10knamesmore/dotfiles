@@ -19,6 +19,9 @@ PanelWindow {
     property real panelTargetY: -1
     property real closedOffsetX: 0
     property real closedOffsetY: 20
+    // 控制中心的头部含独立按钮，关闭热区只占最右侧；其他胶囊仍可整头点击收起。
+    property bool interactiveHeader: false
+    property bool alignRight: false
 
     enum Entrance {
         Morph,
@@ -223,7 +226,7 @@ PanelWindow {
         readonly property real widthProgress: root.hasMorphSource ? progress + 0.14 * Math.sin(Math.PI * progress) : progress
         readonly property real headerHeight: root.hasMorphSource ? root._source.bounds.height : 0
         readonly property real targetHeight: Math.min(root.panelHeight + headerHeight, root.hasMorphSource ? root.height - targetY - 10 : root.panelHeight)
-        readonly property real targetX: root.hasMorphSource ? Math.max(10, Math.min(root.width - root.panelWidth - 10, root._source.bounds.x + (root._source.bounds.width - root.panelWidth) / 2)) : (root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2)
+        readonly property real targetX: root.alignRight ? root.width - root.panelWidth - 10 : root.hasMorphSource ? Math.max(10, Math.min(root.width - root.panelWidth - 10, root._source.bounds.x + (root._source.bounds.width - root.panelWidth) / 2)) : (root.panelTargetX >= 0 ? root.panelTargetX : (root.width - root.panelWidth) / 2)
         readonly property real targetY: root.hasMorphSource ? root._source.bounds.y : (root.panelTargetY >= 0 ? root.panelTargetY : (root.height - root.panelHeight) / 2)
         readonly property real sourceX: root.hasMorphSource ? root._returnBounds.x : targetX + root.closedOffsetX
         readonly property real sourceY: root.hasMorphSource ? root._returnBounds.y : targetY + root.closedOffsetY
@@ -254,6 +257,7 @@ PanelWindow {
 
             MouseArea {
                 anchors.fill: parent
+                anchors.leftMargin: root.interactiveHeader ? parent.width - 36 : 0
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor

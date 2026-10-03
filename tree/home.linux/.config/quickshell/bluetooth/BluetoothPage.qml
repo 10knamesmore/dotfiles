@@ -141,10 +141,10 @@ FocusScope {
     }
 
     required property bool showing
-    signal closeRequested
     focus: showing
     onShowingChanged: {
         if (showing) {
+            searchInput.text = "";
             searchQuery = "";
             errorMsg = "";
             actionDevice = "";
@@ -558,7 +558,6 @@ FocusScope {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent

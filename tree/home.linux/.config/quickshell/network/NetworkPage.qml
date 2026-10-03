@@ -1,6 +1,7 @@
 import "../components"
 import "../theme"
 import "../state"
+import "../services"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -178,10 +179,10 @@ FocusScope {
     }
 
     required property bool showing
-    signal closeRequested
     focus: showing
     onShowingChanged: {
         if (showing) {
+            searchInput.text = "";
             searchQuery = "";
             selectedSsid = "";
             editingSsid = "";
@@ -487,7 +488,7 @@ FocusScope {
             Layout.fillWidth: true
 
             Text {
-                text: root.wifiEnabled ? "󰤨" : "󰤭"
+                text: root.wifiEnabled ? NetworkService.statusIcon : "󰤭"
                 color: root.wifiEnabled ? Colors.blue : Colors.overlay1
                 font.family: Fonts.family
                 font.pixelSize: Fonts.title
@@ -582,6 +583,37 @@ FocusScope {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: connectionSummary.implicitHeight + 20
+            visible: !NetworkService.disconnected
+            radius: Tokens.radiusMS
+            color: Colors.withAlpha(Colors.blue, 0.08)
+
+            ColumnLayout {
+                id: connectionSummary
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 4
+                Text {
+                    Layout.fillWidth: true
+                    text: (NetworkService.connectionType === "wifi" ? NetworkService.ssid : "有线连接") + " · " + NetworkService.interfaceName
+                    color: Colors.text
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.small
+                    elide: Text.ElideRight
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "IP: " + NetworkService.address + (NetworkService.connectionType === "wifi" ? " · 信号 " + NetworkService.signalStrength + "%" : "")
+                    color: Colors.subtext0
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.xs
+                    wrapMode: Text.WrapAnywhere
+                }
+            }
+        }
+
         // ── 搜索框 ──
         Rectangle {
             Layout.fillWidth: true
@@ -616,7 +648,6 @@ FocusScope {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent

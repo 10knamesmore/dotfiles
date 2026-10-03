@@ -9,6 +9,11 @@ QtObject {
     property bool launcherOpen: false
     property bool controlCenterOpen: false
     property string controlCenterPage: "home"
+    readonly property int controlCenterTab: tabForControlPage(controlCenterPage)
+
+    function tabForControlPage(page) {
+        return page === "notifications" ? 1 : page === "clipboard" ? 2 : 0;
+    }
     readonly property bool anyPanelOpen: calendarOpen || mediaOpen || powerMenuOpen || launcherOpen || controlCenterOpen
 
     onControlCenterOpenChanged: console.info("[control-center]", controlCenterOpen ? "opened" : "closed", controlCenterPage)

@@ -11,6 +11,8 @@ ColumnLayout {
     id: root
 
     property bool expanded: false
+    // 面板隐藏或离开控制分区时停止采集，折叠状态与已显示内容不随之清空。
+    required property bool active
     // ── 数据 ──
     property string cpuModel: ""
     property int cpuTemp: 0
@@ -88,13 +90,13 @@ ColumnLayout {
     Layout.fillWidth: true
     visible: expanded
     spacing: 8
-    onExpandedChanged: {
-        if (expanded)
+    onActiveChanged: {
+        if (active)
             fetchAll();
     }
 
     Timer {
-        running: root.expanded
+        running: root.active
         interval: 5000
         repeat: true
         onTriggered: fetchDynamic()

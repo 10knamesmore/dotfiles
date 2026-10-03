@@ -13,6 +13,7 @@ Singleton {
     property string ssid: ""
     property int signalStrength: 0
     readonly property bool disconnected: connectionType === "disconnected"
+    readonly property string statusIcon: disconnected ? "󰤮" : connectionType === "wifi" ? ["󰤟", "󰤢", "󰤥", "󰤨"][Math.min(3, Math.floor(signalStrength / 25))] : "󰈀"
 
     Process {
         id: reader

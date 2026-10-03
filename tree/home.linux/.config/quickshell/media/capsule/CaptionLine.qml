@@ -57,6 +57,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             width: root.wordTimed ? root.implicitWidth : root.width
+            horizontalAlignment: root.wordTimed ? Text.AlignLeft : Text.AlignHCenter
             text: root.caption.text
             textFormat: Text.PlainText
             font: textMetrics.font

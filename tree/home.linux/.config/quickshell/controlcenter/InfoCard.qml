@@ -33,6 +33,7 @@ Rectangle {
 
         anchors.fill: parent
         hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.NoButton
     }
 

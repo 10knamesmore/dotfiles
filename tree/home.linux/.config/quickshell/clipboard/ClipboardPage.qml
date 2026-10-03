@@ -70,6 +70,7 @@ FocusScope {
     focus: showing
     onShowingChanged: {
         if (showing) {
+            searchInput.text = "";
             searchQuery = "";
             loadClipboard();
             focusTimer.start();
@@ -250,7 +251,6 @@ FocusScope {
                         root.searchQuery = text;
                         root.applyFilter();
                     }
-                    Keys.onEscapePressed: root.closeRequested()
 
                     Text {
                         anchors.fill: parent
