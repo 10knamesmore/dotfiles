@@ -2,7 +2,7 @@ import "../state"
 import QtQuick
 import Quickshell
 
-// 读取当前播放器的 MPRIS 歌词元数据，合并原文、逐字、翻译与罗马音到 LyricsState。
+// 读取当前播放器的 MPRIS 歌词元数据，合并原文、逐字与翻译到 LyricsState。
 // 播放时按帧同步歌词时间；暂停、跳转和偏移变化立即同步，不另起进程查询歌词。
 Scope {
     id: root
@@ -12,18 +12,17 @@ Scope {
 
     function refreshLyrics() {
         const metadata = player ? player.metadata : {};
-        const raw = [metadata["mineral:words"] || "", metadata["xesam:asText"] || "", metadata["mineral:translation"] || "", metadata["mineral:romanization"] || ""];
+        const raw = [metadata["mineral:words"] || "", metadata["xesam:asText"] || "", metadata["mineral:translation"] || ""];
         const serialized = JSON.stringify(raw);
         if (LyricsState.lyricsTrackId === MediaService.activeTrackKey && lastLyrics === serialized)
             return;
 
         lastLyrics = serialized;
-        const built = _buildLines(raw[0], raw[1], raw[2], raw[3]);
+        const built = _buildLines(raw[0], raw[1], raw[2]);
         LyricsState.lyricsTrackId = MediaService.activeTrackKey;
         LyricsState.lyricsLines = built.lines;
         LyricsState.hasWords = built.hasWords;
         LyricsState.hasTranslation = built.lines.some(line => line.translation.length > 0);
-        LyricsState.hasRomanization = built.lines.some(line => line.romanization.length > 0);
         LyricsState.currentLyricIndex = -1;
         LyricsState.currentLyric = "";
         syncPosition();
@@ -107,9 +106,9 @@ Scope {
         }
     }
 
-    // 把附加轨（翻译/罗马音）按时间轴就近合并到 lines 的对应行
-    function _mergeAux(lines, aux, field) {
-        for (let a of aux) {
+    // 按时间轴就近合并翻译到原文，最多允许相差 0.5 秒。
+    function _mergeTranslation(lines, translations) {
+        for (let a of translations) {
             let best = -1, bestDiff = 1e9;
             for (let i = 0; i < lines.length; i++) {
                 let d = Math.abs(lines[i].time - a.time);
@@ -119,12 +118,12 @@ Scope {
                 }
             }
             if (best >= 0 && bestDiff < 0.5)
-                lines[best][field] = a.text;
+                lines[best].translation = a.text;
         }
     }
 
     // 组装统一行模型，返回 { lines, hasWords }
-    function _buildLines(wordsJson, asText, translation, romanization) {
+    function _buildLines(wordsJson, asText, translation) {
         let lines, hasWords;
         let wl = _parseWords(wordsJson);
         if (wl.length > 0) {
@@ -133,8 +132,7 @@ Scope {
                         "time": w.start / 1000,
                         "text": w.text,
                         "words": w.words,
-                        "translation": "",
-                        "romanization": ""
+                        "translation": ""
                     }));
         } else {
             hasWords = false;
@@ -142,19 +140,17 @@ Scope {
                         "time": l.time,
                         "text": l.text,
                         "words": [],
-                        "translation": "",
-                        "romanization": ""
+                        "translation": ""
                     }));
         }
-        _mergeAux(lines, _parseLrc(translation), "translation");
-        _mergeAux(lines, _parseLrc(romanization), "romanization");
+        _mergeTranslation(lines, _parseLrc(translation));
         return {
             "lines": lines,
             "hasWords": hasWords
         };
     }
 
-    // ── 同步当前行 + 当前时间（逐字 wipe 用）──
+    // ── 同步当前行与整词高亮使用的播放时间 ──
     function _syncLyric(positionSec) {
         LyricsState.currentTimeMs = positionSec * 1000;
         let lines = LyricsState.lyricsLines;
@@ -176,7 +172,7 @@ Scope {
         }
     }
 
-    // position getter 在本地计算播放位置；逐字扫亮直接跟随渲染帧，不用定时器插值。
+    // position getter 在本地计算播放位置；按帧同步以保持顶栏歌词视口平滑跟随。
     FrameAnimation {
         running: root.player !== null && root.player.isPlaying && LyricsState.lyricsLines.length > 0
         onTriggered: root.syncPosition()

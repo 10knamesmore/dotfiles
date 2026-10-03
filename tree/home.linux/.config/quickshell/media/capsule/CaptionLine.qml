@@ -3,7 +3,7 @@ import "../../state"
 import "../../components"
 import QtQuick
 
-// 一帧标题或歌词。长文本往返滚动；有逐字时间的歌词跟随演唱位置。
+// 一帧标题或歌词。长文本往返滚动；有逐词时间时整词高亮，视口跟随演唱位置。
 Item {
     id: root
 
@@ -18,6 +18,7 @@ Item {
             const left = textMetrics.advanceWidth(prefix);
             prefix += word.text;
             ranges.push({
+                text: word.text,
                 start: word.start,
                 duration: word.duration,
                 left: left,
@@ -26,7 +27,8 @@ Item {
         }
         return ranges;
     }
-    readonly property real sungWidth: {
+    // 连续演唱位置仅用于平滑移动视口，不再裁切词内的高亮区域。
+    readonly property real playbackTextPosition: {
         const now = LyricsState.currentTimeMs;
         for (const word of wordRanges) {
             if (now < word.start)
@@ -37,7 +39,7 @@ Item {
         return wordTimed ? implicitWidth : 0;
     }
     readonly property real overflowWidth: Math.max(0, implicitWidth - width)
-    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(overflowWidth, sungWidth - width * 0.6)) : autoScroll.offset
+    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(overflowWidth, playbackTextPosition - width * 0.6)) : autoScroll.offset
 
     implicitWidth: textMetrics.advanceWidth(caption.text)
     implicitHeight: 28
@@ -69,12 +71,13 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            width: root.wordTimed ? root.implicitWidth : Math.max(root.width, root.implicitWidth)
-            horizontalAlignment: root.wordTimed ? Text.AlignLeft : Text.AlignHCenter
+            visible: !root.wordTimed
+            width: Math.max(root.width, root.implicitWidth)
+            horizontalAlignment: Text.AlignHCenter
             text: root.caption.text
             textFormat: Text.PlainText
             font: textMetrics.font
-            color: root.wordTimed ? Colors.overlay1 : (root.caption.lyric ? Colors.mauve : root.textColor)
+            color: root.caption.lyric ? Colors.mauve : root.textColor
             elide: Text.ElideNone
             Behavior on color {
                 ColorAnimation {
@@ -83,18 +86,32 @@ Item {
             }
         }
 
-        Item {
-            width: root.sungWidth
-            height: parent.height
-            visible: root.wordTimed
-            clip: true
+        Repeater {
+            model: root.wordTimed ? root.wordRanges : []
 
-            Text {
+            delegate: Text {
+                required property var modelData
+
+                x: modelData.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.caption.text
+                text: modelData.text
                 textFormat: Text.PlainText
                 font: textMetrics.font
-                color: Colors.mauve
+                color: {
+                    const now = LyricsState.currentTimeMs;
+                    if (now >= modelData.start + modelData.duration)
+                        return Colors.text;
+                    if (now >= modelData.start)
+                        return Colors.mauve;
+                    return Colors.overlay1;
+                }
+                Accessible.ignored: true
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
+                }
             }
         }
     }
