@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# 按当前布局移动窗口或调整尺寸。
+# Usage: layout_dispatch.sh <shift|ctrl> <h|j|k|l>
+# 依赖：hyprctl、jq；通过继承的 Hyprland 环境连接当前会话。
+# 未处理的命令失败时停止，避免继续操作窗口。
 set -euo pipefail
 
 mode="${1:-}"   # shift | ctrl
@@ -35,9 +39,23 @@ case "$mode" in
         "$script_dir/move_or_swap.sh" "$dir"
         ;;
       scrolling)
-        # scrolling 下先在当前布局内移动。
-        # 如果窗口坐标没变（说明撞到边缘），则按方向移动到相邻显示器。
         win_before="$(hyprctl -j activewindow 2>/dev/null || true)"
+
+        if [[ "$key" == h || "$key" == l ]] && jq -e '.floating == false' <<< "$win_before" >/dev/null; then
+          # 堆叠时先拆成相邻独立列；独占一列时并入邻列底部。
+          case "$key" in
+            h) column_direction="prev" ;;
+            l) column_direction="next" ;;
+          esac
+          move_result="$(hyprctl dispatch "hl.dsp.layout('consume_or_expel $column_direction')")"
+          # 无相邻列时保留跨显示器移动；成功时不以屏幕坐标判断，避免视口滚动造成误判。
+          if [[ "$move_result" != "ok" ]]; then
+            "$script_dir/move_window_to_monitor.sh" "$dir" || true
+          fi
+          exit 0
+        fi
+
+        # 上下移动和浮动窗口沿用方向移动；坐标未变时尝试相邻显示器。
         old_x="$(echo "$win_before" | jq -r '.at[0] // empty')"
         old_y="$(echo "$win_before" | jq -r '.at[1] // empty')"
 

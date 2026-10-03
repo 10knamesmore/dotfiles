@@ -2,7 +2,7 @@ import "../../theme"
 import "../../state"
 import QtQuick
 
-// 一帧标题或歌词。逐字时间映射到实际字宽，长句让正在演唱的位置保持在可视区域。
+// 一帧标题或歌词。长文本往返滚动；有逐字时间的歌词跟随演唱位置。
 Item {
     id: root
 
@@ -35,7 +35,11 @@ Item {
         }
         return wordTimed ? implicitWidth : 0;
     }
-    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(implicitWidth - width, sungWidth - width * 0.6)) : 0
+    readonly property real overflowWidth: Math.max(0, implicitWidth - width)
+    property real autoScrollProgress: 0
+    // 自动滚动速度为 30 px/s；首尾停留，短距离至少用一秒完成。
+    readonly property int autoScrollDuration: Math.max(1000, Math.round(overflowWidth / 30 * 1000))
+    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(overflowWidth, sungWidth - width * 0.6)) : overflowWidth * autoScrollProgress
 
     implicitWidth: textMetrics.advanceWidth(caption.text)
     implicitHeight: 28
@@ -49,6 +53,29 @@ Item {
         font.weight: Font.Medium
     }
 
+    SequentialAnimation {
+        running: !root.wordTimed && root.overflowWidth > 0
+        loops: Animation.Infinite
+        onStopped: root.autoScrollProgress = 0
+
+        PauseAnimation { duration: 1200 }
+        NumberAnimation {
+            target: root
+            property: "autoScrollProgress"
+            from: 0
+            to: 1
+            duration: root.autoScrollDuration
+        }
+        PauseAnimation { duration: 1200 }
+        NumberAnimation {
+            target: root
+            property: "autoScrollProgress"
+            from: 1
+            to: 0
+            duration: root.autoScrollDuration
+        }
+    }
+
     Item {
         x: -root.scrollOffset
         width: Math.max(root.width, root.implicitWidth)
@@ -56,13 +83,13 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            width: root.wordTimed ? root.implicitWidth : root.width
+            width: root.wordTimed ? root.implicitWidth : Math.max(root.width, root.implicitWidth)
             horizontalAlignment: root.wordTimed ? Text.AlignLeft : Text.AlignHCenter
             text: root.caption.text
             textFormat: Text.PlainText
             font: textMetrics.font
             color: root.wordTimed ? Colors.overlay1 : (root.caption.lyric ? Colors.mauve : root.textColor)
-            elide: root.wordTimed ? Text.ElideNone : Text.ElideRight
+            elide: Text.ElideNone
             Behavior on color {
                 ColorAnimation {
                     duration: Tokens.animFast

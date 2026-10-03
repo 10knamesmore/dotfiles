@@ -27,10 +27,6 @@ BarModule {
     // 展开面板已有完整歌词区，头部保留歌名，避免曲目信息被歌词替掉。
     readonly property bool showingLyrics: autoLyrics && !titleHold.running && !headerInPanel && LyricsState.lyricsTrackId === trackKey && currentLine && currentLine.text.length > 0
     readonly property string fullContent: showingLyrics ? currentLine.text : songTitle
-    readonly property string compactContent: {
-        const limit = showingLyrics ? 40 : 35;
-        return fullContent.length > limit ? fullContent.substring(0, limit - 3) + "…" : fullContent;
-    }
 
     function showNewTrack() {
         if (player)
@@ -53,8 +49,10 @@ BarModule {
     accentColor: Colors.pink
     progress: player && player.lengthSupported && player.length > 0 ? player.position / player.length : -1
     readonly property real compactWidth: Math.max(compactMeasure.implicitWidth + coverWidth + horizontalPadding * 2, 160)
-    readonly property real hoverWidth: Math.max(compactWidth, Math.min(600, fullMeasure.implicitWidth + coverWidth + horizontalPadding * 2 + (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6))
-    implicitWidth: showDetails ? hoverWidth : compactWidth
+    readonly property real hoverDetailsWidth: (player ? identityText.implicitWidth + 16 : 0) + volumeText.implicitWidth + 6
+    // hover 只展开两侧信息，文字视口不变，往返滚动不中断。
+    readonly property real compactCaptionWidth: compactWidth - coverWidth - horizontalPadding * 2
+    implicitWidth: compactWidth + (showDetails ? hoverDetailsWidth : 0)
     hoverReveal: showDetails ? 1 : 0
     onClicked: mouse => {
         if (root.isVolumeClick(mouse))
@@ -87,17 +85,8 @@ BarModule {
     Text {
         id: compactMeasure
         visible: false
-        text: root.compactContent
-        textFormat: Text.PlainText
-        font.family: Fonts.family
-        font.pixelSize: Fonts.body
-        font.weight: Font.Medium
-    }
-
-    Text {
-        id: fullMeasure
-        visible: false
-        text: root.fullContent
+        // 只用前段文字确定胶囊宽度；显示内容始终保留完整文本。
+        text: root.fullContent.substring(0, root.showingLyrics ? 40 : 35)
         textFormat: Text.PlainText
         font.family: Fonts.family
         font.pixelSize: Fonts.body
@@ -164,7 +153,9 @@ BarModule {
         }
 
         AnimatedCaption {
-            width: Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0))
+            width: root.headerInPanel
+                ? Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0))
+                : root.compactCaptionWidth
             height: 28
             anchors.verticalCenter: parent.verticalCenter
             textColor: root.detailProgress > 0 ? Colors.pink : Colors.text
