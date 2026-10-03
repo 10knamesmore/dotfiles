@@ -1,17 +1,12 @@
 import "../../theme"
 import QtQuick
 
-// 顶栏胶囊。可展开模块的 capsuleHeader 会暂时移入面板，文字和进度仍使用原组件。
+// 顶栏交互模块。可展开模块的 moduleHeader 会暂时移入面板，文字和进度仍使用原组件。
 Rectangle {
     id: root
 
     property color accentColor: Colors.blue
-    property color backgroundColor: Colors.surface0
-    property color tintColor: "transparent"
-    property real backgroundAlpha: Tokens.panelAlpha
-    property bool flat: false
     property bool clickable: true
-    property bool backgroundOnlyHover: false
     property real expansion: 0
     property real panelProgress: 0
     property bool hovered: !headerInPanel && hoverArea.containsMouse
@@ -21,7 +16,7 @@ Rectangle {
     readonly property real detailProgress: headerInPanel ? expansion : hoverReveal
     property real progress: -1
     property bool progressDraggable: false
-    readonly property alias capsuleHeader: header
+    readonly property alias moduleHeader: header
     default property alias contents: inner.data
 
     signal clicked(var mouse)
@@ -31,20 +26,9 @@ Rectangle {
     signal moved(var mouse)
 
     clip: true
-    radius: Tokens.radiusL
-    color: root.flat ? Colors.withAlpha(Colors.surface1, root.hovered ? 0.85 : 0.5) : (root.hovered ? Colors.withAlpha(Colors.surface1, Math.min(1, root.backgroundAlpha + 0.08)) : Colors.withAlpha(root.backgroundColor, root.backgroundAlpha))
-    border.color: hovered && !root.backgroundOnlyHover ? Colors.withAlpha(root.accentColor, Tokens.borderHoverAlpha) : Colors.overlay(0.06)
-    border.width: root.flat ? 0 : Tokens.borderWidth
+    radius: Tokens.radiusS
+    color: root.hovered ? Colors.overlay(0.07) : "transparent"
     implicitHeight: 36
-    scale: hovered && !root.backgroundOnlyHover ? 1.03 : 1
-
-    SoftShadow {
-        anchors.fill: parent
-        radius: root.radius
-        shadowColor: "#000000"
-        strength: root.hovered && !root.backgroundOnlyHover ? Tokens.shadowHoverOpacity : Tokens.shadowOpacity
-        visible: !root.flat
-    }
 
     Item {
         id: header
@@ -52,47 +36,30 @@ Rectangle {
         clip: true
 
         Rectangle {
-            anchors.fill: parent
-            radius: root.radius
-            color: root.tintColor
-            visible: root.tintColor !== Qt.rgba(0, 0, 0, 0)
-            Behavior on color {
-                ColorAnimation {
-                    duration: Tokens.animElaborate
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
-
-        Item {
-            property real displayedProgress: Math.max(0, root.progress)
+            id: progressTrack
+            property real displayedProgress: Math.max(0, Math.min(1, root.progress))
             visible: root.progress >= 0
             anchors.left: parent.left
-            anchors.top: parent.top
+            anchors.right: parent.right
             anchors.bottom: parent.bottom
-            width: displayedProgress * header.width
-            clip: true
+            anchors.leftMargin: 15
+            anchors.rightMargin: 15
+            anchors.bottomMargin: 1
+            height: 2
+            radius: 1
+            color: Colors.withAlpha(root.accentColor, 0.12)
+
+            Rectangle {
+                width: parent.width * progressTrack.displayedProgress
+                height: parent.height
+                radius: 1
+                color: root.accentColor
+            }
 
             Behavior on displayedProgress {
                 NumberAnimation {
                     duration: Tokens.animNormal
                     easing.type: Easing.OutCubic
-                }
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: header.width
-                radius: root.radius
-                color: root.accentColor
-                opacity: 0.27 + 0.15 * (root.headerInPanel ? root.expansion : (root.hovered ? 1 : 0))
-                Behavior on opacity {
-                    enabled: !root.headerInPanel
-                    NumberAnimation {
-                        duration: Tokens.animFast
-                    }
                 }
             }
         }
@@ -139,9 +106,6 @@ Rectangle {
     Behavior on color {
         BarColorAnimation {}
     }
-    Behavior on border.color {
-        BarColorAnimation {}
-    }
     Behavior on hoverReveal {
         enabled: !root.headerInPanel
         NumberAnimation {
@@ -152,13 +116,5 @@ Rectangle {
     Behavior on implicitWidth {
         enabled: !root.headerInPanel
         BarWidthAnimation {}
-    }
-    Behavior on scale {
-        enabled: !root.headerInPanel
-        NumberAnimation {
-            duration: Tokens.animNormal
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: Anim.elastic
-        }
     }
 }

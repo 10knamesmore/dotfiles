@@ -5,8 +5,8 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 
-// 顶栏展开时直接接管原胶囊的头部，文字、图标和进度保持实时更新。
-// 一个进度同时驱动轮廓、补充信息和内容显现，收起直接回到紧凑胶囊。
+// 顶栏展开时直接接管原模块的头部，文字、图标和进度保持实时更新。
+// 一个进度同时驱动轮廓、补充信息和内容显现，收起直接回到顶栏模块。
 PanelWindow {
     id: root
 
@@ -19,7 +19,7 @@ PanelWindow {
     property real panelTargetY: -1
     property real closedOffsetX: 0
     property real closedOffsetY: 20
-    // 控制中心的头部含独立按钮，关闭热区只占最右侧；其他胶囊仍可整头点击收起。
+    // 控制中心的头部含独立按钮，关闭热区只占最右侧；其他模块仍可整头点击收起。
     property bool interactiveHeader: false
     property bool alignRight: false
 
@@ -72,7 +72,7 @@ PanelWindow {
     function _finishClose() {
         _keepVisible = false;
         if (_sourceHeld)
-            console.info("[panel-morph] returned to capsule on", _source.screen.name);
+            console.info("[panel-morph] returned to bar module on", _source.screen.name);
         _releaseSource();
         _source = null;
     }
@@ -118,7 +118,7 @@ PanelWindow {
         } else {
             _waitingForSize = false;
             if (hasMorphSource) {
-                // 曲目或计数变化可能改变顶栏宽度，终点使用当前紧凑胶囊的几何。
+                // 曲目或计数变化可能改变顶栏宽度，终点使用当前顶栏模块的几何。
                 _returnBounds = MorphState.boundsFor(_source.item, _source.barWindow);
                 _closingDetails = _source.item.expansion;
                 _closingProgress = panel.progress;

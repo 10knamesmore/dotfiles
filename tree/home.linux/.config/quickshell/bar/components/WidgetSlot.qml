@@ -2,14 +2,13 @@ import "../../theme"
 import QtQuick
 import QtQuick.Layouts
 
-// widget 槽位：分组项 {group:[...]} → 组容器药丸（深凹槽，组内 flat 模块）；否则 → 单个 WidgetHost。
+// widget 槽位：分组项 {group:[...]} → 无背景的组容器；否则 → 单个 WidgetHost。
 Loader {
     id: slot
 
     property var widgetItem: null
     property var barScreen: null
     property var barWindow: null
-    property bool flat: false
 
     readonly property bool isGroup: slot.widgetItem && slot.widgetItem.group !== undefined
 
@@ -20,7 +19,6 @@ Loader {
 
         WidgetHost {
             item: BarLayout.normalize(slot.widgetItem)
-            flat: slot.flat
             barScreen: slot.barScreen
             barWindow: slot.barWindow
         }
@@ -29,9 +27,7 @@ Loader {
     Component {
         id: groupComp
 
-        Rectangle {
-            radius: Tokens.radiusL
-            color: Colors.withAlpha(Colors.base, 0.6)
+        Item {
             implicitWidth: groupRow.implicitWidth + 12
             implicitHeight: 36
 
@@ -48,7 +44,6 @@ Loader {
                         required property var modelData
 
                         item: BarLayout.normalize(modelData)
-                        flat: true
                         barScreen: slot.barScreen
                         barWindow: slot.barWindow
                         Layout.preferredWidth: implicitWidth

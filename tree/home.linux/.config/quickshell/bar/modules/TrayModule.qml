@@ -6,45 +6,14 @@ import Quickshell.Services.SystemTray
 import Quickshell.Widgets
 
 // 系统托盘 — 不使用 BarModule，因为需要每个图标独立接收点击事件
-Rectangle {
+Item {
     id: root
 
     property var barWindow: null
-    property bool flat: false
 
     implicitWidth: Math.max(trayRow.implicitWidth + 24, 36)
     implicitHeight: 36
-    radius: 16
-    color: root.flat ? Colors.withAlpha(Colors.surface1, 0.5) : Colors.surface0
     visible: trayRepeater.count > 0
-    clip: false
-
-    // 柔和阴影
-    SoftShadow {
-        anchors.fill: parent
-        radius: root.radius
-        visible: !root.flat
-    }
-
-    // 左侧弧形指示器
-    Item {
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: 4
-        height: parent.height * 0.5
-        clip: true
-        visible: !root.flat
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: root.radius * 2
-            radius: root.radius
-            color: Colors.overlay1
-            opacity: 0.6
-        }
-    }
 
     RowLayout {
         id: trayRow

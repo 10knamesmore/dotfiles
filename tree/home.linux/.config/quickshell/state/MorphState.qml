@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 
 // 顶栏写入来源几何与真实头部组件；PanelOverlay 暂时接管头部，收起后归还。
-// heldItems 只隐藏原胶囊的外壳，保留其布局位置和数据更新；本单例不采集系统数据。
+// heldItems 只隐藏原顶栏模块，保留其布局位置和数据更新；本单例不采集系统数据。
 QtObject {
     property var pendingSource: null
     property var heldItems: []
@@ -30,8 +30,8 @@ QtObject {
         item.parent.morphItem = item;
         pendingSource = {
             item: item,
-            header: item.capsuleHeader,
-            home: item.capsuleHeader.parent,
+            header: item.moduleHeader,
+            home: item.moduleHeader.parent,
             barWindow: barWindow,
             screen: barWindow.screen,
             initialDetails: item.detailProgress,

@@ -5,9 +5,6 @@ import QtQuick
 // 顶栏布局：左侧导航信息带，中部独立模块，右侧按功能分组。
 QtObject {
     readonly property int spacing: 8
-    readonly property int sideMargin: 6
-    readonly property int topMargin: 6
-    readonly property bool moduleFlat: true
 
     // widget 项支持：字符串 id / {id, props} / {group: [...]}
     readonly property var leftWidgets: ["navigation", "tray"]

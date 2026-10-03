@@ -46,7 +46,7 @@ BarModule {
     }
 
     function isVolumeClick(mouse) {
-        const point = volumeText.mapFromItem(root.capsuleHeader, mouse.x, mouse.y);
+        const point = volumeText.mapFromItem(root.moduleHeader, mouse.x, mouse.y);
         return volumeText.visible && point.x >= 0 && point.x <= volumeText.width;
     }
 

@@ -7,7 +7,7 @@ import "../components"
 import QtQuick
 import Quickshell.Bluetooth
 
-// 四个功能入口与最右侧控制首页 handle 共用胶囊；只高亮自身，不移动、缩放或弹出提示。
+// 四个功能入口与最右侧控制首页 handle 共用顶栏模块；只高亮自身，不移动、缩放或弹出提示。
 BarModule {
     id: root
 

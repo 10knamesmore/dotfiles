@@ -18,7 +18,7 @@ Rectangle {
     implicitWidth: navigationRow.implicitWidth + 18
     implicitHeight: 36
     radius: Tokens.radiusS
-    color: Colors.withAlpha(Colors.surface0, railHover.hovered ? 0.82 : 0.68)
+    color: railHover.hovered ? Colors.overlay(0.05) : "transparent"
     Behavior on color {
         BarColorAnimation {}
     }
