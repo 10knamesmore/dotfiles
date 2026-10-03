@@ -29,10 +29,6 @@ Flickable {
         width: root.width - Tokens.spaceL * 2
         spacing: Tokens.spaceM
 
-        SectionLabel {
-            text: "连接"
-        }
-
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spaceM
@@ -55,10 +51,6 @@ Flickable {
             }
         }
 
-        SectionLabel {
-            text: "显示"
-        }
-
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: displayControls.implicitHeight + Tokens.spaceL * 2
@@ -74,7 +66,9 @@ Flickable {
                 spacing: Tokens.spaceS
 
                 EffectSlider {
-                    label: "☀ 亮度"
+                    label: "☀"
+                    accessibleName: "亮度"
+                    compactLabel: true
                     value: ScreenEffectsState.brightness
                     onMoved: value => ScreenEffectsState.setBrightness(value)
                 }
@@ -107,6 +101,7 @@ Flickable {
         required property string iconText
         Layout.fillWidth: true
         implicitHeight: 52
+        padding: 0
         Accessible.name: title
         Accessible.description: description
 
@@ -125,8 +120,9 @@ Flickable {
         }
 
         contentItem: RowLayout {
-            spacing: Tokens.spaceM
+            spacing: Tokens.spaceS
             Text {
+                Layout.fillWidth: false
                 text: link.iconText
                 color: Colors.mauve
                 font.family: Fonts.family
@@ -136,12 +132,14 @@ Flickable {
                 Layout.fillWidth: true
                 spacing: 3
                 Text {
+                    Layout.fillWidth: true
                     text: link.title
                     color: Colors.text
                     font.family: Fonts.family
                     font.pixelSize: Fonts.body
                 }
                 Text {
+                    Layout.fillWidth: true
                     text: link.description
                     color: Colors.subtext0
                     font.family: Fonts.family
@@ -149,6 +147,7 @@ Flickable {
                 }
             }
             Text {
+                Layout.fillWidth: false
                 text: "›"
                 color: Colors.overlay1
                 font.family: Fonts.family

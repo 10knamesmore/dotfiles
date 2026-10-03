@@ -7,6 +7,8 @@ Rectangle {
 
     property color accentColor: Colors.blue
     property bool clickable: true
+    // 内容自带独立按钮时，禁用覆盖整块模块的热区，避免拦截按钮的 hover。
+    property bool contentHandlesInput: false
     property real expansion: 0
     property real panelProgress: 0
     property real horizontalPadding: BarLayout.modulePadding
@@ -93,6 +95,7 @@ Rectangle {
     MouseArea {
         id: hoverArea
         anchors.fill: parent
+        enabled: !root.contentHandlesInput
         hoverEnabled: true
         cursorShape: root.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
         acceptedButtons: root.clickable ? Qt.LeftButton | Qt.RightButton : Qt.NoButton

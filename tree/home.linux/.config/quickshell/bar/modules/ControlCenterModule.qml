@@ -11,8 +11,7 @@ import Quickshell.Bluetooth
 BarModule {
     id: root
 
-    clickable: false
-    hovered: false
+    contentHandlesInput: true
     horizontalPadding: Tokens.spaceXS
     implicitWidth: entries.implicitWidth + horizontalPadding * 2
 

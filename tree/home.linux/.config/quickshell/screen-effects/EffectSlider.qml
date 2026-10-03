@@ -15,6 +15,8 @@ RowLayout {
     id: root
 
     property string label: ""
+    property string accessibleName: label
+    property bool compactLabel: false
     property int value: 0
 
     signal moved(int val)
@@ -52,12 +54,12 @@ RowLayout {
         font.family: Fonts.family
         font.pixelSize: Fonts.bodyLarge
         color: Colors.subtext1
-        Layout.preferredWidth: 90
+        Layout.preferredWidth: root.compactLabel ? implicitWidth : 90
     }
 
     Slider {
         id: slider
-        Accessible.name: root.label
+        Accessible.name: root.accessibleName
 
         Layout.fillWidth: true
         from: 0
