@@ -1,11 +1,12 @@
 import "../../theme"
+import "../../components"
 import "../components"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 
 // 每屏一条连续信息带，宽度由工作区、窗口块与标题共同决定。
-// 点击标题复制当前窗口 PID；hover 与复制反馈只改变颜色，不改变内容宽度。
+// 长标题平时往返滚动，hover 在左侧可用空间内展开；点击标题复制当前窗口 PID。
 Rectangle {
     id: root
 
@@ -14,6 +15,14 @@ Rectangle {
     property int copyingPid: 0
     property bool copied: false
     property bool copyFailed: false
+
+    function copyWindowPid() {
+        if (root.windowPid <= 0 || copyProcess.running)
+            return;
+        root.copyingPid = root.windowPid;
+        copyProcess.command = ["wl-copy", String(root.copyingPid)];
+        copyProcess.running = true;
+    }
 
     implicitWidth: navigationRow.implicitWidth + 18
     implicitHeight: 36
@@ -37,6 +46,11 @@ Rectangle {
             root.copied = false;
             root.copyFailed = false;
             copiedTimer.stop();
+            // 同一窗口的 spinner、进度等标题刷新不重置滚动；切换窗口才从头开始。
+            Qt.callLater(() => {
+                if (titleScroll.running)
+                    titleScroll.restart();
+            });
         }
     }
 
@@ -79,7 +93,9 @@ Rectangle {
         }
 
         Rectangle {
-            implicitWidth: titleText.implicitWidth + 6
+            id: titleButton
+            readonly property real compactTextWidth: Math.min(titleText.implicitWidth, 220)
+            implicitWidth: (titleHover.containsMouse ? titleText.implicitWidth : compactTextWidth) + 6
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.preferredHeight: 30
@@ -89,21 +105,43 @@ Rectangle {
                 BarColorAnimation {}
             }
 
-            Text {
-                id: titleText
+            Accessible.role: root.windowPid > 0 ? Accessible.Button : Accessible.StaticText
+            Accessible.name: titleText.text
+            Accessible.description: root.windowPid <= 0 ? ""
+                : copyProcess.running ? "正在复制窗口 PID"
+                : root.copied ? "窗口 PID 已复制"
+                : root.copyFailed ? "复制窗口 PID 失败"
+                : "复制窗口 PID"
+            Accessible.onPressAction: root.copyWindowPid()
+
+            TextScrollAnimation {
+                id: titleScroll
+                // 展开时继续走原来的滚动进度；只有实际显示偏移受当前视口限制。
+                distance: Math.max(0, titleText.implicitWidth - Math.min(titleButton.compactTextWidth, titleViewport.width))
+            }
+
+            Item {
+                id: titleViewport
                 anchors.fill: parent
                 anchors.leftMargin: 3
                 anchors.rightMargin: 3
-                verticalAlignment: Text.AlignVCenter
-                text: windowContext.activeWindow ? windowContext.activeWindow.title : "桌面"
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                font.family: Fonts.family
-                font.pixelSize: Fonts.body
-                font.weight: Font.Medium
-                color: root.copied ? Colors.green : root.copyFailed ? Colors.red : titleHover.containsMouse ? Colors.lavender : Colors.text
-                Behavior on color {
-                    BarColorAnimation {}
+                clip: true
+
+                Text {
+                    id: titleText
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: -Math.min(titleScroll.offset, Math.max(0, implicitWidth - titleViewport.width))
+                    text: windowContext.activeWindow ? windowContext.activeWindow.title : "桌面"
+                    textFormat: Text.PlainText
+                    elide: Text.ElideNone
+                    font.family: Fonts.family
+                    font.pixelSize: Fonts.body
+                    font.weight: Font.Medium
+                    color: root.copied ? Colors.green : root.copyFailed ? Colors.red : titleHover.containsMouse ? Colors.lavender : Colors.text
+                    Accessible.ignored: true
+                    Behavior on color {
+                        BarColorAnimation {}
+                    }
                 }
             }
 
@@ -113,13 +151,7 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: root.windowPid > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
                 acceptedButtons: Qt.LeftButton
-                onClicked: {
-                    if (root.windowPid <= 0 || copyProcess.running)
-                        return;
-                    root.copyingPid = root.windowPid;
-                    copyProcess.command = ["wl-copy", String(root.copyingPid)];
-                    copyProcess.running = true;
-                }
+                onClicked: root.copyWindowPid()
             }
         }
     }

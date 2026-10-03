@@ -1,5 +1,6 @@
 import "../../theme"
 import "../../state"
+import "../../components"
 import QtQuick
 
 // 一帧标题或歌词。长文本往返滚动；有逐字时间的歌词跟随演唱位置。
@@ -36,10 +37,7 @@ Item {
         return wordTimed ? implicitWidth : 0;
     }
     readonly property real overflowWidth: Math.max(0, implicitWidth - width)
-    property real autoScrollProgress: 0
-    // 自动滚动速度为 30 px/s；首尾停留，短距离至少用一秒完成。
-    readonly property int autoScrollDuration: Math.max(1000, Math.round(overflowWidth / 30 * 1000))
-    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(overflowWidth, sungWidth - width * 0.6)) : overflowWidth * autoScrollProgress
+    readonly property real scrollOffset: wordTimed ? Math.max(0, Math.min(overflowWidth, sungWidth - width * 0.6)) : autoScroll.offset
 
     implicitWidth: textMetrics.advanceWidth(caption.text)
     implicitHeight: 28
@@ -53,26 +51,14 @@ Item {
         font.weight: Font.Medium
     }
 
-    SequentialAnimation {
-        running: !root.wordTimed && root.overflowWidth > 0
-        loops: Animation.Infinite
-        onStopped: root.autoScrollProgress = 0
-
-        PauseAnimation { duration: 1200 }
-        NumberAnimation {
-            target: root
-            property: "autoScrollProgress"
-            from: 0
-            to: 1
-            duration: root.autoScrollDuration
-        }
-        PauseAnimation { duration: 1200 }
-        NumberAnimation {
-            target: root
-            property: "autoScrollProgress"
-            from: 1
-            to: 0
-            duration: root.autoScrollDuration
+    TextScrollAnimation {
+        id: autoScroll
+        distance: root.overflowWidth
+        running: !root.wordTimed && distance > 0
+        // 字幕视口变化后按新距离重新计时；换行由 AnimatedCaption 创建新组件。
+        onDistanceChanged: {
+            if (running)
+                restart();
         }
     }
 
