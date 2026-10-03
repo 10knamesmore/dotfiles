@@ -10,6 +10,7 @@ import "./media"
 import "./notifications"
 import "./osd"
 import "./power"
+import "./resources"
 import "./services"
 import "./state"
 import QtQuick
@@ -31,6 +32,8 @@ ShellRoot {
     }
 
     SystemStatsService {}
+
+    ResourceMonitorService {}
 
     MonitorService {}
 
@@ -100,6 +103,12 @@ ShellRoot {
     CalendarPanel {}
 
     MediaPanel {}
+
+    CpuPanel {}
+
+    MemoryPanel {}
+
+    NetworkPanel {}
 
     PowerMenu {}
 

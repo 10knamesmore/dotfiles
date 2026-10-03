@@ -8,3 +8,4 @@ NotificationService 1.0 NotificationService.qml
 OsdService 1.0 OsdService.qml
 ScreenEffectsService 1.0 ScreenEffectsService.qml
 SystemStatsService 1.0 SystemStatsService.qml
+ResourceMonitorService 1.0 ResourceMonitorService.qml

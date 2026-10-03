@@ -1,75 +1,77 @@
 import "../../theme"
 import "../../state"
+import "../../state/StatsFormat.js" as StatsFormat
 import "../components"
 import QtQuick
 
+// 悬停补充 used/total；移入面板后仍保持一秒刷新。
 BarModule {
     id: root
 
-    // 数据来自 SystemStats（SystemStatsService 每秒更新）
+    readonly property var stats: SystemStats.memory
+    readonly property int usage: stats.totalBytes > 0 ? Math.round(stats.usedBytes / stats.totalBytes * 100) : 0
+
+    Accessible.checkable: true
+    Accessible.checked: PanelState.memoryOpen
+    Accessible.description: memoryDetails.text
+    Accessible.name: "内存"
+    Accessible.role: Accessible.Button
     accentColor: Colors.mauve
-    implicitWidth: compactLabel.implicitWidth + 32 + (hovered && SystemStats.memTooltipText !== "" ? memoryDetails.implicitWidth + label.spacing : 0)
-    clickable: false
+    activeFocusOnTab: true
+    implicitWidth: summary.implicitWidth + 30 + (hovered ? memoryDetails.implicitWidth + 5 : 0)
+
+    Accessible.onPressAction: PanelState.toggleResourcePanel("memory", root)
+    Keys.onReturnPressed: PanelState.toggleResourcePanel("memory", root)
+    Keys.onSpacePressed: PanelState.toggleResourcePanel("memory", root)
+    onClicked: PanelState.toggleResourcePanel("memory", root)
 
     Row {
-        id: compactLabel
-        visible: false
-        spacing: 5
-        Text {
-            text: memoryIcon.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.icon
-        }
-        Text {
-            text: SystemStats.memUsagePct + "%"
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-        }
-    }
+        id: summary
 
-    Row {
-        id: label
-
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         spacing: 5
 
         Text {
             id: memoryIcon
-            text: "󰍛"
+
+            anchors.verticalCenter: parent.verticalCenter
             color: Colors.mauve
             font.family: Fonts.family
             font.pixelSize: Fonts.icon
             font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
+            text: "󰍛"
         }
-
         Text {
-            text: SystemStats.memUsagePct + "%"
-            color: SystemStats.memUsagePct > 85 ? Colors.red : (SystemStats.memUsagePct > 60 ? Colors.yellow : Colors.text)
+            id: usageText
+
+            anchors.verticalCenter: parent.verticalCenter
+            color: root.usage > 85 ? Colors.red : root.usage > 60 ? Colors.yellow : Colors.text
             font.family: Fonts.family
             font.pixelSize: Fonts.bodyLarge
             font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
+            text: root.usage + "%"
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 300
+                    duration: Tokens.animNormal
                 }
             }
         }
+    }
+    Text {
+        id: memoryDetails
 
-        // hover 展开显示详细内存（RAM + Swap，memTooltipText 折成一行）
-        Text {
-            id: memoryDetails
-            visible: root.hoverDetailsVisible && SystemStats.memTooltipText !== ""
-            width: implicitWidth * root.hoverReveal
-            clip: true
-            text: SystemStats.memTooltipText.replace("\n", "  ·  ")
-            color: Colors.subtext0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.caption
-            anchors.verticalCenter: parent.verticalCenter
-            opacity: root.hoverReveal
-        }
+        anchors.left: summary.right
+        anchors.leftMargin: 5
+        anchors.verticalCenter: parent.verticalCenter
+        clip: true
+        color: Colors.subtext0
+        font.family: Fonts.family
+        font.pixelSize: Fonts.caption
+        opacity: root.detailProgress
+        text: StatsFormat.gib(root.stats.usedBytes) + " / " + StatsFormat.gib(root.stats.totalBytes) + " GiB"
+        visible: root.detailProgress > 0
+        width: implicitWidth * root.detailProgress
     }
 }

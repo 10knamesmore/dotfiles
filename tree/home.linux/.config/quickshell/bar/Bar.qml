@@ -53,7 +53,7 @@ PanelWindow {
         // ── 左区 ──
         RowLayout {
             anchors.left: parent.left
-            anchors.right: centerLeftRow.left
+            anchors.right: centerRow.left
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: 4
@@ -83,30 +83,6 @@ PanelWindow {
             }
         }
 
-        // 网速独立贴在媒体两侧，宽度变化不推偏屏幕正中的媒体胶囊。
-        RowLayout {
-            id: centerLeftRow
-            anchors.right: centerRow.left
-            anchors.rightMargin: BarLayout.spacing
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: BarLayout.spacing
-            height: parent.height
-
-            Repeater {
-                model: BarLayout.centerLeftWidgets
-
-                delegate: WidgetSlot {
-                    required property var modelData
-                    widgetItem: modelData
-                    flat: BarLayout.moduleFlat
-                    barScreen: root.modelData
-                    barWindow: root
-                    Layout.preferredWidth: implicitWidth
-                    Layout.preferredHeight: implicitHeight
-                }
-            }
-        }
-
         // ── 中区 ──
         RowLayout {
             id: centerRow
@@ -120,28 +96,6 @@ PanelWindow {
                 delegate: WidgetSlot {
                     required property var modelData
 
-                    widgetItem: modelData
-                    flat: BarLayout.moduleFlat
-                    barScreen: root.modelData
-                    barWindow: root
-                    Layout.preferredWidth: implicitWidth
-                    Layout.preferredHeight: implicitHeight
-                }
-            }
-        }
-
-        RowLayout {
-            anchors.left: centerRow.right
-            anchors.leftMargin: BarLayout.spacing
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: BarLayout.spacing
-            height: parent.height
-
-            Repeater {
-                model: BarLayout.centerRightWidgets
-
-                delegate: WidgetSlot {
-                    required property var modelData
                     widgetItem: modelData
                     flat: BarLayout.moduleFlat
                     barScreen: root.modelData

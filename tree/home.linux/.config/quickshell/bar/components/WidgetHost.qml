@@ -3,7 +3,7 @@ import "../navigation"
 import "../../state"
 import QtQuick
 
-// id → bar module 工厂。特例 props（direction / barScreen / barWindow）与 flat 在此集中注入。
+// id → bar module 工厂。barScreen / barWindow 与 flat 在此集中注入。
 // 用内联 Component（声明式绑定，宿主属性变化自动透传）而非 Qt.createComponent。
 Loader {
     id: host
@@ -57,11 +57,9 @@ Loader {
             flat: host.flat
         }
     }
-    // props 型
     Component {
         id: cNetSpeed
         NetSpeedModule {
-            direction: host.item.props && host.item.props.direction ? host.item.props.direction : "up"
             flat: host.flat
         }
     }

@@ -3,140 +3,161 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 顶栏资源采集 — 每秒读一次 /proc/stat + /proc/meminfo + /proc/net/dev，
-// 进程内直读（FileView.blockAllReads），算好 CPU / 内存 / 网速写入 SystemStats。
-// 采集不创建外部进程。
+// 顶栏每秒进程内直读 /proc；面板关闭时也保留轻量趋势，不启动进程采集。
 Scope {
     id: root
 
-    property var _prevCpuStat: null   // [total, idle]
-    property var _prevCpuCores: []     // [[total, idle], ...]
-    property real _prevNetRx: -1
-    property real _prevNetTx: -1
+    property var previousCpu: ({})
+    property var previousNetwork: ({})
+    property real previousNetworkTime: 0
 
-    // /proc 是动态伪文件：blockAllReads 让 reload() 同步重读，watchChanges 关闭是因为 /proc 不触发 inotify。
-    FileView {
-        id: statFile
-        path: "/proc/stat"
-        blockAllReads: true
-        watchChanges: false
-        printErrors: false
+    function parseCpu(text, now) {
+        const current = {};
+        for (const line of text.split("\n")) {
+            const fields = line.trim().split(/\s+/);
+            if (!/^cpu\d*$/.test(fields[0]))
+                continue;
+            // guest 已计入 user，guest_nice 已计入 nice，不重复求和。
+            const ticks = fields.slice(1, 9).map(Number);
+            current[fields[0]] = {
+                total: ticks.reduce((sum, value) => sum + value, 0),
+                idle: ticks[3] + ticks[4]
+            };
+        }
+        function usage(name) {
+            const before = root.previousCpu[name];
+            if (!before)
+                return 0;
+            const elapsed = current[name].total - before.total;
+            return elapsed > 0 ? 100 * (elapsed - current[name].idle + before.idle) / elapsed : 0;
+        }
+        if (root.previousCpu.cpu && current.cpu) {
+            SystemStats.cpu = {
+                usage: Math.round(usage("cpu")),
+                cores: Object.keys(current).filter(name => name !== "cpu").map(name => Math.round(usage(name)))
+            };
+            if (!PanelState.cpuOpen)
+                ResourceStats.recordCpu(now, SystemStats.cpu.usage);
+        }
+        root.previousCpu = current;
     }
-    FileView {
-        id: memFile
-        path: "/proc/meminfo"
-        blockAllReads: true
-        watchChanges: false
-        printErrors: false
+    function parseMemory(text, now) {
+        const values = {};
+        for (const line of text.split("\n")) {
+            const match = line.match(/^(\w+):\s+(\d+)/);
+            if (match)
+                values[match[1]] = Number(match[2]) * 1024;
+        }
+        if (!values.MemTotal || values.MemAvailable === undefined)
+            return;
+        const used = values.MemTotal - values.MemAvailable;
+        SystemStats.memory = {
+            usage: Math.round(used / values.MemTotal * 100),
+            usedBytes: used,
+            totalBytes: values.MemTotal
+        };
+        if (!PanelState.memoryOpen)
+            ResourceStats.recordMemory(now, used);
     }
-    FileView {
-        id: netFile
-        path: "/proc/net/dev"
-        blockAllReads: true
-        watchChanges: false
-        printErrors: false
+    function parseNetwork(text, routes, now) {
+        let defaultInterface = "";
+        let lowestMetric = Infinity;
+        for (const line of routes.trim().split("\n").slice(1)) {
+            const fields = line.trim().split(/\s+/);
+            if (fields[1] === "00000000" && (parseInt(fields[3], 16) & 1) && Number(fields[6]) < lowestMetric) {
+                defaultInterface = fields[0];
+                lowestMetric = Number(fields[6]);
+            }
+        }
+        const elapsed = now - root.previousNetworkTime;
+        const current = {};
+        const interfaces = [];
+        for (const line of text.split("\n")) {
+            const match = line.match(/^\s*(\S+):\s+(.*)/);
+            if (!match || match[1] === "lo")
+                continue;
+            const name = match[1];
+            const fields = match[2].trim().split(/\s+/);
+            const received = Number(fields[0]);
+            const sent = Number(fields[8]);
+            const before = root.previousNetwork[name];
+            current[name] = {
+                received: received,
+                sent: sent
+            };
+            interfaces.push({
+                name: name,
+                downSpeed: before && elapsed > 0 ? Math.max(0, received - before.received) / elapsed : 0,
+                upSpeed: before && elapsed > 0 ? Math.max(0, sent - before.sent) / elapsed : 0,
+                downTotal: received,
+                upTotal: sent
+            });
+        }
+        let selected = interfaces.find(iface => iface.name === ResourceStats.networkInterface);
+        if (!selected)
+            selected = interfaces.find(iface => iface.name === defaultInterface) || interfaces[0];
+        SystemStats.network = selected || {
+            name: "",
+            downSpeed: 0,
+            upSpeed: 0,
+            downTotal: 0,
+            upTotal: 0
+        };
+        ResourceStats.networkInterface = selected ? selected.name : "";
+        if (root.previousNetworkTime > 0 && !PanelState.networkStatsOpen)
+            ResourceStats.recordNetwork(now, interfaces.filter(iface => root.previousNetwork[iface.name]));
+        root.previousNetwork = current;
+        root.previousNetworkTime = now;
     }
-
-    // parser 自行筛选所需行，因此直接接收完整 /proc 文件内容。
-    function _tick() {
+    function tick() {
+        const now = Date.now() / 1000;
         statFile.reload();
         memFile.reload();
         netFile.reload();
-        root._parseCpu(statFile.text());
-        root._parseMem(memFile.text());
-        root._parseNet(netFile.text());
+        routeFile.reload();
+        parseCpu(statFile.text(), now);
+        parseMemory(memFile.text(), now);
+        parseNetwork(netFile.text(), routeFile.text(), now);
     }
 
-    function _parseCpu(seg) {
-        let cores = [];
-        for (let line of seg.split("\n")) {
-            let parts = line.trim().split(/\s+/);
-            if (!parts[0] || !parts[0].startsWith("cpu"))
-                continue;
-            let nums = parts.slice(1).map(Number);
-            if (nums.length < 5)
-                continue;
-            let idle = nums[3] + nums[4];
-            let total = nums.reduce((a, b) => a + b, 0);
-            if (parts[0] === "cpu") {
-                if (root._prevCpuStat !== null) {
-                    let dt = total - root._prevCpuStat[0];
-                    let di = idle - root._prevCpuStat[1];
-                    SystemStats.cpuUsage = dt > 0 ? Math.round((dt - di) / dt * 100) : 0;
-                }
-                root._prevCpuStat = [total, idle];
-            } else {
-                cores.push([total, idle]);
-            }
-        }
-        if (root._prevCpuCores.length === cores.length && cores.length > 0) {
-            let pcts = [];
-            for (let i = 0; i < cores.length; i++) {
-                let dt = cores[i][0] - root._prevCpuCores[i][0];
-                let di = cores[i][1] - root._prevCpuCores[i][1];
-                pcts.push(dt > 0 ? Math.round((dt - di) / dt * 100) : 0);
-            }
-            SystemStats.cpuCorePcts = pcts;
-        }
-        root._prevCpuCores = cores;
-    }
+    FileView {
+        id: statFile
 
-    function _parseMem(seg) {
-        let vals = {};
-        for (let line of seg.split("\n")) {
-            let m = line.match(/^(\w+):\s+(\d+)/);
-            if (m)
-                vals[m[1]] = parseInt(m[2]);
-        }
-        if (vals.MemTotal && vals.MemAvailable) {
-            let used = vals.MemTotal - vals.MemAvailable;
-            SystemStats.memUsagePct = Math.round(used / vals.MemTotal * 100);
-            let usedGib = (used / 1.04858e+06).toFixed(1);
-            let totalGib = (vals.MemTotal / 1.04858e+06).toFixed(1);
-            let swapUsed = vals.SwapTotal - (vals.SwapFree ?? 0);
-            SystemStats.memTooltipText = "RAM: " + usedGib + " / " + totalGib + " GiB (" + SystemStats.memUsagePct + "%)" + (vals.SwapTotal > 0 ? "\nSwap: " + (swapUsed / 1.04858e+06).toFixed(1) + " / " + (vals.SwapTotal / 1.04858e+06).toFixed(1) + " GiB" : "");
-        }
+        blockAllReads: true
+        path: "/proc/stat"
+        printErrors: false
+        watchChanges: false
     }
+    FileView {
+        id: memFile
 
-    function _parseNet(seg) {
-        let skipPrefixes = ["lo", "docker", "br-", "vmnet", "veth"];
-        for (let line of seg.split("\n")) {
-            let m = line.match(/^\s*(\S+):\s+(.*)/);
-            if (!m)
-                continue;
-            let iface = m[1];
-            let skip = false;
-            for (let p of skipPrefixes) {
-                if (iface.startsWith(p)) {
-                    skip = true;
-                    break;
-                }
-            }
-            if (skip)
-                continue;
-            let fields = m[2].trim().split(/\s+/);
-            if (fields.length < 10)
-                continue;
-            let rxBytes = parseInt(fields[0]);
-            let txBytes = parseInt(fields[8]);
-            SystemStats.netIface = iface;
-            SystemStats.netDownTotal = rxBytes;
-            SystemStats.netUpTotal = txBytes;
-            if (root._prevNetRx >= 0) {
-                SystemStats.netDownSpeed = rxBytes - root._prevNetRx;
-                SystemStats.netUpSpeed = txBytes - root._prevNetTx;
-            }
-            root._prevNetRx = rxBytes;
-            root._prevNetTx = txBytes;
-            break; // 只取第一个匹配的物理接口
-        }
+        blockAllReads: true
+        path: "/proc/meminfo"
+        printErrors: false
+        watchChanges: false
     }
+    FileView {
+        id: netFile
 
+        blockAllReads: true
+        path: "/proc/net/dev"
+        printErrors: false
+        watchChanges: false
+    }
+    FileView {
+        id: routeFile
+
+        blockAllReads: true
+        path: "/proc/net/route"
+        printErrors: false
+        watchChanges: false
+    }
     Timer {
         interval: 1000
-        running: true
         repeat: true
+        running: true
         triggeredOnStart: true
-        onTriggered: root._tick()
+
+        onTriggered: root.tick()
     }
 }

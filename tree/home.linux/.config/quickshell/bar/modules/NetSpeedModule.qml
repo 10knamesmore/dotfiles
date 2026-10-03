@@ -1,105 +1,112 @@
+pragma ComponentBehavior: Bound
+
 import "../../theme"
 import "../../state"
+import "../../state/StatsFormat.js" as StatsFormat
 import "../components"
 import QtQuick
 
+// 下载、上传纵向排列，hover 时各行补充累计量；顶栏和面板头部都按一秒更新。
 BarModule {
     id: root
 
-    property string direction: "up" // "up" 或 "down"
+    readonly property real rateWidth: Math.max(rateSize.width, download.rateTextWidth, upload.rateTextWidth)
+    readonly property var stats: SystemStats.network
+    readonly property real totalWidth: Math.max(totalSize.width, download.totalTextWidth, upload.totalTextWidth)
 
-    // 数据来自 SystemStats（SystemStatsService 每秒更新；up/down 共用一次 /proc/net/dev 读取）
-    readonly property real speed: direction === "up" ? SystemStats.netUpSpeed : SystemStats.netDownSpeed
-    readonly property real totalBytes: direction === "up" ? SystemStats.netUpTotal : SystemStats.netDownTotal
-    readonly property string ifaceName: SystemStats.netIface
-
-    function formatSpeed(bytesPerSec) {
-        if (bytesPerSec < 1024)
-            return bytesPerSec.toFixed(0) + " B/s";
-        if (bytesPerSec < 1024 * 1024)
-            return (bytesPerSec / 1024).toFixed(1) + " KB/s";
-        return (bytesPerSec / (1024 * 1024)).toFixed(2) + " MB/s";
-    }
-
-    function formatTotal(bytes) {
-        if (bytes < 1024)
-            return bytes.toFixed(0) + " B";
-        if (bytes < 1024 * 1024)
-            return (bytes / 1024).toFixed(1) + " KB";
-        if (bytes < 1024 * 1024 * 1024)
-            return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-    }
-
-    property string displayText: (direction === "up" ? "󰕒" : "󰁅") + " " + formatSpeed(speed)
-
-    readonly property real expandedContentWidth: speedLabel.implicitWidth + totalLabel.implicitWidth + 6 + (ifaceName !== "" ? ifaceText.implicitWidth + 16 : 0)
+    Accessible.checkable: true
+    Accessible.checked: PanelState.networkStatsOpen
+    Accessible.description: "下载 " + StatsFormat.speed(stats.downSpeed) + "，上传 " + StatsFormat.speed(stats.upSpeed)
+    Accessible.name: "网络速率"
+    Accessible.role: Accessible.Button
     accentColor: Colors.teal
-    implicitWidth: root.hovered ? Math.max(expandedContentWidth + 32, 180) : Math.max(speedLabel.implicitWidth + 32, 120)
-    clickable: false
+    activeFocusOnTab: true
+    implicitWidth: download.compactWidth + 30 + (hovered ? totalWidth + 6 : 0)
 
-    // 方向与网速始终使用同一组件；只有两侧的补充信息渐变显隐。
-    Row {
-        anchors.centerIn: parent
+    Accessible.onPressAction: PanelState.toggleResourcePanel("network", root)
+    Keys.onReturnPressed: PanelState.toggleResourcePanel("network", root)
+    Keys.onSpacePressed: PanelState.toggleResourcePanel("network", root)
+    onClicked: PanelState.toggleResourcePanel("network", root)
+
+    // 按常用短值留少量余量，更长的数值才按实际文本扩宽。
+    TextMetrics {
+        id: rateSize
+
+        font.family: Fonts.family
+        font.pixelSize: Fonts.small
+        font.weight: Font.DemiBold
+        text: "9.9 KiB/s"
+    }
+    TextMetrics {
+        id: totalSize
+
+        font.family: Fonts.family
+        font.pixelSize: Fonts.caption
+        text: "Σ 9.99 GiB"
+    }
+    Column {
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+
+        TrafficDirection {
+            id: download
+
+            downloading: true
+        }
+        TrafficDirection {
+            id: upload
+
+            downloading: false
+        }
+    }
+
+    component TrafficDirection: Row {
+        id: direction
+
+        readonly property real compactWidth: arrow.implicitWidth + 5 + root.rateWidth
+        required property bool downloading
+        readonly property real rateTextWidth: rate.implicitWidth
+        readonly property real totalTextWidth: total.implicitWidth
+
         spacing: 0
 
-        // 接口名标签
-        Rectangle {
-            visible: root.ifaceName !== "" && root.hoverDetailsVisible
-            color: Colors.withAlpha(Colors.teal, 0.2)
-            radius: 4
-            width: (ifaceText.implicitWidth + 10) * root.hoverReveal
-            height: ifaceText.implicitHeight + 4
-            opacity: root.hoverReveal
-            clip: true
-            anchors.verticalCenter: parent.verticalCenter
-
-            Text {
-                id: ifaceText
-
-                anchors.centerIn: parent
-                text: root.ifaceName
-                color: Colors.teal
-                font.family: Fonts.family
-                font.pixelSize: Fonts.caption
-                font.weight: Font.DemiBold
-            }
-        }
-
-        Item {
-            width: root.ifaceName !== "" ? 6 * root.hoverReveal : 0
-            height: 1
-        }
-
-        // 方向图标 + 速度
         Text {
-            id: speedLabel
-            text: root.displayText
-            color: Colors.teal
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            font.weight: Font.DemiBold
+            id: arrow
+
             anchors.verticalCenter: parent.verticalCenter
+            color: direction.downloading ? Colors.teal : Colors.blue
+            font: rate.font
+            text: direction.downloading ? "󰁅" : "󰕒"
         }
-
         Item {
-            width: 6 * root.hoverReveal
             height: 1
+            width: 5
         }
-
-        // 累计流量
         Text {
-            id: totalLabel
-            visible: root.hoverDetailsVisible
-            width: implicitWidth * root.hoverReveal
-            opacity: root.hoverReveal
+            id: rate
+
+            anchors.verticalCenter: parent.verticalCenter
+            color: direction.downloading ? Colors.teal : Colors.blue
+            font: rateSize.font
+            horizontalAlignment: Text.AlignRight
+            text: StatsFormat.speed(direction.downloading ? root.stats.downSpeed : root.stats.upSpeed)
+            width: root.rateWidth
+        }
+        Item {
+            height: 1
+            width: 6 * root.detailProgress
+        }
+        Text {
+            id: total
+
+            anchors.verticalCenter: parent.verticalCenter
             clip: true
-            text: "Σ " + root.formatTotal(root.totalBytes)
             color: Colors.subtext0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.caption
-            font.weight: Font.Normal
-            anchors.verticalCenter: parent.verticalCenter
+            font: totalSize.font
+            opacity: root.detailProgress
+            text: "Σ " + StatsFormat.bytes(direction.downloading ? root.stats.downTotal : root.stats.upTotal)
+            visible: root.detailProgress > 0
+            width: root.totalWidth * root.detailProgress
         }
     }
 }
