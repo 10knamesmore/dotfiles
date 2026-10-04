@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# 把 Hyprland Portal 的共享请求交给正在运行的 Quickshell 捕获浮层。
+# Usage: dots-capture-picker [--allow-token]（由 Portal 调用）
+# 依赖：python3；XDG_CONFIG_HOME 默认 ~/.config，其余会话环境由 Portal 提供。
+exec python3 "${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/capture/backend/picker.py" "$@"

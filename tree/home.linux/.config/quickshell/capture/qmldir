@@ -1,0 +1,10 @@
+singleton CaptureService 1.0 CaptureService.qml
+CaptureWindows 1.0 CaptureWindows.qml
+CaptureModule 1.0 CaptureModule.qml
+CaptureSurface 1.0 CaptureSurface.qml
+CaptureArtwork 1.0 CaptureArtwork.qml
+CaptureControls 1.0 CaptureControls.qml
+CaptureTools 1.0 CaptureTools.qml
+CaptureButton 1.0 CaptureButton.qml
+CaptureCheckBox 1.0 CaptureCheckBox.qml
+CaptureComboBox 1.0 CaptureComboBox.qml

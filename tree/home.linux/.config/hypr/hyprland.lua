@@ -50,7 +50,6 @@ hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("QT_STYLE_OVERRIDE", "Breeze")
 hl.env("QT_QPA_PLATFORMTHEME", "kde")
 hl.env("AQ_DRM_DEVICES", "/dev/dri/card0:/dev/dri/card1")
-hl.env("HYPRSHOT_DIR", "Pictures/Screenshots")
 hl.env("WEBKIT_DISABLE_DMABUF_RENDERER", "1") -- NVIDIA 上 WebKit 渲染
 
 -- ============================================================
@@ -312,6 +311,12 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
+  name = "quickshell_capture",
+  match = { namespace = "^quickshell-capture(-notice)?$" },
+  no_anim = true,
+})
+
+hl.layer_rule({
   name = "quickshell_panels",
   match = { namespace = "^quickshell-panel$" },
   no_anim = true,
@@ -361,8 +366,11 @@ bind(mainMod .. " + E", "应用启动 · 文件管理器", hl.dsp.exec_cmd(termi
 bind("ALT + V", "窗口 · 切换浮动", hl.dsp.window.float({ action = "toggle" }))
 bind(mainMod .. " + R", "应用启动 · 应用启动器", hl.dsp.global("quickshell:launcher"))
 bind(mainMod .. " + S", "布局 · 切换方向", hl.dsp.layout("togglesplit"))
-bind(mainMod .. " + P", "截图 · 区域", hl.dsp.exec_cmd("hyprshot -m region"))
-bind(mainMod .. " + SHIFT + P", "截图 · 窗口", hl.dsp.exec_cmd("hyprshot -m window"))
+bind(mainMod .. " + P", "捕获 · 区域截图", hl.dsp.global("quickshell:captureScreenshot"))
+bind(mainMod .. " + SHIFT + P", "捕获 · 窗口截图", hl.dsp.global("quickshell:captureWindow"))
+bind(mainMod .. " + ALT + P", "捕获 · 取色", hl.dsp.global("quickshell:captureColor"))
+bind(mainMod .. " + CTRL + P", "捕获 · 录屏", hl.dsp.global("quickshell:captureRecord"))
+bind(mainMod .. " + CTRL + SHIFT + P", "捕获 · 停止录屏", hl.dsp.global("quickshell:captureStopRecording"))
 bind(mainMod .. " + SHIFT + T", "面板 · 控制中心", hl.dsp.global("quickshell:controlCenter"))
 bind(mainMod .. " + SHIFT + Q", "会话 · 锁屏", hl.dsp.exec_cmd("hyprlock"))
 

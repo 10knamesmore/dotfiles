@@ -4,6 +4,7 @@
 import "./ai-usage"
 import "./bar"
 import "./calendar"
+import "./capture"
 import "./computer-control"
 import "./controlcenter"
 import "./launcher"
@@ -41,6 +42,8 @@ ShellRoot {
     ScreenEffectsService {}
 
     ComputerControlService {}
+
+    CaptureWindows {}
 
     // ── 每个显示器生成一个 Bar ──
     Variants {
@@ -98,6 +101,41 @@ ShellRoot {
         name: "controlCenter"
         description: "Toggle control center"
         onPressed: PanelState.toggleControlCenter()
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "captureScreenshot"
+        description: "Capture screenshot"
+        onPressed: CaptureService.open("screenshot", "region")
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "captureWindow"
+        description: "Capture window screenshot"
+        onPressed: CaptureService.open("screenshot", "window")
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "captureColor"
+        description: "Pick screen color"
+        onPressed: CaptureService.open("color", "region")
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "captureRecord"
+        description: "Start screen recording"
+        onPressed: CaptureService.open("record-setup", "region")
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "captureStopRecording"
+        description: "Stop screen recording"
+        onPressed: CaptureService.stopRecording()
     }
 
     // ── 全局面板（唯一实例）──

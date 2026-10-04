@@ -1,4 +1,5 @@
 import "../state"
+import "../capture"
 import "../theme"
 import "./components"
 import "./modules"
@@ -12,8 +13,8 @@ PanelWindow {
     id: root
 
     required property var modelData
-    property bool revealed: BarState.isBarVisibleForScreen(root.modelData.name)
-    property bool transientReveal: !BarState.barPinnedVisible && BarState.barHoverRevealScreen === root.modelData.name
+    property bool revealed: CaptureService.recordingActive || BarState.isBarVisibleForScreen(root.modelData.name)
+    property bool transientReveal: !CaptureService.recordingActive && !BarState.barPinnedVisible && BarState.barHoverRevealScreen === root.modelData.name
     property int barHeight: 44
     property int trackingBandHeight: 44
 
