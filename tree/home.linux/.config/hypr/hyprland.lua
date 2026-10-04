@@ -44,6 +44,7 @@ end
 -- ============================================================
 
 hl.env("XCURSOR_SIZE", "24")
+hl.env("XMODIFIERS", "@im=fcitx")
 hl.env("XDG_MENU_PREFIX", "arch-")
 hl.env("LIBVA_DRIVER_NAME", "nvidia") -- NVIDIA 硬件加速
 hl.env("QT_QPA_PLATFORM", "wayland")
@@ -113,14 +114,14 @@ hl.config({
     rounding = 12,
     rounding_power = 2.0,
     active_opacity = 1,
-    inactive_opacity = 0.95,
+    inactive_opacity = 0.98,
     fullscreen_opacity = 1,
     dim_inactive = true,
     dim_strength = 0.15,
     dim_special = 0.5,
     blur = {
       enabled = true,
-      size = 8,
+      size = 6,
       passes = 2,
       vibrancy = 0.1696,
       special = true,
@@ -230,6 +231,12 @@ hl.device({ name = "msft0001:00-04f3:317c-touchpad", enabled = false })
 -- ============================================================
 -- Window rules
 -- ============================================================
+
+hl.window_rule({
+  name = "windows-no-blur",
+  match = { class = ".*" },
+  no_blur = true,
+})
 
 hl.window_rule({
   name = "suppress-maximize-events",
