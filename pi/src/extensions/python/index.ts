@@ -6,6 +6,8 @@ import { PythonSession, type PythonToolDetails } from "./session.js";
 import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
 import { describePythonEnvironment, inspectPythonEnvironment, type PythonEnvironment } from "./environment.js";
 import { logPythonEvent } from "./diagnostics.js";
+import { PythonObserverServer } from "./observer/server.js";
+import type { ObserverStatus } from "./observer/types.js";
 
 const Parameters = Type.Object(
   {
@@ -58,10 +60,44 @@ export function registerPython(pi: ExtensionAPI): void {
   }));
 
   let session: PythonSession | undefined;
+  let currentContext: ExtensionContext | undefined;
+  const observer = new PythonObserverServer(() => session);
   const inspectionController = new AbortController();
 
-  const createSession = (ctx: ExtensionContext): PythonSession =>
-    new PythonSession(ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared, updateEnvironment);
+  const createSession = (ctx: ExtensionContext): PythonSession => {
+    currentContext = ctx;
+    return new PythonSession(
+      ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared, updateEnvironment, updateStatus,
+    );
+  };
+
+  pi.registerCommand("python", {
+    description: "打开 Python / Terminal 只读 Web 观测台",
+    handler: async (_args, ctx) => {
+      currentContext = ctx;
+      session ??= createSession(ctx);
+      let url: string;
+      try {
+        url = await observer.open();
+      } catch (error) {
+        logPythonEvent({
+          sessionId: ctx.sessionManager.getSessionId(), phase: "observer_open_failed",
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        ctx.ui.notify("无法启动运行观测，请查看 Python 扩展日志。", "error");
+        return;
+      }
+      updateStatus(session.status());
+      let opened = false;
+      try {
+        const result = await pi.exec(process.platform === "darwin" ? "open" : "xdg-open", [url], { timeout: 10_000 });
+        opened = result.code === 0;
+      } catch {
+        logPythonEvent({ sessionId: ctx.sessionManager.getSessionId(), phase: "observer_browser_open_failed" });
+      }
+      ctx.ui.notify(`${opened ? "运行观测已打开" : "请在浏览器打开运行观测"}：${url}`, "info");
+    },
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     session = createSession(ctx);
@@ -94,14 +130,19 @@ export function registerPython(pi: ExtensionAPI): void {
   });
   pi.on("session_shutdown", async () => {
     inspectionController.abort();
+    await observer.close();
     await session?.close();
     session = undefined;
+    currentContext?.ui.setStatus("python", undefined);
+    currentContext = undefined;
   });
   pi.on("session_tree", async (event, ctx) => {
     if (event.newLeafId === event.oldLeafId) return;
+    currentContext = ctx;
     const hadEnvironment = session?.available;
     await session?.close();
     session = createSession(ctx);
+    updateStatus(session.status());
     if (hadEnvironment || hasPythonHistory(ctx)) notifyEnvironmentCleared();
   });
   pi.on("tool_result", (event) => {
@@ -124,6 +165,7 @@ export function registerPython(pi: ExtensionAPI): void {
     executionMode: "sequential",
     async execute(callId, params, signal, onUpdate, ctx) {
       if (!params.code.trim()) throw new Error("code must not be blank.");
+      currentContext = ctx;
       const runtime = (session ??= createSession(ctx));
       onUpdate?.({
         content: [
@@ -150,6 +192,14 @@ export function registerPython(pi: ExtensionAPI): void {
     renderResult: renderPythonResult,
   };
   pi.registerTool(tool);
+
+  function updateStatus(status: ObserverStatus): void {
+    if (!currentContext?.hasUI) return;
+    const labels: Record<ObserverStatus["state"], string> = {
+      not_started: "未启动", starting: "启动中", running: "执行中", idle: "空闲", stopping: "停止中", exited: "已退出",
+    };
+    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · 终端 ${status.terminalCount} · /python`);
+  }
 
   function notifyEnvironmentCleared(): void {
     // Use the live message queue so the active tool loop and saved history receive the same notice.
