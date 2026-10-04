@@ -72,9 +72,14 @@ export function registerPython(pi: ExtensionAPI): void {
   };
 
   pi.registerCommand("python", {
-    description: "打开 Python / Terminal 只读 Web 观测台",
+    description: "Toggle the Python / Terminal observer",
     handler: async (_args, ctx) => {
       currentContext = ctx;
+      if (observer.isOpen) {
+        await observer.close();
+        ctx.ui.notify("Runtime observer closed", "info");
+        return;
+      }
       session ??= createSession(ctx);
       let url: string;
       try {
@@ -84,7 +89,7 @@ export function registerPython(pi: ExtensionAPI): void {
           sessionId: ctx.sessionManager.getSessionId(), phase: "observer_open_failed",
           reason: error instanceof Error ? error.message : String(error),
         });
-        ctx.ui.notify("无法启动运行观测，请查看 Python 扩展日志。", "error");
+        ctx.ui.notify("Could not start the runtime observer. Check the Python extension logs.", "error");
         return;
       }
       updateStatus(session.status());
@@ -95,7 +100,7 @@ export function registerPython(pi: ExtensionAPI): void {
       } catch {
         logPythonEvent({ sessionId: ctx.sessionManager.getSessionId(), phase: "observer_browser_open_failed" });
       }
-      ctx.ui.notify(`${opened ? "运行观测已打开" : "请在浏览器打开运行观测"}：${url}`, "info");
+      ctx.ui.notify(`${opened ? "Runtime observer opened" : "Open the runtime observer in your browser"}: ${url}`, "info");
     },
   });
 
@@ -196,9 +201,9 @@ export function registerPython(pi: ExtensionAPI): void {
   function updateStatus(status: ObserverStatus): void {
     if (!currentContext?.hasUI) return;
     const labels: Record<ObserverStatus["state"], string> = {
-      not_started: "未启动", starting: "启动中", running: "执行中", idle: "空闲", stopping: "停止中", exited: "已退出",
+      not_started: "not started", starting: "starting", running: "running", idle: "idle", stopping: "stopping", exited: "exited",
     };
-    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · 终端 ${status.terminalCount} · /python`);
+    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · Terminals ${status.terminalCount} · /python`);
   }
 
   function notifyEnvironmentCleared(): void {

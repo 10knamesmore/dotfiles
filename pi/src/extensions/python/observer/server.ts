@@ -31,6 +31,10 @@ export class PythonObserverServer {
 
   public constructor(private readonly getSession: () => PythonSession | undefined) {}
 
+  public get isOpen(): boolean {
+    return this.starting !== undefined;
+  }
+
   public open(): Promise<string> {
     return (this.starting ??= this.listen().catch((error: unknown) => {
       this.starting = undefined;
