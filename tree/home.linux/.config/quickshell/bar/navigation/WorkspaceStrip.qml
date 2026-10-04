@@ -5,7 +5,7 @@ import "../components"
 import QtQuick
 import Quickshell.Hyprland._Ipc
 
-// 工作区入口使用稳定的命中区域；活动下划线滑动，悬停只改变底色与文字。
+// 工作区命中区域与数字不动；活动标记移动时轻微拉长，到位后恢复为短线。
 Item {
     id: root
 
@@ -66,18 +66,37 @@ Item {
     }
 
     Rectangle {
-        x: root.activeIndex * 27 + 9
+        id: activeMarker
+        property real destination: root.activeIndex * 27 + 13
+        property real center: destination
+        property real stretch: 0
+        property bool ready: false
+
+        x: center - width / 2
         y: 29
-        width: 8
+        width: 8 + stretch
         height: 2
         radius: 1
         visible: root.activeIndex >= 0
         color: Colors.mauve
-        Behavior on x {
+        Accessible.ignored: true
+        Component.onCompleted: ready = true
+        onDestinationChanged: {
+            if (ready && visible)
+                inkMotion.restart();
+        }
+
+        Behavior on center {
             NumberAnimation {
                 duration: Tokens.animNormal
                 easing.type: Easing.OutCubic
             }
+        }
+
+        SequentialAnimation {
+            id: inkMotion
+            NumberAnimation { target: activeMarker; property: "stretch"; to: 10; duration: 90; easing.type: Easing.OutCubic }
+            NumberAnimation { target: activeMarker; property: "stretch"; to: 0; duration: 200; easing.type: Easing.OutCubic }
         }
     }
 }

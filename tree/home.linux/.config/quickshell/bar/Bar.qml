@@ -47,6 +47,11 @@ PanelWindow {
         anchors.right: parent.right
         height: root.barHeight
 
+        SmokedGlass {
+            anchors.fill: parent
+            radius: 0
+        }
+
         HoverHandler {
             id: barHover
         }

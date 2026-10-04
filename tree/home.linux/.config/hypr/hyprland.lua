@@ -102,10 +102,6 @@ hl.config({
       bottom = 10,
     },
     border_size = 2,
-    col = {
-      active_border = { colors = { "rgba(89b4faee)", "rgba(cba6f7ee)" }, angle = 45 },
-      inactive_border = "rgba(45475a40)",
-    },
     resize_on_border = true,
     hover_icon_on_border = true,
     allow_tearing = false,
@@ -135,8 +131,6 @@ hl.config({
       enabled = true,
       range = 15,
       render_power = 2,
-      color = { colors = { "rgba(11111bee)", "rgba(1e1b3cee)" }, angle = 45 },
-      color_inactive = "rgba(11111b99)",
     },
 
     -- 窗口位移运动模糊
@@ -171,6 +165,12 @@ hl.config({
     vfr = true,
   },
 })
+
+-- 壁纸配色由 dots-wallpaper 生成；换壁纸时通过 eval 热更新。
+local wallpaperColors = loadfile(HOME .. "/.local/state/dots/theme/hyprland.lua")
+if wallpaperColors then
+  wallpaperColors()
+end
 
 -- ============================================================
 -- 动画曲线 + 动画绑定
@@ -302,7 +302,7 @@ hl.window_rule({
 -- Layer rules
 -- ============================================================
 
--- 胶囊和面板使用实色底，形变与淡入淡出由 QML 驱动。
+-- 面板通过 BackgroundEffect 提交局部模糊区域，材质与形变由 QML 驱动。
 -- 接管边框和断开按钮必须从首帧起位于固定位置；光标动画由 QML 驱动。
 hl.layer_rule({
   name = "computer_control",
@@ -320,11 +320,12 @@ hl.layer_rule({
   name = "quickshell_panels",
   match = { namespace = "^quickshell-panel$" },
   no_anim = true,
+  ignore_alpha = 0.1,
 })
 
 hl.layer_rule({
   name = "quickshell_toasts",
-  match = { namespace = "^quickshell-toast$" },
+  match = { namespace = "^quickshell-(toast|osd)$" },
   no_anim = true,
   blur = true,
   ignore_alpha = 0.1,
@@ -471,7 +472,7 @@ bind("XF86AudioPrev", "播放 · 上一首", hl.dsp.exec_cmd("playerctl previous
 -- ============================================================
 
 -- 幂等守卫：同名进程已在跑就跳过。hyprland.start 每次 compositor 启动都触发——
--- 对「无单实例锁」的守护（swaybg/hypridle/wl-paste），若不守卫，Hyprland 每崩溃/
+-- 对「无单实例锁」的守护（hypridle/wl-paste），若不守卫，Hyprland 每崩溃/
 -- 重启一次就再拉起一份，堆叠出孤儿进程。
 -- exec 通过 /bin/sh 解释 `||`；guard 缺省取命令首 token 作进程名。
 local function exec_once(cmd, guard)
@@ -479,7 +480,7 @@ local function exec_once(cmd, guard)
 end
 
 hl.on("hyprland.start", function()
-  exec_once("swaybg -i " .. HOME .. "/Pictures/wallpapers/disco_elysium_wallpaper.png", "swaybg")
+  hl.exec_cmd(SCRIPTS .. "/dots-wallpaper")
   hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
   exec_once("hypridle")
   exec_once("wl-paste --watch cliphist store", "wl-paste")

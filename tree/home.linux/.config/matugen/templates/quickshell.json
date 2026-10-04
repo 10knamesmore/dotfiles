@@ -1,0 +1,19 @@
+{
+  "source": "{{colors.source_color.dark.hex}}",
+  "background": "{{colors.surface.dark.hex}}",
+  "surfaceLowest": "{{colors.surface_container_lowest.dark.hex}}",
+  "surfaceLow": "{{colors.surface_container_low.dark.hex}}",
+  "surface": "{{colors.surface_container.dark.hex}}",
+  "surfaceHigh": "{{colors.surface_container_high.dark.hex}}",
+  "surfaceHighest": "{{colors.surface_container_highest.dark.hex}}",
+  "text": "{{colors.on_surface.dark.hex}}",
+  "textSecondary": "{{colors.on_surface_variant.dark.hex}}",
+  "outline": "{{colors.outline.dark.hex}}",
+  "outlineVariant": "{{colors.outline_variant.dark.hex}}",
+  "primary": "{{colors.primary.dark.hex}}",
+  "secondary": "{{colors.secondary.dark.hex}}",
+  "tertiary": "{{colors.tertiary.dark.hex}}",
+  "success": "{{colors.success.dark.hex}}",
+  "warning": "{{colors.warning.dark.hex}}",
+  "error": "{{colors.error.dark.hex}}"
+}

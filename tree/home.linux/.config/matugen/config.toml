@@ -1,0 +1,25 @@
+[config]
+version_check = false
+caching = true
+source_color_index = 0
+
+# 状态色保留可辨识的色相，同时与壁纸主色协调。
+[config.custom_colors]
+success = "#4caf50"
+warning = "#ffb300"
+
+[templates.quickshell]
+input_path = "templates/quickshell.json"
+output_path = "~/.local/state/dots/theme/colors.json"
+
+[templates.hyprland]
+input_path = "templates/hyprland.lua"
+output_path = "~/.local/state/dots/theme/hyprland.lua"
+
+[templates.hyprlock]
+input_path = "templates/hyprlock.conf"
+output_path = "~/.local/state/dots/theme/hyprlock.conf"
+
+[templates.kitty]
+input_path = "templates/kitty.conf"
+output_path = "~/.local/state/dots/theme/kitty.conf"

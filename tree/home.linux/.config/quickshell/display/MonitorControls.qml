@@ -72,6 +72,12 @@ ColumnLayout {
             color: cs.enabled ? Colors.blue : Colors.overlay0
             border.width: 2
             border.color: Colors.base
+
+            SliderGlow {
+                anchors.centerIn: parent
+                pressed: cs.pressed
+                accentColor: Colors.blue
+            }
         }
     }
 

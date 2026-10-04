@@ -2,6 +2,7 @@ import "../theme"
 import "../state"
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 
@@ -24,6 +25,7 @@ PanelWindow {
     margins.bottom: 40
     exclusionMode: ExclusionMode.Ignore
     focusable: false
+    WlrLayershell.namespace: "quickshell-osd"
     color: "transparent"
     visible: showing || _hideAnim.running
     onShowingChanged: {
@@ -50,9 +52,6 @@ PanelWindow {
             root.refreshDismissTimer();
         }
 
-        function onOsdTypeChanged() {
-            root.refreshDismissTimer();
-        }
     }
 
     // 自动关闭定时器
@@ -121,6 +120,11 @@ PanelWindow {
         border.width: 1
         opacity: 0
 
+        SmokedGlass {
+            anchors.fill: parent
+            radius: osdWidget.radius
+        }
+
         SoftShadow {
             anchors.fill: parent
             radius: parent.radius
@@ -142,22 +146,47 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
-                // 进度条
+                // 弯月前沿随数值移动；满值时收成与轨道一致的圆头。
                 Rectangle {
+                    id: track
+                    property real displayedValue: Math.max(0, Math.min(1, OsdState.osdValue / 100))
+                    readonly property real fillWidth: displayedValue * width
+                    readonly property real capRadius: Math.min(height / 2, fillWidth / 2)
+                    readonly property real fullCap: Math.max(0, (displayedValue - 0.95) / 0.05)
+                    readonly property real edgeX: fillWidth - capRadius * fullCap
+                    readonly property real bend: Math.min(3, fillWidth * 0.25)
+
                     width: 150
-                    height: 6
-                    radius: 3
+                    height: 8
+                    radius: 4
                     color: Colors.surface1
 
-                    Rectangle {
-                        width: Math.max(0, Math.min(1, OsdState.osdValue / 100)) * parent.width
-                        height: parent.height
-                        radius: parent.radius
-                        color: Colors.blue
+                    Behavior on displayedValue { NumberAnimation { duration: 100 } }
 
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: 100
+                    Shape {
+                        anchors.fill: parent
+                        visible: track.fillWidth > 0
+                        preferredRendererType: Shape.CurveRenderer
+                        Accessible.ignored: true
+
+                        ShapePath {
+                            strokeColor: "transparent"
+                            fillColor: Colors.blue
+                            startX: track.capRadius
+                            startY: 0
+                            PathLine { x: track.edgeX; y: 0 }
+                            PathQuad {
+                                x: track.edgeX
+                                y: track.height
+                                controlX: track.fillWidth - 2 * track.bend * (1 - track.fullCap) + track.capRadius * track.fullCap
+                                controlY: track.height / 2
+                            }
+                            PathLine { x: track.capRadius; y: track.height }
+                            PathQuad {
+                                x: track.capRadius
+                                y: 0
+                                controlX: -track.capRadius
+                                controlY: track.height / 2
                             }
                         }
                     }

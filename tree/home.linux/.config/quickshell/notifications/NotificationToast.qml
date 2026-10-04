@@ -88,6 +88,7 @@ PanelWindow {
                     exiting = true;
                     dismissTimer.stop();
                     progressAnim.stop();
+                    arrivalLight.stop();
                     toast.x = toast.width;
                     removeTimer.start();
                 }
@@ -106,6 +107,12 @@ PanelWindow {
                     dismissTimer.start();
                     progressAnim.duration = model.timeout;
                     progressAnim.start();
+                    arrivalLight.start();
+                }
+
+                SmokedGlass {
+                    anchors.fill: parent
+                    radius: toast.radius
                 }
 
                 Timer {
@@ -238,6 +245,52 @@ PanelWindow {
                         to: 1
                         duration: 5000
                         running: false
+                    }
+                }
+
+                // 到达时只掠过一次，倒计时边框仍由上面的独立进度控制。
+                Shape {
+                    id: arrivalBorder
+                    property real progress: 0
+                    anchors.fill: parent
+                    visible: arrivalLight.running
+                    opacity: Math.sin(Math.PI * progress)
+                    preferredRendererType: Shape.CurveRenderer
+                    Accessible.ignored: true
+
+                    ShapePath {
+                        strokeColor: "transparent"
+                        fillRule: ShapePath.OddEvenFill
+                        fillGradient: ConicalGradient {
+                            centerX: arrivalBorder.width / 2
+                            centerY: arrivalBorder.height / 2
+                            angle: arrivalBorder.progress * 360
+                            GradientStop { position: 0; color: "transparent" }
+                            GradientStop { position: 0.68; color: "transparent" }
+                            GradientStop { position: 0.88; color: Colors.withAlpha(Colors.blue, 0.9) }
+                            GradientStop { position: 1; color: "transparent" }
+                        }
+                        PathRectangle {
+                            width: arrivalBorder.width
+                            height: arrivalBorder.height
+                            radius: toast.radius
+                        }
+                        PathRectangle {
+                            x: 1.5
+                            y: 1.5
+                            width: Math.max(0, arrivalBorder.width - 3)
+                            height: Math.max(0, arrivalBorder.height - 3)
+                            radius: Math.max(0, toast.radius - 1.5)
+                        }
+                    }
+
+                    NumberAnimation on progress {
+                        id: arrivalLight
+                        from: 0
+                        to: 1
+                        duration: 1200
+                        running: false
+                        easing.type: Easing.OutCubic
                     }
                 }
 

@@ -1,4 +1,5 @@
 import "../theme"
+import "../components"
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -83,6 +84,12 @@ ColumnLayout {
                 color: Colors.mauve
                 opacity: progress.enabled && (progress.hovered || progress.pressed || progress.visualFocus) ? 1 : 0
                 scale: progress.pressed ? 1.2 : 1
+
+                SliderGlow {
+                    anchors.centerIn: parent
+                    pressed: progress.pressed
+                    accentColor: Colors.mauve
+                }
 
                 Behavior on opacity {
                     NumberAnimation {

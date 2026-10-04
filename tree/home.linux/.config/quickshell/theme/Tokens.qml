@@ -24,12 +24,12 @@ QtObject {
     readonly property int spaceL: 16
     readonly property int spaceXL: 24
 
-    // ── 毛玻璃面板 ──
-    readonly property real panelAlpha: 0.55
+    // ── 烟熏玻璃面板 ──
+    readonly property real panelAlpha: 0.86
     // 主面板（Settings/Calendar/Notif…）
     readonly property real cardAlpha: 0.45
     // 面板内卡片（比面板更透）
-    readonly property real toastAlpha: 0.65
+    readonly property real toastAlpha: 0.88
     // Toast/OSD（需要快速阅读）
     readonly property real backdropDim: 0.2
     // 遮罩层

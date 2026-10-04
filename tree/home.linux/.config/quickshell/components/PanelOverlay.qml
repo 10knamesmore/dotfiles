@@ -196,6 +196,12 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-panel"
     color: "transparent"
 
+    // 只模糊面板当前的圆角轮廓；全屏遮罩与点击区域不参与模糊。
+    BackgroundEffect.blurRegion: Region {
+        item: panel
+        radius: panel.radius
+    }
+
     Rectangle {
         anchors.fill: parent
         color: "#000000"
@@ -238,11 +244,17 @@ PanelWindow {
         width: sourceWidth + (root.panelWidth - sourceWidth) * widthProgress
         height: sourceHeight + (targetHeight - sourceHeight) * progress
         radius: root.hasMorphSource ? root._source.item.radius + (root.panelRadius - root._source.item.radius) * progress : root.panelRadius
-        color: root.hasMorphSource ? Qt.tint(root._source.item.color, Colors.withAlpha(Colors.surface0, revealProgress)) : Colors.surface0
+        color: root.hasMorphSource ? Qt.tint(root._source.item.color, Colors.withAlpha(Colors.surface0, revealProgress * Tokens.panelAlpha)) : Colors.withAlpha(Colors.surface0, Tokens.panelAlpha)
         border.color: Colors.overlay(Tokens.borderAlpha)
         border.width: root.hasMorphSource ? root._source.item.border.width + (1 - root._source.item.border.width) * revealProgress : 1
         opacity: root.hasMorphSource ? (root._sourceHeld ? 1 : 0) : (root._atTarget ? 1 : 0)
         clip: true
+
+        SmokedGlass {
+            anchors.fill: parent
+            radius: panel.radius
+            opacity: panel.revealProgress
+        }
 
         MouseArea {
             anchors.fill: parent

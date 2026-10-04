@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 设置静态壁纸，并统一生成 Quickshell、Hyprland、锁屏与 Kitty 配色。
+# 不带参数时恢复上次选择；首次使用沿用当前桌面的默认壁纸。
+state_dir="$HOME/.local/state/dots"
+selection="$state_dir/wallpaper"
+if (( $# > 1 )); then
+    printf '用法: dots-wallpaper [图片路径]\n' >&2
+    exit 2
+fi
+if (( $# == 1 )); then
+    image=$(realpath -- "$1")
+elif [[ -f "$selection" ]]; then
+    IFS= read -r image < "$selection"
+else
+    image="$HOME/Pictures/wallpapers/disco_elysium_wallpaper.png"
+fi
+if [[ ! -f "$image" ]]; then
+    printf '[wallpaper] 图片不存在: %s\n' "$image" >&2
+    exit 1
+fi
+
+printf '[wallpaper] 生成深色配色: %s\n' "$image" >&2
+matugen --config "$HOME/.config/matugen/config.toml" image "$image" --mode dark --type scheme-tonal-spot
+mkdir -p "$state_dir"
+printf '%s\n' "$image" > "$selection.tmp"
+mv -- "$selection.tmp" "$selection"
+
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    result=$(hyprctl eval "dofile(os.getenv('HOME') .. '/.local/state/dots/theme/hyprland.lua')")
+    if [[ "$result" != "ok" ]]; then
+        printf '[wallpaper] Hyprland 配色应用失败: %s\n' "$result" >&2
+        exit 1
+    fi
+    pkill -USR1 -u "$(id -u)" -x kitty || [[ $? == 1 ]]
+    pkill -u "$(id -u)" -x swaybg || [[ $? == 1 ]]
+    swaybg -i "$image" -m fill >/dev/null 2>&1 &
+    printf '[wallpaper] 壁纸与桌面配色已应用\n' >&2
+else
+    printf '[wallpaper] 配色已生成；当前不在 Hyprland 会话中\n' >&2
+fi

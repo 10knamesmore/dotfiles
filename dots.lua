@@ -80,6 +80,7 @@ dots.resource.cargo_binary({
 
 local cargo_binary_packages = {
   "starship",
+  "matugen",
   "zoxide",
   "du-dust",
   "ripgrep",

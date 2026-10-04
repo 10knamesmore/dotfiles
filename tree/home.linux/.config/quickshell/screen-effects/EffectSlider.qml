@@ -1,4 +1,5 @@
 import "../theme"
+import "../components"
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -113,6 +114,12 @@ RowLayout {
             height: 30
             radius: 15
             color: "transparent"
+
+            SliderGlow {
+                anchors.centerIn: parent
+                pressed: slider.pressed
+                accentColor: Colors.mauve
+            }
 
             Rectangle {
                 anchors.centerIn: parent

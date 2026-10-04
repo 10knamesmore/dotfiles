@@ -1,4 +1,5 @@
 import "../theme"
+import "../components"
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -36,6 +37,7 @@ ColumnLayout {
 
     Slider {
         id: slider
+        Accessible.name: root.label
 
         Layout.fillWidth: true
         from: 0
@@ -93,6 +95,12 @@ ColumnLayout {
             border.color: root.accentColor
             border.width: 2
             scale: slider.pressed ? 1.15 : slider.hovered ? 1.08 : 1
+
+            SliderGlow {
+                anchors.centerIn: parent
+                pressed: slider.pressed
+                accentColor: root.accentColor
+            }
 
             // Hover 外圈发光
             Rectangle {

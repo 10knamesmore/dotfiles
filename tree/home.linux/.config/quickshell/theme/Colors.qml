@@ -1,42 +1,77 @@
 pragma Singleton
+pragma ComponentBehavior: Bound
 import QtQuick
+import Quickshell
+import Quickshell.Io
 
-// Catppuccin Mocha 调色板 — 固定口味
-QtObject {
-    readonly property color base: "#1e1e2e"
-    readonly property color mantle: "#181825"
-    readonly property color crust: "#11111b"
-    readonly property color text: "#cdd6f4"
-    readonly property color subtext1: "#bac2de"
-    readonly property color subtext0: "#a6adc8"
-    readonly property color overlay2: "#9399b2"
-    readonly property color overlay1: "#7f849c"
-    readonly property color overlay0: "#6c7086"
-    readonly property color surface2: "#585b70"
-    readonly property color surface1: "#45475a"
-    readonly property color surface0: "#313244"
-    readonly property color blue: "#89b4fa"
-    readonly property color lavender: "#b4befe"
-    readonly property color sapphire: "#74c7ec"
-    readonly property color sky: "#89dceb"
-    readonly property color teal: "#94e2d5"
-    readonly property color green: "#a6e3a1"
-    readonly property color yellow: "#f9e2af"
-    readonly property color peach: "#fab387"
-    readonly property color maroon: "#eba0ac"
-    readonly property color red: "#f38ba8"
-    readonly property color mauve: "#cba6f7"
-    readonly property color pink: "#f5c2e7"
-    readonly property color flamingo: "#f2cdcd"
-    readonly property color rosewater: "#f5e0dc"
+// 读取 dots-wallpaper 生成的深色配色；文件变化时所有消费者立即更新。
+// 中性色仅用于首次生成前，状态色由 Matugen 与壁纸主色协调。
+Singleton {
+    id: root
 
-    // 为任意调色板颜色附加 alpha。
-    function withAlpha(c, a) {
-        return Qt.rgba(c.r, c.g, c.b, a);
+    readonly property color base: palette.background
+    readonly property color mantle: palette.surfaceLow
+    readonly property color crust: palette.surfaceLowest
+    readonly property color text: palette.text
+    readonly property color subtext1: palette.textSecondary
+    readonly property color subtext0: Qt.tint(base, withAlpha(root.subtext1, 0.78))
+    readonly property color overlay2: palette.outline
+    readonly property color overlay1: Qt.tint(base, withAlpha(root.subtext1, 0.60))
+    readonly property color overlay0: palette.outlineVariant
+    readonly property color surface2: palette.surfaceHighest
+    readonly property color surface1: palette.surfaceHigh
+    readonly property color surface0: palette.surface
+    readonly property color blue: palette.primary
+    readonly property color lavender: palette.secondary
+    readonly property color sapphire: palette.secondary
+    readonly property color sky: palette.secondary
+    readonly property color teal: palette.tertiary
+    readonly property color green: palette.success
+    readonly property color yellow: palette.warning
+    readonly property color peach: palette.warning
+    readonly property color maroon: palette.error
+    readonly property color red: palette.error
+    readonly property color mauve: palette.primary
+    readonly property color pink: palette.tertiary
+    readonly property color flamingo: palette.secondary
+    readonly property color rosewater: palette.secondary
+
+    function withAlpha(color, alpha) {
+        return Qt.rgba(color.r, color.g, color.b, alpha);
     }
 
-    // 中性 hover/描边叠色：暗色主题用白。
-    function overlay(a) {
-        return Qt.rgba(1, 1, 1, a);
+    function overlay(alpha) {
+        return withAlpha(root.text, alpha);
+    }
+
+    JsonAdapter {
+        id: palette
+        property string source: ""
+        property string background: "#181818"
+        property string surfaceLowest: "#101010"
+        property string surfaceLow: "#1c1c1c"
+        property string surface: "#242424"
+        property string surfaceHigh: "#2b2b2b"
+        property string surfaceHighest: "#333333"
+        property string text: "#eeeeee"
+        property string textSecondary: "#cccccc"
+        property string outline: "#999999"
+        property string outlineVariant: "#555555"
+        property string primary: "#cccccc"
+        property string secondary: "#bbbbbb"
+        property string tertiary: "#dddddd"
+        property string success: "#a5d6a7"
+        property string warning: "#ffe082"
+        property string error: "#ef9a9a"
+    }
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/dots/theme/colors.json"
+        adapter: palette
+        watchChanges: true
+        blockLoading: true
+        onFileChanged: reload()
+        onLoaded: console.info("[theme] wallpaper palette loaded", palette.source)
+        onLoadFailed: error => console.warn("[theme] palette unavailable; run dots-wallpaper", error)
     }
 }
