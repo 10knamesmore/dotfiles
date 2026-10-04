@@ -1,6 +1,8 @@
 import { homedir, hostname, userInfo } from "node:os";
 import type { ExtensionContext, ReadonlyFooterDataProvider } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
+import type { EditorActivity } from "../editor/api.js";
+import { FooterPet } from "./pet/index.js";
 import { fitByDropping, formatDuration, formatFooterCwd, formatTokens, sanitizeFooterText } from "./format.js";
 import type { GitDiffStat, GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
@@ -16,6 +18,9 @@ import { palette, separator } from "./palette.js";
 interface ClaudeFooterComponentOptions {
   /** Returns the latest event context instead of a session-start snapshot. */
   getContext: () => ExtensionContext;
+
+  /** Same live activity decision used by the editor and window title. */
+  getActivity: () => EditorActivity;
 
   /** Pi-owned extension status provider. */
   footerData: ReadonlyFooterDataProvider;
@@ -249,7 +254,13 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
 
 function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
-    .filter(([key]) => key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage")
+    .filter(
+      ([key]) =>
+        key !== "todo" &&
+        key !== "subagent-workflow" &&
+        key !== "subagent-workflow:usage" &&
+        key !== "openai-fast",
+    )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([, value]) => sanitizeFooterText(value))
     .filter(Boolean);
@@ -286,9 +297,12 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
 export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
+  private readonly pet: FooterPet;
   private disposed = false;
 
-  public constructor(private readonly options: ClaudeFooterComponentOptions) {}
+  public constructor(private readonly options: ClaudeFooterComponentOptions) {
+    this.pet = new FooterPet(() => this.requestRender());
+  }
 
   /**
    * Rebind background git observation when Pi replaces the active session
@@ -306,10 +320,7 @@ export class ClaudeFooterComponent implements Component {
     this.options.git.refreshForEvent();
   }
 
-  /**
-   * Request a repaint for provider/model lifecycle events without running an
-   * idle timer.
-   */
+  /** Repaint while this component still belongs to the active TUI session. */
   public requestRender(): void {
     if (!this.disposed) {
       this.options.requestRender();
@@ -317,43 +328,52 @@ export class ClaudeFooterComponent implements Component {
   }
 
   public render(width: number): string[] {
-    if (width <= 0) {
+    if (width <= 0 || this.disposed) {
       return ["", "", ""];
     }
 
     const ctx = this.options.getContext();
     const git = this.options.git.snapshot();
     const metrics = this.options.metrics.snapshot(ctx);
+    // OpenAI Fast publishes this key only when enabled and applicable to the current model.
+    const fastRequested = this.options.footerData.getExtensionStatuses().has("openai-fast");
+    const petLines = this.pet.render(this.options.getActivity(), fastRequested, width);
+    const leftWidths = petLines.map((line) => (line ? Math.max(0, width - visibleWidth(line) - 3) : width));
 
-    return [
+    const lines = [
       renderFirstLine({
-        width,
+        width: leftWidths[0]!,
         username: this.username,
         host: this.host,
         ctx,
         git,
       }),
-      renderSecondLine({ width, metrics }),
+      renderSecondLine({ width: leftWidths[1]!, metrics }),
       renderThirdLine({
-        width,
+        width: leftWidths[2]!,
         footerData: this.options.footerData,
         promptRun: metrics.promptRun,
         hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
       }),
     ];
+    return lines.map((line, index) => {
+      const pet = petLines[index]!;
+      return pet ? line + " ".repeat(width - visibleWidth(line) - visibleWidth(pet)) + pet : line;
+    });
   }
 
   public invalidate(): void {
     // The footer reads current state from its sources during every render.
   }
 
-  /** Stop git watchers, debounce timers, and any running git process. */
+  /** Stop the pet animation, git watchers, debounce timers, and any running git process. */
   public dispose(): void {
     if (this.disposed) {
       return;
     }
 
     this.disposed = true;
+    this.pet.dispose();
     this.options.git.dispose();
   }
 }

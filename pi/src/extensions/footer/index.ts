@@ -69,6 +69,7 @@ class FooterRuntime {
       const git = new GitStatusCache(this.cwd(ctx), () => tui.requestRender());
       const component = new ClaudeFooterComponent({
         getContext: () => this.currentContext ?? ctx,
+        getActivity: () => this.activityStatus(),
         footerData,
         git,
         metrics: this.metrics,
@@ -281,7 +282,7 @@ class FooterRuntime {
     if (wasIdle) this.component?.requestRender();
   }
 
-  /** One activity decision shared by editor rendering and title subscribers. */
+  /** One activity decision shared by the editor, footer pet, and title subscribers. */
   private activityStatus(): EditorStatus["activity"] {
     const spinner = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
     const model = this.modelResponse.snapshot();
