@@ -57,4 +57,4 @@ desktop.type_text("你好，世界")
 
 ## 接入浏览器页面
 
-目标为 Chrome/Chromium 页面时，可将 `desktop.hyprland.query("clients")` 中已确认窗口的 `pid` 交给 `browser_use.connect(pid=window["pid"])`。一个进程可能拥有多个窗口，连接后仍需列出标签页确认目标。完整流程与远程调试要求见 [browser-use](../../../browser-use/skills/browser-use/SKILL.md)。浏览器工具栏和系统对话框仍使用 computer-use。
+目标为 Chrome/Chromium 页面时，可将 `desktop.hyprland.query("clients")` 中已确认窗口的 `pid` 交给 `browser_use.connect(pid=window["pid"])`。一个进程可能拥有多个窗口，连接后在 `session.run(async_callback)` 中通过原生 Playwright 列出标签页确认目标。完整流程与远程调试要求见 [browser-use](../../../browser-use/skills/browser-use/SKILL.md)。浏览器工具栏和系统对话框仍使用 computer-use。

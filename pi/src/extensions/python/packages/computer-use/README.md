@@ -70,9 +70,9 @@ worker 在 cell 失败或取消时调用 `_close_all()`，关闭所有活动桌�
 ## 构建与维护
 
 ```sh
-cargo fmt --manifest-path pi/src/extensions/python/native/computer-use/Cargo.toml --check
-cargo check --locked --manifest-path pi/src/extensions/python/native/computer-use/Cargo.toml
-uv build --wheel --out-dir pi/src/extensions/python/native/computer-use/target/dist pi/src/extensions/python/native/computer-use
+cargo fmt --manifest-path pi/src/extensions/python/packages/computer-use/Cargo.toml --check
+cargo check --locked --manifest-path pi/src/extensions/python/packages/computer-use/Cargo.toml
+uv build --wheel --out-dir pi/src/extensions/python/packages/computer-use/target/dist pi/src/extensions/python/packages/computer-use
 qmllint -I /usr/lib/qt6/qml tree/home.linux/.config/quickshell/computer-control/*.qml
 ```
 

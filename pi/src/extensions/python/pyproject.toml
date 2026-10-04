@@ -24,7 +24,7 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-browser-use-sdk = { path = "native/browser-use" }
-computer-use-sdk = { path = "native/computer-use" }
-pi-display-image-sdk = { path = "native/pi-display-image" }
-terminal-use-sdk = { path = "native/terminal-use" }
+browser-use-sdk = { path = "packages/browser-use", editable = true }
+computer-use-sdk = { path = "packages/computer-use" }
+pi-display-image-sdk = { path = "packages/pi-display-image" }
+terminal-use-sdk = { path = "packages/terminal-use" }
