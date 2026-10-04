@@ -10,6 +10,7 @@ import QtQuick
 BarModule {
     id: root
 
+    required property var barScreen
     readonly property var player: MediaService.activePlayer
     readonly property string trackKey: MediaService.activeTrackKey
     property bool autoLyrics: true
@@ -27,6 +28,11 @@ BarModule {
     // 展开面板已有完整歌词区，头部保留歌名，避免曲目信息被歌词替掉。
     readonly property bool showingLyrics: autoLyrics && !titleHold.running && !headerInPanel && LyricsState.lyricsTrackId === trackKey && currentLine && currentLine.text.length > 0
     readonly property string fullContent: showingLyrics ? currentLine.text : songTitle
+    readonly property bool captionVisible: root.visible && (headerInPanel ? PanelState.mediaOpen : BarState.isBarVisibleForScreen(barScreen.name))
+    readonly property bool lyricsViewActive: captionVisible && autoLyrics && !titleHold.running && !headerInPanel
+
+    onLyricsViewActiveChanged: LyricsState.setViewVisible(root, lyricsViewActive)
+    Component.onDestruction: LyricsState.setViewVisible(root, false)
 
     function showNewTrack() {
         if (player)
@@ -66,7 +72,10 @@ BarModule {
         volumeFeedback.restart();
     }
     onTrackKeyChanged: showNewTrack()
-    Component.onCompleted: showNewTrack()
+    Component.onCompleted: {
+        showNewTrack();
+        LyricsState.setViewVisible(root, lyricsViewActive);
+    }
 
     Accessible.role: Accessible.Button
     Accessible.name: "媒体"
@@ -153,6 +162,7 @@ BarModule {
         }
 
         AnimatedCaption {
+            active: root.captionVisible
             width: root.headerInPanel
                 ? Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0))
                 : root.compactCaptionWidth

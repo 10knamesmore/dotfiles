@@ -67,6 +67,7 @@ Loader {
     Component {
         id: cMedia
         MediaModule {
+            barScreen: host.barScreen
         }
     }
     Component {

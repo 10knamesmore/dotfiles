@@ -7,6 +7,18 @@ import QtQuick
 //     words: [{ start: ms, duration: ms, text: "字" }, ...],  // 逐字，空数组=无逐字
 //     translation: "译文行" | "" }
 QtObject {
+    property var _visibleViews: []
+    readonly property bool hasVisibleViews: _visibleViews.length > 0
+
+    // 每屏胶囊和歌词面板分别登记；任一视图可见时才需要逐帧同步。
+    function setViewVisible(view, visible) {
+        const registered = _visibleViews.includes(view);
+        if (visible && !registered)
+            _visibleViews = _visibleViews.concat([view]);
+        else if (!visible && registered)
+            _visibleViews = _visibleViews.filter(item => item !== view);
+    }
+
     property var lyricsLines: []
     property int currentLyricIndex: -1
     property string currentLyric: ""

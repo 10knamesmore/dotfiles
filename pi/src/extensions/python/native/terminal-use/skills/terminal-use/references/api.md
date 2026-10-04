@@ -4,7 +4,9 @@
 import terminal_use as terminal
 ```
 
-所有方法使用 `terminal.start(...)['id']`（或 `list()`）返回的字符串会话 id。会话不存在、已关闭或 PTY 操作失败时抛 `RuntimeError`，参数不合法时抛 `ValueError`/`TypeError`。注册了 lifecycle hook 后，`start`、`close`、`close_all` 只能在注册 hook 的线程调用；跨线程调用会在产生副作用前抛 `RuntimeError`。未注册 hook 时不附加线程限制，其他方法没有此限制。
+`terminal.start(...)` 返回 `Session` 对象，后续操作通过该对象调用，例如 `session.read()`、`session.send_text(...)`。`terminal.list()` 返回当前 worker 尚未关闭的 Session 对象；模块级操作只有 `start`、`list` 和 `close_all`，不接受字符串 id 操作会话。
+
+Session 已关闭或 PTY 操作失败时抛 `RuntimeError`，参数不合法时抛 `ValueError`/`TypeError`。注册了 lifecycle hook 后，`terminal.start`、`session.close`、`terminal.close_all` 只能在注册 hook 的线程调用；跨线程调用会在产生副作用前抛 `RuntimeError`。未注册 hook 时不附加线程限制，其他方法没有此限制。
 
 ## 类型
 
@@ -13,6 +15,7 @@ import terminal_use as terminal
 ```python
 from typing import Literal, Mapping, NotRequired, Sequence, TypedDict
 
+Session = terminal.Session
 Rect = terminal.Rect
 TerminalImage = terminal.TerminalImage
 
@@ -217,23 +220,33 @@ terminal.start(
     cols: int = 80,
     rows: int = 24,
     cell_size: tuple[int, int] | None = None,
-) -> SessionInfo
+) -> Session
 ```
 
 - `argv`：程序与参数列表，`argv[0]` 按 `PATH` 查找；空列表、空程序名或非字符串参数报错。
 - `cwd`：已存在的目录，默认继承 worker 当前目录。指定后，SDK 会把子进程的 `PWD` 同步为这个值；如果 `env` 显式提供 `PWD`，则以显式值为准。这是因为部分 TUI 会优先读取 `PWD` 决定初始目录，而不是调用 `getcwd()`。
 - `env`：在 worker 环境之上添加或覆盖变量，不是隔离环境；未提供的变量（如 `PATH`、`HOME`）继续透传。当前没有清空继承环境或删除单个继承变量的参数。未在 `env` 中提供 `TERM` 时，SDK 会设置为 `xterm-256color`。
 - `cell_size`：虚拟单元格的 `(宽, 高)`，单位为像素；省略或传 `None` 时使用 `(8, 16)`。两个值都必须大于 0，`cols × 宽` 与 `rows × 高` 不得超过 65535。PTY ioctl、终端尺寸查询和图片布局使用相同几何；这不是实际字体大小。`resize` 保留单元格大小。
-- 返回完整的 `SessionInfo`。
+- 返回绑定此 PTY 的 `Session`，不能直接构造 Session 或从字符串 id 恢复对象。完整元数据通过 `session.inspect()` 读取。
 
-## list / inspect
+## Session / list / inspect
 
 ```python
-terminal.list() -> list[SessionInfo]
-terminal.inspect(session_id: str) -> SessionInfo
+terminal.list() -> list[Session]
+session.inspect() -> SessionInfo
 ```
 
-`SessionInfo` 字段：
+| 只读属性 | 含义 |
+| --- | --- |
+| `session.id: str` | worker 内稳定的诊断标识，对应快照和 ownership 事件中的 id；不是操作入口。 |
+| `session.pid: int` | PTY 子进程 PID，退出后仍保留。 |
+| `session.closed: bool` | 是否已开始关闭 PTY；进程自行退出不等于 Session 已关闭。 |
+
+`list()` 包含运行中与已退出但尚未关闭的会话，按 id 排序。它返回指向同一批底层会话的对象；任一对象调用 `close()`，其他指向同一会话的对象也会变为 closed。不要依赖 Python 对象身份判断是否为同一会话，使用 `id`。
+
+Session 可跨 cell 保留；丢弃 Python 变量不会关闭 PTY，仍可通过 `list()` 取得对象。支持 `with terminal.start(...) as session:`，退出作用域时关闭，不吞掉作用域内的异常。跨 cell 使用时保留变量并显式关闭，不要每个 cell 都新建会话。
+
+关闭后仍可读取 `id`、`pid`、`closed` 和 `inspect()`，也可重复 `close()`；其他终端操作报错。`inspect()` 返回 `SessionInfo` 的即时快照，不消费输出。字段如下：
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
@@ -256,8 +269,7 @@ terminal.inspect(session_id: str) -> SessionInfo
 ## read
 
 ```python
-terminal.read(
-    session_id: str,
+session.read(
     *,
     rect: RectInput | None = None,
     wait_for: WaitFor | None = None,
@@ -274,7 +286,7 @@ terminal.read(
 - `wait_for`：恰好包含 `contains` 或 `regex` 之一，可选 `source`：
 
 ```python
-{'contains': 'ready> '}                       # screen 子串（默认）
+{'contains': 'ready>'}                        # screen 子串（默认）
 {'regex': r'Done in \d+\.\d+s'}               # screen 正则
 {'contains': 'Traceback', 'source': 'raw'}    # 匹配保留窗口内的原始输出
 ```
@@ -327,7 +339,7 @@ terminal.read(
 ## 图片快照
 
 ```python
-screen = terminal.read(session_id, images=True)
+screen = session.read(images=True)
 print(screen["text"])
 for image in screen["images"]:
     print(image.image_id, image.size, image.placements)
@@ -366,8 +378,7 @@ Ghostty 的图片存储上限为每个屏幕 64 MiB；达到上限时由核心�
 ## read_raw
 
 ```python
-terminal.read_raw(
-    session_id: str,
+session.read_raw(
     *,
     max_bytes: int = 65536,
     since: int | None = None,
@@ -394,16 +405,15 @@ terminal.read_raw(
 ## input / send_text / send_key / paste / write
 
 ```python
-terminal.input(
-    session_id: str,
+session.input(
     events: Sequence[TerminalEvent],
     *,
     delay: float = 0.0,
 ) -> None
-terminal.send_text(session_id: str, text: str) -> None
-terminal.send_key(session_id: str, *keys: str) -> None
-terminal.paste(session_id: str, text: str) -> None
-terminal.write(session_id: str, data: bytes) -> None
+session.send_text(text: str) -> None
+session.send_key(*keys: str) -> None
+session.paste(text: str) -> None
+session.write(data: bytes) -> None
 ```
 
 `input` 先验证整批事件，再写入 PTY；任一事件非法则整批不发送任何字节。默认 `delay=0` 时仍合并为一次写入。`Up`、`Down`、`Left`、`Right`、`Home`、`End` 会根据会话最近解析到的 application cursor mode 选择普通或 SS3 序列；需要严格控制字节时使用 `write()`。设置 `delay` 后，按事件逐个写入，并在相邻事件的成功写入之间等待指定毫秒数；第一个事件前和最后一个事件后都不等待。它用于模拟逐步的人类输入，不保证 PTY 读取端的 chunk 边界，也不替代等待应用状态。Playwright 的 `pressSequentially(..., {delay})` 使用同样的毫秒单位语义。事件结构见 `TerminalEvent`：
@@ -420,12 +430,12 @@ terminal.write(session_id: str, data: bytes) -> None
 与 computer-use 一样，键名忽略大小写，字母表示 US 基础键位；修饰键分开传参，不把组合键写成单个字符串。`"a"` 与 `"A"` 都发送小写 a，大写须显式加 `shift`。输入字面文字（含 Unicode、大写和标点）使用 `send_text()`，不是 `send_key()`。
 
 ```python
-terminal.send_key(session_id, "ctrl", "c")
-terminal.send_key(session_id, "alt", "x")
-terminal.send_key(session_id, "shift", "a")  # A
-terminal.send_key(session_id, "shift", "1")  # !
-terminal.send_text(session_id, "你好，A!")
-terminal.input(session_id, [{"kind": "key", "keys": ["ctrl", "c"]}])
+session.send_key("ctrl", "c")
+session.send_key("alt", "x")
+session.send_key("shift", "a")  # A
+session.send_key("shift", "1")  # !
+session.send_text("你好，A!")
+session.input([{"kind": "key", "keys": ["ctrl", "c"]}])
 ```
 
 支持的基础键：
@@ -469,9 +479,9 @@ PTY 不保留按键按住状态；这里只发送一次组合键对应的字节�
 ## resize / wait / signal
 
 ```python
-terminal.resize(session_id: str, *, cols: int, rows: int) -> SessionInfo
-terminal.wait(session_id: str, *, timeout: float = 5.0) -> DrainOutcome
-terminal.signal(session_id: str, signal_name: str) -> None
+session.resize(*, cols: int, rows: int) -> SessionInfo
+session.wait(*, timeout: float = 5.0) -> DrainOutcome
+session.signal(signal_name: str) -> None
 ```
 
 - `resize` 更新 PTY 窗口和屏幕尺寸，返回更新后的 `SessionInfo`；全屏程序会收到窗口变化。
@@ -481,9 +491,10 @@ terminal.signal(session_id: str, signal_name: str) -> None
 ## close / close_all
 
 ```python
-terminal.close(session_id: str, *, grace_ms: int = 500) -> SessionInfo
+session.close(*, grace_ms: int = 500) -> SessionInfo
 terminal.close_all(*, grace_ms: int = 500) -> None
 ```
 
-- `close` 先发 `SIGTERM`，等待 `grace_ms` 毫秒后升级为 `SIGKILL`；`grace_ms` 最大按 30 秒处理。它随后尝试回收子进程并释放 PTY，但如果进程组或 reader 未能在最终等待窗口内结束，返回的 `SessionInfo.status` 仍可能是 `running`，而 id 之后不可再使用。需要保留最终屏幕时必须在 `close` 前调用 `read`。线程限制会在关闭前检查，因此跨线程失败不会销毁 session。
-- `close_all` 关闭 worker 的全部会话，逐个关闭；某个会话失败也继续，最后抛出第一个错误。解释器退出时 SDK 已自动调用，正常流程只需显式关闭正在使用的会话。
+- `close` 先发 `SIGTERM`，等待 `grace_ms` 毫秒后升级为 `SIGKILL`；`grace_ms` 最大按 30 秒处理。它随后尝试回收子进程并释放 PTY，但如果进程组或 reader 未能在最终等待窗口内结束，返回的 `SessionInfo.status` 仍可能是 `running`，而对象已关闭，不能继续终端操作。需要保留最终屏幕时必须在 `close` 前调用 `read`。线程限制会在关闭前检查，因此跨线程失败不会销毁 Session。
+- `close` 幂等：重复调用只返回当前元数据，不重复发送关闭 ownership 事件。关闭的会话从 `terminal.list()` 中移除；已保留的对象仍可用于检查元数据。
+- `close_all` 关闭 worker 的全部会话，逐个关闭，包括没有保留 Python 对象的会话；已有对象同步变为 closed。某个会话失败也继续，最后抛出第一个错误。解释器退出时 SDK 已自动调用，正常流程只需显式关闭正在使用的会话。

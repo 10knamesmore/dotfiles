@@ -15,6 +15,9 @@ ColumnLayout {
 
     signal seekRequested(real seconds)
 
+    Component.onCompleted: LyricsState.setViewVisible(root, root.active)
+    Component.onDestruction: LyricsState.setViewVisible(root, false)
+
     function scrollToCurrent(animated) {
         if (!active || !hasLyrics || !autoFollow)
             return ;
@@ -39,6 +42,7 @@ ColumnLayout {
 
     spacing: 4
     onActiveChanged: {
+        LyricsState.setViewVisible(root, active);
         if (active) {
             autoFollow = true;
             Qt.callLater(() => {

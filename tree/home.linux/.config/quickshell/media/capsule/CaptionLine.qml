@@ -9,6 +9,7 @@ Item {
 
     // AnimatedCaption 创建时传入的内容快照，换行退场期间不替换文字。
     required property var caption
+    required property bool active
     property color textColor: Colors.text
     readonly property bool wordTimed: caption.lyric && caption.words.length > 0
     readonly property var wordRanges: {
@@ -56,7 +57,7 @@ Item {
     TextScrollAnimation {
         id: autoScroll
         distance: root.overflowWidth
-        running: !root.wordTimed && distance > 0
+        running: root.active && !root.wordTimed && distance > 0
         // 字幕视口变化后按新距离重新计时；换行由 AnimatedCaption 创建新组件。
         onDistanceChanged: {
             if (running)

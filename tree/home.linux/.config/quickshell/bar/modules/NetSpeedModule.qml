@@ -10,7 +10,7 @@ import QtQuick
 BarModule {
     id: root
 
-    readonly property real rateWidth: Math.max(rateSize.width, download.rateTextWidth, upload.rateTextWidth)
+    readonly property real rateWidth: rateSize.width
     readonly property var stats: SystemStats.network
     readonly property real totalWidth: Math.max(totalSize.width, download.totalTextWidth, upload.totalTextWidth)
 
@@ -28,14 +28,14 @@ BarModule {
     Keys.onSpacePressed: PanelState.toggleResourcePanel("network", root)
     onClicked: PanelState.toggleResourcePanel("network", root)
 
-    // 按常用短值留少量余量，更长的数值才按实际文本扩宽。
+    // 速率列预留单位换档前的四位整数，数值更新不触发胶囊伸缩。
     TextMetrics {
         id: rateSize
 
         font.family: Fonts.family
         font.pixelSize: Fonts.small
         font.weight: Font.DemiBold
-        text: "9.9 KiB/s"
+        text: "1023.9 MiB/s"
     }
     TextMetrics {
         id: totalSize
@@ -65,7 +65,6 @@ BarModule {
 
         readonly property real compactWidth: arrow.implicitWidth + 5 + root.rateWidth
         required property bool downloading
-        readonly property real rateTextWidth: rate.implicitWidth
         readonly property real totalTextWidth: total.implicitWidth
 
         spacing: 0

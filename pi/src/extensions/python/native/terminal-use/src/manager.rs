@@ -4,18 +4,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use nix::sys::signal::Signal;
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use rustc_hash::FxHashMap;
 
 use crate::diagnostics;
 use crate::error::{TerminalError, TerminalResult};
-use crate::model::{
-    DrainOutcome, InputSpec, PixelSize, RawOutput, Rect, ScreenSnapshot, SessionInfo, Size,
-    WaitSpec,
-};
+use crate::model::{PixelSize, SessionInfo, Size};
 use crate::session::{ScreenGeometry, Session, pty_pixel_size};
 
 /// A worker-local registry of child PTY sessions.
@@ -40,7 +36,7 @@ impl Manager {
         rows: u16,
         cols: u16,
         cell_size: PixelSize,
-    ) -> TerminalResult<SessionInfo> {
+    ) -> TerminalResult<Arc<Session>> {
         if argv.is_empty() || argv[0].is_empty() {
             return Err(TerminalError::invalid(
                 "argv must contain a non-empty program",
@@ -133,130 +129,39 @@ impl Manager {
                 info.pid, cell_size.width, cell_size.height
             ),
         );
-        Ok(info)
+        Ok(session)
     }
 
-    pub(crate) fn list(&self) -> Vec<SessionInfo> {
+    pub(crate) fn list(&self) -> Vec<Arc<Session>> {
         let mut sessions: Vec<_> = self
             .sessions
             .lock()
             .expect("terminal session registry mutex poisoned")
-            .values()
-            .map(|session| session.info())
+            .iter()
+            .map(|(id, session)| (id.clone(), Arc::clone(session)))
             .collect();
-        sessions.sort_by(|left, right| left.id.cmp(&right.id));
-        sessions
+        sessions.sort_by(|left, right| left.0.cmp(&right.0));
+        sessions.into_iter().map(|(_, session)| session).collect()
     }
 
-    pub(crate) fn inspect(&self, session_id: &str) -> TerminalResult<SessionInfo> {
-        Ok(self.session(session_id)?.info())
-    }
-
-    pub(crate) fn read(
+    /// Return metadata once per registry removal so aliases cannot duplicate ownership events.
+    pub(crate) fn close(
         &self,
-        session_id: &str,
-        rect: Option<Rect>,
-        wait_for: &WaitSpec,
-        trim_trailing_spaces: bool,
-        include_cells: bool,
-        include_images: bool,
-    ) -> TerminalResult<ScreenSnapshot> {
-        self.session(session_id)?.read(
-            rect,
-            wait_for,
-            trim_trailing_spaces,
-            include_cells,
-            include_images,
-        )
-    }
-
-    /// Wait for a screen or raw pattern for up to `timeout` and report whether it matched.
-    pub(crate) fn wait_screen(
-        &self,
-        session_id: &str,
-        rect: Option<Rect>,
-        wait_for: &WaitSpec,
-        timeout: f64,
-        trim_trailing_spaces: bool,
-    ) -> TerminalResult<bool> {
-        if !timeout.is_finite() || timeout < 0.0 {
-            return Err(TerminalError::invalid(
-                "timeout must be a finite non-negative number",
-            ));
-        }
-        let deadline = Instant::now()
-            .checked_add(Duration::from_secs_f64(timeout))
-            .ok_or_else(|| TerminalError::invalid("timeout is too large"))?;
-        self.session(session_id)?.wait_screen(
-            rect,
-            wait_for,
-            deadline.saturating_duration_since(Instant::now()),
-            trim_trailing_spaces,
-        )
-    }
-
-    pub(crate) fn read_raw(
-        &self,
-        session_id: &str,
-        max_bytes: usize,
-        since: Option<u64>,
-    ) -> TerminalResult<RawOutput> {
-        Ok(self.session(session_id)?.read_raw(max_bytes, since))
-    }
-
-    pub(crate) fn wait(&self, session_id: &str, timeout: f64) -> TerminalResult<DrainOutcome> {
-        if !timeout.is_finite() || timeout < 0.0 {
-            return Err(TerminalError::invalid(
-                "timeout must be a finite non-negative number",
-            ));
-        }
-        Ok(self
-            .session(session_id)?
-            .wait(Duration::from_secs_f64(timeout)))
-    }
-
-    pub(crate) fn write(&self, session_id: &str, input: &InputSpec) -> TerminalResult<()> {
-        self.session(session_id)?.write(input)
-    }
-
-    pub(crate) fn write_many(&self, session_id: &str, inputs: &[InputSpec]) -> TerminalResult<()> {
-        self.session(session_id)?.write_many(inputs)
-    }
-
-    pub(crate) fn resize(
-        &self,
-        session_id: &str,
-        rows: u16,
-        cols: u16,
-    ) -> TerminalResult<SessionInfo> {
-        self.session(session_id)?.resize(rows, cols)
-    }
-
-    pub(crate) fn signal(&self, session_id: &str, signal_name: &str) -> TerminalResult<()> {
-        let signal = parse_signal(signal_name)?;
-        self.session(session_id)?.signal(signal)
-    }
-
-    pub(crate) fn close(&self, session_id: &str, grace_ms: u64) -> TerminalResult<SessionInfo> {
-        let session = self.session(session_id)?;
+        session: &Session,
+        grace_ms: u64,
+    ) -> TerminalResult<Option<SessionInfo>> {
         let info = session.close(Duration::from_millis(grace_ms.min(30_000)))?;
-        diagnostics::event(session_id, "closed");
-        self.sessions
+        let removed = self
+            .sessions
             .lock()
             .map_err(|_| TerminalError::runtime("terminal session registry mutex poisoned"))?
-            .remove(session_id);
-        Ok(info)
-    }
-
-    fn session(&self, session_id: &str) -> TerminalResult<Arc<Session>> {
-        self.sessions
-            .lock()
-            .map_err(|_| TerminalError::runtime("terminal session registry mutex poisoned"))?
-            .get(session_id)
-            .cloned()
-            .ok_or_else(|| {
-                TerminalError::runtime(format!("unknown terminal session: {session_id}"))
-            })
+            .remove(&info.id);
+        if removed.is_some() {
+            diagnostics::event(&info.id, "closed");
+            Ok(Some(info))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -264,22 +169,4 @@ impl Manager {
 pub(crate) fn global_manager() -> &'static Manager {
     static MANAGER: OnceLock<Manager> = OnceLock::new();
     MANAGER.get_or_init(Manager::new)
-}
-
-fn parse_signal(name: &str) -> TerminalResult<Signal> {
-    match name
-        .trim()
-        .trim_start_matches("SIG")
-        .to_ascii_uppercase()
-        .as_str()
-    {
-        "HUP" => Ok(Signal::SIGHUP),
-        "INT" => Ok(Signal::SIGINT),
-        "TERM" => Ok(Signal::SIGTERM),
-        "KILL" => Ok(Signal::SIGKILL),
-        "QUIT" => Ok(Signal::SIGQUIT),
-        other => Err(TerminalError::invalid(format!(
-            "unsupported Unix signal: {other}"
-        ))),
-    }
 }

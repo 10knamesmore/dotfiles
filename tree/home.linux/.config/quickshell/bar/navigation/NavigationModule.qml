@@ -1,12 +1,11 @@
 import "../../theme"
-import "../../components"
 import "../components"
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 
 // 每屏一条连续信息带，宽度由工作区、窗口块与标题共同决定。
-// 长标题平时往返滚动，hover 在左侧可用空间内展开；点击标题复制当前窗口 PID。
+// 长标题默认省略，hover 在左侧可用空间内展开；点击标题复制当前窗口 PID。
 Rectangle {
     id: root
 
@@ -46,11 +45,6 @@ Rectangle {
             root.copied = false;
             root.copyFailed = false;
             copiedTimer.stop();
-            // 同一窗口的 spinner、进度等标题刷新不重置滚动；切换窗口才从头开始。
-            Qt.callLater(() => {
-                if (titleScroll.running)
-                    titleScroll.restart();
-            });
         }
     }
 
@@ -114,12 +108,6 @@ Rectangle {
                 : "复制窗口 PID"
             Accessible.onPressAction: root.copyWindowPid()
 
-            TextScrollAnimation {
-                id: titleScroll
-                // 展开时继续走原来的滚动进度；只有实际显示偏移受当前视口限制。
-                distance: Math.max(0, titleText.implicitWidth - Math.min(titleButton.compactTextWidth, titleViewport.width))
-            }
-
             Item {
                 id: titleViewport
                 anchors.fill: parent
@@ -130,10 +118,10 @@ Rectangle {
                 Text {
                     id: titleText
                     anchors.verticalCenter: parent.verticalCenter
-                    x: -Math.min(titleScroll.offset, Math.max(0, implicitWidth - titleViewport.width))
+                    width: titleViewport.width
                     text: windowContext.activeWindow ? windowContext.activeWindow.title : "桌面"
                     textFormat: Text.PlainText
-                    elide: Text.ElideNone
+                    elide: Text.ElideRight
                     font.family: Fonts.family
                     font.pixelSize: Fonts.body
                     font.weight: Font.Medium

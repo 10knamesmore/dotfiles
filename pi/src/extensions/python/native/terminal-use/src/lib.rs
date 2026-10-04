@@ -12,10 +12,11 @@ mod palette;
 mod session;
 
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::ThreadId;
 use std::time::{Duration, Instant};
 
+use nix::sys::signal::Signal;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyDict, PyList, PyModule, PySequence, PyString};
@@ -28,7 +29,8 @@ use crate::input::{
     parse_rect, parse_wait,
 };
 use crate::manager::global_manager;
-use crate::model::{InputSpec, ScreenSnapshot};
+use crate::model::{InputSpec, ScreenSnapshot, SessionInfo};
+use crate::session::Session;
 
 const DEFAULT_WORKER_CONTROL_FDS: [i32; 2] = [3, 4];
 
@@ -39,22 +41,11 @@ static LIFECYCLE_THREAD: OnceLock<Mutex<Option<ThreadId>>> = OnceLock::new();
 #[pymodule]
 fn terminal_use(module: &Bound<'_, PyModule>) -> PyResult<()> {
     mark_worker_control_fds_cloexec(&DEFAULT_WORKER_CONTROL_FDS);
+    module.add_class::<PySession>()?;
     module.add_class::<PyRect>()?;
     module.add_class::<crate::images::PyTerminalImage>()?;
     module.add_function(wrap_pyfunction!(start, module)?)?;
     module.add_function(wrap_pyfunction!(list, module)?)?;
-    module.add_function(wrap_pyfunction!(inspect, module)?)?;
-    module.add_function(wrap_pyfunction!(read, module)?)?;
-    module.add_function(wrap_pyfunction!(read_raw, module)?)?;
-    module.add_function(wrap_pyfunction!(wait, module)?)?;
-    module.add_function(wrap_pyfunction!(send_events, module)?)?;
-    module.add_function(wrap_pyfunction!(send_text, module)?)?;
-    module.add_function(wrap_pyfunction!(send_key, module)?)?;
-    module.add_function(wrap_pyfunction!(paste, module)?)?;
-    module.add_function(wrap_pyfunction!(write, module)?)?;
-    module.add_function(wrap_pyfunction!(resize, module)?)?;
-    module.add_function(wrap_pyfunction!(signal, module)?)?;
-    module.add_function(wrap_pyfunction!(close, module)?)?;
     module.add_function(wrap_pyfunction!(close_all, module)?)?;
     module.add_function(wrap_pyfunction!(_set_lifecycle_hook, module)?)?;
     module.add_function(wrap_pyfunction!(_set_worker_control_fds, module)?)?;
@@ -95,7 +86,7 @@ fn _set_worker_control_fds(fds: Option<Bound<'_, PyAny>>) -> PyResult<()> {
     Ok(())
 }
 
-/// Start a program attached to a new Unix PTY.
+/// Start a program attached to a new Unix PTY and return its Session handle.
 #[pyfunction]
 #[pyo3(signature = (argv, *, cwd = None, env = None, cols = 80, rows = 24, cell_size = None))]
 fn start(
@@ -106,249 +97,310 @@ fn start(
     cols: u16,
     rows: u16,
     cell_size: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
+) -> PyResult<PySession> {
     ensure_lifecycle_thread()?;
     let cell_size = parse_cell_size(cell_size.as_ref())?;
-    let info = global_manager()
+    let inner = global_manager()
         .start(argv, cwd, env, rows, cols, cell_size)
         .map_err(terminal_error)?;
+    let info = inner.info();
     if let Err(error) = emit_ownership(py, "opened", &info.id, info.pid) {
-        let _ = global_manager().close(&info.id, 500);
+        let _ = global_manager().close(&inner, 500);
         return Err(error);
     }
-    to_python(py, &info)
+    Ok(PySession { inner })
 }
 
-/// List live and recently exited PTY sessions owned by this worker.
+/// Return handles to this worker's running and exited sessions that have not been closed.
 #[pyfunction]
-fn list(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    to_python(py, &global_manager().list())
+fn list() -> Vec<PySession> {
+    global_manager()
+        .list()
+        .into_iter()
+        .map(|inner| PySession { inner })
+        .collect()
 }
 
-/// Inspect one PTY session without consuming output.
-#[pyfunction]
-fn inspect(py: Python<'_>, session_id: String) -> PyResult<Py<PyAny>> {
-    let info = global_manager()
-        .inspect(&session_id)
-        .map_err(terminal_error)?;
-    to_python(py, &info)
+/// A handle to one worker-owned PTY, created by start() or recovered through list().
+/// Handles share process state; dropping a handle does not close the worker's session.
+#[pyclass(name = "Session", frozen, module = "terminal_use")]
+struct PySession {
+    /// The same native session is shared by all Python handles and the worker registry.
+    inner: Arc<Session>,
 }
 
-/// Read a screen snapshot, optionally waiting for a screen or raw-output pattern.
-#[allow(clippy::too_many_arguments)] // Keep Python keyword options explicit and discoverable.
-#[pyfunction]
-#[pyo3(signature = (session_id, *, rect = None, wait_for = None, timeout = 0.0, trim_trailing_spaces = true, cells = false, images = false))]
-fn read(
-    py: Python<'_>,
-    session_id: String,
-    rect: Option<Bound<'_, PyAny>>,
-    wait_for: Option<Bound<'_, PyAny>>,
-    timeout: f64,
-    trim_trailing_spaces: bool,
-    cells: bool,
-    images: bool,
-) -> PyResult<Py<PyAny>> {
-    let rect = parse_rect(rect.as_ref())?;
-    let wait_for = parse_wait(wait_for.as_ref())?;
-    if !timeout.is_finite() || timeout < 0.0 {
-        return Err(value_error("timeout must be a finite non-negative number"));
+impl PySession {
+    fn ensure_open(&self) -> PyResult<()> {
+        if self.inner.info().closed {
+            return Err(runtime_error("terminal session is closed"));
+        }
+        Ok(())
     }
-    if wait_for.is_empty() && timeout != 0.0 {
-        return Err(value_error("timeout is only used with wait_for"));
+
+    fn write_input(&self, input: InputSpec) -> PyResult<()> {
+        self.ensure_open()?;
+        self.inner.write(&input).map_err(terminal_error)
     }
-    if !wait_for.is_empty() && timeout == 0.0 {
-        return Err(value_error(
-            "wait_for requires a finite timeout greater than 0",
-        ));
+
+    fn write_inputs(&self, inputs: &[InputSpec]) -> PyResult<()> {
+        self.ensure_open()?;
+        self.inner.write_many(inputs).map_err(terminal_error)
     }
-    let deadline = Instant::now()
-        .checked_add(Duration::from_secs_f64(timeout))
-        .ok_or_else(|| value_error("timeout is too large"))?;
-    loop {
-        if !wait_for.is_empty() {
-            loop {
-                let remaining = deadline.saturating_duration_since(Instant::now());
-                if remaining.is_zero() {
-                    break;
+
+    fn close_session(&self, py: Python<'_>, grace_ms: u64) -> PyResult<SessionInfo> {
+        ensure_lifecycle_thread()?;
+        if let Some(info) = global_manager()
+            .close(&self.inner, grace_ms)
+            .map_err(terminal_error)?
+        {
+            emit_ownership(py, "closed", &info.id, info.pid)?;
+            Ok(info)
+        } else {
+            Ok(self.inner.info())
+        }
+    }
+}
+
+#[pymethods]
+impl PySession {
+    /// Worker-local diagnostic ID, also included in snapshots and ownership events.
+    #[getter]
+    fn id(&self) -> String {
+        self.inner.info().id
+    }
+
+    /// PID of the program attached to this PTY, retained after it exits.
+    #[getter]
+    fn pid(&self) -> u32 {
+        self.inner.info().pid
+    }
+
+    /// Whether close() has begun releasing the PTY; process exit alone does not close it.
+    #[getter]
+    fn closed(&self) -> bool {
+        self.inner.info().closed
+    }
+
+    /// Inspect current process and terminal metadata, including after close().
+    fn inspect(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        to_python(py, &self.inner.info())
+    }
+
+    /// Read a screen snapshot, optionally waiting for a screen or raw-output pattern.
+    #[allow(clippy::too_many_arguments)] // Keep Python keyword options explicit and discoverable.
+    #[pyo3(signature = (*, rect = None, wait_for = None, timeout = 0.0, trim_trailing_spaces = true, cells = false, images = false))]
+    fn read(
+        &self,
+        py: Python<'_>,
+        rect: Option<Bound<'_, PyAny>>,
+        wait_for: Option<Bound<'_, PyAny>>,
+        timeout: f64,
+        trim_trailing_spaces: bool,
+        cells: bool,
+        images: bool,
+    ) -> PyResult<Py<PyAny>> {
+        self.ensure_open()?;
+        let rect = parse_rect(rect.as_ref())?;
+        let wait_for = parse_wait(wait_for.as_ref())?;
+        if !timeout.is_finite() || timeout < 0.0 {
+            return Err(value_error("timeout must be a finite non-negative number"));
+        }
+        if wait_for.is_empty() && timeout != 0.0 {
+            return Err(value_error("timeout is only used with wait_for"));
+        }
+        if !wait_for.is_empty() && timeout == 0.0 {
+            return Err(value_error(
+                "wait_for requires a finite timeout greater than 0",
+            ));
+        }
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs_f64(timeout))
+            .ok_or_else(|| value_error("timeout is too large"))?;
+        loop {
+            if !wait_for.is_empty() {
+                loop {
+                    self.ensure_open()?;
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    if remaining.is_zero() {
+                        break;
+                    }
+                    let matched = py.detach(|| {
+                        self.inner.wait_screen(
+                            rect,
+                            &wait_for,
+                            remaining.min(Duration::from_millis(50)),
+                            trim_trailing_spaces,
+                        )
+                    });
+                    if matched.map_err(terminal_error)? {
+                        break;
+                    }
+                    py.check_signals()?;
                 }
-                let matched = py.detach(|| {
-                    global_manager().wait_screen(
-                        &session_id,
-                        rect,
-                        &wait_for,
-                        remaining.min(Duration::from_millis(50)).as_secs_f64(),
-                        trim_trailing_spaces,
-                    )
-                });
-                if matched.map_err(terminal_error)? {
-                    break;
-                }
-                py.check_signals()?;
             }
-        }
-        let mut snapshot = py
-            .detach(|| {
-                global_manager().read(
-                    &session_id,
-                    rect,
-                    &wait_for,
-                    trim_trailing_spaces,
-                    cells,
-                    images,
-                )
-            })
-            .map_err(terminal_error)?;
-        if wait_for.is_empty() || snapshot.wait.matched || Instant::now() >= deadline {
-            return snapshot_to_python(py, &mut snapshot, images);
-        }
-        // A redraw can remove the match between the wait and the snapshot request.
-        py.check_signals()?;
-    }
-}
-
-/// Read retained bytes from the bounded raw-output ring without changing the screen snapshot.
-#[pyfunction]
-#[pyo3(signature = (session_id, *, max_bytes = 65536, since = None))]
-fn read_raw(
-    py: Python<'_>,
-    session_id: String,
-    max_bytes: usize,
-    since: Option<u64>,
-) -> PyResult<Py<PyAny>> {
-    if max_bytes == 0 {
-        return Err(value_error("max_bytes must be greater than 0"));
-    }
-    let output = py
-        .detach(|| global_manager().read_raw(&session_id, max_bytes, since))
-        .map_err(terminal_error)?;
-    to_python(py, &output)
-}
-
-/// Wait for the child process and its PTY reader to finish.
-#[pyfunction]
-#[pyo3(signature = (session_id, *, timeout = 5.0))]
-fn wait(py: Python<'_>, session_id: String, timeout: f64) -> PyResult<Py<PyAny>> {
-    if !timeout.is_finite() || timeout < 0.0 {
-        return Err(value_error("timeout must be a finite non-negative number"));
-    }
-    let deadline = Instant::now()
-        .checked_add(Duration::from_secs_f64(timeout))
-        .ok_or_else(|| value_error("timeout is too large"))?;
-    loop {
-        let remaining = deadline
-            .checked_duration_since(Instant::now())
-            .unwrap_or_default();
-        let status = py.detach(|| {
-            global_manager().wait(
-                &session_id,
-                remaining.min(Duration::from_millis(50)).as_secs_f64(),
-            )
-        });
-        let status = status.map_err(terminal_error)?;
-        if (status.exited && status.drained) || remaining.is_zero() {
-            return to_python(py, &status);
-        }
-        py.check_signals()?;
-    }
-}
-
-/// Validate and write a sequence of encoded input events.
-#[pyfunction(name = "input")]
-#[pyo3(signature = (session_id, events, *, delay = 0.0))]
-fn send_events(
-    py: Python<'_>,
-    session_id: String,
-    events: Bound<'_, PyAny>,
-    delay: f64,
-) -> PyResult<()> {
-    let encoded_events = encode_events(&events)?;
-    let delay = input_delay(delay)?;
-
-    if delay.is_zero() {
-        return write_inputs(&session_id, &encoded_events);
-    }
-
-    for (index, input) in encoded_events.iter().enumerate() {
-        write_inputs(&session_id, std::slice::from_ref(input))?;
-        if index + 1 < encoded_events.len() {
-            py.detach(|| std::thread::sleep(delay));
+            self.ensure_open()?;
+            let mut snapshot = py
+                .detach(|| {
+                    self.inner
+                        .read(rect, &wait_for, trim_trailing_spaces, cells, images)
+                })
+                .map_err(terminal_error)?;
+            if wait_for.is_empty() || snapshot.wait.matched || Instant::now() >= deadline {
+                return snapshot_to_python(py, &mut snapshot, images);
+            }
+            // A redraw can remove the match between the wait and the snapshot request.
             py.check_signals()?;
         }
     }
-    Ok(())
+
+    /// Read retained bytes from the bounded raw-output ring without changing the screen snapshot.
+    #[pyo3(signature = (*, max_bytes = 65536, since = None))]
+    fn read_raw(
+        &self,
+        py: Python<'_>,
+        max_bytes: usize,
+        since: Option<u64>,
+    ) -> PyResult<Py<PyAny>> {
+        self.ensure_open()?;
+        if max_bytes == 0 {
+            return Err(value_error("max_bytes must be greater than 0"));
+        }
+        let output = py.detach(|| self.inner.read_raw(max_bytes, since));
+        to_python(py, &output)
+    }
+
+    /// Wait for the child process and its PTY reader to finish; timeout does not kill the child.
+    #[pyo3(signature = (*, timeout = 5.0))]
+    fn wait(&self, py: Python<'_>, timeout: f64) -> PyResult<Py<PyAny>> {
+        self.ensure_open()?;
+        if !timeout.is_finite() || timeout < 0.0 {
+            return Err(value_error("timeout must be a finite non-negative number"));
+        }
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs_f64(timeout))
+            .ok_or_else(|| value_error("timeout is too large"))?;
+        loop {
+            self.ensure_open()?;
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .unwrap_or_default();
+            let status = py.detach(|| self.inner.wait(remaining.min(Duration::from_millis(50))));
+            if (status.exited && status.drained) || remaining.is_zero() {
+                return to_python(py, &status);
+            }
+            py.check_signals()?;
+        }
+    }
+
+    /// Validate all input events before writing; delay is milliseconds between events.
+    #[pyo3(name = "input", signature = (events, *, delay = 0.0))]
+    fn send_events(&self, py: Python<'_>, events: Bound<'_, PyAny>, delay: f64) -> PyResult<()> {
+        self.ensure_open()?;
+        let encoded_events = encode_events(&events)?;
+        let delay = input_delay(delay)?;
+
+        if delay.is_zero() {
+            return self.write_inputs(&encoded_events);
+        }
+
+        for (index, input) in encoded_events.iter().enumerate() {
+            self.write_inputs(std::slice::from_ref(input))?;
+            if index + 1 < encoded_events.len() {
+                py.detach(|| std::thread::sleep(delay));
+                py.check_signals()?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Write literal UTF-8 text without appending a newline.
+    fn send_text(&self, text: String) -> PyResult<()> {
+        self.write_input(encode_text(&text))
+    }
+
+    /// Write one chord with separate modifier names and one US base key; no keys remain held.
+    #[pyo3(signature = (*keys))]
+    fn send_key(&self, keys: Vec<String>) -> PyResult<()> {
+        self.write_input(encode_key_input(&keys)?)
+    }
+
+    /// Write text wrapped in bracketed-paste markers.
+    fn paste(&self, text: String) -> PyResult<()> {
+        self.write_input(encode_paste(&text))
+    }
+
+    /// Write bytes to the PTY master; child termios and the kernel line discipline still apply.
+    fn write(&self, data: Vec<u8>) -> PyResult<()> {
+        self.write_input(InputSpec::Bytes(data))
+    }
+
+    /// Change the PTY and screen dimensions, returning updated metadata.
+    #[pyo3(signature = (*, cols, rows))]
+    fn resize(&self, py: Python<'_>, cols: u16, rows: u16) -> PyResult<Py<PyAny>> {
+        self.ensure_open()?;
+        let info = self.inner.resize(rows, cols).map_err(terminal_error)?;
+        to_python(py, &info)
+    }
+
+    /// Send a Unix signal to the PTY's process group.
+    fn signal(&self, signal_name: String) -> PyResult<()> {
+        self.ensure_open()?;
+        let signal = match signal_name
+            .trim()
+            .trim_start_matches("SIG")
+            .to_ascii_uppercase()
+            .as_str()
+        {
+            "HUP" => Signal::SIGHUP,
+            "INT" => Signal::SIGINT,
+            "TERM" => Signal::SIGTERM,
+            "KILL" => Signal::SIGKILL,
+            "QUIT" => Signal::SIGQUIT,
+            other => return Err(value_error(format!("unsupported Unix signal: {other}"))),
+        };
+        self.inner.signal(signal).map_err(terminal_error)
+    }
+
+    /// Close and reap the PTY; repeated calls return metadata without another ownership event.
+    #[pyo3(signature = (*, grace_ms = 500))]
+    fn close(&self, py: Python<'_>, grace_ms: u64) -> PyResult<Py<PyAny>> {
+        let info = self.close_session(py, grace_ms)?;
+        to_python(py, &info)
+    }
+
+    fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
+        slf.ensure_open()?;
+        Ok(slf)
+    }
+
+    fn __exit__(
+        &self,
+        py: Python<'_>,
+        _exc_type: &Bound<'_, PyAny>,
+        _exc_value: &Bound<'_, PyAny>,
+        _traceback: &Bound<'_, PyAny>,
+    ) -> PyResult<bool> {
+        self.close_session(py, 500)?;
+        Ok(false)
+    }
+
+    fn __repr__(&self) -> String {
+        let info = self.inner.info();
+        format!(
+            "Session(id={:?}, pid={}, closed={})",
+            info.id, info.pid, info.closed
+        )
+    }
 }
 
-/// Write literal UTF-8 text without appending a newline.
-#[pyfunction]
-fn send_text(session_id: String, text: String) -> PyResult<()> {
-    write_input(&session_id, encode_text(&text))
-}
-
-/// Write one chord with separate modifier names and one US base key; no keys remain held.
-#[pyfunction]
-#[pyo3(signature = (session_id, *keys))]
-fn send_key(session_id: String, keys: Vec<String>) -> PyResult<()> {
-    write_input(&session_id, encode_key_input(&keys)?)
-}
-
-/// Write text wrapped in bracketed-paste markers.
-#[pyfunction]
-fn paste(session_id: String, text: String) -> PyResult<()> {
-    write_input(&session_id, encode_paste(&text))
-}
-
-/// Write bytes to the PTY master; child termios and the kernel line discipline may translate, echo, buffer, or interpret them as signals.
-#[pyfunction]
-fn write(session_id: String, data: Vec<u8>) -> PyResult<()> {
-    write_input(&session_id, InputSpec::Bytes(data))
-}
-
-/// Change the PTY and screen dimensions.
-#[pyfunction]
-#[pyo3(signature = (session_id, *, cols, rows))]
-fn resize(py: Python<'_>, session_id: String, cols: u16, rows: u16) -> PyResult<Py<PyAny>> {
-    let info = global_manager()
-        .resize(&session_id, rows, cols)
-        .map_err(terminal_error)?;
-    to_python(py, &info)
-}
-
-/// Send a Unix signal to the PTY's process group.
-#[pyfunction]
-fn signal(session_id: String, signal_name: String) -> PyResult<()> {
-    global_manager()
-        .signal(&session_id, &signal_name)
-        .map_err(terminal_error)
-}
-
-/// Close one PTY session and reap its child process.
-#[pyfunction]
-#[pyo3(signature = (session_id, *, grace_ms = 500))]
-fn close(py: Python<'_>, session_id: String, grace_ms: u64) -> PyResult<Py<PyAny>> {
-    ensure_lifecycle_thread()?;
-    let info = global_manager()
-        .close(&session_id, grace_ms)
-        .map_err(terminal_error)?;
-    emit_ownership(py, "closed", &info.id, info.pid)?;
-    to_python(py, &info)
-}
-
-/// Close every PTY session owned by this worker.
+/// Close every PTY session owned by this worker, including sessions with no saved Python handle.
 #[pyfunction]
 #[pyo3(signature = (*, grace_ms = 500))]
 fn close_all(py: Python<'_>, grace_ms: u64) -> PyResult<()> {
     ensure_lifecycle_thread()?;
-    let sessions = global_manager().list();
     let mut first_error = None;
-    for session in sessions {
-        let result = global_manager()
-            .close(&session.id, grace_ms)
-            .map_err(terminal_error)
-            .and_then(|info| {
-                emit_ownership(py, "closed", &info.id, info.pid)?;
-                Ok(info)
-            });
-        if let Err(error) = result
+    for session in list() {
+        if let Err(error) = session.close_session(py, grace_ms)
             && first_error.is_none()
         {
             first_error = Some(error);
@@ -377,18 +429,6 @@ fn input_delay(delay_ms: f64) -> PyResult<Duration> {
         ));
     }
     Duration::try_from_secs_f64(delay_ms / 1000.0).map_err(|_| value_error("delay is too large"))
-}
-
-fn write_input(session_id: &str, input: InputSpec) -> PyResult<()> {
-    global_manager()
-        .write(session_id, &input)
-        .map_err(terminal_error)
-}
-
-fn write_inputs(session_id: &str, inputs: &[InputSpec]) -> PyResult<()> {
-    global_manager()
-        .write_many(session_id, inputs)
-        .map_err(terminal_error)
 }
 
 fn emit_ownership(py: Python<'_>, action: &str, session_id: &str, pid: u32) -> PyResult<()> {

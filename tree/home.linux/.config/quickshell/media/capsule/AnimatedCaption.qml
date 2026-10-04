@@ -10,6 +10,7 @@ StackView {
 
     // key 区分曲目、标题和歌词行；重复歌词也能按行号触发动画。
     required property var caption
+    required property bool active
     property color textColor: Colors.text
 
     implicitHeight: 28
@@ -19,7 +20,7 @@ StackView {
     hoverEnabled: false
 
     function updateCaption() {
-        if (busy)
+        if (!active || busy)
             return;
         const line = currentItem as CaptionLine;
         if (empty) {
@@ -36,6 +37,8 @@ StackView {
     }
 
     onCaptionChanged: Qt.callLater(updateCaption)
+    onActiveChanged: if (active)
+        Qt.callLater(updateCaption)
     onBusyChanged: if (!busy)
         Qt.callLater(updateCaption)
     Component.onCompleted: updateCaption()
@@ -43,6 +46,7 @@ StackView {
     Component {
         id: lineComponent
         CaptionLine {
+            active: root.active
             textColor: root.textColor
         }
     }

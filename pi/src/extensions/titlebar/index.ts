@@ -3,7 +3,7 @@ import type { EditorActivity } from "../editor/api.js";
 import { SESSION_ACTIVITY_CHANGED } from "../footer/activity.js";
 import { baseTitle, busyTitle, type TitleContext } from "./title.js";
 
-const FRAME_INTERVAL_MS = 80;
+const FRAME_INTERVAL_MS = Math.round(1000 / 6);
 
 /** Show the editor's activity in the terminal title, restoring Pi's title when ready. */
 export function registerTitlebar(pi: ExtensionAPI): void {

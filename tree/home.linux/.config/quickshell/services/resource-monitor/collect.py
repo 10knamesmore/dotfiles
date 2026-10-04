@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Stream one open resource panel's Linux metrics as JSON lines every 100 ms."""
+"""Stream one open resource panel's Linux metrics as JSON lines every 100 ms.
+
+CPU, memory and network totals are refreshed every tick. Process leaderboards scan
+/proc every 500 ms; CPU frequency and temperature refresh every second. These slower
+fields retain their previous values between refreshes.
+"""
 
 import argparse
 import errno
@@ -13,6 +18,8 @@ import struct
 import time
 
 INTERVAL = 0.1
+PROCESS_INTERVAL = 0.5
+HARDWARE_INTERVAL = 1.0
 PAGE_BYTES = os.sysconf("SC_PAGE_SIZE")
 LOG = logging.getLogger("resource-monitor")
 
@@ -77,42 +84,80 @@ def cpu_temperature_paths():
 
 
 class CpuSampler:
-    """Measure interval CPU usage, with every process normalized to whole-machine 100%."""
+    """Measure CPU usage every tick, rescaling the process leaderboard every PROCESS_INTERVAL.
+
+    A process is normalized to whole-machine 100% using the machine total jiffies elapsed
+    between the two process scans that produced its jiffy delta, so the leaderboard keeps
+    its scale at the slower refresh cadence. Frequency and temperature refresh once a second.
+    """
 
     def __init__(self):
-        self.previous_cpu = read_cpu_times()
-        self.previous_processes = read_processes()
+        cpu = read_cpu_times()
+        self.previous_cpu = cpu
+        # Endpoint of the current process window; each refresh advances it with the scan.
+        self.process_cpu_total = cpu[0]
+        self.processes = read_processes()
+        self.process_time = None
+        self.ranking = []
         self.frequency_paths = list(Path("/sys/devices/system/cpu/cpufreq").glob("policy*/scaling_cur_freq"))
         self.temperature_paths = cpu_temperature_paths()
+        self.frequency = None
+        self.temperature = None
+        self.hardware_time = None
 
-    def sample(self):
-        current = read_cpu_times()
+    def refresh_processes(self, cpu_total):
+        """Rank processes by jiffies spent since the previous scan, normalized to 100% whole machine."""
         processes = read_processes()
-        elapsed = current[0] - self.previous_cpu[0]
+        elapsed = cpu_total - self.process_cpu_total
         ranked = []
         for pid, process in processes.items():
-            previous = self.previous_processes.get(pid)
+            previous = self.processes.get(pid)
             if previous is None or previous["started"] != process["started"]:
                 continue
             usage = 100 * (process["ticks"] - previous["ticks"]) / elapsed if elapsed else 0
             ranked.append({"pid": pid, "name": process["name"], "usage": usage})
+        self.processes = processes
+        self.process_cpu_total = cpu_total
+        self.ranking = sorted(ranked, key=lambda process: process["usage"], reverse=True)[:8]
+
+    def refresh_hardware(self):
         frequencies = [value / 1_000_000 for path in self.frequency_paths if (value := optional_number(path)) is not None]
         temperatures = [value / 1000 for path in self.temperature_paths if (value := optional_number(path)) is not None]
+        self.frequency = sum(frequencies) / len(frequencies) if frequencies else None
+        self.temperature = max(temperatures) if temperatures else None
+
+    def sample(self):
+        now = time.monotonic()
+        current = read_cpu_times()
+        if self.process_time is None or now - self.process_time >= PROCESS_INTERVAL:
+            self.refresh_processes(current[0])
+            self.process_time = now
+        if self.hardware_time is None or now - self.hardware_time >= HARDWARE_INTERVAL:
+            self.refresh_hardware()
+            self.hardware_time = now
         snapshot = {
             "usage": cpu_usage(current, self.previous_cpu),
-            "frequencyGHz": sum(frequencies) / len(frequencies) if frequencies else None,
-            "temperatureC": max(temperatures) if temperatures else None,
-            "processes": sorted(ranked, key=lambda process: process["usage"], reverse=True)[:8],
+            "frequencyGHz": self.frequency,
+            "temperatureC": self.temperature,
+            "processes": self.ranking,
         }
         self.previous_cpu = current
-        self.previous_processes = processes
         return snapshot
 
 
 class MemorySampler:
-    """Report available-based RAM usage, swap bytes, PSI some avg10 and top process RSS."""
+    """Report available-based RAM usage, swap bytes, PSI some avg10 and top process RSS.
+
+    RAM and PSI fields refresh every tick; the RSS leaderboard is rescanned every
+    PROCESS_INTERVAL and repeats its previous value in between.
+    """
+
+    def __init__(self):
+        self.process_time = None
+        self.processes = []
 
     def sample(self):
+        now = time.monotonic()
         with open("/proc/meminfo") as source:
             values = {fields[0].rstrip(":"): int(fields[1]) * 1024 for line in source if (fields := line.split())}
         pressure = None
@@ -123,7 +168,10 @@ class MemorySampler:
                         pressure = float(dict(field.split("=") for field in line.split()[1:])["avg10"])
         except FileNotFoundError:
             pass
-        largest = sorted(read_processes().values(), key=lambda process: process["rssBytes"], reverse=True)[:8]
+        if self.process_time is None or now - self.process_time >= PROCESS_INTERVAL:
+            largest = sorted(read_processes().values(), key=lambda process: process["rssBytes"], reverse=True)[:8]
+            self.processes = [{key: process[key] for key in ("pid", "name", "rssBytes")} for process in largest]
+            self.process_time = now
         return {
             "totalBytes": values["MemTotal"],
             "usedBytes": values["MemTotal"] - values["MemAvailable"],
@@ -137,7 +185,7 @@ class MemorySampler:
             "swapTotalBytes": values["SwapTotal"],
             "swapUsedBytes": values["SwapTotal"] - values["SwapFree"],
             "pressureSome10": pressure,
-            "processes": [{key: process[key] for key in ("pid", "name", "rssBytes")} for process in largest],
+            "processes": self.processes,
         }
 
 

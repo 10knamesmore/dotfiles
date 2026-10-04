@@ -29,6 +29,12 @@ BarModule {
     Keys.onSpacePressed: PanelState.toggleResourcePanel("cpu", root)
     onClicked: PanelState.toggleResourcePanel("cpu", root)
 
+    TextMetrics {
+        id: usageSize
+        font: usageText.font
+        text: "100%"
+    }
+
     Row {
         id: summary
 
@@ -45,6 +51,9 @@ BarModule {
             text: ""
         }
         Text {
+            id: usageText
+            width: usageSize.width
+            horizontalAlignment: Text.AlignRight
             anchors.verticalCenter: parent.verticalCenter
             color: root.usage > 80 ? Colors.red : root.usage > 50 ? Colors.yellow : Colors.text
             font.family: Fonts.family

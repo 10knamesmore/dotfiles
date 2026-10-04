@@ -18,12 +18,23 @@ BarModule {
     Accessible.role: Accessible.Button
     accentColor: Colors.mauve
     activeFocusOnTab: true
-    implicitWidth: summary.implicitWidth + horizontalPadding * 2 + (hovered ? memoryDetails.implicitWidth + 5 : 0)
+    implicitWidth: summary.implicitWidth + horizontalPadding * 2 + (hovered ? detailsSize.width + 5 : 0)
 
     Accessible.onPressAction: PanelState.toggleResourcePanel("memory", root)
     Keys.onReturnPressed: PanelState.toggleResourcePanel("memory", root)
     Keys.onSpacePressed: PanelState.toggleResourcePanel("memory", root)
     onClicked: PanelState.toggleResourcePanel("memory", root)
+
+    TextMetrics {
+        id: usageSize
+        font: usageText.font
+        text: "100%"
+    }
+    TextMetrics {
+        id: detailsSize
+        font: memoryDetails.font
+        text: StatsFormat.gib(root.stats.totalBytes) + " / " + StatsFormat.gib(root.stats.totalBytes) + " GiB"
+    }
 
     Row {
         id: summary
@@ -44,6 +55,8 @@ BarModule {
         }
         Text {
             id: usageText
+            width: usageSize.width
+            horizontalAlignment: Text.AlignRight
 
             anchors.verticalCenter: parent.verticalCenter
             color: root.usage > 85 ? Colors.red : root.usage > 60 ? Colors.yellow : Colors.text
@@ -72,6 +85,6 @@ BarModule {
         opacity: root.detailProgress
         text: StatsFormat.gib(root.stats.usedBytes) + " / " + StatsFormat.gib(root.stats.totalBytes) + " GiB"
         visible: root.detailProgress > 0
-        width: implicitWidth * root.detailProgress
+        width: detailsSize.width * root.detailProgress
     }
 }

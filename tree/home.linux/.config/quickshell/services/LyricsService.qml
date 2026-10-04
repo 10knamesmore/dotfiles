@@ -3,12 +3,19 @@ import QtQuick
 import Quickshell
 
 // 读取当前播放器的 MPRIS 歌词元数据，合并原文、逐字与翻译到 LyricsState。
-// 播放时按帧同步歌词时间；暂停、跳转和偏移变化立即同步，不另起进程查询歌词。
+// 歌词可见且播放时按帧同步；暂停、跳转和偏移变化立即同步，不另起进程查询歌词。
 Scope {
     id: root
 
     readonly property var player: MediaService.activePlayer
+    readonly property bool needsFrameSync: LyricsState.hasVisibleViews && root.player !== null && root.player.isPlaying && LyricsState.lyricsLines.length > 0
     property string lastLyrics: ""
+
+    onNeedsFrameSyncChanged: {
+        console.debug("[lyrics] frame sync", needsFrameSync ? "active" : "idle");
+        if (needsFrameSync)
+            syncPosition();
+    }
 
     function refreshLyrics() {
         const metadata = player ? player.metadata : {};
@@ -174,7 +181,7 @@ Scope {
 
     // position getter 在本地计算播放位置；按帧同步以保持顶栏歌词视口平滑跟随。
     FrameAnimation {
-        running: root.player !== null && root.player.isPlaying && LyricsState.lyricsLines.length > 0
+        running: root.needsFrameSync
         onTriggered: root.syncPosition()
     }
 }
