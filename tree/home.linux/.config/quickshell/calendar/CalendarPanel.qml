@@ -1,16 +1,18 @@
 import "../components"
 import "../services"
-import "../theme"
 import "../state"
+import "../theme"
 import "Lunar.js" as Lunar
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
+import "weather"
 
 // 从最右侧时钟展开，日历、农历与天气预报并排显示。
 PanelOverlay {
     id: root
 
-    property date currentDate: new Date()
+    property date currentDate: clock.date
     property int viewYear: currentDate.getFullYear()
     property int viewMonth: currentDate.getMonth() // 0-based
 
@@ -25,7 +27,7 @@ PanelOverlay {
         let startDow = (first.getDay() + 6) % 7;
         let daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
         let prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
-        let today = new Date();
+        let today = root.currentDate;
         let todayY = today.getFullYear();
         let todayM = today.getMonth();
         let todayD = today.getDate();
@@ -44,7 +46,8 @@ PanelOverlay {
             });
         }
         // 当月
-        let curM = viewMonth + 1; // 1-based
+        let curM = viewMonth + 1;
+        // 1-based
         for (let d = 1; d <= daysInMonth; d++) {
             let lunar = Lunar.toLunar(viewYear, curM, d);
             days.push({
@@ -73,41 +76,53 @@ PanelOverlay {
     }
 
     showing: PanelState.calendarOpen
-    panelWidth: 800
+    panelWidth: 1000
     panelHeight: contentRow.implicitHeight + Tokens.spaceL * 2
     panelTargetX: root.width - panelWidth - 10
     panelTargetY: 54
     closedOffsetY: -20
     onCloseRequested: PanelState.calendarOpen = false
-
     onShowingChanged: {
         if (showing) {
-            currentDate = new Date();
             viewYear = currentDate.getFullYear();
             viewMonth = currentDate.getMonth();
+            WeatherService.refreshIfStale();
         }
+    }
+
+    SystemClock {
+        id: clock
+
+        enabled: root.showing
+        precision: SystemClock.Minutes
     }
 
     RowLayout {
         id: contentRow
+
+        Keys.onEscapePressed: PanelState.calendarOpen = false
         anchors.fill: parent
         anchors.margins: Tokens.spaceL
-        spacing: Tokens.spaceL
+        spacing: 20
 
         ColumnLayout {
             id: col
-            Layout.minimumWidth: 352
-            Layout.preferredWidth: 352
-            Layout.maximumWidth: 352
+
+            Layout.minimumWidth: 288
+            Layout.preferredWidth: 288
+            Layout.maximumWidth: 288
             Layout.alignment: Qt.AlignTop
             spacing: Tokens.spaceS
+            opacity: Math.max(0, Math.min(1, (root.panel.revealProgress - 0.08) / 0.82))
 
             // ── 月份导航 ──
             RowLayout {
                 Layout.fillWidth: true
 
-                CalNavButton {
+                WeatherButton {
                     text: "󰅁"
+                    label: "上个月"
+                    iconOnly: true
                     onClicked: {
                         if (root.viewMonth === 0) {
                             root.viewMonth = 11;
@@ -134,8 +149,10 @@ PanelOverlay {
                     Layout.fillWidth: true
                 }
 
-                CalNavButton {
+                WeatherButton {
                     text: "󰅂"
+                    label: "下个月"
+                    iconOnly: true
                     onClicked: {
                         if (root.viewMonth === 11) {
                             root.viewMonth = 0;
@@ -145,6 +162,7 @@ PanelOverlay {
                         }
                     }
                 }
+
             }
 
             Rectangle {
@@ -169,7 +187,9 @@ PanelOverlay {
                         font.pixelSize: Fonts.small
                         horizontalAlignment: Text.AlignHCenter
                     }
+
                 }
+
             }
 
             // ── 日期网格 ──
@@ -186,13 +206,13 @@ PanelOverlay {
                         property bool hovered: dayArea.containsMouse
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 50
+                        Layout.preferredHeight: 43
                         radius: Tokens.radiusL
                         color: {
                             if (modelData.isToday)
                                 return Colors.mauve;
 
-                            if (modelData.hovered)
+                            if (hovered)
                                 return Colors.surface1;
 
                             return "transparent";
@@ -237,6 +257,7 @@ PanelOverlay {
                                 font.family: Fonts.family
                                 font.pixelSize: Fonts.xs
                             }
+
                         }
 
                         MouseArea {
@@ -250,104 +271,45 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
+
                         }
+
                     }
+
                 }
+
             }
 
-            // ── 今天按钮 ──
-            Rectangle {
+            WeatherButton {
                 Layout.alignment: Qt.AlignHCenter
-                width: todayText.implicitWidth + 20
-                height: 26
-                radius: Tokens.radiusFull
-                color: todayBtnArea.containsMouse ? Colors.surface1 : "transparent"
-
-                Text {
-                    id: todayText
-
-                    anchors.centerIn: parent
-                    text: "今天"
-                    color: Colors.mauve
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.small
-                    font.weight: Font.DemiBold
-                }
-
-                MouseArea {
-                    id: todayBtnArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.currentDate = new Date();
-                        root.viewYear = root.currentDate.getFullYear();
-                        root.viewMonth = root.currentDate.getMonth();
-                    }
-                }
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 150
-                    }
+                text: "今天 · " + Qt.formatDate(root.currentDate, "M 月 d 日")
+                label: "返回今天"
+                onClicked: {
+                    root.viewYear = root.currentDate.getFullYear();
+                    root.viewMonth = root.currentDate.getMonth();
                 }
             }
+
+            AirQualityCard {
+                Layout.fillWidth: true
+                Layout.topMargin: 16
+                opacity: Math.max(0, Math.min(1, (root.panel.revealProgress - 0.4) / 0.6))
+                now: root.currentDate.getTime()
+            }
+
+            transform: Translate {
+                y: (1 - col.opacity) * 12
+            }
+
         }
 
-        ColumnLayout {
+        WeatherPanel {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignTop
-
-            WeatherCard {
-                Layout.fillWidth: true
-                expanded: true
-            }
-
-            Text {
-                Layout.fillWidth: true
-                visible: !WeatherService.loaded
-                text: "天气数据尚未更新"
-                color: Colors.subtext0
-                font.family: Fonts.family
-                font.pixelSize: Fonts.body
-                horizontalAlignment: Text.AlignHCenter
-            }
+            entranceProgress: root.panel.revealProgress
+            now: root.currentDate.getTime()
         }
+
     }
 
-    // 可复用导航按钮
-    component CalNavButton: Rectangle {
-        property string text: ""
-
-        signal clicked
-
-        width: 28
-        height: 28
-        radius: Tokens.radiusFull
-        color: navArea.containsMouse ? Colors.surface1 : "transparent"
-
-        Text {
-            anchors.centerIn: parent
-            text: parent.text
-            color: Colors.subtext0
-            font.family: Fonts.family
-            font.pixelSize: Fonts.icon
-        }
-
-        MouseArea {
-            id: navArea
-
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: parent.clicked()
-        }
-
-        Behavior on color {
-            ColorAnimation {
-                duration: 150
-            }
-        }
-    }
 }

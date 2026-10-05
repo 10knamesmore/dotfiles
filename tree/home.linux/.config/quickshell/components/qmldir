@@ -1,6 +1,7 @@
 Dropdown 1.0 Dropdown.qml
 FadeOutListItem 1.0 FadeOutListItem.qml
 PanelOverlay 1.0 PanelOverlay.qml
+PanelBorderGlow 1.0 PanelBorderGlow.qml
 ToggleSwitch 1.0 ToggleSwitch.qml
 TextScrollAnimation 1.0 TextScrollAnimation.qml
 SliderGlow 1.0 SliderGlow.qml

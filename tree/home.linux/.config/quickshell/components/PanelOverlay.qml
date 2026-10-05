@@ -330,4 +330,22 @@ PanelWindow {
             }
         }
     }
+
+    HoverHandler {
+        id: cursorTracker
+        parent: root.contentItem
+        enabled: root.visible
+        blocking: false
+    }
+
+    PanelBorderGlow {
+        x: panel.x
+        y: panel.y
+        width: panel.width
+        height: panel.height
+        radius: panel.radius
+        cursorPosition: Qt.point(cursorTracker.point.position.x - x, cursorTracker.point.position.y - y)
+        opacity: panel.opacity * panel.revealProgress * (cursorTracker.hovered ? 1 : 0)
+        visible: opacity > 0
+    }
 }
