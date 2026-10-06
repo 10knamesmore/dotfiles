@@ -54,13 +54,7 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.rightMargin: 9
         spacing: 11
-        opacity: windowContext.focused ? 1 : 0.7
         clip: true
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Tokens.animFast
-            }
-        }
 
         WorkspaceStrip {
             context: windowContext

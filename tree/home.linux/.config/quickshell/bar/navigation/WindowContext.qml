@@ -8,7 +8,6 @@ QtObject {
     required property var barScreen
     readonly property var monitor: barScreen ? Hyprland.monitorFor(barScreen) : null
     readonly property int workspaceId: monitor ? (monitor.lastIpcObject.specialWorkspace?.id || monitor.activeWorkspace?.id || 0) : 0
-    readonly property bool focused: monitor ? monitor.focused : false
     readonly property var windows: WindowUpdates.toplevels.values.filter(window => window.workspace && window.workspace.id === root.workspaceId && window.lastIpcObject.mapped)
 
     // 非焦点屏仍显示该屏最近操作的窗口，不跟随另一屏的全局焦点。

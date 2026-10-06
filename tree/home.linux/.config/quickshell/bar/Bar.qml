@@ -13,6 +13,7 @@ PanelWindow {
     id: root
 
     required property var modelData
+    readonly property var monitor: Hyprland.monitorFor(root.modelData)
     property bool revealed: CaptureService.recordingActive || BarState.isBarVisibleForScreen(root.modelData.name)
     property bool transientReveal: !CaptureService.recordingActive && !BarState.barPinnedVisible && BarState.barHoverRevealScreen === root.modelData.name
     property int barHeight: 44
@@ -46,6 +47,13 @@ PanelWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         height: root.barHeight
+        opacity: root.monitor && root.monitor.focused ? 1 : 0.7
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Tokens.animFast
+            }
+        }
 
         SmokedGlass {
             anchors.fill: parent
