@@ -1,4 +1,3 @@
-vim.api.nvim_set_hl(0, "BlinkCmpSource", { italic = true, fg = "#c0caf5", bold = true })
 return {
   "saghen/blink.cmp", -- 插件名称，blink.cmp 是一个补全框架，支持 LSP/snippet 等多种来源
 

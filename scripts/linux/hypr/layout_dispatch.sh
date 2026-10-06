@@ -49,7 +49,10 @@ case "$mode" in
           esac
           move_result="$(hyprctl dispatch "hl.dsp.layout('consume_or_expel $column_direction')")"
           # 无相邻列时保留跨显示器移动；成功时不以屏幕坐标判断，避免视口滚动造成误判。
-          if [[ "$move_result" != "ok" ]]; then
+          if [[ "$move_result" == "ok" ]]; then
+            # consume_or_expel 不发送布局事件；完成后通知顶栏刷新窗口几何。
+            hyprctl dispatch "hl.dsp.event('window-layout-changed')" >/dev/null
+          else
             "$script_dir/move_window_to_monitor.sh" "$dir" || true
           fi
           exit 0

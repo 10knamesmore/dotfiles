@@ -7,5 +7,8 @@ return {
   submodules = false,
   ---@module "rainbow-delimiters"
   ---@type rainbow_delimiters.config
-  opts = {},
+  opts = {
+    -- Vue tag captures use priorities 105/110; nesting colors should not replace their semantic colors.
+    priority = { vue = 104 },
+  },
 }

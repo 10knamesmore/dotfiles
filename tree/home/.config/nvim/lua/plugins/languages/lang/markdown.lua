@@ -7,8 +7,6 @@ vim.api.nvim_create_autocmd("User", {
   end,
 })
 
-vim.api.nvim_set_hl(0, "@spell", { italic = true })
-
 -- 绝对路径 markdown link 不是 marksman 的 definition 输入；链接上直接打开文件，其他位置保留 LSP fallback。
 local function normalize_markdown_anchor(value)
   value = vim.uri_decode(vim.trim(value)):lower()

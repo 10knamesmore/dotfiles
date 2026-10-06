@@ -138,15 +138,12 @@ return {
           priority = {
             style = function(context)
               local value = context.value:lower()
-              if value == "high" then
-                return { fg = "#ff5555", bold = true }
-              elseif value == "medium" then
-                return { fg = "#ffb86c" }
-              elseif value == "low" then
-                return { fg = "#8be9fd" }
-              else -- fallback
-                return { fg = "#8be9fd" }
-              end
+              local group = value == "high" and "DiagnosticError"
+                or value == "medium" and "DiagnosticWarn"
+                or "DiagnosticInfo"
+              local style = vim.api.nvim_get_hl(0, { name = group, link = false })
+              style.bold = value == "high"
+              return style
             end,
             get_value = function()
               return "medium" -- Default priority
@@ -162,7 +159,7 @@ return {
           -- Example: A @started tag that uses a default date/time string when added
           started = {
             aliases = { "init" },
-            style = { fg = "#9fd6d5" },
+            style = { link = "DiagnosticInfo" },
             get_value = function()
               return tostring(os.date("%m/%d/%y %H:%M"))
             end,
@@ -172,7 +169,7 @@ return {
           -- Example: A @done tag that also sets the todo item state when it is added and removed
           done = {
             aliases = { "completed", "finished" },
-            style = { fg = "#96de7a" },
+            style = { link = "DiagnosticOk" },
             get_value = function()
               return tostring(os.date("%m/%d/%y %H:%M"))
             end,
@@ -187,7 +184,12 @@ return {
             sort_order = 100,
           },
           blocked = {
-            style = { fg = "#ff5555", underline = true, bold = true },
+            style = function()
+              local style = vim.api.nvim_get_hl(0, { name = "DiagnosticError", link = false })
+              style.underline = true
+              style.bold = true
+              return style
+            end,
             get_value = function()
               return "By:"
             end,

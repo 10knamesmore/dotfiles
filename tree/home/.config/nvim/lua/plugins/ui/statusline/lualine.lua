@@ -1,61 +1,3 @@
-local colors = {
-  black = "#1a1b26",
-  white = "#c0caf5",
-  red = "#f7768e",
-  green = "#9ece6a",
-  blue = "#7aa2f7",
-  yellow = "#e0af68",
-  purple = "#9d7cd8",
-  gray = "#a9b1d6",
-  cyan = "#10b3cc",
-  darkgray = "#2a2e3f",
-  lightgray = "#3b4261",
-  inactivegray = "#414868",
-}
-
-local my_theme = {
-  normal = {
-    a = { bg = colors.blue, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.gray },
-    y = { bg = colors.lightgray, fg = colors.white },
-  },
-  insert = {
-    a = { bg = colors.red, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.white },
-    y = { bg = colors.lightgray, fg = colors.red },
-  },
-  visual = {
-    a = { bg = colors.purple, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.white },
-    y = { bg = colors.lightgray, fg = colors.purple },
-  },
-  replace = {
-    a = { bg = colors.red, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.white },
-  },
-  command = {
-    a = { bg = colors.yellow, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.white },
-    y = { bg = colors.lightgray, fg = colors.yellow },
-  },
-  inactive = {
-    a = { bg = colors.darkgray, fg = colors.gray, gui = "bold" },
-    b = { bg = colors.darkgray, fg = colors.gray },
-    c = { bg = colors.darkgray, fg = colors.gray },
-  },
-  terminal = {
-    a = { bg = colors.green, fg = colors.black, gui = "bold" },
-    b = { bg = colors.lightgray, fg = colors.white },
-    c = { bg = colors.darkgray, fg = colors.white },
-    y = { bg = colors.lightgray, fg = colors.green },
-  },
-}
-
 -- 状态栏显示项目根目录名。
 local function dirname()
   return vim.fs.basename(utils.path.get_root())
@@ -82,7 +24,7 @@ return {
 
     local opts = {
       options = {
-        theme = my_theme,
+        theme = require("config.disco.lualine").theme,
         globalstatus = vim.o.laststatus == 3,
         disabled_filetypes = {
           statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" },
@@ -165,7 +107,12 @@ return {
 
         lualine_x = {
 
-          { "searchcount", color = { fg = colors.cyan } },
+          {
+            "searchcount",
+            color = function()
+              return { fg = Snacks.util.color("Special") }
+            end,
+          },
           -- 当前命令提示
           {
             function()
@@ -205,11 +152,15 @@ return {
             "encoding",
             separator = "",
             padding = { left = 1, right = 1 },
-            color = { fg = colors.blue, gui = "italic,bold" },
+            color = function()
+              return { fg = Snacks.util.color("Type"), gui = "italic,bold" }
+            end,
           },
           {
             "filesize",
-            color = { fg = colors.purple, gui = "italic,bold" },
+            color = function()
+              return { fg = Snacks.util.color("Keyword"), gui = "italic,bold" }
+            end,
           },
         },
 
@@ -218,18 +169,18 @@ return {
             "selectioncount",
             separator = " ",
             padding = { left = 1, right = 1 },
-            color = { fg = colors.white, gui = "bold" },
+            color = { gui = "bold" },
           },
           {
             "progress",
             separator = " ",
             padding = { left = 0, right = 1 },
-            color = { fg = colors.black, cterm = "italic,bold", gui = "italic,bold" },
+            color = { gui = "italic,bold" },
           },
           {
             "location",
             padding = { left = 0, right = 1 },
-            color = { fg = colors.black, gui = "italic,bold" },
+            color = { gui = "italic,bold" },
           },
         },
       },
