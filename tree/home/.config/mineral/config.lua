@@ -142,8 +142,21 @@ return {
       peach = "#ff9e64",
     },
     spectrum = {
-      style = "terrain",
+      -- style = "terrain",
       waterfall = { push_ms = 42 },
+    },
+
+    progress = {
+      track = { -- 主题 text 对实际背景的混色比例,0-1
+        played_alpha = 0.4,
+        buffered_alpha = 0.15,
+        unbuffered_alpha = 0.04,
+      },
+      playhead = {
+        text_mix = 0.40, -- accent 向 text 混色
+        trail_columns = 6, -- 播放头后方向已播色淡出的距离,字符列
+        lead_columns = 2, -- 播放头前方向轨道色淡出的距离,字符列
+      },
     },
     cover = {
       debounce_ms = 32,

@@ -32,7 +32,7 @@ return {
     },
     config = function(_, opts)
       require("tokyonight").setup(opts)
-      vim.cmd.colorscheme("disco-whirling")
+      vim.cmd.colorscheme("tokyonight-moon")
     end,
   },
 }
