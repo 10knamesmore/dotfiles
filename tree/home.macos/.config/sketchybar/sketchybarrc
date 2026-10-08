@@ -280,8 +280,8 @@ sketchybar --add item network.details.gateway popup.network \
 sketchybar --add item network.details.dns popup.network \
            --set network.details.dns "${network_details_common[@]}"
 
-# AI 额度固定按 Codex、Kimi、OpenCode 排列，并紧邻 battery 左侧。
-# 主标签只显示 W/5h 的剩余百分比；其他计划窗口保留在各自 popup。
+# AI 额度只显示 Codex，并紧邻 battery 左侧。
+# 主标签只显示 W/5h 的剩余百分比；完整窗口保留在 popup。
 ai_limit_common=(
   label="--"
   label.max_chars=24
@@ -296,24 +296,8 @@ sketchybar --add item ai.codex right \
                           icon="󰚩" \
                           icon.color="$GREEN" \
                           label.color="$GREEN" \
-                          script="$PLUGIN_DIR/ai_limits/run.sh codex" \
+                          script="$PLUGIN_DIR/ai_limits/run.sh" \
            --subscribe ai.codex mouse.entered mouse.exited mouse.exited.global
-
-sketchybar --add item ai.kimi right \
-           --set ai.kimi "${ai_limit_common[@]}" \
-                         icon="󰽥" \
-                         icon.color="$BLUE" \
-                         label.color="$BLUE" \
-                         script="$PLUGIN_DIR/ai_limits/run.sh kimi" \
-           --subscribe ai.kimi mouse.entered mouse.exited mouse.exited.global
-
-sketchybar --add item ai.opencode right \
-           --set ai.opencode "${ai_limit_common[@]}" \
-                             icon="󰅩" \
-                             icon.color="$PEACH" \
-                             label.color="$PEACH" \
-                             script="$PLUGIN_DIR/ai_limits/run.sh opencode" \
-           --subscribe ai.opencode mouse.entered mouse.exited mouse.exited.global
 
 ai_limit_details_common=(
   icon.drawing=off
@@ -326,24 +310,15 @@ ai_limit_details_common=(
   background.drawing=off
 )
 
-for provider in codex kimi opencode
+sketchybar --add item ai.codex.details.title popup.ai.codex \
+           --set ai.codex.details.title "${ai_limit_details_common[@]}" \
+                                         label.color="$GREEN" \
+                                         label.font="Hack Nerd Font:Bold:14.0"
+
+for slot in 1 2 3 4
 do
-  case "$provider" in
-    codex) detail_color="$GREEN" ;;
-    kimi) detail_color="$BLUE" ;;
-    opencode) detail_color="$PEACH" ;;
-  esac
-
-  sketchybar --add item "ai.$provider.details.title" "popup.ai.$provider" \
-             --set "ai.$provider.details.title" "${ai_limit_details_common[@]}" \
-                                                   label.color="$detail_color" \
-                                                   label.font="Hack Nerd Font:Bold:14.0"
-
-  for slot in 1 2 3 4
-  do
-    sketchybar --add item "ai.$provider.details.$slot" "popup.ai.$provider" \
-               --set "ai.$provider.details.$slot" "${ai_limit_details_common[@]}"
-  done
+  sketchybar --add item "ai.codex.details.$slot" popup.ai.codex \
+             --set "ai.codex.details.$slot" "${ai_limit_details_common[@]}"
 done
 
 battery=(

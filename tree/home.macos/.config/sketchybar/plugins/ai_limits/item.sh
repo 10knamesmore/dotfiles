@@ -1,33 +1,16 @@
 #!/bin/sh
-# 把标准化额度 JSON 映射到 W/5h 剩余百分比主标签和完整 hover popup。
-# Usage: item.sh <codex|kimi|opencode>
-# 依赖：sketchybar, jq，以及同目录对应的采集器
+# 把 Codex 额度 JSON 映射到 W/5h 剩余百分比主标签和完整 hover popup。
+# Usage: item.sh
+# 依赖：sketchybar, jq，以及同目录的 codex.sh 采集器
 # 读取环境变量：NAME、SENDER（SketchyBar 注入）及采集器声明的凭据变量
 # 写入环境变量：无
 
-PROVIDER="${1:-}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DISPLAY_NAME="Codex"
+DETAIL_SLOTS=4
 
-case "$PROVIDER" in
-  codex)
-    DISPLAY_NAME="Codex"
-    DETAIL_SLOTS=4
-    ;;
-  kimi)
-    DISPLAY_NAME="Kimi"
-    DETAIL_SLOTS=4
-    ;;
-  opencode)
-    DISPLAY_NAME="OpenCode"
-    DETAIL_SLOTS=4
-    ;;
-  *)
-    exit 1
-    ;;
-esac
-
-ITEM_NAME="${NAME:-ai.$PROVIDER}"
-DETAIL_PREFIX="ai.$PROVIDER.details"
+ITEM_NAME="${NAME:-ai.codex}"
+DETAIL_PREFIX="ai.codex.details"
 
 show_details() {
   sketchybar --set "$ITEM_NAME" popup.drawing=on
@@ -61,7 +44,7 @@ refresh_usage() {
   local slot
   local detail
 
-  payload="$("$SCRIPT_DIR/$PROVIDER.sh" 2>/dev/null)"
+  payload="$("$SCRIPT_DIR/codex.sh" 2>/dev/null)"
   if ! printf '%s\n' "$payload" | jq -e 'type == "object" and (.status | type == "string")' >/dev/null 2>&1; then
     render_error "Invalid collector response"
     return

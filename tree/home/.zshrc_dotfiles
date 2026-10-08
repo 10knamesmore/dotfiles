@@ -84,8 +84,9 @@ zle-line-init() {
 
     local saved_prompt=$PROMPT
     local saved_rprompt=$RPROMPT
+    # 右提示符只要路径、不要时间：starship 的 rtransient 要多起一个子进程，
+    # 且 profile 里 $path 不生效、改不了配色，所以这里写死 catppuccin lavender。
     PROMPT="$(starship prompt --profile transient)"
-    # starship 的 rtransient 有 bug 不能显示，RPROMPT 硬编码 catppuccin lavender
     RPROMPT=$'%{\e[38;2;180;190;254m%}[ %~]%{\e[0m%}'
     zle .reset-prompt
     PROMPT=$saved_prompt
