@@ -20,8 +20,6 @@ from typing import Literal, cast, override
 
 WORKER_REQUEST_FD = 3
 WORKER_EVENT_FD = 4
-OBSERVER_REQUEST_FD = 5
-OBSERVER_RESPONSE_FD = 6
 
 
 class SessionInterpreter(code.InteractiveInterpreter):
@@ -100,7 +98,7 @@ def install_process_ownership_hooks() -> None:
             # The event pipe may already be gone; stderr still carries the reason.
             pass
         raise SystemExit(reason) from error
-    _set_worker_control_fds((WORKER_REQUEST_FD, WORKER_EVENT_FD, OBSERVER_REQUEST_FD, OBSERVER_RESPONSE_FD))
+    _set_worker_control_fds((WORKER_REQUEST_FD, WORKER_EVENT_FD))
     terminal_hook(partial(handle_process_ownership, "terminal"))
     browser_hook(partial(handle_process_ownership, "browser"))
 
@@ -253,8 +251,6 @@ def main() -> None:
     install_process_ownership_hooks()
     interpreter = SessionInterpreter()
     runtime = CellRuntime(interpreter)
-    from observer.inspection import start_observer
-    start_observer(interpreter.locals, OBSERVER_REQUEST_FD, OBSERVER_RESPONSE_FD)
     # An empty import path follows each call's cwd instead of pinning the startup directory.
     sys.path.insert(0, "")
     send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})

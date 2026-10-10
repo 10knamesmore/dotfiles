@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
 import { mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,8 +8,6 @@ import { StringDecoder } from "node:string_decoder";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail } from "@earendil-works/pi-coding-agent";
 import { logPythonEvent } from "./diagnostics.js";
-import { ObserverBridge } from "./observer/bridge.js";
-import type { InspectRequest, InspectResult, ObserverExecution, ObserverStatus } from "./observer/types.js";
 import {
   isPythonEnvironment,
   pythonWorkerArguments,
@@ -37,6 +34,15 @@ export interface PythonToolDetails {
   inputCleanupFailed: boolean;
   /** uv and worker infrastructure diagnostics, separate from user code output. */
   diagnosticsPath?: string;
+}
+
+/** Python lifecycle and owned terminal handles displayed in Pi's status bar. */
+export interface PythonSessionStatus {
+  /** Worker lifecycle; starting includes preparation of its uv environment. */
+  state: "not_started" | "starting" | "running" | "idle" | "stopping" | "exited";
+
+  /** Includes exited terminal children until their handles are closed. */
+  terminalCount: number;
 }
 
 /** Captured text and complete image attachments, including output emitted before a cell failed. */
@@ -104,7 +110,6 @@ interface WorkerProcess {
   launcher: ChildProcess;
   requests: Writable;
   events: Readable;
-  observer: ObserverBridge;
   ready: Promise<WorkerInfo>;
   resolveReady: (info: WorkerInfo) => void;
   rejectReady: (error: Error) => void;
@@ -131,18 +136,13 @@ export class PythonSession {
   private worker?: WorkerProcess;
   private disposed = false;
   private running = false;
-  private readonly runtimeId = randomUUID();
-  private generation = 0;
-  private callNumber = 0;
-  private execution?: ObserverExecution;
-  private activeOutputPath?: string;
 
   public constructor(
     private readonly sessionId: string,
     private readonly sessionCwd: string,
     private readonly onStateLost: () => void,
     private readonly onEnvironmentReady: (environment: PythonEnvironment) => void,
-    private readonly onStatusChanged: (status: ObserverStatus) => void,
+    private readonly onStatusChanged: (status: PythonSessionStatus) => void,
   ) {}
 
   public get available(): boolean {
@@ -150,49 +150,17 @@ export class PythonSession {
   }
 
   /** Metadata remains readable even when Python holds the GIL or is waiting in native code. */
-  public status(): ObserverStatus {
+  public status(): PythonSessionStatus {
     const worker = this.worker;
-    let state: ObserverStatus["state"] = "not_started";
+    let state: PythonSessionStatus["state"] = "not_started";
     if (this.disposed || worker?.ended) state = "exited";
     else if (worker?.stopping) state = "stopping";
     else if (this.available) state = this.running ? "running" : "idle";
     else if (this.running) state = "starting";
     return {
-      sessionId: this.sessionId,
-      workspaceId: `${this.runtimeId}:${this.generation}`,
-      cwd: this.sessionCwd,
       state,
-      pid: this.available ? worker?.info?.pid : undefined,
-      version: worker?.info?.environment.version,
       terminalCount: [...(worker?.ownedProcessGroups.values() ?? [])].filter((group) => group.kind === "terminal").length,
-      execution: this.execution ? { ...this.execution } : undefined,
     };
-  }
-
-  /** Tail the current call's file only while a browser is asking to see it. */
-  public async observeStatus(includeOutput: boolean): Promise<ObserverStatus> {
-    const status = this.status();
-    const path = this.activeOutputPath;
-    if (!includeOutput || !path || !status.execution) return status;
-    try {
-      const preview = await readOutput(path);
-      if (status.workspaceId !== this.status().workspaceId || status.execution.callId !== this.execution?.callId)
-        return this.status();
-      status.execution.output = preview.text;
-      status.execution.outputTruncated = preview.truncated;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return this.status();
-      status.execution.outputUnavailable = true;
-      this.log({ phase: "observer_output_failed", reason: errorMessage(error) });
-    }
-    return status;
-  }
-
-  /** Never start a worker just because a user opens the observer. */
-  public inspect(request: InspectRequest): Promise<InspectResult> {
-    return this.available && this.worker
-      ? this.worker.observer.inspect(request)
-      : Promise.resolve({ status: "unavailable", workspaceId: this.status().workspaceId });
   }
 
   private changed(): void {
@@ -213,10 +181,6 @@ export class PythonSession {
     if (this.running) throw new Error("Python calls must execute sequentially.");
     this.running = true;
     const started = Date.now();
-    this.execution = {
-      callId, number: ++this.callNumber, code, cwd, startedAt: started,
-      timeoutSeconds, output: "", outputTruncated: false,
-    };
     this.changed();
     let directory: string | undefined;
     let worker: WorkerProcess | undefined;
@@ -239,7 +203,6 @@ export class PythonSession {
           // Create before dispatch so even an immediate process exit has a readable output file.
           const file = await open(path, "wx", 0o600);
           await file.close();
-          this.activeOutputPath = path;
           const submitted = await this.submit(worker, code, timeoutSeconds, callId, cwd, path, signal, onStarted);
           outcome = submitted.outcome;
           imageFiles = submitted.images;
@@ -272,8 +235,6 @@ export class PythonSession {
       outcome = signal?.aborted || this.disposed ? "interrupted" : worker ? "output_error" : "startup_error";
       this.log({ phase: "execution_failure", callId, outcome, reason: errorMessage(error) });
     } finally {
-      this.execution = { ...this.execution!, output, outputTruncated: truncated, outcome, finishedAt: Date.now() };
-      this.activeOutputPath = undefined;
       if (directory) {
         // Truncated text remains readable, but its already attached image files can be removed.
         const paths = outputPath ? imageFiles.map((image) => image.path) : [directory];
@@ -307,7 +268,6 @@ export class PythonSession {
     this.disposed = true;
     this.changed();
     const worker = this.worker;
-    worker?.observer.close();
     if (!worker || worker.ended) return;
     this.log({ phase: "shutdown", pid: worker.info?.pid });
     if (!worker.stopping) {
@@ -339,7 +299,7 @@ export class PythonSession {
       launcher = spawn("uv", pythonWorkerArguments(), {
         cwd: this.sessionCwd,
         detached: true,
-        stdio: ["ignore", logFd, logFd, "pipe", "pipe", "pipe", "pipe"],
+        stdio: ["ignore", logFd, logFd, "pipe", "pipe"],
       });
     } finally {
       closeSync(logFd);
@@ -354,14 +314,8 @@ export class PythonSession {
     const exited = new Promise<void>((resolve) => {
       resolveExited = resolve;
     });
-    this.generation++;
-    const observer = new ObserverBridge(
-      this.sessionId, this.status().workspaceId,
-      launcher.stdio.at(5) as Writable, launcher.stdio.at(6) as Readable,
-    );
     const worker: WorkerProcess = {
       launcher,
-      observer,
       requests: launcher.stdio[3] as Writable,
       events: launcher.stdio[4] as Readable,
       ready,
@@ -518,7 +472,6 @@ export class PythonSession {
     if (message.type === "started") {
       if (pending.started) throw new Error("Python started a call twice.");
       pending.started = true;
-      if (this.execution) this.execution.startedAt = Date.now();
       this.changed();
       clearTimeout(pending.timer);
       pending.timer = setTimeout(() => this.interrupt(worker, "timed_out"), pending.timeoutSeconds * 1000);
@@ -584,7 +537,6 @@ export class PythonSession {
   private terminate(worker: WorkerProcess): void {
     if (worker.ended || worker.stopping) return;
     worker.stopping = true;
-    worker.observer.close();
     this.changed();
     this.log({ phase: "terminate", pid: worker.info?.pid, callId: worker.pending?.callId });
     // SDK children lead separate groups so interrupting a cell leaves them alive.
@@ -613,7 +565,6 @@ export class PythonSession {
   private processEnded(worker: WorkerProcess): void {
     if (worker.ended) return;
     worker.ended = true;
-    worker.observer.close();
     // A SIGKILLed worker never runs Python cleanup; terminate its separate SDK groups here.
     this.terminateOwnedProcessGroups(worker);
     if (worker.info) {

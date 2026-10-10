@@ -2,12 +2,10 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { PythonSession, type PythonToolDetails } from "./session.js";
+import { PythonSession, type PythonSessionStatus, type PythonToolDetails } from "./session.js";
 import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
 import { describePythonEnvironment, inspectPythonEnvironment, type PythonEnvironment } from "./environment.js";
 import { logPythonEvent } from "./diagnostics.js";
-import { PythonObserverServer } from "./observer/server.js";
-import type { ObserverStatus } from "./observer/types.js";
 
 const Parameters = Type.Object(
   {
@@ -61,7 +59,6 @@ export function registerPython(pi: ExtensionAPI): void {
 
   let session: PythonSession | undefined;
   let currentContext: ExtensionContext | undefined;
-  const observer = new PythonObserverServer(() => session);
   const inspectionController = new AbortController();
 
   const createSession = (ctx: ExtensionContext): PythonSession => {
@@ -70,39 +67,6 @@ export function registerPython(pi: ExtensionAPI): void {
       ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared, updateEnvironment, updateStatus,
     );
   };
-
-  pi.registerCommand("python", {
-    description: "Toggle the Python / Terminal observer",
-    handler: async (_args, ctx) => {
-      currentContext = ctx;
-      if (observer.isOpen) {
-        await observer.close();
-        ctx.ui.notify("Runtime observer closed", "info");
-        return;
-      }
-      session ??= createSession(ctx);
-      let url: string;
-      try {
-        url = await observer.open();
-      } catch (error) {
-        logPythonEvent({
-          sessionId: ctx.sessionManager.getSessionId(), phase: "observer_open_failed",
-          reason: error instanceof Error ? error.message : String(error),
-        });
-        ctx.ui.notify("Could not start the runtime observer. Check the Python extension logs.", "error");
-        return;
-      }
-      updateStatus(session.status());
-      let opened = false;
-      try {
-        const result = await pi.exec(process.platform === "darwin" ? "open" : "xdg-open", [url], { timeout: 10_000 });
-        opened = result.code === 0;
-      } catch {
-        logPythonEvent({ sessionId: ctx.sessionManager.getSessionId(), phase: "observer_browser_open_failed" });
-      }
-      ctx.ui.notify(`${opened ? "Runtime observer opened" : "Open the runtime observer in your browser"}: ${url}`, "info");
-    },
-  });
 
   pi.on("session_start", async (_event, ctx) => {
     session = createSession(ctx);
@@ -135,7 +99,6 @@ export function registerPython(pi: ExtensionAPI): void {
   });
   pi.on("session_shutdown", async () => {
     inspectionController.abort();
-    await observer.close();
     await session?.close();
     session = undefined;
     currentContext?.ui.setStatus("python", undefined);
@@ -198,12 +161,12 @@ export function registerPython(pi: ExtensionAPI): void {
   };
   pi.registerTool(tool);
 
-  function updateStatus(status: ObserverStatus): void {
+  function updateStatus(status: PythonSessionStatus): void {
     if (!currentContext?.hasUI) return;
-    const labels: Record<ObserverStatus["state"], string> = {
+    const labels: Record<PythonSessionStatus["state"], string> = {
       not_started: "not started", starting: "starting", running: "running", idle: "idle", stopping: "stopping", exited: "exited",
     };
-    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · Terminals ${status.terminalCount} · /python`);
+    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · Terminals ${status.terminalCount}`);
   }
 
   function notifyEnvironmentCleared(): void {

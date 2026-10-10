@@ -8,7 +8,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p src/extensions/python/observer/ui/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "update:pi": "pnpm update --latest --no-save @earendil-works/pi-ai @earendil-works/pi-coding-agent @earendil-works/pi-tui"
   },
   "dependencies": {
