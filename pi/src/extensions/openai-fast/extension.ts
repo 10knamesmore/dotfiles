@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { readPersonalConfig, updatePersonalConfig } from "../../config/index.js";
+import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../editor/api.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -18,10 +19,11 @@ function isOpenAISubscription(ctx: ExtensionContext): boolean {
 /** Persist /fast globally and request priority service using Pi's OpenAI subscription login. */
 export default function registerOpenAIFast(pi: ExtensionAPI): void {
   let lastResponse: { model: string; reportedTier: string | undefined } | undefined;
+  // Requested mode for the active model; the prompt editor badge reads it before each render.
+  let fastRequested = false;
 
-  function updateStatus(ctx: ExtensionContext): void {
-    const active = readPersonalConfig().openai.fast && isOpenAISubscription(ctx);
-    ctx.ui.setStatus("openai-fast", active ? "Fast requested" : undefined);
+  function refreshFastRequested(ctx: ExtensionContext): void {
+    fastRequested = readPersonalConfig().openai.fast && isOpenAISubscription(ctx);
   }
 
   function showStatus(ctx: ExtensionContext): void {
@@ -56,21 +58,25 @@ export default function registerOpenAIFast(pi: ExtensionAPI): void {
         });
         pi.appendEntry("openai-fast-setting", { enabled: readPersonalConfig().openai.fast });
       }
-      updateStatus(ctx);
+      refreshFastRequested(ctx);
       showStatus(ctx);
     },
   });
 
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
+    (requested as PromptEditorApi).useFastRequested(() => fastRequested);
+  });
+
   pi.on("session_start", (_event, ctx) => {
     lastResponse = undefined;
-    updateStatus(ctx);
+    refreshFastRequested(ctx);
   });
-  pi.on("model_select", (_event, ctx) => updateStatus(ctx));
+  pi.on("model_select", (_event, ctx) => refreshFastRequested(ctx));
 
   pi.on("before_provider_request", (event, ctx) => {
     if (!ctx.model || !isOpenAISubscription(ctx)) return;
     const enabled = readPersonalConfig().openai.fast;
-    updateStatus(ctx);
+    refreshFastRequested(ctx);
     if (!isObject(event.payload) || event.payload.model !== ctx.model.id) return;
     pi.appendEntry("openai-fast-request", { model: ctx.model.id, enabled });
     if (!enabled) return;

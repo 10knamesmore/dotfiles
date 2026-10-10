@@ -4,6 +4,8 @@ import type { AgentInputNavigation } from "./navigation.js";
 export interface PromptEditorApi {
   useAgentNavigation(navigation: AgentInputNavigation): void;
   useStatus(readStatus: () => EditorStatus): void;
+  /** Whether the model name should carry the OpenAI Fast marker. */
+  useFastRequested(readFastRequested: () => boolean): void;
   useTodoStatus(readTodoStatus: () => string | undefined): void;
   useWorkflowUsage(readWorkflowUsage: () => string | undefined): void;
 }

@@ -1,8 +1,6 @@
 import { homedir, hostname, userInfo } from "node:os";
 import type { ExtensionContext, ReadonlyFooterDataProvider } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
-import type { EditorActivity } from "../editor/api.js";
-import { FooterPet } from "./pet/index.js";
 import { fitByDropping, formatDuration, formatFooterCwd, formatTokens, sanitizeFooterText } from "./format.js";
 import type { GitDiffStat, GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
@@ -18,9 +16,6 @@ import { palette, separator } from "./palette.js";
 interface ClaudeFooterComponentOptions {
   /** Returns the latest event context instead of a session-start snapshot. */
   getContext: () => ExtensionContext;
-
-  /** Same live activity decision used by the editor and window title. */
-  getActivity: () => EditorActivity;
 
   /** Pi-owned extension status provider. */
   footerData: ReadonlyFooterDataProvider;
@@ -255,11 +250,7 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
 function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
     .filter(
-      ([key]) =>
-        key !== "todo" &&
-        key !== "subagent-workflow" &&
-        key !== "subagent-workflow:usage" &&
-        key !== "openai-fast",
+      ([key]) => key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage",
     )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([, value]) => sanitizeFooterText(value))
@@ -297,12 +288,9 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
 export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
-  private readonly pet: FooterPet;
   private disposed = false;
 
-  public constructor(private readonly options: ClaudeFooterComponentOptions) {
-    this.pet = new FooterPet(() => this.requestRender());
-  }
+  public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
   /**
    * Rebind background git observation when Pi replaces the active session
@@ -335,45 +323,36 @@ export class ClaudeFooterComponent implements Component {
     const ctx = this.options.getContext();
     const git = this.options.git.snapshot();
     const metrics = this.options.metrics.snapshot(ctx);
-    // OpenAI Fast publishes this key only when enabled and applicable to the current model.
-    const fastRequested = this.options.footerData.getExtensionStatuses().has("openai-fast");
-    const petLines = this.pet.render(this.options.getActivity(), fastRequested, width);
-    const leftWidths = petLines.map((line) => (line ? Math.max(0, width - visibleWidth(line) - 3) : width));
 
-    const lines = [
+    return [
       renderFirstLine({
-        width: leftWidths[0]!,
+        width,
         username: this.username,
         host: this.host,
         ctx,
         git,
       }),
-      renderSecondLine({ width: leftWidths[1]!, metrics }),
+      renderSecondLine({ width, metrics }),
       renderThirdLine({
-        width: leftWidths[2]!,
+        width,
         footerData: this.options.footerData,
         promptRun: metrics.promptRun,
         hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
       }),
     ];
-    return lines.map((line, index) => {
-      const pet = petLines[index]!;
-      return pet ? line + " ".repeat(width - visibleWidth(line) - visibleWidth(pet)) + pet : line;
-    });
   }
 
   public invalidate(): void {
     // The footer reads current state from its sources during every render.
   }
 
-  /** Stop the pet animation, git watchers, debounce timers, and any running git process. */
+  /** Stop git watchers, debounce timers, and any running git process. */
   public dispose(): void {
     if (this.disposed) {
       return;
     }
 
     this.disposed = true;
-    this.pet.dispose();
     this.options.git.dispose();
   }
 }

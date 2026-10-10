@@ -17,6 +17,9 @@ import { palette, separator } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
 import type { AgentInputNavigation } from "./navigation.js";
 
+/** Nerd Font bolt appended to the model name while OpenAI Fast is requested. */
+const FAST_BADGE = palette.yellow(" \uf0e7");
+
 /** Pi's input editor, with session information on its borders and optional agent navigation. */
 export class PromptEditor extends CustomEditor {
   constructor(
@@ -26,6 +29,7 @@ export class PromptEditor extends CustomEditor {
     private readonly navigation: () => AgentInputNavigation | undefined,
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
+    private readonly fastRequested: () => boolean,
     private readonly todoStatus: () => string | undefined = () => undefined,
     private readonly workflowUsage: () => string | undefined = () => undefined,
   ) {
@@ -82,8 +86,10 @@ export class PromptEditor extends CustomEditor {
     const top = status ? this.activityLabel(status.activity) + this.timingLabel(status) : palette.readyBadge(" READY ");
     const ctx = this.context();
     const model = ctx?.model;
+    // The badge reports the mode the user requested; /fast status shows the server's tier.
+    const fast = this.fastRequested() ? FAST_BADGE : "";
     const modelLabel = model
-      ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
+      ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${fast}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
       : palette.sky("no-model");
     const modelAndContext = ctx ? `${modelLabel}${separator}${this.contextLabel(ctx)}` : modelLabel;
     const sides = [...lines.slice(1, bottom), ...lines.slice(bottom + 1)].map(
