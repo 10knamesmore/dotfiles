@@ -1,5 +1,5 @@
 /** Search backends exposed by the distribution's websearch tool. */
-export type SearchProvider = "exa" | "codex";
+export type SearchProvider = "deepseek" | "codex" | "exa";
 
 /** One query sent to the selected backend; filters remain provider-side constraints. */
 export interface SearchRequest {

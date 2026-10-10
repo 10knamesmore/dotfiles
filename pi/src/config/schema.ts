@@ -30,13 +30,15 @@ const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> = {
 
 const WebSettingsSchema = Type.Object(
   {
-    searchProvider: Type.Optional(Type.Union([Type.Literal("exa"), Type.Literal("codex")])),
+    searchProvider: Type.Optional(
+      Type.Union([Type.Literal("deepseek"), Type.Literal("codex"), Type.Literal("exa")]),
+    ),
     codexModel: Type.Optional(Type.String({ minLength: 1, pattern: "^\\S+$" })),
   },
   { additionalProperties: false },
 );
 
-export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "exa" | "codex" };
+export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "deepseek" | "codex" | "exa" };
 
 const ModelReferenceSchema = Type.String({ pattern: "^[^/\]+/\\S+$" });
 const PersonalConfigSchema = Type.Object(
@@ -86,7 +88,7 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     language: config.language ?? "中文",
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
-    web: { searchProvider: "exa", ...config.web },
+    web: { searchProvider: "deepseek", ...config.web },
     openai: { fast: false, ...config.openai },
   };
 }

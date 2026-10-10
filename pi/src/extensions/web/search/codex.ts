@@ -4,29 +4,36 @@ import { WebError } from "../errors.js";
 import { requestText } from "../http.js";
 import type { SearchRequest, SearchResult, SearchSource } from "./types.js";
 
-const CODEX_BASE_URL = "https://chatgpt.com/backend-api";
-const CODEX_RESPONSES_URL = `${CODEX_BASE_URL}/codex/responses`;
-const SEARCH_TIMEOUT_MS = 60_000;
+const OPENAI_API_URL = "https://api.openai.com/v1";
+const OPENAI_RESPONSES_URL = `${OPENAI_API_URL}/responses`;
+const OPENAI_MODELS_URL = `${OPENAI_API_URL}/models`;
+const SEARCH_TIMEOUT_MS = 180_000;
+const CATALOG_TIMEOUT_MS = 30_000;
+const CATALOG_TTL_MS = 10 * 60_000;
 const MAX_ANSWER_CHARS = 12_000;
 const MAX_SNIPPET_CHARS = 300;
-const EXCLUDED_MODEL_SEGMENTS = new Set(["pro", "ultra"]);
+const HIDDEN_VISIBILITY = "hide";
 
-type CodexModel = ReturnType<ExtensionContext["modelRegistry"]["getAll"]>[number];
+type OpenAIModel = ReturnType<ExtensionContext["modelRegistry"]["getAll"]>[number];
+type OpenAIAuth = Awaited<ReturnType<ExtensionContext["modelRegistry"]["getApiKeyAndHeaders"]>>;
+type ResolvedAuth = Extract<OpenAIAuth, { ok: true }>;
 type JsonObject = Record<string, unknown>;
+
+/** Account search-model slugs ordered by the account's own priority; reused until it goes stale. */
+let modelCatalog: { slugs: string[]; fetchedAt: number } | undefined;
 
 function isObject(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isOfficialCodexModel(model: CodexModel | undefined): model is CodexModel {
-  if (!model || model.provider !== "openai-codex" || model.api !== "openai-codex-responses") return false;
+function isOfficialOpenAIBaseUrl(raw: string): boolean {
   try {
-    const url = new URL(model.baseUrl);
+    const url = new URL(raw);
     return (
       url.protocol === "https:" &&
-      url.hostname.toLowerCase() === "chatgpt.com" &&
+      url.hostname.toLowerCase() === "api.openai.com" &&
       url.port === "" &&
-      url.pathname.replace(/\/+$/u, "") === "/backend-api" &&
+      url.pathname.replace(/\/+$/u, "") === "/v1" &&
       url.username === "" &&
       url.password === "" &&
       url.search === "" &&
@@ -37,60 +44,92 @@ function isOfficialCodexModel(model: CodexModel | undefined): model is CodexMode
   }
 }
 
-function pickPreferredModel(models: readonly CodexModel[]): CodexModel | undefined {
-  const candidates = models
-    .filter((model) => model.provider === "openai-codex" && model.api === "openai-codex-responses")
-    .filter((model) => !model.id.split("-").some((segment) => EXCLUDED_MODEL_SEGMENTS.has(segment)))
-    .sort((left, right) => right.id.localeCompare(left.id, undefined, { numeric: true }));
+/** Codex models live under the openai provider behind Pi's ChatGPT subscription login. */
+function isSubscriptionModel(ctx: ExtensionContext, model: OpenAIModel): boolean {
   return (
-    candidates.find((model) => model.id.includes("terra")) ??
-    candidates.find((model) => /^gpt-\d+(?:\.\d+)?$/u.test(model.id)) ??
-    candidates[0]
+    model.provider === "openai" &&
+    model.api === "openai-responses" &&
+    isOfficialOpenAIBaseUrl(model.baseUrl) &&
+    ctx.modelRegistry.isUsingOAuth(model)
   );
 }
 
-function selectModel(ctx: ExtensionContext, modelId: string | undefined): CodexModel {
-  let models: ReturnType<ExtensionContext["modelRegistry"]["getAll"]>;
+function subscriptionModels(ctx: ExtensionContext): OpenAIModel[] {
+  let models: OpenAIModel[];
   try {
     models = ctx.modelRegistry.getAll();
   } catch {
-    throw new WebError("authentication", "Codex model registry is unavailable.");
+    throw new WebError("authentication", "OpenAI model registry is unavailable.");
   }
-
-  if (modelId !== undefined) {
-    const configuredModelId = modelId.trim();
-    if (!configuredModelId) throw new WebError("invalid_input", "Codex model ID must not be empty.");
-    const configured = models.find((model) => model.provider === "openai-codex" && model.id === configuredModelId);
-    if (!configured) throw new WebError("unsupported", `Codex model "${configuredModelId}" is not registered.`);
-    if (!isOfficialCodexModel(configured)) {
-      throw new WebError("unsupported", "Codex search requires the official openai-codex endpoint.");
-    }
-    return configured;
-  }
-
-  const current = ctx.model as CodexModel | undefined;
-  if (isOfficialCodexModel(current)) return current;
-  const preferred = pickPreferredModel(models);
-  if (!preferred) throw new WebError("unsupported", "No openai-codex search model is registered.");
-  if (!isOfficialCodexModel(preferred)) {
-    throw new WebError("unsupported", "Codex search requires the official openai-codex endpoint.");
-  }
-  return preferred;
+  return models.filter((model) => isSubscriptionModel(ctx, model));
 }
 
-function decodeJwtAccountId(token: string): string | undefined {
-  const payload = token.split(".")[1];
-  if (!payload) return undefined;
-  try {
-    const decoded: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (!isObject(decoded)) return undefined;
-    const auth = decoded["https://api.openai.com/auth"];
-    if (!isObject(auth)) return undefined;
-    const accountId = auth.chatgpt_account_id;
-    return typeof accountId === "string" && accountId.trim() ? accountId.trim() : undefined;
-  } catch {
-    return undefined;
+function requestHeaders(auth: ResolvedAuth, token: string, accept: string): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(auth.headers ?? {})) {
+    if (value === null) headers.delete(name);
+    else headers.set(name, value);
   }
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Accept", accept);
+  return headers;
+}
+
+function priorityOf(entry: JsonObject): number {
+  return typeof entry.priority === "number" ? entry.priority : Number.MAX_SAFE_INTEGER;
+}
+
+/** The API account only serves a changing subset of models; its own catalog picks the default. */
+async function accountSearchModel(auth: ResolvedAuth, token: string, signal?: AbortSignal): Promise<string> {
+  const catalog = modelCatalog;
+  if (catalog !== undefined && Date.now() - catalog.fetchedAt < CATALOG_TTL_MS) {
+    const cached = catalog.slugs[0];
+    if (cached !== undefined) return cached;
+  }
+
+  const response = await requestText(
+    OPENAI_MODELS_URL,
+    { method: "GET", headers: requestHeaders(auth, token, "application/json") },
+    signal,
+    CATALOG_TIMEOUT_MS,
+  );
+  const payload = parseJson(response.text);
+  const entries = isObject(payload) && Array.isArray(payload.models) ? payload.models : [];
+  const named = entries.filter(
+    (entry): entry is JsonObject => isObject(entry) && typeof entry.slug === "string" && entry.slug.trim() !== "",
+  );
+  const visible = named.filter((entry) => entry.visibility !== HIDDEN_VISIBILITY);
+  const ordered = (visible.length > 0 ? visible : named).sort((left, right) => priorityOf(left) - priorityOf(right));
+  const slugs = ordered.map((entry) => String(entry.slug).trim());
+  const first = slugs[0];
+  if (first === undefined) {
+    throw new WebError("invalid_response", "OpenAI returned no search models for this account.");
+  }
+  modelCatalog = { slugs, fetchedAt: Date.now() };
+  return first;
+}
+
+function buildBody(request: SearchRequest, model: string): JsonObject {
+  const recencyLabels = { day: "past 24 hours", week: "past week", month: "past month", year: "past year" } as const;
+  const instructions = [
+    "Search the web and return a concise answer grounded only in the web results.",
+    "Include clickable source citations in the response text when possible.",
+    `Prefer around ${request.limit} distinct sources.`,
+  ];
+  // Responses supports domain filters directly, but recency only as search guidance.
+  if (request.recency) instructions.push(`Prefer sources from the ${recencyLabels[request.recency]}.`);
+  const filters = domainFilters(request.domains);
+  return {
+    model,
+    instructions: instructions.join(" "),
+    input: [{ role: "user", content: [{ type: "input_text", text: request.query }] }],
+    tools: [{ type: "web_search", ...(filters ? { filters } : {}) }],
+    include: ["web_search_call.action.sources"],
+    store: false,
+    stream: true,
+    tool_choice: "required",
+    parallel_tool_calls: true,
+  };
 }
 
 function normalizeDomain(raw: string): { domain: string; blocked: boolean } | undefined {
@@ -122,27 +161,12 @@ function domainFilters(domains: readonly string[] | undefined): JsonObject | und
   };
 }
 
-function buildBody(request: SearchRequest, model: string): JsonObject {
-  const recencyLabels = { day: "past 24 hours", week: "past week", month: "past month", year: "past year" } as const;
-  const instructions = [
-    "Search the web and return a concise answer grounded only in the web results.",
-    "Include clickable source citations in the response text when possible.",
-    `Prefer around ${request.limit} distinct sources.`,
-  ];
-  // Responses supports domain filters directly, but recency only as search guidance.
-  if (request.recency) instructions.push(`Prefer sources from the ${recencyLabels[request.recency]}.`);
-  const filters = domainFilters(request.domains);
-  return {
-    model,
-    instructions: instructions.join(" "),
-    input: [{ role: "user", content: [{ type: "input_text", text: request.query }] }],
-    tools: [{ type: "web_search", ...(filters ? { filters } : {}) }],
-    include: ["web_search_call.action.sources"],
-    store: false,
-    stream: true,
-    tool_choice: "required",
-    parallel_tool_calls: true,
-  };
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 function parseSseEvents(text: string): JsonObject[] {
@@ -286,7 +310,7 @@ function extractResult(output: unknown[], limit: number): SearchResult {
   return { provider: "codex", answer: answerParts.join("\n").trim().slice(0, MAX_ANSWER_CHARS), sources };
 }
 
-/** Run hosted web_search with Pi's Codex credentials. Adapted from pi-web-access/openai-search.ts at 6c5afa1 (MIT). */
+/** Run hosted web_search with Pi's OpenAI subscription credentials. Adapted from pi-web-access/openai-search.ts at 6c5afa1 (MIT). */
 export async function searchCodex(
   request: SearchRequest,
   ctx: ExtensionContext,
@@ -299,44 +323,49 @@ export async function searchCodex(
   }
   if (signal?.aborted) throw new WebError("cancelled", "Request cancelled.");
 
-  const model = selectModel(ctx, modelId);
-  let auth: Awaited<ReturnType<ExtensionContext["modelRegistry"]["getApiKeyAndHeaders"]>>;
+  const configured = modelId?.trim();
+  if (modelId !== undefined && configured === "") {
+    throw new WebError("invalid_input", "Codex model ID must not be empty.");
+  }
+
+  const models = subscriptionModels(ctx);
+  if (configured !== undefined && !models.some((model) => model.id === configured)) {
+    throw new WebError("unsupported", `Codex model "${configured}" is not a registered OpenAI subscription model.`);
+  }
+  const current = models.find((model) => model.id === ctx.model?.id);
+  const probe = current ?? models[0];
+  if (probe === undefined) {
+    throw new WebError("authentication", "Codex search requires Pi's OpenAI subscription login. Sign in with /login.");
+  }
+
+  let auth: OpenAIAuth;
   try {
-    auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+    auth = await ctx.modelRegistry.getApiKeyAndHeaders(probe);
   } catch {
-    throw new WebError("authentication", `Codex authentication failed for model "${model.id}".`);
+    throw new WebError("authentication", `OpenAI authentication failed for model "${probe.id}".`);
   }
   if (signal?.aborted) throw new WebError("cancelled", "Request cancelled.");
-  if (!auth.ok || !auth.apiKey) {
+  if (!auth.ok) {
+    throw new WebError("authentication", "OpenAI subscription authentication is unavailable. Sign in with /login.");
+  }
+  const token = auth.apiKey?.trim();
+  if (!token) {
     throw new WebError(
       "authentication",
-      "Codex authentication is unavailable. Sign in to OpenAI Codex using Pi's /login.",
+      "OpenAI subscription authentication returned no access token. Sign in with /login.",
     );
   }
-  if (auth.baseUrl !== undefined && !isOfficialCodexModel({ ...model, baseUrl: auth.baseUrl })) {
+  if (auth.baseUrl !== undefined && !isOfficialOpenAIBaseUrl(auth.baseUrl)) {
     throw new WebError("unsupported", "Codex search refuses credentials resolved for a nonofficial endpoint.");
   }
 
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(auth.headers ?? {})) {
-    if (value === null) headers.delete(name);
-    else headers.set(name, value);
-  }
-  headers.set("Authorization", `Bearer ${auth.apiKey}`);
-  headers.set("Content-Type", "application/json");
-  headers.set("Accept", "text/event-stream");
-  headers.set("OpenAI-Beta", "responses=experimental");
-  headers.set("originator", "pi");
-  const accountId = decodeJwtAccountId(auth.apiKey);
-  if (accountId) headers.set("chatgpt-account-id", accountId);
+  const model = configured ?? current?.id ?? (await accountSearchModel(auth, token, signal));
 
+  const headers = requestHeaders(auth, token, "text/event-stream");
+  headers.set("Content-Type", "application/json");
   const response = await requestText(
-    CODEX_RESPONSES_URL,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify(buildBody(request, model.id)),
-    },
+    OPENAI_RESPONSES_URL,
+    { method: "POST", headers, body: JSON.stringify(buildBody(request, model)) },
     signal,
     SEARCH_TIMEOUT_MS,
   );
