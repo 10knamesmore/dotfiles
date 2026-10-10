@@ -1,12 +1,12 @@
 [package]
-name = "pi-display-image-sdk"
+name = "pi-repl-tools"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-description = "Validated image display for Pi's Python worker"
+description = "Native image display and namespace summaries for Pi's Python worker"
 
 [lib]
-name = "pi_display_image"
+name = "pi_repl_tools"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -28,5 +28,5 @@ missing_docs = "deny"
 
 [package.metadata.maturin]
 bindings = "pyo3"
-module-name = "pi_display_image"
+module-name = "pi_repl_tools"
 features = ["python-extension"]

@@ -847,11 +847,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pi-display-image-sdk"
-version = "0.1.0"
-source = { directory = "packages/pi-display-image" }
-
-[[package]]
 name = "pi-python-worker"
 version = "0.1.0"
 source = { virtual = "." }
@@ -862,7 +857,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "openai" },
-    { name = "pi-display-image-sdk" },
+    { name = "pi-repl-tools" },
     { name = "pillow" },
     { name = "psutil" },
     { name = "rapidfuzz" },
@@ -881,7 +876,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "openai", specifier = ">=3.19.2" },
-    { name = "pi-display-image-sdk", directory = "packages/pi-display-image" },
+    { name = "pi-repl-tools", directory = "packages/pi-repl-tools" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "rapidfuzz", specifier = ">=3.14.6" },
@@ -891,6 +886,11 @@ requires-dist = [
     { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "tree-sitter-language-pack", specifier = ">=1.20.0" },
 ]
+
+[[package]]
+name = "pi-repl-tools"
+version = "0.1.0"
+source = { directory = "packages/pi-repl-tools" }
 
 [[package]]
 name = "pillow"

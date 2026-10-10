@@ -1,6 +1,6 @@
 //! Validate image inputs and deliver encoded images to the Python worker's sink.
 
-mod diagnostics;
+use crate::diagnostics;
 
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -42,9 +42,7 @@ struct PreparedImage {
     dimensions: (u32, u32),
 }
 
-/// Register the native Python API; the worker installs its own image transport.
-#[pymodule]
-fn pi_display_image(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(display_image, module)?)?;
     module.add_function(wrap_pyfunction!(_set_image_sink, module)?)?;
     Ok(())

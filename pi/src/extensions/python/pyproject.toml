@@ -10,7 +10,7 @@ dependencies = [
     "numpy>=2.5.3",
     "openai>=3.19.2",
     "pillow>=12.3.0",
-    "pi-display-image-sdk",
+    "pi-repl-tools",
     "psutil>=7.2.2",
     "rapidfuzz>=3.14.6",
     "regex>=2026.9.10",
@@ -26,5 +26,5 @@ package = false
 [tool.uv.sources]
 browser-use-sdk = { path = "packages/browser-use", editable = true }
 computer-use-sdk = { path = "packages/computer-use" }
-pi-display-image-sdk = { path = "packages/pi-display-image" }
+pi-repl-tools = { path = "packages/pi-repl-tools" }
 terminal-use-sdk = { path = "packages/terminal-use" }

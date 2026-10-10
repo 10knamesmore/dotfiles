@@ -117,10 +117,10 @@ class CellRuntime:
     """Bind image output and Linux desktop cleanup to the worker's active cell."""
 
     def __init__(self, interpreter: SessionInterpreter) -> None:
-        """Load required SDKs before user imports and expose the native image function."""
+        """Load required SDKs before user imports and expose native REPL helpers."""
         self.close_desktops: Callable[[], None] | None = None
         try:
-            from pi_display_image import _set_image_sink, display_image
+            from pi_repl_tools import _make_summarize, _set_image_sink, display_image
             if sys.platform == "linux":
                 from computer_use import _close_all
                 self.close_desktops = _close_all
@@ -132,6 +132,7 @@ class CellRuntime:
         self.pid = os.getpid()
         _set_image_sink(self.write_image)
         interpreter.locals["display_image"] = display_image
+        interpreter.locals["summarize"] = _make_summarize(interpreter.locals)
 
     def begin_cell(self, call_id: str, output_path: str) -> None:
         """Start an image sequence in the controller's output directory for this cell."""

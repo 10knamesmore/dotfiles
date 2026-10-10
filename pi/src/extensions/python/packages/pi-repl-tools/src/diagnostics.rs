@@ -1,4 +1,4 @@
-//! Record bounded operational metadata without image data, paths, or exception text.
+//! Record bounded operational metadata without object values, images, paths, or exception text.
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -13,10 +13,10 @@ pub(crate) fn event(message: &str) {
     let Ok(_guard) = LOG_LOCK.lock() else {
         return;
     };
-    let path = std::env::var_os("PI_DISPLAY_IMAGE_LOG")
+    let path = std::env::var_os("PI_REPL_TOOLS_LOG")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("pi-display-image-sdk.log"));
+        .unwrap_or_else(|| std::env::temp_dir().join("pi-repl-tools.log"));
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }

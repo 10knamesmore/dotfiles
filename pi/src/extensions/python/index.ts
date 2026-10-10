@@ -44,12 +44,10 @@ const COMPUTER_USE_SKILL = fileURLToPath(
   new URL("./packages/computer-use/skills/computer-use/SKILL.md", import.meta.url),
 );
 
-const BROWSER_USE_SKILL = fileURLToPath(
-  new URL("./packages/browser-use/skills/browser-use/SKILL.md", import.meta.url),
-);
+const BROWSER_USE_SKILL = fileURLToPath(new URL("./packages/browser-use/skills/browser-use/SKILL.md", import.meta.url));
 
 const TOOL_DESCRIPTION =
-  "Execute complete Python code in a persistent environment shared by this live Pi session. Variables, functions, and imports survive calls, normal exceptions, model changes, and compaction. Runs in cwd for this call, defaulting to the session directory; relative file paths and new local imports resolve there. Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable. Text output is limited, larger output is saved to a file. display_image(image) sends an image to the model; accepts a file path, encoded image bytes, or an image object. No import needed. Browser automation: import browser_use as browser and follow the browser-use skill. Create and connect browsers through this Pi adapter, not directly through playwright. session.run(async_callback) synchronously runs native Playwright async operations on a persistent background loop; return screenshot bytes and call display_image on the Python cell thread. Installed packages include implementation dependencies, not separate recommended tool entry points.";
+  "Execute Python code in a repl environment. Variables, functions, and imports survive calls. Call summarize() to inspect retained objects. Runs in cwd for this call, defaulting to the session directory; Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable.use display_image(image) to display image; accepts a file path, encoded image bytes, or an image object.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
@@ -64,7 +62,11 @@ export function registerPython(pi: ExtensionAPI): void {
   const createSession = (ctx: ExtensionContext): PythonSession => {
     currentContext = ctx;
     return new PythonSession(
-      ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared, updateEnvironment, updateStatus,
+      ctx.sessionManager.getSessionId(),
+      ctx.cwd,
+      notifyEnvironmentCleared,
+      updateEnvironment,
+      updateStatus,
     );
   };
 
@@ -164,7 +166,12 @@ export function registerPython(pi: ExtensionAPI): void {
   function updateStatus(status: PythonSessionStatus): void {
     if (!currentContext?.hasUI) return;
     const labels: Record<PythonSessionStatus["state"], string> = {
-      not_started: "not started", starting: "starting", running: "running", idle: "idle", stopping: "stopping", exited: "exited",
+      not_started: "not started",
+      starting: "starting",
+      running: "running",
+      idle: "idle",
+      stopping: "stopping",
+      exited: "exited",
     };
     currentContext.ui.setStatus("python", `Python ${labels[status.state]} · Terminals ${status.terminalCount}`);
   }
