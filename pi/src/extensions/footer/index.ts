@@ -12,10 +12,17 @@ import {
   RecentTokensPerSecondTracker,
 } from "./metrics.js";
 import { SessionMetrics } from "./session-metrics.js";
+import { SPINNER_INTERVAL_MS, spinnerFrameAt } from "./spinner.js";
 
-/** Braille spinner frames, advanced while the model or a tool is working. */
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
-const SPINNER_INTERVAL_MS = 80;
+/** Compare published activity including the animated frame, so the title follows every tick. */
+function sameActivity(a: EditorStatus["activity"], b: EditorStatus["activity"]): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "ready") return true;
+  if (b.kind === "ready") return true;
+  if (a.spinner !== b.spinner) return false;
+  if (a.kind === "tool" && b.kind === "tool") return a.toolName === b.toolName && a.toolCount === b.toolCount;
+  return true;
+}
 
 /** Tracks session metrics and activity for the editor, and owns the footer component. */
 class FooterRuntime {
@@ -30,7 +37,6 @@ class FooterRuntime {
   private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
   private readonly activeTools = new Map<string, string>();
-  private spinnerFrame = 0;
   private spinnerTimer: ReturnType<typeof setInterval> | undefined;
   private idleStartedAt: number | undefined;
   private idleTimer: ReturnType<typeof setInterval> | undefined;
@@ -283,7 +289,7 @@ class FooterRuntime {
 
   /** One activity decision shared by the editor and title subscribers. */
   private activityStatus(): EditorStatus["activity"] {
-    const spinner = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
+    const spinner = spinnerFrameAt(Date.now());
     const model = this.modelResponse.snapshot();
     if (model.phase === "compacting") return { kind: "compacting", spinner };
     const toolNames = [...this.activeTools.values()];
@@ -297,11 +303,7 @@ class FooterRuntime {
   private publishActivity(): void {
     const next = this.activityStatus();
     const previous = this.lastPublishedActivity;
-    if (previous?.kind === next.kind) {
-      if (next.kind !== "tool") return;
-      if (previous.kind === "tool" && previous.toolName === next.toolName && previous.toolCount === next.toolCount)
-        return;
-    }
+    if (previous !== undefined && sameActivity(previous, next)) return;
     this.lastPublishedActivity = next;
     this.onActivityChanged(next);
   }
@@ -310,9 +312,9 @@ class FooterRuntime {
     const active =
       this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.metrics.isRunning();
     if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
-      this.spinnerFrame = 0;
       this.spinnerTimer = setInterval(() => {
-        this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
+        // Publishing every frame keeps the titlebar animation on the same clock.
+        this.publishActivity();
         this.component?.requestRender();
       }, SPINNER_INTERVAL_MS);
     } else if (!active && this.spinnerTimer) {

@@ -9,10 +9,6 @@ import { sanitizeFooterText } from "../footer/format.js";
  */
 const TITLE_PREFIX = "π";
 
-/** Tool execution keeps a distinct spinner from model work. */
-const MODEL_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
-const TOOL_FRAMES = ["◐", "◓", "◑", "◒"] as const;
-
 type BusyActivity = Exclude<EditorActivity, { kind: "ready" }>;
 
 /** Session identity Pi shows in the title. */
@@ -29,15 +25,13 @@ export function baseTitle(context: TitleContext): string {
     : `${TITLE_PREFIX} - ${directory}`;
 }
 
-/** Busy title: animated phase marker in front of the base title. */
-export function busyTitle(activity: BusyActivity, frameIndex: number, context: TitleContext): string {
-  const frames = activity.kind === "tool" ? TOOL_FRAMES : MODEL_FRAMES;
-  const frame = frames[frameIndex % frames.length] ?? frames[0];
+/** Busy title: the activity frame the footer publishes, in front of the base title. */
+export function busyTitle(activity: BusyActivity, context: TitleContext): string {
   const label =
     activity.kind === "tool"
       ? activity.toolCount > 1
         ? `TOOLS ${activity.toolCount}`
         : `TOOL · ${sanitizeFooterText(activity.toolName)}`
       : activity.kind.toUpperCase();
-  return `${frame} ${label} · ${baseTitle(context)}`;
+  return `${activity.spinner} ${label} · ${baseTitle(context)}`;
 }
