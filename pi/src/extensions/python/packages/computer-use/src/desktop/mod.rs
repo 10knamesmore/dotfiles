@@ -52,12 +52,13 @@ impl Desktop {
         })
     }
 
-    /// Capture the focused or named output; rect uses native pixels and max_size only scales the image.
-    #[pyo3(signature = (*, monitor=None, rect=None, max_size=None))]
+    /// Capture the focused or named output, one window, or a rect; max_size only scales the image.
+    #[pyo3(signature = (*, monitor=None, window=None, rect=None, max_size=None))]
     fn capture(
         &self,
         py: Python<'_>,
         monitor: Option<String>,
+        window: Option<String>,
         rect: Option<Rect>,
         max_size: Option<u32>,
     ) -> PyResult<Capture> {
@@ -68,24 +69,41 @@ impl Desktop {
                 &session.target,
                 id,
                 monitor,
+                window,
                 rect,
                 max_size,
             )
         })
     }
 
-    #[pyo3(signature = (x, y, *, relative_to=None))]
+    /// Move the pointer to absolute desktop or capture-image coordinates, or by a relative delta.
+    #[pyo3(signature = (x, y, *, relative_to=None, relative=false))]
     fn move_pointer(
         &self,
         py: Python<'_>,
         x: f64,
         y: f64,
         relative_to: Option<&Capture>,
+        relative: bool,
     ) -> PyResult<()> {
-        let point = self.point((x, y), relative_to)?;
-        self.handle.call(py, "move_pointer", move |session| {
-            session.input(|input, control, target| input.move_pointer(control, target, point))
-        })
+        if relative {
+            if relative_to.is_some() {
+                return Err(wait::invalid(
+                    "relative_to cannot be combined with relative motion",
+                ));
+            }
+            self.handle.shared.check()?;
+            self.handle.call(py, "move_pointer", move |session| {
+                session.input(|input, control, target| {
+                    input.move_pointer_relative(control, target, (x, y))
+                })
+            })
+        } else {
+            let point = self.point((x, y), relative_to)?;
+            self.handle.call(py, "move_pointer", move |session| {
+                session.input(|input, control, target| input.move_pointer(control, target, point))
+            })
+        }
     }
 
     #[pyo3(signature = (x, y, *, button="left", count=1, relative_to=None))]
@@ -126,10 +144,40 @@ impl Desktop {
         })
     }
 
-    #[pyo3(signature = (amount, *, horizontal=false))]
-    fn scroll(&self, py: Python<'_>, amount: i32, horizontal: bool) -> PyResult<()> {
+    /// Scroll discrete wheel steps or, with continuous=true, one fractional amount at the pointer.
+    #[pyo3(signature = (amount, *, horizontal=false, continuous=false))]
+    fn scroll(
+        &self,
+        py: Python<'_>,
+        amount: f64,
+        horizontal: bool,
+        continuous: bool,
+    ) -> PyResult<()> {
         self.handle.call(py, "scroll", move |session| {
-            session.input(|input, control, _| input.scroll(control, amount, horizontal))
+            session.input(|input, control, _| input.scroll(control, amount, horizontal, continuous))
+        })
+    }
+
+    /// Press and keep holding the given buttons until button_up() or release_buttons().
+    #[pyo3(signature = (*buttons))]
+    fn button_down(&self, py: Python<'_>, buttons: Vec<String>) -> PyResult<()> {
+        self.handle.call(py, "button_down", move |session| {
+            session.input(|input, control, _| input.button_down(control, &buttons).map(|_| ()))
+        })
+    }
+
+    /// Release the given held buttons; buttons that are not held have no effect.
+    #[pyo3(signature = (*buttons))]
+    fn button_up(&self, py: Python<'_>, buttons: Vec<String>) -> PyResult<()> {
+        self.handle.call(py, "button_up", move |session| {
+            session.input(|input, control, _| input.button_up(control, &buttons))
+        })
+    }
+
+    /// Release every held button on this desktop without closing it.
+    fn release_buttons(&self, py: Python<'_>) -> PyResult<()> {
+        self.handle.call(py, "release_buttons", |session| {
+            session.input(|input, control, _| input.release_buttons(control))
         })
     }
 
@@ -281,7 +329,7 @@ impl Hold {
             let result = self.handle.call(py, "hold.exit", move |session| {
                 session.input(|input, control, _| {
                     input.run(control, |input| {
-                        input.release_acquisitions(&acquisitions);
+                        input.release_acquisitions(control, &acquisitions);
                         Ok(())
                     })
                 })

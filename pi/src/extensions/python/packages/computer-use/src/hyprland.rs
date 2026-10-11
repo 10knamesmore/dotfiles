@@ -140,6 +140,7 @@ pub(crate) fn dispatch(control: &Control, target: &Target, expression: &str) -> 
 /// Output geometry in desktop logical coordinates; capture pixels retain the native mode.
 #[derive(Clone, Deserialize)]
 pub(crate) struct Monitor {
+    pub id: i32,
     pub name: String,
     pub width: u32,
     pub height: u32,
@@ -177,4 +178,61 @@ pub(crate) fn monitors(control: &Control, target: &Target) -> PyResult<Vec<Monit
         return Err(wait::runtime("Hyprland returned invalid output geometry"));
     }
     Ok(monitors)
+}
+
+/// One window as reported by the clients JSON query.
+#[derive(Clone, Deserialize)]
+pub(crate) struct Client {
+    /// Pointer address formatted as `0x...`; the low 32 bits identify the window to capture.
+    pub address: String,
+    pub mapped: bool,
+    pub at: [f64; 2],
+    pub size: [f64; 2],
+    pub monitor: i32,
+    pub class: String,
+}
+
+impl Client {
+    /// Pointer address parsed from the JSON `0x...` field.
+    pub(crate) fn raw_address(&self) -> PyResult<u64> {
+        let hex = self.address.strip_prefix("0x").unwrap_or(&self.address);
+        u64::from_str_radix(hex, 16)
+            .map_err(|_| wait::runtime("Hyprland returned an invalid window address"))
+    }
+
+    /// Handle expected by hyprland_toplevel_export_manager_v1: the lower 32 address bits.
+    pub(crate) fn handle(&self) -> PyResult<u32> {
+        Ok((self.raw_address()? & 0xFFFF_FFFF) as u32)
+    }
+
+    /// Main surface box in desktop logical coordinates, matching client `at`/`size` fields.
+    pub(crate) fn bounds(&self) -> (f64, f64, f64, f64) {
+        (self.at[0], self.at[1], self.size[0], self.size[1])
+    }
+}
+
+pub(crate) fn clients(control: &Control, target: &Target) -> PyResult<Vec<Client>> {
+    serde_json::from_value(query_value(control, target, "clients")?).map_err(wait::runtime)
+}
+
+pub(crate) fn active_window(control: &Control, target: &Target) -> PyResult<Option<Client>> {
+    let value = query_value(control, target, "activewindow")?;
+    if value.get("address").is_none() {
+        return Ok(None);
+    }
+    serde_json::from_value(value)
+        .map(Some)
+        .map_err(wait::runtime)
+}
+
+pub(crate) fn cursor_position(control: &Control, target: &Target) -> PyResult<(f64, f64)> {
+    let value = query_value(control, target, "cursorpos")?;
+    let x = value.get("x").and_then(Value::as_f64);
+    let y = value.get("y").and_then(Value::as_f64);
+    match (x, y) {
+        (Some(x), Some(y)) => Ok((x, y)),
+        _ => Err(wait::runtime(
+            "Hyprland returned an invalid cursor position",
+        )),
+    }
 }

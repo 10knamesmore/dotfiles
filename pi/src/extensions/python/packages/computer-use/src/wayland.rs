@@ -9,6 +9,9 @@ use wayland_client::protocol::{
     wl_buffer, wl_callback, wl_output, wl_registry, wl_seat, wl_shm, wl_shm_pool,
 };
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle, WEnum, delegate_noop};
+use wayland_protocols_hyprland::toplevel_export::v1::client::{
+    hyprland_toplevel_export_frame_v1, hyprland_toplevel_export_manager_v1,
+};
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::{
     zwp_virtual_keyboard_manager_v1, zwp_virtual_keyboard_v1,
 };
@@ -79,6 +82,10 @@ pub(crate) struct State {
 
     /// Capture manager; binding it does not request a screenshot.
     pub screencopy: Option<zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1>,
+
+    /// Single-window capture manager; binding it does not request a capture.
+    pub toplevel_export:
+        Option<hyprland_toplevel_export_manager_v1::HyprlandToplevelExportManagerV1>,
 
     /// Pointer factory; devices are created only by input operations.
     pub pointer_manager: Option<zwlr_virtual_pointer_manager_v1::ZwlrVirtualPointerManagerV1>,
@@ -232,6 +239,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 "zwlr_screencopy_manager_v1" if version >= 3 => {
                     state.screencopy = Some(registry.bind(name, 3, qh, ()))
                 }
+                "hyprland_toplevel_export_manager_v1" if version >= 1 => {
+                    state.toplevel_export = Some(registry.bind(name, 1, qh, ()))
+                }
                 "zwlr_virtual_pointer_manager_v1" if version >= 2 => {
                     state.pointer_manager = Some(registry.bind(name, 2, qh, ()))
                 }
@@ -316,11 +326,43 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, ()> for State {
     }
 }
 
+impl Dispatch<hyprland_toplevel_export_frame_v1::HyprlandToplevelExportFrameV1, ()> for State {
+    fn event(
+        state: &mut Self,
+        _: &hyprland_toplevel_export_frame_v1::HyprlandToplevelExportFrameV1,
+        event: hyprland_toplevel_export_frame_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        use hyprland_toplevel_export_frame_v1::Event;
+        match event {
+            Event::Buffer {
+                format,
+                width,
+                height,
+                stride,
+            } => {
+                state.frame.format = format.into_result().ok();
+                state.frame.width = width;
+                state.frame.height = height;
+                state.frame.stride = stride;
+            }
+            Event::BufferDone => state.frame.buffer_done = true,
+            Event::Flags { flags } => state.frame.y_invert = u32::from(flags) & 1 != 0,
+            Event::Ready { .. } => state.frame.ready = true,
+            Event::Failed => state.frame.failed = true,
+            _ => {}
+        }
+    }
+}
+
 delegate_noop!(State: ignore wl_shm::WlShm);
 delegate_noop!(State: ignore wl_shm_pool::WlShmPool);
 delegate_noop!(State: ignore wl_buffer::WlBuffer);
 delegate_noop!(State: ignore wl_seat::WlSeat);
 delegate_noop!(State: ignore zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1);
+delegate_noop!(State: ignore hyprland_toplevel_export_manager_v1::HyprlandToplevelExportManagerV1);
 delegate_noop!(State: ignore zwlr_virtual_pointer_manager_v1::ZwlrVirtualPointerManagerV1);
 delegate_noop!(State: ignore VirtualPointer);
 delegate_noop!(State: ignore zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1);

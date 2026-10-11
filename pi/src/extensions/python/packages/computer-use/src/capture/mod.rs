@@ -7,9 +7,10 @@ use std::os::fd::AsFd;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use wayland_client::protocol::wl_buffer;
 
 use crate::desktop::{Control, Target};
-use crate::hyprland::{self, Monitor};
+use crate::hyprland;
 use crate::wayland::{Desktop, Frame};
 use crate::{logging, wait};
 use buffer::PixelBuffer;
@@ -22,7 +23,7 @@ pub(crate) type Rect = (i64, i64, i64, i64);
 pub(crate) struct Capture {
     /// Prevents interpreting this image's coordinates on another desktop.
     pub(crate) desktop_id: u64,
-    /// Hyprland output name at capture time.
+    /// Hyprland output name at capture time; the window's monitor for window captures.
     #[pyo3(get)]
     monitor: String,
 
@@ -77,18 +78,24 @@ impl Capture {
     }
 }
 
-/// Capture native pixels from the focused or named monitor; max_size affects only the image.
+/// Capture native pixels from the focused monitor, a named monitor, or one window.
 pub(crate) fn capture(
     control: &Control,
     target: &Target,
     desktop_id: u64,
     monitor: Option<String>,
+    window: Option<String>,
     rect: Option<Rect>,
     max_size: Option<u32>,
 ) -> PyResult<Capture> {
     let result = (|| {
         if max_size == Some(0) {
             return Err(wait::invalid("max_size must be greater than zero"));
+        }
+        if monitor.is_some() && window.is_some() {
+            return Err(wait::invalid(
+                "capture accepts either monitor or window, not both",
+            ));
         }
         if let Some((x, y, w, h)) = rect
             && (x < 0 || y < 0 || w <= 0 || h <= 0)
@@ -97,95 +104,190 @@ pub(crate) fn capture(
                 "rect must have non-negative x/y and positive width/height",
             ));
         }
-        let info = hyprland::monitors(control, target)?
-            .into_iter()
-            .find(|info| {
-                monitor
-                    .as_ref()
-                    .map_or(info.focused, |name| *name == info.name)
-            })
-            .ok_or_else(|| wait::invalid("requested monitor was not found"))?;
+
+        let (base, name, handle, expected_pixels) = if let Some(selector) = window.as_deref() {
+            let (client, monitor) = resolve_window(control, target, selector)?;
+            let expected = (
+                (client.size[0] * monitor.scale).round() as u32,
+                (client.size[1] * monitor.scale).round() as u32,
+            );
+            (
+                client.bounds(),
+                monitor.name,
+                Some(client.handle()?),
+                Some(expected),
+            )
+        } else {
+            let info = hyprland::monitors(control, target)?
+                .into_iter()
+                .find(|info| {
+                    monitor
+                        .as_ref()
+                        .map_or(info.focused, |name| *name == info.name)
+                })
+                .ok_or_else(|| wait::invalid("requested monitor was not found"))?;
+            (info.bounds(), info.name, None, None)
+        };
+
         let mut desktop = Desktop::connect(control, target)?;
-        let output = desktop
-            .state
-            .outputs
-            .values()
-            .find(|output| output.name == info.name)
-            .ok_or_else(|| wait::runtime("monitor is not advertised by Wayland"))?;
-        let transform = output.transform;
-        let manager = desktop
-            .state
-            .screencopy
-            .as_ref()
-            .ok_or_else(|| wait::runtime("zwlr_screencopy_manager_v1 v3 is required"))?;
-        let frame = manager.capture_output(1, &output.proxy, &desktop.queue.handle(), ());
-        desktop.wait_for(control, true, |state| {
-            state.frame.buffer_done || state.frame.failed
-        })?;
-        if desktop.state.frame.failed {
-            return Err(wait::runtime("compositor refused the capture"));
+        let (bytes, geometry, transform) = match handle {
+            Some(handle) => {
+                let manager = desktop.state.toplevel_export.as_ref().ok_or_else(|| {
+                    wait::runtime("hyprland_toplevel_export_manager_v1 is required")
+                })?;
+                let frame = manager.capture_toplevel(0, handle, &desktop.queue.handle(), ());
+                let (bytes, geometry) =
+                    grab_frame(control, &mut desktop, |buffer| frame.copy(buffer, 1))?;
+                frame.destroy();
+                (bytes, geometry, 0)
+            }
+            None => {
+                let (transform, frame) = {
+                    let output = desktop
+                        .state
+                        .outputs
+                        .values()
+                        .find(|output| output.name == name)
+                        .ok_or_else(|| wait::runtime("monitor is not advertised by Wayland"))?;
+                    let manager = desktop.state.screencopy.as_ref().ok_or_else(|| {
+                        wait::runtime("zwlr_screencopy_manager_v1 v3 is required")
+                    })?;
+                    (
+                        output.transform,
+                        manager.capture_output(1, &output.proxy, &desktop.queue.handle(), ()),
+                    )
+                };
+                let (bytes, geometry) =
+                    grab_frame(control, &mut desktop, |buffer| frame.copy(buffer))?;
+                frame.destroy();
+                (bytes, geometry, transform)
+            }
+        };
+        if let Some((width, height)) = expected_pixels
+            && (geometry.width != width || geometry.height != height)
+        {
+            return Err(wait::runtime(
+                "window is resizing; capture again after its geometry settles",
+            ));
         }
-        let format = desktop
-            .state
-            .frame
-            .format
-            .ok_or_else(|| wait::runtime("compositor did not offer a shared-memory capture"))?;
-        let geometry = &desktop.state.frame;
-        let length = geometry
-            .stride
-            .checked_mul(geometry.height)
-            .filter(|length| *length <= i32::MAX as u32 && *length > 0)
-            .ok_or_else(|| wait::runtime("invalid capture buffer size"))?;
-        if geometry.width > i32::MAX as u32 || geometry.height > i32::MAX as u32 {
-            return Err(wait::runtime("invalid capture dimensions"));
-        }
-        let file = tempfile::tempfile().map_err(wait::runtime)?;
-        file.set_len(length as u64).map_err(wait::runtime)?;
-        let shm = desktop
-            .state
-            .shm
-            .as_ref()
-            .ok_or_else(|| wait::runtime("wl_shm is required"))?;
-        let pool = shm.create_pool(file.as_fd(), length as i32, &desktop.queue.handle(), ());
-        let buffer = pool.create_buffer(
-            0,
-            geometry.width as i32,
-            geometry.height as i32,
-            geometry.stride as i32,
-            format,
-            &desktop.queue.handle(),
-            (),
-        );
-        frame.copy(&buffer);
-        desktop.wait_for(control, true, |state| {
-            state.frame.ready || state.frame.failed
-        })?;
-        if desktop.state.frame.failed {
-            return Err(wait::runtime("compositor could not copy the capture"));
-        }
-        frame.destroy();
-        buffer.destroy();
-        pool.destroy();
-        desktop.sync(control, true)?;
-        let geometry = std::mem::take(&mut desktop.state.frame);
-        drop(desktop);
-        let mut file = file;
-        file.rewind().map_err(wait::runtime)?;
-        let mut bytes = vec![0; length as usize];
-        file.read_exact(&mut bytes).map_err(wait::runtime)?;
         control.check()?;
-        let result = prepare(bytes, geometry, transform, info, rect, max_size, desktop_id)?;
+        let result = prepare(
+            bytes, geometry, transform, base, name, rect, max_size, desktop_id,
+        )?;
         control.check()?;
         Ok(result)
     })();
     logging::result("capture", result)
 }
 
+/// Resolve `active` or a clients address to one mapped window and its monitor.
+fn resolve_window(
+    control: &Control,
+    target: &Target,
+    selector: &str,
+) -> PyResult<(hyprland::Client, hyprland::Monitor)> {
+    let client = if selector == "active" {
+        hyprland::active_window(control, target)?
+            .ok_or_else(|| wait::runtime("there is no active window"))?
+    } else {
+        let wanted = selector.strip_prefix("address:").unwrap_or(selector);
+        if !wanted.starts_with("0x") {
+            return Err(wait::invalid(
+                "window must be \"active\" or an address from the clients query",
+            ));
+        }
+        let wanted = parse_address(wanted)?;
+        hyprland::clients(control, target)?
+            .into_iter()
+            .find(|client| client.raw_address().is_ok_and(|address| address == wanted))
+            .ok_or_else(|| wait::runtime("no window matches the requested address"))?
+    };
+    if !client.mapped {
+        return Err(wait::runtime(format!(
+            "window is not mapped: {}",
+            client.class
+        )));
+    }
+    let monitor = hyprland::monitors(control, target)?
+        .into_iter()
+        .find(|monitor| monitor.id == client.monitor)
+        .ok_or_else(|| wait::runtime("window monitor was not found"))?;
+    Ok((client, monitor))
+}
+
+fn parse_address(raw: &str) -> PyResult<u64> {
+    let hex = raw.strip_prefix("0x").unwrap_or(raw);
+    u64::from_str_radix(hex, 16).map_err(|_| wait::invalid("invalid window address"))
+}
+
+/// Copy the advertised shared-memory frame, free it, and return raw bytes with metadata.
+fn grab_frame(
+    control: &Control,
+    desktop: &mut Desktop,
+    copy: impl FnOnce(&wl_buffer::WlBuffer),
+) -> PyResult<(Vec<u8>, Frame)> {
+    desktop.wait_for(control, true, |state| {
+        state.frame.buffer_done || state.frame.failed
+    })?;
+    if desktop.state.frame.failed {
+        return Err(wait::runtime("compositor refused the capture"));
+    }
+    let format = desktop
+        .state
+        .frame
+        .format
+        .ok_or_else(|| wait::runtime("compositor did not offer a shared-memory capture"))?;
+    let width = desktop.state.frame.width;
+    let height = desktop.state.frame.height;
+    let stride = desktop.state.frame.stride;
+    let length = stride
+        .checked_mul(height)
+        .filter(|length| *length <= i32::MAX as u32 && *length > 0)
+        .ok_or_else(|| wait::runtime("invalid capture buffer size"))?;
+    if width > i32::MAX as u32 || height > i32::MAX as u32 {
+        return Err(wait::runtime("invalid capture dimensions"));
+    }
+    let file = tempfile::tempfile().map_err(wait::runtime)?;
+    file.set_len(length as u64).map_err(wait::runtime)?;
+    let shm = desktop
+        .state
+        .shm
+        .as_ref()
+        .ok_or_else(|| wait::runtime("wl_shm is required"))?;
+    let pool = shm.create_pool(file.as_fd(), length as i32, &desktop.queue.handle(), ());
+    let buffer = pool.create_buffer(
+        0,
+        width as i32,
+        height as i32,
+        stride as i32,
+        format,
+        &desktop.queue.handle(),
+        (),
+    );
+    copy(&buffer);
+    desktop.wait_for(control, true, |state| {
+        state.frame.ready || state.frame.failed
+    })?;
+    if desktop.state.frame.failed {
+        return Err(wait::runtime("compositor could not copy the capture"));
+    }
+    buffer.destroy();
+    pool.destroy();
+    desktop.sync(control, true)?;
+    let geometry = std::mem::take(&mut desktop.state.frame);
+    let mut file = file;
+    file.rewind().map_err(wait::runtime)?;
+    let mut bytes = vec![0; length as usize];
+    file.read_exact(&mut bytes).map_err(wait::runtime)?;
+    Ok((bytes, geometry))
+}
+
 fn prepare(
     bytes: Vec<u8>,
     frame: Frame,
     transform: u32,
-    monitor: Monitor,
+    base: Bounds,
+    monitor: String,
     rect: Option<Rect>,
     max_size: Option<u32>,
     desktop_id: u64,
@@ -195,12 +297,11 @@ fn prepare(
     let rect = rect.unwrap_or((0, 0, full_width as i64, full_height as i64));
     let buffer = buffer.crop(rect)?;
     let (x, y, width, height) = rect;
-    let screen = monitor.bounds();
     let bounds = (
-        screen.0 + x as f64 * screen.2 / full_width as f64,
-        screen.1 + y as f64 * screen.3 / full_height as f64,
-        width as f64 * screen.2 / full_width as f64,
-        height as f64 * screen.3 / full_height as f64,
+        base.0 + x as f64 * base.2 / full_width as f64,
+        base.1 + y as f64 * base.3 / full_height as f64,
+        width as f64 * base.2 / full_width as f64,
+        height as f64 * base.3 / full_height as f64,
     );
     let mut size = buffer.size();
     if let Some(maximum) = max_size
@@ -214,7 +315,7 @@ fn prepare(
     }
     Ok(Capture {
         desktop_id,
-        monitor: monitor.name,
+        monitor,
         size,
         bounds,
         buffer,

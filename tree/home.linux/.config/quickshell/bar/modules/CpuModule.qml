@@ -4,6 +4,7 @@ import "../../theme"
 import "../../state"
 import "../components"
 import QtQuick
+import QtQuick.Shapes
 
 // 头部始终读取一秒快照；逐核图在 hover 时预览，移入面板后铺满头部剩余宽度。
 BarModule {
@@ -40,30 +41,79 @@ BarModule {
 
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 5
+        spacing: 8
 
-        Text {
+        Shape {
+            Accessible.ignored: true
             anchors.verticalCenter: parent.verticalCenter
-            color: Colors.blue
-            font.family: Fonts.family
-            font.pixelSize: Fonts.icon
-            font.weight: Font.DemiBold
-            text: ""
+            height: 24
+            preferredRendererType: Shape.CurveRenderer
+            width: 24
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: Colors.withAlpha(root.accentColor, 0.15)
+                strokeWidth: 2.6
+
+                PathAngleArc {
+                    centerX: 12
+                    centerY: 12
+                    radiusX: 10
+                    radiusY: 10
+                    startAngle: -90
+                    sweepAngle: 360
+                }
+            }
+            ShapePath {
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                strokeColor: root.accentColor
+                strokeWidth: 2.6
+
+                PathAngleArc {
+                    centerX: 12
+                    centerY: 12
+                    radiusX: 10
+                    radiusY: 10
+                    startAngle: -90
+                    sweepAngle: root.usage * 3.6
+
+                    Behavior on sweepAngle {
+                        NumberAnimation {
+                            duration: Tokens.animNormal
+                        }
+                    }
+                }
+            }
         }
-        Text {
-            id: usageText
-            width: usageSize.width
-            horizontalAlignment: Text.AlignRight
+        Column {
             anchors.verticalCenter: parent.verticalCenter
-            color: root.usage > 80 ? Colors.red : root.usage > 50 ? Colors.yellow : Colors.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.bodyLarge
-            font.weight: Font.DemiBold
-            text: root.usage + "%"
+            spacing: 1
+            width: usageSize.width
 
-            Behavior on color {
-                ColorAnimation {
-                    duration: Tokens.animNormal
+            Text {
+                Accessible.ignored: true
+                color: root.accentColor
+                font.family: Fonts.family
+                font.pixelSize: Fonts.xs
+                font.weight: Font.DemiBold
+                text: "CPU"
+            }
+            Text {
+                id: usageText
+
+                Accessible.ignored: true
+                color: root.usage > 80 ? Colors.red : root.usage > 50 ? Colors.yellow : Colors.text
+                font.family: Fonts.family
+                font.pixelSize: Fonts.small
+                font.weight: Font.DemiBold
+                text: root.usage + "%"
+                width: parent.width
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Tokens.animNormal
+                    }
                 }
             }
         }

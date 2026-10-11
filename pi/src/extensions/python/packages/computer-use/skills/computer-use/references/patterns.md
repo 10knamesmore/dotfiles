@@ -65,6 +65,30 @@ display_image(desktop.capture(monitor="DP-3", max_size=1600))
 
 不要自行除以显示器 scale 或重复加裁剪偏移。`relative_to` 已包含转换信息，且只接受当前桌面对象的截图。显示器布局变化或目标窗口移动后重新观察。
 
+## 按窗口捕获与分步拖拽
+
+```python
+clients = desktop.hyprland.query("clients")
+target = next(c for c in clients if c["class"] == "google-chrome")
+# 窗口打开动画结束后尺寸才固定；此时捕获报错就稍后重试。
+shot = desktop.capture(window=target["address"])
+display_image(shot)
+
+# 按住按钮后可以跨多次调用移动，适合 HTML5 拖放和需要停顿的框选。
+desktop.move_pointer(200, 160, relative_to=shot)
+desktop.button_down("left")
+desktop.move_pointer(260, 200, relative_to=shot)
+desktop.move_pointer(320, 240, relative_to=shot)
+desktop.button_up("left")
+
+# 指针锁定应用和精细调整用相对位移。
+desktop.move_pointer(0, -40, relative=True)
+```
+
+`window` 只接受 `"active"` 或 `clients` 里的 `address`（可带 `address:` 前缀）；多个窗口共享 class 时先按 title 选出目标再取地址。窗口捕获不含鼠标指针，`rect` 是窗口帧内的原生像素。
+
+窗口刚出现后的第一次拖拽可能被窗口激活流程吞掉（`drag()` 同样如此）；拖拽没有生效时重试一次即可。
+
 ## 读取区域 RGB 与原始字节
 
 ```python
@@ -117,7 +141,7 @@ display_image(shot)
 desktop.drag((300, 350), (800, 350), duration=0.4, relative_to=shot)
 ```
 
-`scroll(-2)` 向上两格；`scroll(2, horizontal=True)` 向右两格。拖拽中断会释放按钮；重新截图确认应用已经接受了哪些动作。
+`scroll(-2)` 向上两格；`scroll(2, horizontal=True)` 向右两格。`scroll(1.5, continuous=True)` 用连续轴发送更细的滚动量，一个整数单位等于一格的行程。拖拽中断会释放按钮；重新截图确认应用已经接受了哪些动作。
 
 ## 交还当前桌面
 

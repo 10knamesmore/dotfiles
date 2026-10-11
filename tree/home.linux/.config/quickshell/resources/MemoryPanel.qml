@@ -46,7 +46,7 @@ PanelOverlay {
             StatRow {
                 label: "可用"
                 value: StatsFormat.gib(root.memory.availableBytes) + " GiB"
-                valueColor: Colors.mauve
+                valueColor: Colors.teal
                 width: parent.width
             }
             StatRow {
@@ -57,7 +57,7 @@ PanelOverlay {
             }
             TimeSeriesChart {
                 Accessible.name: "已用内存，最近一分钟"
-                lineColor: Colors.mauve
+                lineColor: Colors.teal
                 maxValue: root.memory.totalBytes
                 points: ResourceStats.memoryHistory
                 width: parent.width

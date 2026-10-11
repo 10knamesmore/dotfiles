@@ -60,6 +60,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "wayland-client",
+ "wayland-protocols-hyprland",
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "xkbcommon",
@@ -507,6 +508,20 @@ dependencies = [
  "bitflags",
  "wayland-backend",
  "wayland-client",
+ "wayland-scanner",
+]
+
+[[package]]
+name = "wayland-protocols-hyprland"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "398431fac4608bdae919e5c21a1f53af76deb9fcafdf682912a506ecc945582f"
+dependencies = [
+ "bitflags",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
  "wayland-scanner",
 ]
 

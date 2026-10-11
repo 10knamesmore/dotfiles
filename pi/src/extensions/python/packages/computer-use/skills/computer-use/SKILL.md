@@ -27,7 +27,7 @@ display_image(shot)
 
 以最近一次截图为坐标依据：`desktop.click(x, y, relative_to=shot)`。坐标是图像像素，不是缩放前的 buffer 像素；不传 `relative_to` 时使用桌面逻辑单位。截图只能用于它所属的桌面对象；重新连接、切换显示器布局或移动窗口后重新截图。
 
-`capture(rect=(x,y,width,height))` 按完整、方向正确的原始输出像素裁剪，越界报错。`shot.buffer.data` 是未编码像素字节；`shot.buffer.rgb()` 返回原生 8-bit 或 10-bit RGB 数组。`display_image(shot)` 按需生成同一帧的 8-bit PNG；`max_size` 只缩小图像，不改变 buffer。详见 [API](references/api.md)。
+`capture(rect=(x,y,width,height))` 按完整、方向正确的原始输出像素裁剪，越界报错。`capture(window="active"|"address:0x…")` 捕获单个窗口内容（不含鼠标指针）；窗口打开动画或改大小期间会报错，等几何稳定后重试。`shot.buffer.data` 是未编码像素字节；`shot.buffer.rgb()` 返回原生 8-bit 或 10-bit RGB 数组。`display_image(shot)` 按需生成同一帧的 8-bit PNG；`max_size` 只缩小图像，不改变 buffer。详见 [API](references/api.md)。
 
 ## 输入
 
@@ -41,7 +41,7 @@ desktop.type_text("你好，世界")
 
 `hold()` 只释放此作用域新获取的键，支持嵌套。成功的 `key_down()` 可跨 cell 保留，局部组合键优先用 `hold()`。`release_keys()` 只释放当前对象的虚拟键，不等于交还桌面；它不能释放用户物理键盘的按键。
 
-滚动作用于当前指针位置，单位为离散格数：正数向下，`horizontal=True` 时向右。Hyprland 使用当前 Lua dispatcher 表达式，例如 `desktop.hyprland.dispatch("hl.dsp.focus({ workspace = 3 })")`。窗口选择器、裁剪、拖拽和后台应用示例见 [patterns](references/patterns.md)。
+滚动作用于当前指针位置，单位为离散格数：正数向下，`horizontal=True` 时向右；`continuous=True` 时接受小数，一个整数单位等于一格。拖放和需要停顿的框选用 `button_down()` → 多次移动 → `button_up()`；指针锁定应用用 `move_pointer(..., relative=True)`。Hyprland 使用当前 Lua dispatcher 表达式，例如 `desktop.hyprland.dispatch("hl.dsp.focus({ workspace = 3 })")`。窗口选择器、裁剪、拖拽和后台应用示例见 [patterns](references/patterns.md)。
 
 ## 交还、撤销与错误
 

@@ -51,11 +51,13 @@ SDK 独立打开 lockfile 并以 `LOCK_EX | LOCK_NB` 加锁，成功后写 PID�
 
 ## 捕获与输入
 
-`desktop.capture()` 同时返回原始缓冲区与图像。`Capture.buffer` 保留裁剪区域的原生像素字和 8-bit/10-bit 位深，只修正方向、裁剪并移除行填充。`_repr_png_()` 按需生成同一帧的 8-bit RGB PNG；`max_size` 只限制图像，不改变 buffer。`display_image` 由 Python worker 提供，SDK 不依赖图像展示包。
+`desktop.capture()` 同时返回原始缓冲区与图像。`capture(window=...)` 按 `"active"` 或 `clients` 的 `address` 捕获单个窗口内容；它不含边框、阴影和鼠标指针，窗口打开或改大小期间会报 `RuntimeError`，等几何稳定后重试。`Capture.buffer` 保留裁剪区域的原生像素字和 8-bit/10-bit 位深，只修正方向、裁剪并移除行填充。`_repr_png_()` 按需生成同一帧的 8-bit RGB PNG；`max_size` 只限制图像，不改变 buffer。`display_image` 由 Python worker 提供，SDK 不依赖图像展示包。
 
 `relative_to=shot` 使用图像像素坐标，自动处理裁剪和缩放；截图绑定原桌面对象，不能在另一个对象上用于输入。桌面关闭后，已有截图仍可作为不可变图像或缓冲区读取。
 
 键名采用 US 基础键位对应的 XKB 名称。`hold()` 只释放当前作用域新获取的键；嵌套作用域与重新获取的同名键用独立标识区分。`type_text()` 通过专用 Unicode 键图输入，不改剪贴板，也不绕过应用输入法。物理键盘状态不属于 SDK，不能通过释放 API 清除。
+
+指针支持绝对和相对移动。`move_pointer(..., relative=True)` 发送相对位移，用于指针锁定应用和精细调整，不能与 `relative_to` 同用。`button_down()`/`button_up()` 可跨调用按住鼠标按钮，适合需要停顿的拖放、滑条和区域选择；`click()` 与 `drag()` 只释放本次自己按下的按钮，不会松开调用前已经持有的按钮。`scroll()` 默认按整数格滚动，`continuous=True` 时接受小数，一个整数单位等于一格。
 
 每个桌面的原生线程独占 XKB/Wayland 状态。Python 等待期间释放 GIL 并检查取消；取消会等待桌面清理后传播原异常。先前有键盘输入时，切换到文字键图或执行首个指针操作前等待 20 ms，让客户端和输入法处理已发送的按键；文本逐字符保留投递时间，额外间隔由 `interval` 指定。操作后仍需观察应用结果，协议确认不等于业务完成。
 

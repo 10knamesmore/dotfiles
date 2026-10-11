@@ -6,6 +6,7 @@ mod pointer;
 use pyo3::prelude::*;
 use serde_json::json;
 use std::time::{Duration, Instant};
+use wayland_client::protocol::wl_pointer::ButtonState;
 use xkbcommon::xkb;
 
 use crate::desktop::{Control, Target};
@@ -19,6 +20,13 @@ struct HeldKey {
     acquisition: u64,
 }
 
+struct HeldButton {
+    pointer: VirtualPointer,
+    button: u32,
+    /// Never reused, so an old scope cannot release a later acquisition.
+    acquisition: u64,
+}
+
 /// XKB and Wayland objects never leave the thread that constructs this value.
 pub(crate) struct Input {
     desktop: Desktop,
@@ -27,7 +35,7 @@ pub(crate) struct Input {
     pointers: std::collections::HashMap<String, VirtualPointer>,
     keys: Vec<HeldKey>,
     keyboard_pending: bool,
-    buttons: Vec<(VirtualPointer, u32)>,
+    buttons: Vec<HeldButton>,
     next_acquisition: u64,
     clock: Instant,
 }
@@ -107,7 +115,8 @@ impl Input {
         Ok(acquisitions)
     }
 
-    pub(crate) fn release_acquisitions(&mut self, acquisitions: &[u64]) {
+    /// Release the given acquisitions on keys and buttons, newest first.
+    pub(crate) fn release_acquisitions(&mut self, control: &Control, acquisitions: &[u64]) {
         for acquisition in acquisitions.iter().rev() {
             if let Some(index) = self
                 .keys
@@ -115,6 +124,12 @@ impl Input {
                 .position(|held| held.acquisition == *acquisition)
             {
                 self.release_key(index);
+            } else if let Some(index) = self
+                .buttons
+                .iter()
+                .position(|held| held.acquisition == *acquisition)
+            {
+                self.release_button_at(control, index);
             }
         }
     }
@@ -147,24 +162,58 @@ impl Input {
         Ok(())
     }
 
-    fn release_buttons(&mut self, control: &Control) {
-        while let Some((pointer, button)) = self.buttons.pop() {
-            pointer.button(
-                self.time(),
-                button,
-                wayland_client::protocol::wl_pointer::ButtonState::Released,
-            );
-            pointer.frame();
-            // A failed display channel must never prevent the matching Wayland button release.
-            let _ = control.event(
-                json!({"type":"button", "button":pointer::button_name(button), "pressed":false}),
-            );
+    fn release_all_buttons(&mut self, control: &Control) {
+        while !self.buttons.is_empty() {
+            self.release_button_at(control, self.buttons.len() - 1);
+        }
+    }
+
+    /// Press one button unless this desktop already holds it; returns the acquisition token.
+    fn acquire_button(
+        &mut self,
+        control: &Control,
+        pointer: &VirtualPointer,
+        button: u32,
+    ) -> PyResult<Option<u64>> {
+        if self.buttons.iter().any(|held| held.button == button) {
+            return Ok(None);
+        }
+        control.check()?;
+        pointer.button(self.time(), button, ButtonState::Pressed);
+        pointer.frame();
+        let acquisition = self.next_acquisition;
+        self.next_acquisition += 1;
+        self.buttons.push(HeldButton {
+            pointer: pointer.clone(),
+            button,
+            acquisition,
+        });
+        control.event(
+            json!({"type":"button", "button":pointer::button_name(button), "pressed":true}),
+        )?;
+        Ok(Some(acquisition))
+    }
+
+    fn release_button_at(&mut self, control: &Control, index: usize) {
+        let held = self.buttons.remove(index);
+        held.pointer
+            .button(self.time(), held.button, ButtonState::Released);
+        held.pointer.frame();
+        // A failed display channel must never prevent the matching Wayland button release.
+        let _ = control.event(
+            json!({"type":"button", "button":pointer::button_name(held.button), "pressed":false}),
+        );
+    }
+
+    fn release_button_code(&mut self, control: &Control, button: u32) {
+        while let Some(index) = self.buttons.iter().position(|held| held.button == button) {
+            self.release_button_at(control, index);
         }
     }
 
     /// Always attempt the Wayland releases, even after cancel, revoke or prompt EOF.
     pub(crate) fn release_all(&mut self, control: &Control) -> PyResult<()> {
-        self.release_buttons(control);
+        self.release_all_buttons(control);
         let keys = self.release_keys();
         let sync = self.desktop.sync(control, false);
         let result = keys.and(sync);
@@ -179,7 +228,12 @@ impl Input {
         control: &Control,
         action: impl FnOnce(&mut Self) -> PyResult<T>,
     ) -> PyResult<T> {
-        let previous: Vec<_> = self.keys.iter().map(|held| held.acquisition).collect();
+        let previous: Vec<u64> = self
+            .keys
+            .iter()
+            .map(|held| held.acquisition)
+            .chain(self.buttons.iter().map(|held| held.acquisition))
+            .collect();
         let result = action(self).and_then(|value| {
             if let Err(error) = self.desktop.sync(control, true) {
                 control.disconnect();
@@ -191,11 +245,11 @@ impl Input {
             let acquired: Vec<_> = self
                 .keys
                 .iter()
-                .filter(|held| !previous.contains(&held.acquisition))
                 .map(|held| held.acquisition)
+                .chain(self.buttons.iter().map(|held| held.acquisition))
+                .filter(|acquisition| !previous.contains(acquisition))
                 .collect();
-            self.release_acquisitions(&acquired);
-            self.release_buttons(control);
+            self.release_acquisitions(control, &acquired);
             if self.desktop.sync(control, false).is_err() {
                 control.disconnect();
                 logging::event("input.rollback", "connection-lost");
@@ -223,7 +277,7 @@ impl Input {
             for iteration in 0..count {
                 control.check()?;
                 let acquired = input.acquire(control, &keys)?;
-                input.release_acquisitions(&acquired);
+                input.release_acquisitions(control, &acquired);
                 input.show_keys(control)?;
                 input.desktop.sync(control, true)?;
                 if iteration + 1 < count {
@@ -241,6 +295,45 @@ impl Input {
 
     pub(crate) fn validate_keys(control: &Control, names: &[String]) -> PyResult<()> {
         keyboard::resolve(control, names).map(|_| ())
+    }
+
+    fn resolve_buttons(names: &[String]) -> PyResult<Vec<u32>> {
+        names.iter().map(|name| pointer::button(name)).collect()
+    }
+
+    pub(crate) fn button_down(
+        &mut self,
+        control: &Control,
+        names: &[String],
+    ) -> PyResult<Vec<u64>> {
+        let buttons = Self::resolve_buttons(names)?;
+        self.run(control, |input| {
+            let pointer = input.pointer(None)?;
+            let mut acquisitions = Vec::new();
+            for button in buttons {
+                if let Some(acquisition) = input.acquire_button(control, &pointer, button)? {
+                    acquisitions.push(acquisition);
+                }
+            }
+            Ok(acquisitions)
+        })
+    }
+
+    pub(crate) fn button_up(&mut self, control: &Control, names: &[String]) -> PyResult<()> {
+        let buttons = Self::resolve_buttons(names)?;
+        self.run(control, |input| {
+            for button in buttons {
+                input.release_button_code(control, button);
+            }
+            Ok(())
+        })
+    }
+
+    pub(crate) fn release_buttons(&mut self, control: &Control) -> PyResult<()> {
+        self.run(control, |input| {
+            input.release_all_buttons(control);
+            Ok(())
+        })
     }
 
     pub(crate) fn key_up(&mut self, control: &Control, names: &[String]) -> PyResult<()> {

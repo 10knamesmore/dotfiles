@@ -25,13 +25,18 @@ worker 在 cell 失败/取消和正常退出时调用内部 `_close_all()`。该
 
 | 调用 | 约定 |
 | --- | --- |
-| `capture(*, monitor=None, rect=None, max_size=None)` | 默认捕获焦点显示器，返回同一帧的原始像素缓冲区与按需生成的图像。`max_size` 只影响图像。 |
-| `move_pointer(x, y, *, relative_to=None)` | 默认桌面逻辑坐标；指定截图后使用其返回 PNG 的像素坐标。 |
+| `capture(*, monitor=None, window=None, rect=None, max_size=None)` | 默认捕获焦点显示器；`window` 传 `"active"` 或 `clients` 里的 `address`，捕获单个窗口内容。`max_size` 只影响图像。 |
+| `move_pointer(x, y, *, relative_to=None, relative=False)` | 默认桌面逻辑坐标；指定截图后使用其返回 PNG 的像素坐标；`relative=True` 时 x/y 是相对位移，不能与 `relative_to` 同用。 |
 | `click(x, y, *, button="left", count=1, relative_to=None)` | 移动后点击；`count` 为正整数，每次重复完整按下/松开。 |
 | `drag(start, end, *, button="left", duration=0.3, relative_to=None)` | `start/end` 为 `(x,y)`，`duration` 为非负秒数；直线移动，失败也释放按钮。路径须经过有效显示器区域。 |
-| `scroll(amount, *, horizontal=False)` | 在当前指针处滚动离散格数；正数向下或向右，0 不操作。 |
+| `button_down(*buttons)` | 按住按钮，可跨 cell 保留；已持有的按钮不重复按下。 |
+| `button_up(*buttons)` | 释放当前对象持有的对应按钮；未持有的按钮无效果。 |
+| `release_buttons()` | 释放当前对象的全部按钮，不关闭桌面。 |
+| `scroll(amount, *, horizontal=False, continuous=False)` | 在当前指针处滚动；默认 amount 为整数格数，`continuous=True` 时 amount 可为小数，一个整数单位等于一格的行程。正数向下或向右，0 不操作。 |
 
-`button` 为 `left`、`right`、`middle`、`back` 或 `forward`。
+`click`/`drag` 的 `button` 及 `button_down`/`button_up` 的按钮名为 `left`、`right`、`middle`、`back` 或 `forward`。
+
+`window` 捕获窗口内容，不含边框、阴影与鼠标指针；`bounds` 是捕获时窗口报告的盒子，`monitor` 是窗口所在显示器。窗口打开或改变大小期间各帧尺寸不一致，此时捕获报 `RuntimeError`，等窗口几何稳定后重试。窗口捕获与 `monitor` 互斥。
 
 `rect=(x,y,width,height)` 使用指定显示器内、方向正确的原始输出像素，不是桌面逻辑坐标。x/y 非负，宽高为正整数，整个矩形须在输出内；越界不裁掉溢出部分。`max_size` 为正整数，只限制图像最长边，不放大小图，也不缩放 buffer。裁剪偏移和图像缩放供 `relative_to` 转换；它接受图像像素坐标，不是 buffer 像素坐标，并拒绝其他桌面对象产生的截图。改变显示器布局后重新捕获。
 
@@ -39,7 +44,7 @@ worker 在 cell 失败/取消和正常退出时调用内部 `_close_all()`。该
 
 | 只读成员 | 含义 |
 | --- | --- |
-| `monitor: str` | 捕获的 Hyprland 显示器名称。 |
+| `monitor: str` | 捕获的 Hyprland 显示器名称；窗口捕获时为窗口所在显示器。 |
 | `size: tuple[int,int]` | 图像的像素宽高，受 `max_size` 影响。 |
 | `bounds: tuple[float,float,float,float]` | 捕获区域的桌面逻辑 `(x,y,width,height)`，含裁剪偏移，可有负原点。 |
 | `buffer: PixelBuffer` | 同一区域的未缩放像素缓冲区，保留 compositor 的像素格式和位深。 |
@@ -93,6 +98,8 @@ buffer 来自 Wayland 共享内存捕获。SDK 只重排方向、裁剪和去除
 terminal-use 的共有键名、US 基础键位含义和分参数组合键写法相同，但支持范围不同：computer 发送按下/松开事件，可以持有键并与鼠标操作组合；terminal 只发送一次编码后的输入，不提供按住状态，也不支持所有桌面组合键。
 
 `held_keys()` 和释放 API 只跟踪当前对象的虚拟设备。用户物理键盘的修饰键不能被它们释放，仍可能影响 host 应用。单次调用失败会回滚本次新获取的键和按钮；异常逃出 cell 时，worker 进一步关闭全部活动桌面。普通调用错误若被当前 cell 捕获且连接仍有效，不会关闭外层已持有的键。
+
+`button_down()` 与 `release_buttons()` 同样只管理当前对象的虚拟设备，不释放用户物理鼠标按住的按钮。按钮与键共用一套所有权：`button_up()` 只释放当前对象持有的按钮，`click()` 与 `drag()` 只释放本次自己按下的按钮。
 
 ## Hyprland
 

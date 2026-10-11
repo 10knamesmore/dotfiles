@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 use serde_json::json;
 use std::time::{Duration, Instant};
-use wayland_client::protocol::wl_pointer::{Axis, AxisSource, ButtonState};
+use wayland_client::protocol::wl_pointer::{Axis, AxisSource};
 
 use super::Input;
 use crate::desktop::{Control, Target};
@@ -21,7 +21,7 @@ fn monitor_at(monitors: &[Monitor], point: (f64, f64)) -> PyResult<&Monitor> {
         .ok_or_else(|| wait::invalid("coordinates are outside the active monitors"))
 }
 
-fn button(name: &str) -> PyResult<u32> {
+pub(super) fn button(name: &str) -> PyResult<u32> {
     match name {
         "left" => Ok(0x110),
         "right" => Ok(0x111),
@@ -45,7 +45,7 @@ pub(super) fn button_name(code: u32) -> &'static str {
 }
 
 impl Input {
-    fn pointer(&mut self, monitor: Option<&Monitor>) -> PyResult<VirtualPointer> {
+    pub(super) fn pointer(&mut self, monitor: Option<&Monitor>) -> PyResult<VirtualPointer> {
         let name = monitor.map_or("", |monitor| monitor.name.as_str());
         if let Some(pointer) = self.pointers.get(name) {
             return Ok(pointer.clone());
@@ -106,19 +106,6 @@ impl Input {
         Ok(pointer)
     }
 
-    fn button_down(
-        &mut self,
-        control: &Control,
-        pointer: &VirtualPointer,
-        button: u32,
-    ) -> PyResult<()> {
-        control.check()?;
-        pointer.button(self.time(), button, ButtonState::Pressed);
-        pointer.frame();
-        self.buttons.push((pointer.clone(), button));
-        control.event(json!({"type":"button", "button":button_name(button), "pressed":true}))
-    }
-
     pub(crate) fn move_pointer(
         &mut self,
         control: &Control,
@@ -129,7 +116,15 @@ impl Input {
         monitor_at(&monitors, point)?;
         self.run(control, |input| {
             input.settle_keyboard(control)?;
-            input.move_to(control, &monitors, point).map(|_| ())
+            // A held button and the absolute pointer are different virtual devices, which clients
+            // treat as unrelated input; move the held device's cursor instead. Relative motion
+            // also keeps a drag alive across monitors.
+            if input.buttons.is_empty() {
+                input.move_to(control, &monitors, point).map(|_| ())
+            } else {
+                let current = hyprland::cursor_position(control, target)?;
+                input.move_relative(control, target, (point.0 - current.0, point.1 - current.1))
+            }
         })
     }
 
@@ -151,8 +146,12 @@ impl Input {
             input.settle_keyboard(control)?;
             let pointer = input.move_to(control, &monitors, point)?;
             for iteration in 0..count {
-                input.button_down(control, &pointer, button)?;
-                input.release_buttons(control);
+                // Release only this click's press; a button held by the caller stays down.
+                let acquisitions: Vec<u64> = input
+                    .acquire_button(control, &pointer, button)?
+                    .into_iter()
+                    .collect();
+                input.release_acquisitions(control, &acquisitions);
                 input.desktop.sync(control, true)?;
                 if iteration + 1 < count {
                     wait::pause(control, Duration::from_millis(50))?;
@@ -179,7 +178,10 @@ impl Input {
         self.run(control, |input| {
             input.settle_keyboard(control)?;
             let pointer = input.move_to(control, &monitors, start)?;
-            input.button_down(control, &pointer, button)?;
+            let acquisitions: Vec<u64> = input
+                .acquire_button(control, &pointer, button)?
+                .into_iter()
+                .collect();
             input.desktop.sync(control, true)?;
             let began = Instant::now();
             loop {
@@ -206,17 +208,66 @@ impl Input {
                     Duration::from_millis(10).min(duration.saturating_sub(began.elapsed())),
                 )?;
             }
-            input.release_buttons(control);
+            input.release_acquisitions(control, &acquisitions);
             Ok(())
         })
+    }
+
+    pub(crate) fn move_pointer_relative(
+        &mut self,
+        control: &Control,
+        target: &Target,
+        delta: (f64, f64),
+    ) -> PyResult<()> {
+        if !delta.0.is_finite() || !delta.1.is_finite() {
+            return Err(wait::invalid("coordinates must be finite"));
+        }
+        self.run(control, |input| {
+            input.settle_keyboard(control)?;
+            input.move_relative(control, target, delta)
+        })
+    }
+
+    /// Move the cursor by a relative delta on the seat-wide pointer and report the result.
+    fn move_relative(
+        &mut self,
+        control: &Control,
+        target: &Target,
+        delta: (f64, f64),
+    ) -> PyResult<()> {
+        let pointer = self.pointer(None)?;
+        control.check()?;
+        pointer.motion(self.time(), delta.0, delta.1);
+        pointer.frame();
+        // The overlay cursor follows the real position, which only advances after the compositor applies motion.
+        self.desktop.sync(control, true)?;
+        let position = hyprland::cursor_position(control, target)?;
+        let monitors = hyprland::monitors(control, target)?;
+        let monitor = monitor_at(&monitors, position)?;
+        let (x, y, _, _) = monitor.bounds();
+        control.event(
+            json!({"type":"pointer", "monitor":monitor.name, "x":position.0 - x, "y":position.1 - y}),
+        )
     }
 
     pub(crate) fn scroll(
         &mut self,
         control: &Control,
-        amount: i32,
+        amount: f64,
         horizontal: bool,
+        continuous: bool,
     ) -> PyResult<()> {
+        if !amount.is_finite() {
+            return Err(wait::invalid("amount must be finite"));
+        }
+        if !continuous && amount.fract() != 0.0 {
+            return Err(wait::invalid(
+                "amount must be a whole number; use continuous=True for fractional scroll",
+            ));
+        }
+        if !continuous && (amount > i32::MAX as f64 || amount < i32::MIN as f64) {
+            return Err(wait::invalid("amount is out of range"));
+        }
         self.run(control, |input| {
             input.settle_keyboard(control)?;
             let pointer = input.pointer(None)?;
@@ -226,14 +277,22 @@ impl Input {
                 Axis::VerticalScroll
             };
             control.event(json!({"type":"scroll", "amount":amount, "horizontal":horizontal}))?;
-            for _ in 0..amount.unsigned_abs() {
+            if continuous {
+                if amount != 0.0 {
+                    control.check()?;
+                    // One whole amount equals the 15 surface units used by axis_discrete.
+                    pointer.axis(input.time(), axis, amount * 15.0);
+                    pointer.axis_source(AxisSource::Wheel);
+                    pointer.frame();
+                    input.desktop.sync(control, true)?;
+                }
+                return Ok(());
+            }
+            let steps = amount.abs() as i32;
+            let direction = amount.signum() as i32;
+            for _ in 0..steps {
                 control.check()?;
-                pointer.axis_discrete(
-                    input.time(),
-                    axis,
-                    amount.signum() as f64 * 15.0,
-                    amount.signum(),
-                );
+                pointer.axis_discrete(input.time(), axis, direction as f64 * 15.0, direction);
                 pointer.axis_source(AxisSource::Wheel);
                 pointer.frame();
                 input.desktop.sync(control, true)?;
