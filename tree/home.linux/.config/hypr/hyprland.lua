@@ -382,11 +382,11 @@ bind(mainMod .. " + CTRL + SHIFT + P", "捕获 · 停止录屏", hl.dsp.global("
 bind(mainMod .. " + SHIFT + T", "面板 · 控制中心", hl.dsp.global("quickshell:controlCenter"))
 bind(mainMod .. " + SHIFT + Q", "会话 · 锁屏", hl.dsp.exec_cmd("hyprlock"))
 
--- 焦点切换（hjkl）
-bind(mainMod .. " + h", "焦点切换 · ←", hl.dsp.focus({ direction = "left" }))
-bind(mainMod .. " + l", "焦点切换 · →", hl.dsp.focus({ direction = "right" }))
-bind(mainMod .. " + k", "焦点切换 · ↑", hl.dsp.focus({ direction = "up" }))
-bind(mainMod .. " + j", "焦点切换 · ↓", hl.dsp.focus({ direction = "down" }))
+-- 焦点切换（hjkl）：repeating，按住超过 input.repeat_delay(200ms) 后按 input.repeat_rate 连续移动
+bind(mainMod .. " + h", "焦点切换 · ←", hl.dsp.focus({ direction = "left" }), { repeating = true })
+bind(mainMod .. " + l", "焦点切换 · →", hl.dsp.focus({ direction = "right" }), { repeating = true })
+bind(mainMod .. " + k", "焦点切换 · ↑", hl.dsp.focus({ direction = "up" }), { repeating = true })
+bind(mainMod .. " + j", "焦点切换 · ↓", hl.dsp.focus({ direction = "down" }), { repeating = true })
 
 -- 移动窗口（按当前布局自动分流脚本）
 bind(mainMod .. " + SHIFT + H", "移动窗口 · ←", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift h"))
