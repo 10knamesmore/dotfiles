@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
-import type { ImageContent } from "@earendil-works/pi-ai";
+import type { Api, ImageContent, Model } from "@earendil-works/pi-ai";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail } from "@earendil-works/pi-coding-agent";
 import { logPythonEvent } from "./diagnostics.js";
 import {
@@ -131,11 +131,15 @@ export function validateTimeout(seconds: number): void {
   }
 }
 
+/** Model identity shared with Python SDKs for connected-application status displays. */
+export type PythonModelIdentity = Pick<Model<Api>, "provider" | "id" | "name">;
+
 /** Owns one live Python namespace. Calls are serialized by Pi; close permanently disposes this instance. */
 export class PythonSession {
   private worker?: WorkerProcess;
   private disposed = false;
   private running = false;
+  private model: PythonModelIdentity | null = null;
 
   public constructor(
     private readonly sessionId: string,
@@ -165,6 +169,23 @@ export class PythonSession {
 
   private changed(): void {
     this.onStatusChanged(this.status());
+  }
+
+  /** Update idle workers immediately; active cells consume the change when they finish. */
+  public setModel(model: PythonModelIdentity | undefined): void {
+    const next = model ? { provider: model.provider, id: model.id, name: model.name } : null;
+    if (JSON.stringify(next) === JSON.stringify(this.model)) return;
+    this.model = next;
+    if (this.available) this.sendModel(this.worker!);
+  }
+
+  private sendModel(worker: WorkerProcess): void {
+    try {
+      worker.requests.write(`${JSON.stringify({ type: "model", model: this.model })}\n`);
+    } catch (error) {
+      this.log({ phase: "model_write_failed", reason: errorMessage(error), logPath: worker.logPath });
+      this.terminate(worker);
+    }
   }
 
   /** Execute a complete block in the supplied absolute cwd for this call, preserving partial output on failure. */
@@ -298,6 +319,11 @@ export class PythonSession {
     try {
       launcher = spawn("uv", pythonWorkerArguments(), {
         cwd: this.sessionCwd,
+        env: {
+          ...process.env,
+          PI_PYTHON_SESSION_ID: this.sessionId,
+          PI_PYTHON_SESSION_CWD: this.sessionCwd,
+        },
         detached: true,
         stdio: ["ignore", logFd, logFd, "pipe", "pipe"],
       });
@@ -375,6 +401,7 @@ export class PythonSession {
     try {
       await ready;
       if (worker.stopping || worker.ended) throw new Error("Python exited during startup.");
+      this.sendModel(worker);
       return worker;
     } catch (error) {
       this.terminate(worker);

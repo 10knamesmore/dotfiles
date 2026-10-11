@@ -82,8 +82,6 @@ return {
           settings = {
             basedpyright = {
               disableOrganizeImports = true,
-            },
-            python = {
               analysis = get_python_analysis_settings(),
             },
           },

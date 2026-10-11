@@ -8,6 +8,7 @@ dependencies = [
     "computer-use-sdk; sys_platform == 'linux'",
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
+    "nvim-use-sdk",
     "openai>=3.19.2",
     "pillow>=12.3.0",
     "pi-repl-tools",
@@ -26,5 +27,6 @@ package = false
 [tool.uv.sources]
 browser-use-sdk = { path = "packages/browser-use", editable = true }
 computer-use-sdk = { path = "packages/computer-use" }
+nvim-use-sdk = { path = "packages/nvim-use", editable = true }
 pi-repl-tools = { path = "packages/pi-repl-tools" }
 terminal-use-sdk = { path = "packages/terminal-use" }

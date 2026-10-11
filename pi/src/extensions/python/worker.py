@@ -121,6 +121,9 @@ class CellRuntime:
         self.close_desktops: Callable[[], None] | None = None
         try:
             from pi_repl_tools import _make_summarize, _set_image_sink, display_image
+            from nvim_use import _configure_worker, _set_model
+            _configure_worker(os.environ["PI_PYTHON_SESSION_ID"], os.environ["PI_PYTHON_SESSION_CWD"])
+            self.set_model = _set_model
             if sys.platform == "linux":
                 from computer_use import _close_all
                 self.close_desktops = _close_all
@@ -258,7 +261,10 @@ def main() -> None:
     with os.fdopen(WORKER_REQUEST_FD, "rb") as requests:
         for number, frame in enumerate(requests, start=1):
             request = cast(dict[str, object], json.loads(frame.decode("utf-8")))
-            execute_cell(interpreter, request, number, runtime)
+            if request["type"] == "model":
+                runtime.set_model(cast(dict[str, str] | None, request["model"]))
+            else:
+                execute_cell(interpreter, request, number, runtime)
 
 
 if __name__ == "__main__":

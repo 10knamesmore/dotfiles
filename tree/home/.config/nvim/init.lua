@@ -12,6 +12,7 @@ else
   -- options 必须早于 lazy：lazy.setup() 内部同步跑所有插件的 init()，
   -- 后加载 options.lua 会覆盖插件 init() 设置的选项。
   require("config.options")
+  require("pi_bridge").setup()
   require("config.keymaps")
   require("config.lazy")
   require("config.autocmds")

@@ -45,6 +45,7 @@ const COMPUTER_USE_SKILL = fileURLToPath(
 );
 
 const BROWSER_USE_SKILL = fileURLToPath(new URL("./packages/browser-use/skills/browser-use/SKILL.md", import.meta.url));
+const NVIM_USE_SKILL = fileURLToPath(new URL("./packages/nvim-use/skills/nvim-use/SKILL.md", import.meta.url));
 
 const TOOL_DESCRIPTION =
   "Execute Python code in a repl environment. Variables, functions, and imports survive calls. Call summarize() to inspect retained objects. Runs in cwd for this call, defaulting to the session directory; Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable.use display_image(image) to display image; accepts a file path, encoded image bytes, or an image object.";
@@ -52,7 +53,7 @@ const TOOL_DESCRIPTION =
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
   pi.on("resources_discover", () => ({
-    skillPaths: [TERMINAL_USE_SKILL, BROWSER_USE_SKILL, ...(process.platform === "linux" ? [COMPUTER_USE_SKILL] : [])],
+    skillPaths: [TERMINAL_USE_SKILL, BROWSER_USE_SKILL, NVIM_USE_SKILL, ...(process.platform === "linux" ? [COMPUTER_USE_SKILL] : [])],
   }));
 
   let session: PythonSession | undefined;
@@ -61,13 +62,15 @@ export function registerPython(pi: ExtensionAPI): void {
 
   const createSession = (ctx: ExtensionContext): PythonSession => {
     currentContext = ctx;
-    return new PythonSession(
+    const runtime = new PythonSession(
       ctx.sessionManager.getSessionId(),
       ctx.cwd,
       notifyEnvironmentCleared,
       updateEnvironment,
       updateStatus,
     );
+    runtime.setModel(ctx.model);
+    return runtime;
   };
 
   pi.on("session_start", async (_event, ctx) => {
@@ -98,6 +101,9 @@ export function registerPython(pi: ExtensionAPI): void {
         reason: error instanceof Error ? error.message : String(error),
       });
     }
+  });
+  pi.on("model_select", (event) => {
+    session?.setModel(event.model);
   });
   pi.on("session_shutdown", async () => {
     inspectionController.abort();
@@ -137,6 +143,7 @@ export function registerPython(pi: ExtensionAPI): void {
       if (!params.code.trim()) throw new Error("code must not be blank.");
       currentContext = ctx;
       const runtime = (session ??= createSession(ctx));
+      runtime.setModel(ctx.model);
       onUpdate?.({
         content: [
           {

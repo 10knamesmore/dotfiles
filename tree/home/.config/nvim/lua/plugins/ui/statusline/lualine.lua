@@ -7,7 +7,7 @@ return {
   "nvim-lualine/lualine.nvim",
   -- event = "VeryLazy",
   event = function()
-    return { "BufReadPost", "BufWritePost", "BufNewFile" }
+    return { "BufReadPost", "BufWritePost", "BufNewFile", "User PiConnectionChanged" }
   end,
   init = function()
     vim.g.lualine_laststatus = vim.o.laststatus
@@ -26,10 +26,6 @@ return {
       options = {
         theme = require("config.disco.lualine").theme,
         globalstatus = vim.o.laststatus == 3,
-        disabled_filetypes = {
-          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" },
-        },
-
         section_separators = { left = "", right = "" },
         component_separators = { left = "", right = "" },
       },
@@ -106,6 +102,11 @@ return {
         },
 
         lualine_x = {
+          {
+            function()
+              return require("pi_bridge").statusline()
+            end,
+          },
 
           {
             "searchcount",
