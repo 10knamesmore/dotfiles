@@ -22,7 +22,7 @@ prompt、diagnostic 和 CLI/UI wording 可能影响行为，先确认消费者�
 
 ## 按需读取
 
-- 修改代码注释或文档注释：读 [comments.md](references/comments.md)，再按语言读取其中对应的规范。代码改动引入新语义或不变量时，检查是否需要同步注释；自明代码不制造注释。
+- 修改代码注释或文档注释：读通用注释规则 [comments.md](references/comments.md)。代码改动引入新语义或不变量时，检查是否需要同步注释；自明代码不制造注释。
 - 文档覆盖范围不清楚：读 [document-types.md](references/document-types.md)。
 - 需要校准删减是否丢失条件、modality 或证据：读 [examples.md](references/examples.md)。
 - 专项排查或发现 session、PR、review 视角、过期快照、不可解析引用：使用 [trim-cot-leakage](../trim-cot-leakage/SKILL.md)，不把每次编辑扩成泄漏审计。
