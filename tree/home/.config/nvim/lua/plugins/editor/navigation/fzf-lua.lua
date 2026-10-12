@@ -102,7 +102,10 @@ return {
       {
         "gr",
         function()
-          require("fzf-lua").lsp_references()
+          require("fzf-lua").lsp_references({
+            includeDeclaration = false,
+            jump1 = true,
+          })
         end,
         desc = "References",
         nowait = true,

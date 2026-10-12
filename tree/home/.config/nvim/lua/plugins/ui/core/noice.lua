@@ -21,12 +21,27 @@ return {
         view = "notify",
       },
       lsp = {
+        -- 保留 mini 视图；空的 progress 更新不应该占用编辑区底部。
+        progress = {
+          view = "mini",
+        },
         override = {
           ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
           ["vim.lsp.util.stylize_markdown"] = true,
         },
       },
-      routes = {},
+      routes = {
+        {
+          filter = {
+            event = "lsp",
+            kind = "progress",
+            cond = function(message)
+              return vim.trim(message:content()) == ""
+            end,
+          },
+          opts = { skip = true },
+        },
+      },
       presets = {
         bottom_search = true,
         command_palette = true,
