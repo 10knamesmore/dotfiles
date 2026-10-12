@@ -3,9 +3,9 @@
  *
  * Non-TUI modes (json / print / rpc) auto-approve: a headless caller already made
  * an explicit tool call. In the TUI a dialog previews the workflow (name,
- * description and phases) and offers: Open in editor / Accept / Reject.
- * An inline script is a new script every time, so it never skips the dialog.
- * Reject throws a clear error the model can relay.
+ * description and phases) and offers: Open in editor / Accept / Reject /
+ * Reject with reason. An inline script is a new script every time, so it never
+ * skips the dialog. Rejection throws a clear error the model can relay.
  */
 
 import { spawn } from "node:child_process";
@@ -32,7 +32,7 @@ export interface ApprovalContext {
   mode: ExtensionMode;
   cwd: string;
   isProjectTrusted(): boolean;
-  ui: Pick<ExtensionUIContext, "select" | "custom" | "notify">;
+  ui: Pick<ExtensionUIContext, "select" | "input" | "custom" | "notify">;
 }
 
 export type WorkflowApprovalPolicy = WorkflowSettings["workflowApproval"];
@@ -40,6 +40,7 @@ export type WorkflowApprovalPolicy = WorkflowSettings["workflowApproval"];
 const OPEN = "Open in editor";
 const ACCEPT = "Accept";
 const REJECT = "Reject";
+const REJECT_WITH_REASON = "Reject with reason";
 
 /** Edit a temporary JavaScript file with Pi's configured external editor, releasing the TUI until it exits. */
 async function editWorkflowScript(draft: string, ctx: ApprovalContext): Promise<string> {
@@ -107,7 +108,7 @@ export async function approveLaunch(
   }
   let draft = plan.workflow.script;
   let summary = buildApprovalSummary(plan);
-  const options = [OPEN, ACCEPT, REJECT];
+  const options = [OPEN, ACCEPT, REJECT, REJECT_WITH_REASON];
 
   for (;;) {
     const choice = await ctx.ui.select(summary, options);
@@ -139,6 +140,22 @@ export async function approveLaunch(
         ctx.ui.notify("Workflow script is invalid. Edit it before accepting.", "error");
         continue;
       }
+    }
+    if (choice === REJECT_WITH_REASON) {
+      const reason = await ctx.ui.input(
+        "Reason for rejecting workflow",
+        "Explain the blocker or what should change before retrying",
+      );
+      if (reason === undefined) continue;
+      const normalizedReason = sanitizeTerminalText(reason.trim());
+      if (!normalizedReason) {
+        ctx.ui.notify("A rejection reason is required.", "warning");
+        continue;
+      }
+      reportDiagnostic(`[subagent-workflow] workflow launch rejected with reason (${normalizedReason.length} chars)`);
+      throw new Error(
+        `Workflow "${plan.workflow.meta.name}" launch was rejected by the user.\nReason: ${normalizedReason}\nDo not retry unless the user explicitly asks to run it.`,
+      );
     }
     throw new Error(
       `Workflow "${plan.workflow.meta.name}" launch was rejected by the user. Do not retry unless the user explicitly asks to run it.`,
