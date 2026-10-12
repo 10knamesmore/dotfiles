@@ -49,6 +49,11 @@ return {
         autoload_configurations = false,
       },
       server = {
+        on_init = function(client)
+          -- RA 局部高亮会漏掉外层过程宏上下文，Neovim 合并 full 结果时又会保留错误 token。
+          -- 仅禁用 range 请求，保留 full/delta 语义高亮。
+          client.server_capabilities.semanticTokensProvider.range = false
+        end,
         -- 从项目根目录启动 rustup 代理，避免 Mason 的 PATH 优先级改变工具链。
         cmd = function()
           return function(dispatchers, client_config)
