@@ -10,7 +10,7 @@ interface ModelRequest {
   startedAt: number;
   active: boolean;
   phase: "waiting" | "thinking" | "writing";
-  timeToFirstTokenMilliseconds?: number;
+  contentTiming?: { firstAt: number; lastAt: number };
 }
 
 /** Tracks ordinary response streams separately from compaction requests. */
@@ -44,7 +44,9 @@ export class ModelResponseTracker {
       default:
         return;
     }
-    this.request.timeToFirstTokenMilliseconds ??= Math.max(0, performance.now() - this.request.startedAt);
+    const now = performance.now();
+    this.request.contentTiming ??= { firstAt: now, lastAt: now };
+    this.request.contentTiming.lastAt = now;
     this.request.phase = phase;
   }
 
@@ -67,10 +69,18 @@ export class ModelResponseTracker {
     this.compacting = false;
   }
 
+  /** Content events bound generation time; stream completion and usage events do not extend it. */
+  public generationMilliseconds(): number | undefined {
+    const timing = this.request?.contentTiming;
+    return timing === undefined ? undefined : timing.lastAt - timing.firstAt;
+  }
+
   public snapshot(): { phase: ModelPhase; timeToFirstTokenMilliseconds?: number } {
+    const request = this.request;
     return {
-      phase: this.compacting ? "compacting" : this.request?.active ? this.request.phase : "ready",
-      timeToFirstTokenMilliseconds: this.request?.timeToFirstTokenMilliseconds,
+      phase: this.compacting ? "compacting" : request?.active ? request.phase : "ready",
+      timeToFirstTokenMilliseconds:
+        request?.contentTiming === undefined ? undefined : request.contentTiming.firstAt - request.startedAt,
     };
   }
 }

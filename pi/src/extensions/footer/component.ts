@@ -250,7 +250,7 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
 function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
     .filter(
-      ([key]) => key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage",
+      ([key]) => key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage" && key !== "openai-fast",
     )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([, value]) => sanitizeFooterText(value))

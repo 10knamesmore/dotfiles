@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# 显示当前电池电量百分比，并在充电时切换为充电图标。
+# 显示电池电量和充电状态；台式机不显示电池项。
 
 PERCENTAGE="$(pmset -g batt | grep -Eo "\d+%" | cut -d% -f1)"
 CHARGING="$(pmset -g batt | grep 'AC Power')"
 
 if [ "$PERCENTAGE" = "" ]; then
-    sketchybar --set "$NAME" icon="" label="NoBattery"
+    sketchybar --set "$NAME" drawing=off
     exit 0
 fi
 
@@ -30,4 +30,4 @@ if [[ "$CHARGING" != "" ]]; then
     ICON=""
 fi
 
-sketchybar --set "$NAME" icon="$ICON" label="${PERCENTAGE}%"
+sketchybar --set "$NAME" drawing=on icon="$ICON" label="${PERCENTAGE}%"

@@ -6,7 +6,7 @@ HIDDEN="$(sketchybar --query bar | jq -r '.hidden')"
 
 if [ "$HIDDEN" = "on" ] || [ "$HIDDEN" = "true" ]; then
     sketchybar --bar hidden=off
-    yabai -m config external_bar all:42:0 >/dev/null 2>&1
+    yabai -m config external_bar all:24:0 >/dev/null 2>&1
     sketchybar --update
 else
     sketchybar --bar hidden=on

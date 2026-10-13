@@ -1,5 +1,5 @@
 #!/bin/sh
-# 把 Codex 额度 JSON 映射到 W/5h 剩余百分比主标签和完整 hover popup。
+# 显示 Codex 剩余百分比和完整 hover popup；周额度省略 W 前缀。
 # Usage: item.sh
 # 依赖：sketchybar, jq，以及同目录的 codex.sh 采集器
 # 读取环境变量：NAME、SENDER（SketchyBar 注入）及采集器声明的凭据变量
@@ -25,7 +25,7 @@ render_error() {
   local message="$1"
   local slot
 
-  sketchybar --set "$ITEM_NAME" label="$DISPLAY_NAME --" \
+  sketchybar --set "$ITEM_NAME" label="--" \
              --set "$DETAIL_PREFIX.title" label="$DISPLAY_NAME limits" \
              --set "$DETAIL_PREFIX.1" label="$message" drawing=on
 
@@ -57,8 +57,8 @@ refresh_usage() {
     return
   fi
 
-  main="$(printf '%s\n' "$payload" | jq -r '.main')"
-  sketchybar --set "$ITEM_NAME" label="$DISPLAY_NAME $main" \
+  main="$(printf '%s\n' "$payload" | jq -r '.main | sub("^W "; "")')"
+  sketchybar --set "$ITEM_NAME" label="$main" \
              --set "$DETAIL_PREFIX.title" label="$DISPLAY_NAME limits"
 
   slot=1

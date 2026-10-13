@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# 以 24 小时制显示中间时钟，hover 时显示日期和星期。
+# 以 24 小时制显示时钟，hover 时显示日期和星期。
 
 show_details() {
   sketchybar --set clock.details.date label="$(date '+%Y-%m-%d')" \

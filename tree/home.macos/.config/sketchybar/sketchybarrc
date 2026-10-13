@@ -1,367 +1,205 @@
-#!/bin/sh
-# 配置 macOS SketchyBar 的布局、配色、状态 item 及 hover popup。
-# Usage: sketchybar --reload
-# 依赖：sketchybar、yabai，以及 plugins/ 中各 item 声明的命令
-# 读取环境变量：CONFIG_DIR（SketchyBar 注入，指向当前配置目录）
-# 写入环境变量：无
-
-# ── 基础路径与配色 ───────────────────────────────────────────────────────
+#!/bin/bash
+# 紧凑三段顶栏：左侧导航、中间媒体、右侧系统状态与时钟。
+# sketchybar --reload；依赖 sketchybar、yabai、jq 和 plugins/ 中的采集命令。
 
 PLUGIN_DIR="$CONFIG_DIR/plugins"
 
-# Catppuccin Mocha，与 kitty、bat、fzf 及 Linux QuickShell 共用同一配色语义。
-BASE=0xff1e1e2e
 MANTLE=0xff181825
-SURFACE0=0xff313244
-SURFACE1=0xff45475a
 TEXT=0xffcdd6f4
-SUBTEXT=0xffbac2de
 OVERLAY=0xff7f849c
 BLUE=0xff89b4fa
-SAPPHIRE=0xff74c7ec
-SKY=0xff89dceb
+TEAL=0xff94e2d5
 MAUVE=0xffcba6f7
 GREEN=0xffa6e3a1
-YELLOW=0xfff9e2af
 PEACH=0xfffab387
-RED=0xfff38ba8
-TEAL=0xff94e2d5
-
-# ── Bar 外观与 item 默认值 ───────────────────────────────────────────────
+PINK=0xfff5c2e7
 
 sketchybar --bar \
   position=top \
-  height=36 \
-  y_offset=6 \
-  margin=6 \
+  height=24 \
+  y_offset=0 \
+  margin=0 \
+  corner_radius=0 \
+  color=0xcc1e1e2e \
   blur_radius=24 \
-  corner_radius=16 \
-  color=0x00000000 \
   border_width=0 \
-  padding_left=8 \
-  padding_right=8 \
+  padding_left=6 \
+  padding_right=6 \
   topmost=window \
   sticky=on
 
 default=(
-  icon.font="Hack Nerd Font:Bold:15.0"
-  label.font="Hack Nerd Font:Bold:14.0"
+  icon.font="Hack Nerd Font:Regular:11.0"
+  label.font="Hack Nerd Font:Regular:10.0"
   icon.color="$TEXT"
   label.color="$TEXT"
-  icon.padding_left=10
-  icon.padding_right=6
-  label.padding_left=4
-  label.padding_right=12
-  padding_left=3
-  padding_right=3
-  background.height=28
-  background.corner_radius=12
-  background.color="$SURFACE0"
+  icon.padding_left=5
+  icon.padding_right=3
+  label.padding_left=2
+  label.padding_right=5
+  padding_left=0
+  padding_right=0
+  background.drawing=off
+  background.height=20
+  background.corner_radius=3
   background.border_width=0
-  scroll_texts=on
+  scroll_texts=off
+  popup.background.color="$MANTLE"
+  popup.background.corner_radius=6
+  popup.background.border_width=1
+  popup.background.border_color=0x337f849c
+  popup.blur_radius=16
+  popup.height=24
 )
 sketchybar --default "${default[@]}"
 
-# ── 左侧：工作区与当前窗口 ───────────────────────────────────────────────
-
-space_common=(
-  icon.highlight=off
-  label.drawing=off
-  icon.padding_left=10
-  icon.padding_right=10
-  background.height=22
-  background.corner_radius=12
+popup_row=(
+  icon.drawing=off
+  label.padding_left=10
+  label.padding_right=10
+  label.align=left
   background.drawing=off
-  script="$PLUGIN_DIR/space.sh"
 )
 
-SPACE_ICONS=("1: " "2: " "3: " "4: " "5: " "6: " "7: " "8: " "9: " "10: ")
-for i in "${!SPACE_ICONS[@]}"
-do
-  sid="$(($i+1))"
+# 左侧导航：只显示真实存在的工作区，活动数字下方显示短线。
+while read -r sid display; do
   sketchybar --add space "space.$sid" left \
-             --set "space.$sid" "${space_common[@]}" \
-                                space="$sid" \
-                                icon="${SPACE_ICONS[i]}" \
-                                icon.color="$OVERLAY" \
-                                background.color="$MAUVE" \
-                                click_script="yabai -m space --focus $sid"
-done
+             --set "space.$sid" \
+               space="$sid" display="$display" \
+               icon="$sid" icon.color="$OVERLAY" \
+               icon.width=18 icon.align=center \
+               icon.padding_left=0 icon.padding_right=0 \
+               label.drawing=off \
+               background.color="$MAUVE" \
+               background.height=2 background.corner_radius=1 \
+               background.y_offset=-8 \
+               background.padding_left=5 background.padding_right=5 \
+               script="$PLUGIN_DIR/space.sh" \
+               click_script="yabai -m space --focus $sid"
+done < <(yabai -m query --spaces | jq -r '.[] | "\(.index) \(.display)"')
 
-window_title=(
-  icon=󰘔
-  icon.color="$MAUVE"
-  label.color="$MAUVE"
-  label.max_chars=52
-  scroll_texts=off
-  background.color="$MANTLE"
-  update_freq=2
-  script="$PLUGIN_DIR/window.sh"
-)
+sketchybar --add item navigation.separator left \
+           --set navigation.separator \
+             icon="│" icon.color=0x337f849c \
+             icon.padding_left=5 icon.padding_right=5 \
+             label.drawing=off
+
 sketchybar --add item window_title left \
-           --set window_title "${window_title[@]}" \
-           --subscribe window_title front_app_switched window_focus space_change
+           --set window_title \
+             icon.drawing=off \
+             label.max_chars=36 \
+             update_freq=2 \
+             script="$PLUGIN_DIR/window.sh" \
+           --subscribe window_title front_app_switched space_change
 
-# ── 中间：实时网速与时钟 ─────────────────────────────────────────────────
+# 中区独立居中；没有正在播放或暂停的曲目时不占位置。
+sketchybar --add item media center \
+           --set media \
+             icon="󰎈" icon.color="$PINK" \
+             label.max_chars=32 drawing=off \
+             update_freq=3 \
+             script="$PLUGIN_DIR/media.sh"
 
-net_up=(
-  icon=󰕒
-  icon.color="$GREEN"
-  label.color="$GREEN"
-  update_freq=1
-  script="$PLUGIN_DIR/netspeed.sh up"
-)
-sketchybar --add item net_up center \
-           --set net_up "${net_up[@]}"
-
-clock=(
-  icon=
-  icon.color="$BASE"
-  label.color="$BASE"
-  background.color="$BLUE"
-  background.height=26
-  background.corner_radius=16
-  popup.background.color="$MANTLE"
-  popup.background.corner_radius=12
-  popup.blur_radius=16
-  update_freq=1
-  script="$PLUGIN_DIR/clock.sh"
-)
-sketchybar --add item clock center \
-           --set clock "${clock[@]}" \
+# right 项按从右向左的顺序添加；时钟固定在最右端。
+sketchybar --add item clock right \
+           --set clock \
+             icon.drawing=off \
+             label.font="Hack Nerd Font:Bold:11.0" \
+             label.padding_left=8 \
+             popup.align=right \
+             update_freq=1 \
+             script="$PLUGIN_DIR/clock.sh" \
            --subscribe clock mouse.entered mouse.exited mouse.exited.global
 
-clock_details=(
-  icon.drawing=off
-  label.width=160
-  label.align=center
-  label.padding_left=12
-  label.padding_right=12
-  background.drawing=off
-)
-sketchybar --add item clock.details.date popup.clock \
-           --set clock.details.date "${clock_details[@]}" \
-                                     label.color="$TEXT" \
-                                     label.font="Hack Nerd Font:Bold:14.0"
-
-sketchybar --add item clock.details.weekday popup.clock \
-           --set clock.details.weekday "${clock_details[@]}" \
-                                        label.color="$BLUE"
-
-net_down=(
-  icon=󰇚
-  icon.color="$SKY"
-  label.color="$SKY"
-  update_freq=1
-  script="$PLUGIN_DIR/netspeed.sh down"
-)
-sketchybar --add item net_down center \
-           --set net_down "${net_down[@]}"
-
-# ── 右侧：系统状态、AI 额度与电池（从左到右） ───────────────────────────
-
-# CPU
-
-cpu=(
-  icon=
-  icon.color="$BLUE"
-  label.color="$BLUE"
-  update_freq=2
-  script="$PLUGIN_DIR/cpu.sh"
-)
-sketchybar --add item cpu right \
-           --set cpu "${cpu[@]}"
-
-# 内存及详情 popup
-
-memory=(
-  icon=
-  icon.color="$MAUVE"
-  label.color="$MAUVE"
-  popup.background.color="$MANTLE"
-  popup.background.corner_radius=12
-  popup.blur_radius=16
-  update_freq=3
-  script="$PLUGIN_DIR/memory.sh"
-)
-sketchybar --add item memory right \
-           --set memory "${memory[@]}" \
-           --subscribe memory mouse.entered mouse.exited mouse.exited.global
-
-memory_details_common=(
-  icon.drawing=off
-  label.width=200
-  label.align=left
-  label.padding_left=12
-  label.padding_right=12
-  background.drawing=off
-)
-
-memory_details_title=(
-  "${memory_details_common[@]}"
-  label.color="$MAUVE"
-  label.font="Hack Nerd Font:Bold:14.0"
-)
-sketchybar --add item memory.details.title popup.memory \
-           --set memory.details.title "${memory_details_title[@]}"
-
-sketchybar --add item memory.details.used popup.memory \
-           --set memory.details.used "${memory_details_common[@]}" \
-                                     label.color="$TEXT"
-
-sketchybar --add item memory.details.cached popup.memory \
-           --set memory.details.cached "${memory_details_common[@]}" \
-                                       label.color="$TEXT"
-
-sketchybar --add item memory.details.compressed popup.memory \
-           --set memory.details.compressed "${memory_details_common[@]}" \
-                                           label.color="$TEXT"
-
-sketchybar --add item memory.details.swap popup.memory \
-           --set memory.details.swap "${memory_details_common[@]}" \
-                                     label.color="$TEXT"
-
-# 音量
-
-volume=(
-  icon.color="$PEACH"
-  label.color="$PEACH"
-  script="$PLUGIN_DIR/volume.sh"
-)
-sketchybar --add item volume right \
-           --set volume "${volume[@]}" \
-           --subscribe volume volume_change
-
-# 当前网络及详情 popup
-
-network=(
-  icon=󰖩
-  icon.color="$SKY"
-  label.color="$SKY"
-  label.max_chars=24
-  popup.background.color="$MANTLE"
-  popup.background.corner_radius=12
-  popup.blur_radius=16
-  update_freq=10
-  script="$PLUGIN_DIR/network.sh"
-)
-sketchybar --add item network right \
-           --set network "${network[@]}" \
-           --subscribe network mouse.entered mouse.exited mouse.exited.global
-
-network_details_common=(
-  icon.drawing=off
-  label.max_chars=120
-  label.width=240
-  label.align=left
-  label.padding_left=12
-  label.padding_right=12
-  label.color="$TEXT"
-  background.drawing=off
-)
-
-network_details_title=(
-  "${network_details_common[@]}"
-  label.color="$SKY"
-  label.font="Hack Nerd Font:Bold:14.0"
-)
-sketchybar --add item network.details.title popup.network \
-           --set network.details.title "${network_details_title[@]}"
-
-sketchybar --add item network.details.interface popup.network \
-           --set network.details.interface "${network_details_common[@]}"
-
-sketchybar --add item network.details.ip popup.network \
-           --set network.details.ip "${network_details_common[@]}"
-
-sketchybar --add item network.details.gateway popup.network \
-           --set network.details.gateway "${network_details_common[@]}"
-
-sketchybar --add item network.details.dns popup.network \
-           --set network.details.dns "${network_details_common[@]}"
-
-# AI 额度只显示 Codex，并紧邻 battery 左侧。
-# 主标签只显示 W/5h 的剩余百分比；完整窗口保留在 popup。
-ai_limit_common=(
-  label="--"
-  label.max_chars=24
-  popup.background.color="$MANTLE"
-  popup.background.corner_radius=12
-  popup.blur_radius=16
-  update_freq=60
-)
-
-sketchybar --add item ai.codex right \
-           --set ai.codex "${ai_limit_common[@]}" \
-                          icon="󰚩" \
-                          icon.color="$GREEN" \
-                          label.color="$GREEN" \
-                          script="$PLUGIN_DIR/ai_limits/run.sh" \
-           --subscribe ai.codex mouse.entered mouse.exited mouse.exited.global
-
-ai_limit_details_common=(
-  icon.drawing=off
-  label.max_chars=120
-  label.width=440
-  label.align=left
-  label.padding_left=12
-  label.padding_right=12
-  label.color="$TEXT"
-  background.drawing=off
-)
-
-sketchybar --add item ai.codex.details.title popup.ai.codex \
-           --set ai.codex.details.title "${ai_limit_details_common[@]}" \
-                                         label.color="$GREEN" \
-                                         label.font="Hack Nerd Font:Bold:14.0"
-
-for slot in 1 2 3 4
-do
-  sketchybar --add item "ai.codex.details.$slot" popup.ai.codex \
-             --set "ai.codex.details.$slot" "${ai_limit_details_common[@]}"
+for field in date weekday; do
+  sketchybar --add item "clock.details.$field" popup.clock \
+             --set "clock.details.$field" "${popup_row[@]}" \
+               label.width=150 label.align=center
 done
+sketchybar --set clock.details.weekday label.color="$BLUE"
 
-battery=(
-  icon.color="$GREEN"
-  label.color="$GREEN"
-  update_freq=10
-  script="$PLUGIN_DIR/battery.sh"
-)
 sketchybar --add item battery right \
-           --set battery "${battery[@]}" \
+           --set battery \
+             icon.color="$GREEN" \
+             update_freq=10 \
+             script="$PLUGIN_DIR/battery.sh" \
            --subscribe battery system_woke power_source_change
 
+# 网络与音量作为紧凑入口；网络名称和地址留在悬停详情中。
+sketchybar --add item volume right \
+           --set volume \
+             icon.color="$PEACH" \
+             script="$PLUGIN_DIR/volume.sh" \
+           --subscribe volume volume_change
 
-# ── 可选模块（当前未启用） ───────────────────────────────────────────────
+sketchybar --add item network right \
+           --set network \
+             icon="󰖩" icon.color="$BLUE" \
+             icon.padding_right=5 label.drawing=off \
+             update_freq=10 \
+             script="$PLUGIN_DIR/network.sh" \
+           --subscribe network mouse.entered mouse.exited mouse.exited.global
 
-# layout=(
-#   icon=󰙀
-#   icon.color="$YELLOW"
-#   label.color="$YELLOW"
-#   background.color="$SURFACE0"
-#   update_freq=2
-#   script="$PLUGIN_DIR/layout.sh"
-#   click_script="yabai -m window --toggle split"
-# )
-# sketchybar --add item layout left \
-#            --set layout "${layout[@]}"
+for field in title interface ip gateway dns; do
+  sketchybar --add item "network.details.$field" popup.network \
+             --set "network.details.$field" "${popup_row[@]}" \
+               label.width=240 label.max_chars=40
+done
+sketchybar --set network.details.title label.color="$BLUE"
 
-# media=(
-#   icon=󰎈
-#   icon.color="$TEAL"
-#   label.color="$TEAL"
-#   label.max_chars=28
-#   update_freq=2
-#   script="$PLUGIN_DIR/media.sh"
-# )
-# sketchybar --add item media right \
-#            --set media "${media[@]}"
+# AI 区只显示 Codex；完整限额窗口保留在 popup。
+sketchybar --add item ai.codex right \
+           --set ai.codex \
+             icon="" \
+             icon.background.drawing=on \
+             icon.background.image="$CONFIG_DIR/icons/codex.png" \
+             icon.background.image.scale=0.375 \
+             label="--" label.max_chars=24 \
+             padding_left=5 padding_right=5 \
+             update_freq=60 \
+             script="$PLUGIN_DIR/ai_limits/run.sh" \
+           --subscribe ai.codex mouse.entered mouse.exited mouse.exited.global
 
-# ── 组合项与首次刷新 ─────────────────────────────────────────────────────
+for field in title 1 2 3 4; do
+  sketchybar --add item "ai.codex.details.$field" popup.ai.codex \
+             --set "ai.codex.details.$field" "${popup_row[@]}" \
+               label.width=400 label.max_chars=64
+done
+sketchybar --set ai.codex.details.title label.color="$MAUVE"
 
-sketchybar --add bracket workspaces '/space\..*/' layout \
-           --set workspaces background.color="$BASE" \
-                            background.corner_radius=16 \
-                            background.height=28
+# CPU、内存和网速形成连续状态组；固定速率宽度避免刷新时左右跳动。
+sketchybar --add item net_down right \
+           --set net_down \
+             icon="󰁅" icon.color="$TEAL" \
+             label.width=66 label.align=right \
+             update_freq=1 \
+             script="$PLUGIN_DIR/netspeed.sh down"
+
+sketchybar --add item net_up right \
+           --set net_up \
+             icon="󰕒" icon.color="$BLUE" \
+             label.width=66 label.align=right \
+             update_freq=1 \
+             script="$PLUGIN_DIR/netspeed.sh up"
+
+sketchybar --add item memory right \
+           --set memory \
+             icon="" icon.color="$TEAL" \
+             update_freq=3 \
+             script="$PLUGIN_DIR/memory.sh" \
+           --subscribe memory mouse.entered mouse.exited mouse.exited.global
+
+for field in title used cached compressed swap; do
+  sketchybar --add item "memory.details.$field" popup.memory \
+             --set "memory.details.$field" "${popup_row[@]}" \
+               label.width=200
+done
+sketchybar --set memory.details.title label.color="$TEAL"
+
+sketchybar --add item cpu right \
+           --set cpu \
+             icon="" icon.color="$BLUE" \
+             update_freq=2 \
+             script="$PLUGIN_DIR/cpu.sh"
 
 sketchybar --update

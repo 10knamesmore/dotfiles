@@ -17,8 +17,7 @@ import { palette, separator } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
 import type { AgentInputNavigation } from "./navigation.js";
 
-/** Nerd Font bolt appended to the model name while OpenAI Fast is requested. */
-const FAST_BADGE = palette.yellow(" \uf0e7");
+const FAST_BADGE = palette.yellow(" ⚡");
 
 /** Pi's input editor, with session information on its borders and optional agent navigation. */
 export class PromptEditor extends CustomEditor {
@@ -86,7 +85,6 @@ export class PromptEditor extends CustomEditor {
     const top = status ? this.activityLabel(status.activity) + this.timingLabel(status) : palette.readyBadge(" READY ");
     const ctx = this.context();
     const model = ctx?.model;
-    // The badge reports the mode the user requested; /fast status shows the server's tier.
     const fast = this.fastRequested() ? FAST_BADGE : "";
     const modelLabel = model
       ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${fast}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
