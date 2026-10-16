@@ -1,27 +1,22 @@
-/** Search backends exposed by the distribution's websearch tool. */
-export type SearchProvider = "deepseek" | "codex" | "exa";
-
-/** One query sent to the selected backend; filters remain provider-side constraints. */
+/** One query sent to DeepSeek's search API. */
 export interface SearchRequest {
   query: string;
+  /** The user's original question when `query` is a keyword rewrite; helps the backend understand intent. */
+  oriQuestion?: string;
   /** Maximum number of sources returned to the agent, from 1 to 20. */
   limit: number;
-  /** Publication recency requested from the backend. */
-  recency?: "day" | "week" | "month" | "year";
-  /** Hostnames to include; a leading minus excludes a hostname. */
-  domains?: string[];
 }
 
-/** A linked source, retaining the provider's excerpt rather than inventing a summary. */
+/** One ranked source: title and URL identity, with a model-readable summary when available. */
 export interface SearchSource {
   title: string;
   url: string;
-  snippet: string;
-}
-
-/** Provider answer and sources; an empty source list is distinct from a transport error. */
-export interface SearchResult {
-  provider: SearchProvider;
-  answer: string;
-  sources: SearchSource[];
+  summary: string;
+  /** Publication date as a `YYYY-MM-DD` prefix, absent when unknown. */
+  date?: string;
+  siteName?: string;
+  /** Webpage authority from 0 to 4; absent when the API reports unknown. */
+  authority?: number;
+  /** Composite relevance, authority and timeliness score from 0 to 3. */
+  rerankScore?: number;
 }

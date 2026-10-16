@@ -1,11 +1,10 @@
 import { stripVTControlCharacters } from "node:util";
 import type { AgentToolResult, Theme, ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { SearchProvider } from "./search/types.js";
 
 /** Small result summaries kept in the session; full fetched content belongs in the page cache. */
 export type WebToolDetails =
-  | { kind: "search"; provider: SearchProvider; sourceCount: number }
+  | { kind: "search"; sourceCount: number }
   | { kind: "fetch"; responseId: string; title: string; offset: number; nextOffset?: number; totalChars: number };
 
 /** Render untrusted query text and URLs without terminal control sequences. */
@@ -30,7 +29,7 @@ export function renderWebResult(
   if (!details) return new Text(theme.fg("muted", "Web request completed."), 0, 0);
   const summary =
     details.kind === "search"
-      ? `${details.provider} · ${details.sourceCount} sources`
+      ? `${details.sourceCount} sources`
       : `${displayText(details.title)} · ${details.totalChars} characters${details.nextOffset !== undefined ? " · more available" : ""}`;
   if (!options.expanded) return new Text(theme.fg("success", summary), 0, 0);
   const text = result.content

@@ -2,14 +2,12 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { WebErrorCode } from "./errors.js";
-import type { SearchProvider } from "./search/types.js";
 
 /** Request lifecycle metadata only. Queries, URLs, page bodies, headers, and credentials never enter the log. */
 interface WebEvent {
   tool: "websearch" | "webfetch";
   callId: string;
   phase: "start" | "complete" | "error";
-  provider?: SearchProvider;
   cached?: boolean;
   durationMs?: number;
   sourceCount?: number;

@@ -28,24 +28,11 @@ const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> = {
   showStatusWidget: true,
 };
 
-const WebSettingsSchema = Type.Object(
-  {
-    searchProvider: Type.Optional(
-      Type.Union([Type.Literal("deepseek"), Type.Literal("codex"), Type.Literal("exa")]),
-    ),
-    codexModel: Type.Optional(Type.String({ minLength: 1, pattern: "^\\S+$" })),
-  },
-  { additionalProperties: false },
-);
-
-export type WebSettings = Static<typeof WebSettingsSchema> & { searchProvider: "deepseek" | "codex" | "exa" };
-
 const ModelReferenceSchema = Type.String({ pattern: "^[^/\]+/\\S+$" });
 const PersonalConfigSchema = Type.Object(
   {
     language: Type.Optional(Type.String({ minLength: 1 })),
     "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
-    web: Type.Optional(WebSettingsSchema),
     openai: Type.Optional(
       Type.Object({ fast: Type.Optional(Type.Boolean()) }, { additionalProperties: false }),
     ),
@@ -70,8 +57,6 @@ export interface PersonalConfig {
   /** User-selected provider/model-id bindings. Unconfigured tiers remain absent. */
   "model-tier": ModelTiers;
   "subagent-workflow": WorkflowSettings;
-  /** Default search backend and optional Codex model; authentication stays in Pi. */
-  web: WebSettings;
   /** Request priority service with official OpenAI OAuth; off unless enabled with /fast. */
   openai: { fast: boolean };
   [key: string]: unknown;
@@ -88,7 +73,6 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     language: config.language ?? "中文",
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
-    web: { searchProvider: "deepseek", ...config.web },
     openai: { fast: false, ...config.openai },
   };
 }
