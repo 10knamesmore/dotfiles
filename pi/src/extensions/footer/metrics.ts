@@ -55,46 +55,46 @@ export class RecentHitRateTracker {
   }
 }
 
-/** Generation throughput after the first token, over the most recent completed turns. */
+/** Output throughput over the most recent completed turns. */
 export class RecentTokensPerSecondTracker {
   private readonly turns: Array<{
-    outputTokensAfterFirst: number;
-    generationMilliseconds: number;
+    outputTokens: number;
+    modelMilliseconds: number;
   }> = [];
-  private current = { outputTokensAfterFirst: 0, generationMilliseconds: 0 };
+  private currentOutputTokens = 0;
 
-  /** Pair API usage with the first-to-last content duration of the same assistant message. */
-  public record(usage: Usage | undefined, generationMilliseconds: number | undefined): void {
-    // A single content event has no measurable generation interval.
-    if (!usage || usage.output <= 1 || generationMilliseconds === undefined || generationMilliseconds <= 0) return;
-    this.current.outputTokensAfterFirst += usage.output - 1;
-    this.current.generationMilliseconds += generationMilliseconds;
+  /** Accumulate generated tokens from one assistant message in the current turn. */
+  public record(usage: Usage | undefined): void {
+    if (usage) this.currentOutputTokens += usage.output;
   }
 
   /** Close one turn and retain only the recent window. */
-  public endTurn(): void {
-    if (this.current.generationMilliseconds === 0) return;
-    this.turns.push(this.current);
+  public endTurn(modelMilliseconds: number): void {
+    if (this.currentOutputTokens === 0 && modelMilliseconds === 0) return;
+    this.turns.push({
+      outputTokens: this.currentOutputTokens,
+      modelMilliseconds,
+    });
     if (this.turns.length > RECENT_TURNS) this.turns.shift();
-    this.current = { outputTokensAfterFirst: 0, generationMilliseconds: 0 };
+    this.currentOutputTokens = 0;
   }
 
   /** Clear recent throughput when Pi replaces the active session. */
   public reset(): void {
     this.turns.length = 0;
-    this.current = { outputTokensAfterFirst: 0, generationMilliseconds: 0 };
+    this.currentOutputTokens = 0;
   }
 
-  /** Σ(output tokens − 1) / Σ(first-to-last content seconds), not a mean of per-request rates. */
+  /** Return average generated tokens per model second in the recent window. */
   public tokensPerSecond(): number | undefined {
-    let outputTokensAfterFirst = 0;
-    let generationMilliseconds = 0;
+    let outputTokens = 0;
+    let modelMilliseconds = 0;
     for (const turn of this.turns) {
-      outputTokensAfterFirst += turn.outputTokensAfterFirst;
-      generationMilliseconds += turn.generationMilliseconds;
+      outputTokens += turn.outputTokens;
+      modelMilliseconds += turn.modelMilliseconds;
     }
-    if (generationMilliseconds === 0) return undefined;
-    return outputTokensAfterFirst / (generationMilliseconds / 1_000);
+    if (outputTokens <= 0 || modelMilliseconds <= 0) return undefined;
+    return outputTokens / (modelMilliseconds / 1_000);
   }
 }
 

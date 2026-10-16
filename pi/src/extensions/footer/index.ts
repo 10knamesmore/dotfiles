@@ -34,6 +34,7 @@ class FooterRuntime {
   private readonly sessionDuration = new ActiveSessionDurationTracker();
   private readonly hitRate = new RecentHitRateTracker();
   private readonly throughput = new RecentTokensPerSecondTracker();
+  private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
   private readonly activeTools = new Map<string, string>();
   private spinnerTimer: ReturnType<typeof setInterval> | undefined;
@@ -57,6 +58,7 @@ class FooterRuntime {
     this.sessionDuration.reset();
     this.hitRate.reset();
     this.throughput.reset();
+    this.lastTurnModelMilliseconds = 0;
     this.treeSummaryProviderActive = false;
     this.activeTools.clear();
     this.lastPublishedActivity = undefined;
@@ -198,15 +200,17 @@ class FooterRuntime {
 
   /** Close the recent-turn metrics after the turn's messages have been persisted. */
   public turnEnded(): void {
-    this.throughput.endTurn();
+    const modelMilliseconds = this.modelDuration.elapsedMilliseconds();
+    this.throughput.endTurn(modelMilliseconds - this.lastTurnModelMilliseconds);
+    this.lastTurnModelMilliseconds = modelMilliseconds;
     this.hitRate.endTurn();
     this.component?.requestRender();
   }
 
-  /** Record a completed assistant message's usage and generation duration in the current turn. */
-  public assistantUsageRecorded(usage: Usage | undefined): void {
+  /** Accumulate one assistant message's usage into the in-flight hit-rate turn. */
+  public hitRateRecorded(usage: Usage | undefined): void {
     this.hitRate.record(usage);
-    this.throughput.record(usage, this.modelResponse.generationMilliseconds());
+    this.throughput.record(usage);
   }
 
   /** Start a prompt only once Pi enters the agent loop; retries keep its totals. */
@@ -346,7 +350,7 @@ export function registerFooter(pi: ExtensionAPI): void {
   pi.on("message_end", (event, ctx) => {
     if (event.message.role === "assistant") {
       runtime.modelWorkEnded(ctx);
-      runtime.assistantUsageRecorded(event.message.usage);
+      runtime.hitRateRecorded(event.message.usage);
     } else {
       runtime.contextChanged(ctx);
     }

@@ -7,8 +7,9 @@
  * detached, stdout and stderr go to a log file, and the call returns the pid
  * immediately instead of waiting.
  *
- * The foreground path stays Pi's own tool definition; the background path swaps
- * only process spawning by handing `operations` to that definition. Session
+ * Foreground commands default to 120 seconds and otherwise use Pi's own tool
+ * definition. Background commands have no default timeout and swap only process
+ * spawning by handing `operations` to that definition. Session
  * environment variables, `shellCommandPrefix`, and `shellPath` therefore keep
  * coming from Pi.
  *
@@ -34,16 +35,15 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-/**
- * Pi keeps `bashSchema` module-private, so an override has to re-declare it.
- * Only `background` is new; the other descriptions stay Pi's model-facing text.
- */
+const DEFAULT_FOREGROUND_TIMEOUT_SECONDS = 120;
+
+/** Pi keeps its schema private; declare the foreground deadline and background lifetime here. */
 const bashSchema = Type.Object({
   command: Type.String({ description: "Shell command to execute" }),
   timeout: Type.Optional(
     Type.Number({
       description:
-        "Timeout in seconds (optional, no default timeout). A background command is killed after this many seconds.",
+        `Timeout in seconds. Foreground commands default to ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS} seconds; an explicit value overrides it. Background commands have no default timeout; an explicit timeout limits their lifetime, and session shutdown also kills them.`,
     }),
   ),
   background: Type.Optional(
@@ -81,13 +81,19 @@ export function registerBashBackground(pi: ExtensionAPI): void {
 
   pi.registerTool<typeof bashSchema, BashBackgroundDetails | undefined>({
     ...builtInBash,
-    description: `${builtInBash.description} With background: true the command runs detached and the call returns its pid instead of waiting; use it for long-running commands such as dev servers or watchers.`,
+    description: `${builtInBash.description} Foreground commands default to a ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS}-second timeout; set timeout explicitly to override it. With background: true the command runs detached with no default timeout and the call returns its pid instead of waiting; use it for long-running commands such as dev servers or watchers.`,
     parameters: bashSchema,
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const settings = readShellToolSettings(ctx);
       if (params.background !== true) {
-        return createBashToolDefinition(ctx.cwd, settings).execute(toolCallId, params, signal, onUpdate, ctx);
+        return createBashToolDefinition(ctx.cwd, settings).execute(
+          toolCallId,
+          { ...params, timeout: params.timeout ?? DEFAULT_FOREGROUND_TIMEOUT_SECONDS },
+          signal,
+          onUpdate,
+          ctx,
+        );
       }
 
       const handoff: { started?: BackgroundProcess } = {};
