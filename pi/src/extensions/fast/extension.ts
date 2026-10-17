@@ -12,6 +12,11 @@ function isOfficialSubscription(ctx: ExtensionContext): boolean {
     ctx.modelRegistry.isUsingOAuth(model);
 }
 
+function isFastEnabled(ctx: ExtensionContext): boolean {
+  const model = ctx.model;
+  return model !== undefined && readPersonalConfig().openai.fast[`${model.provider}/${model.id}`] === true;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -23,7 +28,7 @@ export default function fastMode(pi: ExtensionAPI): void {
   });
 
   const refreshStatus = (ctx: ExtensionContext) => {
-    fastActive = readPersonalConfig().openai.fast && isOfficialSubscription(ctx);
+    fastActive = isFastEnabled(ctx) && isOfficialSubscription(ctx);
     ctx.ui.setStatus("openai-fast", fastActive ? "fast" : undefined);
   };
 
@@ -31,7 +36,7 @@ export default function fastMode(pi: ExtensionAPI): void {
   pi.on("model_select", (_event, ctx) => refreshStatus(ctx));
 
   pi.registerCommand("fast", {
-    description: "Toggle OpenAI subscription fast mode (higher usage): /fast [on|off|status]",
+    description: "Toggle OpenAI subscription fast mode for the current model (higher usage): /fast [on|off|status]",
     getArgumentCompletions: (prefix) => {
       const matches = ["on", "off", "status"].filter((value) => value.startsWith(prefix));
       return matches.length ? matches.map((value) => ({ value, label: value })) : null;
@@ -42,24 +47,29 @@ export default function fastMode(pi: ExtensionAPI): void {
         ctx.ui.notify("Usage: /fast [on|off|status]", "warning");
         return;
       }
+      if (!ctx.model) {
+        ctx.ui.notify("Select a model before using /fast.", "warning");
+        return;
+      }
+      const modelReference = `${ctx.model.provider}/${ctx.model.id}`;
       if (action !== "status") {
         updatePersonalConfig((config) => {
-          config.openai.fast = action === "" ? !config.openai.fast : action === "on";
+          config.openai.fast[modelReference] = action === "" ? !config.openai.fast[modelReference] : action === "on";
         });
-        pi.appendEntry("openai-fast-setting", { enabled: readPersonalConfig().openai.fast });
+        pi.appendEntry("openai-fast-setting", { model: modelReference, enabled: isFastEnabled(ctx) });
       }
       refreshStatus(ctx);
-      const enabled = readPersonalConfig().openai.fast;
+      const enabled = isFastEnabled(ctx);
       const scope = isOfficialSubscription(ctx)
         ? enabled ? " Higher subscription usage; applies from the next request." : ""
         : " Applies only to official OpenAI OAuth subscription models, not the current model.";
-      ctx.ui.notify(`Fast mode: ${enabled ? "on" : "off"} (global).${scope}`, "info");
+      ctx.ui.notify(`Fast mode: ${enabled ? "on" : "off"} (${modelReference}).${scope}`, "info");
     },
   });
 
   pi.on("before_provider_request", (event, ctx) => {
     refreshStatus(ctx);
-    if (!readPersonalConfig().openai.fast || !isOfficialSubscription(ctx)) return;
+    if (!fastActive) return;
     if (!isObject(event.payload)) return;
     pi.appendEntry("openai-fast-request", { model: ctx.model!.id, serviceTier: "priority" });
     return { ...event.payload, service_tier: "priority" };

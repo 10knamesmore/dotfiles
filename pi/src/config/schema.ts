@@ -34,7 +34,10 @@ const PersonalConfigSchema = Type.Object(
     language: Type.Optional(Type.String({ minLength: 1 })),
     "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
     openai: Type.Optional(
-      Type.Object({ fast: Type.Optional(Type.Boolean()) }, { additionalProperties: false }),
+      Type.Object(
+        { fast: Type.Optional(Type.Record(ModelReferenceSchema, Type.Boolean())) },
+        { additionalProperties: false },
+      ),
     ),
     "model-tier": Type.Optional(
       Type.Object(
@@ -57,8 +60,8 @@ export interface PersonalConfig {
   /** User-selected provider/model-id bindings. Unconfigured tiers remain absent. */
   "model-tier": ModelTiers;
   "subagent-workflow": WorkflowSettings;
-  /** Request priority service with official OpenAI OAuth; off unless enabled with /fast. */
-  openai: { fast: boolean };
+  /** Priority service by provider/model-id for official OpenAI OAuth; omitted models are off. */
+  openai: { fast: Record<string, boolean> };
   [key: string]: unknown;
 }
 
@@ -73,6 +76,6 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     language: config.language ?? "中文",
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
-    openai: { fast: false, ...config.openai },
+    openai: { fast: {}, ...config.openai },
   };
 }
