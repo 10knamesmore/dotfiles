@@ -15,6 +15,7 @@
 
 ## Frequent false positives
 
+- `不等于` 可以描述数学关系或比较条件；写作规则与示例也会引用免责声明措辞。审查时删除预防假想误读的免责声明，实际限制直接写具体条件和行为。
 - `the key used to sign requests` 中 `used to` 表示用途，不是过去状态。
 - `the currently focused window`、`current connection` 等描述 runtime state，不是过期快照。
 - changelog 与 release notes 中的版本号和日期是这些 surface 的职责。
