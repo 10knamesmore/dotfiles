@@ -58,7 +58,7 @@ Item {
             ctx.lineTo(x(points[0].time), height - 4);
             ctx.closePath();
             const fill = ctx.createLinearGradient(0, 0, 0, height);
-            fill.addColorStop(0, Colors.withAlpha(root.lineColor, 0.2));
+            fill.addColorStop(0, Colors.withAlpha(root.lineColor, 0.3));
             fill.addColorStop(1, Colors.withAlpha(root.lineColor, 0.02));
             ctx.fillStyle = fill;
             ctx.fill();

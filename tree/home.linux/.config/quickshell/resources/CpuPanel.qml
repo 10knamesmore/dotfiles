@@ -11,7 +11,8 @@ PanelOverlay {
     readonly property var processRows: cpu.processes.map(process => ({
                 pid: process.pid,
                 name: process.name,
-                value: process.usage.toFixed(1) + "%"
+                value: process.usage.toFixed(1) + "%",
+                fraction: process.usage / 100
             }))
 
     panelHeight: content.implicitHeight + Tokens.spaceL * 2
@@ -42,27 +43,43 @@ PanelOverlay {
             visible: root.cpu.status !== "error"
             width: parent.width
 
-            Row {
-                spacing: Tokens.spaceXL
-                visible: root.cpu.frequencyGHz !== null || root.cpu.temperatureC !== null
+            Item {
+                height: Math.max(usageMetric.implicitHeight, hardware.implicitHeight)
+                width: parent.width
 
-                Text {
-                    color: Colors.text
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.body
-                    text: root.cpu.frequencyGHz === null ? "" : "频率  " + root.cpu.frequencyGHz.toFixed(1) + " GHz"
-                    visible: root.cpu.frequencyGHz !== null
+                StatMetric {
+                    id: usageMetric
+
+                    label: "整机使用率"
+                    unit: "%"
+                    value: root.cpu.usage.toFixed(0)
+                    valueColor: Colors.blue
                 }
-                Text {
-                    color: Colors.text
-                    font.family: Fonts.family
-                    font.pixelSize: Fonts.body
-                    text: root.cpu.temperatureC === null ? "" : "温度  " + Math.round(root.cpu.temperatureC) + " °C"
-                    visible: root.cpu.temperatureC !== null
+                Column {
+                    id: hardware
+
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Tokens.spaceS
+
+                    Text {
+                        color: Colors.subtext1
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.small
+                        text: root.cpu.frequencyGHz === null ? "" : "频率  " + root.cpu.frequencyGHz.toFixed(1) + " GHz"
+                        visible: root.cpu.frequencyGHz !== null
+                    }
+                    Text {
+                        color: Colors.subtext1
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.small
+                        text: root.cpu.temperatureC === null ? "" : "温度  " + Math.round(root.cpu.temperatureC) + " °C"
+                        visible: root.cpu.temperatureC !== null
+                    }
                 }
             }
             StatRow {
-                label: "使用率"
+                label: "负载趋势"
                 value: "0–100%"
                 valueColor: Colors.subtext0
                 width: parent.width
@@ -71,6 +88,7 @@ PanelOverlay {
                 Accessible.name: "整机 CPU 使用率，最近一分钟"
                 lineColor: Colors.blue
                 maxValue: 100
+                plotHeight: 110
                 points: ResourceStats.cpuHistory
                 width: parent.width
             }

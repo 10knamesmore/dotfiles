@@ -87,8 +87,29 @@ PanelOverlay {
                 }
                 onActivated: index => ResourceStats.networkInterface = model[index]
             }
+            Row {
+                spacing: Tokens.spaceL
+                width: parent.width
+
+                StatMetric {
+                    label: "↓ 下载"
+                    unit: root.iface ? StatsFormat.speed(root.iface.downSpeed).split(" ")[1] : ""
+                    value: root.iface ? StatsFormat.speed(root.iface.downSpeed).split(" ")[0] : ""
+                    valueColor: Colors.teal
+                    valueSize: Fonts.display3
+                    width: (parent.width - Tokens.spaceL) / 2
+                }
+                StatMetric {
+                    label: "↑ 上传"
+                    unit: root.iface ? StatsFormat.speed(root.iface.upSpeed).split(" ")[1] : ""
+                    value: root.iface ? StatsFormat.speed(root.iface.upSpeed).split(" ")[0] : ""
+                    valueColor: Colors.blue
+                    valueSize: Fonts.display3
+                    width: (parent.width - Tokens.spaceL) / 2
+                }
+            }
             StatRow {
-                label: "↓ 下载  " + (root.iface ? StatsFormat.speed(root.iface.downSpeed) : "")
+                label: "↓ 下载"
                 value: "0–" + StatsFormat.speed(root.downMax)
                 valueColor: Colors.teal
                 width: parent.width
@@ -97,12 +118,12 @@ PanelOverlay {
                 Accessible.name: "下载速率，最近一分钟"
                 lineColor: Colors.teal
                 maxValue: root.downMax
-                plotHeight: 62
+                plotHeight: 77
                 points: root.history.down
                 width: parent.width
             }
             StatRow {
-                label: "↑ 上传  " + (root.iface ? StatsFormat.speed(root.iface.upSpeed) : "")
+                label: "↑ 上传"
                 value: "0–" + StatsFormat.speed(root.upMax)
                 valueColor: Colors.blue
                 width: parent.width
@@ -111,7 +132,7 @@ PanelOverlay {
                 Accessible.name: "上传速率，最近一分钟"
                 lineColor: Colors.blue
                 maxValue: root.upMax
-                plotHeight: 62
+                plotHeight: 77
                 points: root.history.up
                 width: parent.width
             }
