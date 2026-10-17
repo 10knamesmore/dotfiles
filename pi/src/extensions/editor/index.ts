@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { PROMPT_EDITOR_CONFIGURE, type EditorStatus, type PromptEditorApi } from "./api.js";
 import { PromptEditor } from "./component.js";
+import { installCopyCommand } from "./copy.js";
 import type { AgentInputNavigation } from "./navigation.js";
 
 type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
@@ -36,8 +37,9 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       },
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
+    let editor!: PromptEditor;
     installedFactory = (tui, theme, keybindings) =>
-      new PromptEditor(
+      (editor = new PromptEditor(
         tui,
         theme,
         keybindings,
@@ -47,8 +49,9 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         () => readFastRequested?.() ?? false,
         () => readTodoStatus?.(),
         () => readWorkflowUsage?.(),
-      );
+      ));
     ctx.ui.setEditorComponent(installedFactory);
+    installCopyCommand(editor, ctx);
   });
 
   pi.on("model_select", (_event, ctx) => {
