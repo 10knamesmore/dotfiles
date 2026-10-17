@@ -7,8 +7,19 @@ Shape {
     id: root
 
     required property point cursorPosition
+    required property size screenSize
     required property real radius
     property color accentColor: Colors.blue
+
+    readonly property real gradientRadius: Math.hypot(screenSize.width, screenSize.height)
+    readonly property real halfBrightnessDistance: 150
+
+    function glowColorAtDistance(distance) {
+        const relativeDistance = distance / halfBrightnessDistance;
+        const brightness = 1 / (1 + relativeDistance * relativeDistance);
+        const tint = Qt.tint(accentColor, Qt.rgba(1, 1, 1, 0.55 * brightness));
+        return Colors.withAlpha(tint, brightness);
+    }
 
     preferredRendererType: Shape.CurveRenderer
     Accessible.ignored: true
@@ -29,23 +40,47 @@ Shape {
             centerY: root.cursorPosition.y
             focalX: centerX
             focalY: centerY
-            centerRadius: 240
+            centerRadius: root.gradientRadius
 
             GradientStop {
                 position: 0
-                color: Qt.tint(root.accentColor, Qt.rgba(1, 1, 1, 0.55))
+                color: root.glowColorAtDistance(0)
             }
             GradientStop {
-                position: 0.3
-                color: Colors.withAlpha(root.accentColor, 0.75)
+                position: 0.01
+                color: root.glowColorAtDistance(0.01 * root.gradientRadius)
             }
             GradientStop {
-                position: 0.65
-                color: Colors.withAlpha(root.accentColor, 0.25)
+                position: 0.02
+                color: root.glowColorAtDistance(0.02 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.035
+                color: root.glowColorAtDistance(0.035 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.06
+                color: root.glowColorAtDistance(0.06 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.1
+                color: root.glowColorAtDistance(0.1 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.18
+                color: root.glowColorAtDistance(0.18 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.32
+                color: root.glowColorAtDistance(0.32 * root.gradientRadius)
+            }
+            GradientStop {
+                position: 0.56
+                color: root.glowColorAtDistance(0.56 * root.gradientRadius)
             }
             GradientStop {
                 position: 1
-                color: "transparent"
+                color: root.glowColorAtDistance(root.gradientRadius)
             }
         }
 

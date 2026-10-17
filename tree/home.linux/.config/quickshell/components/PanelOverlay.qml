@@ -345,6 +345,7 @@ PanelWindow {
         height: panel.height
         radius: panel.radius
         cursorPosition: Qt.point(cursorTracker.point.position.x - x, cursorTracker.point.position.y - y)
+        screenSize: Qt.size(root.width, root.height)
         opacity: panel.opacity * panel.revealProgress * (cursorTracker.hovered ? 1 : 0)
         visible: opacity > 0
     }
