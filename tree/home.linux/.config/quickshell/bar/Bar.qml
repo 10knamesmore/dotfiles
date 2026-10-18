@@ -18,6 +18,8 @@ PanelWindow {
     property bool transientReveal: !CaptureService.recordingActive && !BarState.barPinnedVisible && BarState.barHoverRevealScreen === root.modelData.name
     property int barHeight: 44
     property int trackingBandHeight: 44
+    readonly property bool cursorInside: barHover.hovered
+    readonly property point cursorPosition: Qt.point(barHover.point.position.x + margins.left, barHover.point.position.y + margins.top)
 
     function queueAutoHide() {
         if (!root.transientReveal || PanelState.anyPanelOpen || MorphState.heldItems.length > 0 || barHover.hovered || trackingHover.hovered)

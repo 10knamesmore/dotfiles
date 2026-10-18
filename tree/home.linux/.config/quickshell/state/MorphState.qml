@@ -35,6 +35,10 @@ QtObject {
             barWindow: barWindow,
             screen: barWindow.screen,
             initialDetails: item.detailProgress,
+            cursor: {
+                inside: barWindow.cursorInside,
+                position: barWindow.cursorPosition
+            },
             bounds: boundsFor(item, barWindow)
         };
         console.info("[panel-morph] opening from", barWindow.screen.name, pendingSource.bounds);

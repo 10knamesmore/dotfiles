@@ -70,10 +70,10 @@ PanelWindow {
     }
 
     function _finishClose() {
-        _keepVisible = false;
         if (_sourceHeld)
             console.info("[panel-morph] returned to bar module on", _source.screen.name);
         _releaseSource();
+        _keepVisible = false;
         _source = null;
     }
 
@@ -109,6 +109,9 @@ PanelWindow {
                 _openingProgress = 0;
             }
             screen = hasMorphSource ? _source.screen : null;
+            // 新窗口收到 hover 前，沿用顶栏的光标位置，让高亮从展开首帧开始。
+            cursorTracker.glowPosition = hasMorphSource ? _source.cursor.position : Qt.point(0, 0);
+            cursorTracker.glowActive = hasMorphSource && _source.cursor.inside;
             panel.progress = 0;
             _atTarget = false;
             _keepVisible = true;
@@ -190,7 +193,7 @@ PanelWindow {
     anchors.bottom: true
     anchors.left: true
     anchors.right: true
-    visible: showing || _keepVisible
+    visible: _keepVisible
     focusable: showing
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell-panel"
@@ -333,9 +336,21 @@ PanelWindow {
 
     HoverHandler {
         id: cursorTracker
+        property point glowPosition: Qt.point(0, 0)
+        property bool glowActive: false
+
         parent: root.contentItem
         enabled: root.visible
         blocking: false
+        onHoveredChanged: {
+            glowActive = hovered;
+            if (hovered)
+                glowPosition = point.position;
+        }
+        onPointChanged: {
+            if (hovered)
+                glowPosition = point.position;
+        }
     }
 
     PanelBorderGlow {
@@ -344,9 +359,9 @@ PanelWindow {
         width: panel.width
         height: panel.height
         radius: panel.radius
-        cursorPosition: Qt.point(cursorTracker.point.position.x - x, cursorTracker.point.position.y - y)
+        cursorPosition: Qt.point(cursorTracker.glowPosition.x - x, cursorTracker.glowPosition.y - y)
         screenSize: Qt.size(root.width, root.height)
-        opacity: panel.opacity * panel.revealProgress * (cursorTracker.hovered ? 1 : 0)
+        opacity: panel.opacity * panel.revealProgress * (cursorTracker.glowActive ? 1 : 0)
         visible: opacity > 0
     }
 }
