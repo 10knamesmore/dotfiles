@@ -7,7 +7,8 @@
 ## 核心命令
 
 ```bash
-./dots.sh install         # 执行声明的 Cargo binary 安装或升级，不卸载
+./dots.sh install         # 补装当前平台系统包，再安装或升级 Cargo binary，不卸载
+./dots.sh install --dry-run # 查询系统包状态并预览安装命令，不执行安装
 ./dots.sh sync            # 执行 lifecycle hook，再把 tree/ 链接到 $HOME
 ./dots.sh status          # 只读展示 sync 将执行的完整 Plan
 ./dots.sh forget <资源>   # 不改真实对象，只放弃对应 ownership
@@ -34,7 +35,11 @@ docs/
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；共享 AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.hook.before_sync`（真实 sync 在 planning 前执行的具名程序）、`dots.resource.symlink|copied_file|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.resource.cargo_binary`（只由 `dots install` 直接映射为 `cargo install` 的声明）、`dots.path.exists`（只读条件）。字符串 `cargo_binary.source` 表示 crates.io package；删除声明不卸载已经安装的 binary。条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
+只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；共享 AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.hook.before_sync`（真实 sync 在 planning 前执行的具名程序）、`dots.resource.symlink|copied_file|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.install.pacman|brew|cargo`（只由 `dots install` 执行）、`dots.path.exists`（只读条件）。条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
+
+安装清单按来源分别声明，Lua 无需判断平台：`pacman({...})` 仅在存在 `/etc/arch-release` 的 Linux 上执行，`brew({...})` 仅在 macOS 上执行，其他平台显示跳过。当前平台的管理器不可用或执行失败会报错，不切换来源。两者只补装缺失包，不主动升级已有声明包；pacman 不刷新数据库或执行全系统升级。删除安装声明不卸载软件。
+
+`cargo({source=..., platforms={"macos"}})` 可限定执行平台，只接受 `linux`、`macos`；省略 `platforms` 时在所有平台执行，空表表示全部跳过。字符串 source 表示 crates.io package，table source 表示本地 workspace binary，后者每次强制重建。平台不匹配时显示跳过，不调用 Cargo。
 
 ## 路径注入
 
@@ -54,5 +59,5 @@ docs/
 - 这是个人 dotfiles 仓库**不是公开生产项目**，**禁止**编写测试,**禁止**考虑兼容, **禁止**考虑`这是涉及公开API修改, 所以得慎重` 用户明确了就直接改 。改动使用编译、类型检查和必要的真实运行验证。
 - 仓库内所有东西只考虑 macos & linux 的使用场景
 - 配置管理入口是 `dots`，安装入口是 `bootstrap.sh`。
-- 不安装系统包、rustup、Node、pnpm 或 AI CLI；`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，依次运行 `dots install` 和 `dots sync`。Pi SDK 依赖跟随 npm `latest`；sync 的 Pi hook 执行 `pnpm run update:pi`，更新已解析版本并写入 lockfile。
+- `dots install` 安装显式声明的系统包与 Cargo binary；不安装包管理器本身、rustup、Node、pnpm 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，系统包管理器仅在有适用声明时需要；依次运行 `dots install` 和 `dots sync`。Pi SDK 依赖跟随 npm `latest`；sync 的 Pi hook 执行 `pnpm run update:pi`，更新已解析版本并写入 lockfile。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。

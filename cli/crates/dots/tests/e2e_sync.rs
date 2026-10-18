@@ -296,7 +296,7 @@ fn cargo_binary_runs_only_during_install() {
     fs::write(
         repo.join("dots.lua"),
         r#"
-dots.resource.cargo_binary {
+dots.install.cargo {
     source = {
         path = "mini",
         binary = "mini",

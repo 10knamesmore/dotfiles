@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 检查编译依赖，构建 dots，安装 Cargo binary，再执行 hook 并收敛配置声明。
+# 检查编译依赖，构建 dots，安装当前平台依赖，再执行 hook 并收敛配置声明。
 # Usage: ./bootstrap.sh
-# 依赖：cc、cargo、Node 22.19+、pnpm 11.18
+# 依赖：cc、cargo、Node 22.19+、pnpm 11.18；系统包管理器按适用的安装声明需要
 # 环境变量：无
 # 任一步失败立即退出，避免用不完整的 binary 继续修改本机配置。
 set -euo pipefail

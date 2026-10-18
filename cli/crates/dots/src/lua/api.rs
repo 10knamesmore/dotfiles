@@ -1,14 +1,14 @@
-//! 纯声明 Lua API：mapping、sync Resource、lifecycle hook 与 Cargo installation。
+//! 纯声明 Lua API：mapping、sync Resource、lifecycle hook 与包安装。
 
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
 use dots_core::manifest::{
-    BeforeSyncHook, CargoBinaryDeclaration, DistributeSpec, GranularitySpec, Manifest,
-    ResourceDeclaration, RootSpec,
+    BeforeSyncHook, CargoBinaryDeclaration, CargoBinarySource, DistributeSpec, GranularitySpec,
+    Manifest, ResourceDeclaration, RootSpec,
 };
-use dots_core::{LinkMode, RepoPath};
+use dots_core::{LinkMode, Os, RepoPath};
 use mlua::{Lua, Table, Value};
 
 /// 共享 Manifest builder。
@@ -21,6 +21,7 @@ pub fn register(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     register_root(lua, builder)?;
     register_scripts(lua, builder)?;
     register_resources(lua, builder)?;
+    register_install(lua, builder)?;
     register_hooks(lua, builder)?;
     register_path_queries(lua)?;
     Ok(())
@@ -132,7 +133,7 @@ fn register_scripts(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     Ok(())
 }
 
-/// 注册 `dots.resource.*` typed declaration，包括独立执行的 Cargo installation。
+/// 注册由 `dots sync` 收敛的 `dots.resource.*` 声明。
 fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     let dots: Table = lua.globals().get("dots")?;
     let resource = lua.create_table()?;
@@ -166,20 +167,6 @@ fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
                         source: spec.get("source")?,
                         target: spec.get("target")?,
                     });
-            }
-            Ok(())
-        })?,
-    )?;
-
-    let cargo_builder = builder.clone();
-    resource.set(
-        "cargo_binary",
-        lua.create_function(move |_, spec: Table| {
-            if enabled(&spec)? {
-                cargo_builder
-                    .borrow_mut()
-                    .cargo_binaries
-                    .push(parse_cargo_binary_declaration(&spec)?);
             }
             Ok(())
         })?,
@@ -223,6 +210,48 @@ fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     Ok(())
 }
 
+/// 收集所有平台的安装清单；平台筛选仅在 `dots install` 执行时发生。
+fn register_install(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
+    let dots: Table = lua.globals().get("dots")?;
+    let install = lua.create_table()?;
+
+    let pacman_builder = builder.clone();
+    install.set(
+        "pacman",
+        lua.create_function(move |_, packages: Vec<String>| {
+            pacman_builder.borrow_mut().install.pacman.extend(packages);
+            Ok(())
+        })?,
+    )?;
+
+    let brew_builder = builder.clone();
+    install.set(
+        "brew",
+        lua.create_function(move |_, packages: Vec<String>| {
+            brew_builder.borrow_mut().install.brew.extend(packages);
+            Ok(())
+        })?,
+    )?;
+
+    let cargo_builder = builder.clone();
+    install.set(
+        "cargo",
+        lua.create_function(move |_, spec: Table| {
+            if enabled(&spec)? {
+                cargo_builder
+                    .borrow_mut()
+                    .install
+                    .cargo
+                    .push(parse_cargo_binary_declaration(&spec)?);
+            }
+            Ok(())
+        })?,
+    )?;
+
+    dots.set("install", install)?;
+    Ok(())
+}
+
 /// 注册声明阶段允许的只读 path 查询。
 fn register_path_queries(lua: &Lua) -> mlua::Result<()> {
     let dots: Table = lua.globals().get("dots")?;
@@ -240,14 +269,29 @@ fn enabled(spec: &Table) -> mlua::Result<bool> {
     Ok(spec.get::<Option<bool>>("enabled")?.unwrap_or(true))
 }
 
-/// 解析 cargo binary 的 workspace/crates.io declaration。
+/// 解析 Cargo 安装的平台限制和 workspace/crates.io 来源。
 fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDeclaration> {
-    match spec.get::<Value>("source")? {
-        Value::Table(source) => Ok(CargoBinaryDeclaration::Workspace {
+    let platforms = spec
+        .get::<Option<Vec<String>>>("platforms")?
+        .map(|platforms| {
+            platforms
+                .into_iter()
+                .map(|platform| match platform.as_str() {
+                    "linux" => Ok(Os::Linux),
+                    "macos" => Ok(Os::Macos),
+                    _ => Err(mlua::Error::external(format!(
+                        "dots.install.cargo.platforms 只接受 linux 或 macos，得到 `{platform}`"
+                    ))),
+                })
+                .collect::<mlua::Result<Vec<_>>>()
+        })
+        .transpose()?;
+    let source = match spec.get::<Value>("source")? {
+        Value::Table(source) => CargoBinarySource::Workspace {
             path: source.get("path")?,
             binary: source.get("binary")?,
             root: spec.get("root")?,
-        }),
+        },
         Value::String(package) => {
             if spec.contains_key("target")?
                 || spec.contains_key("root")?
@@ -258,16 +302,19 @@ fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDecla
                     "crates.io cargo binary 只接受字符串 source；root、target、version、binary 由 Cargo 决定",
                 ));
             }
-            Ok(CargoBinaryDeclaration::CratesIo {
+            CargoBinarySource::CratesIo {
                 package: package.to_str()?.to_owned(),
                 binaries: string_sequence(spec, "binaries")?,
-            })
+            }
         }
-        other => Err(mlua::Error::external(format!(
-            "dots.resource.cargo_binary.source 必须是 crates.io package 字符串或 workspace table，得到 {}",
-            other.type_name()
-        ))),
-    }
+        other => {
+            return Err(mlua::Error::external(format!(
+                "dots.install.cargo.source 必须是 crates.io package 字符串或 workspace table，得到 {}",
+                other.type_name()
+            )));
+        }
+    };
+    Ok(CargoBinaryDeclaration { platforms, source })
 }
 
 /// 拒绝不受支持的条目级 Action 字段，避免静默失效。

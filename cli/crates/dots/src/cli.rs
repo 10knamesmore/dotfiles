@@ -9,7 +9,7 @@ use crate::cmd;
 /// 通用 Result 别名。
 pub type Result<T> = color_eyre::Result<T>;
 
-/// dots —— 收敛仓库声明的配置 Resource，并执行 Cargo binary 安装。
+/// dots —— 收敛仓库声明的配置 Resource，并安装所需软件。
 #[derive(Debug, Parser)]
 #[command(
     name = "dots",
@@ -27,8 +27,12 @@ pub struct Args {
 /// dots 的命令。
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// 执行所有 Cargo binary 声明，只安装或升级，不卸载。
-    Install,
+    /// 安装当前平台的系统包和 Cargo binary，不卸载。
+    Install {
+        /// 查询系统包状态并预览安装命令，不执行安装。
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// 收敛当前 Desired Set，并安全创建、更新或删除 Resource。
     Sync {
         /// 只看会做什么，不实际改动。
@@ -48,8 +52,8 @@ pub enum Command {
 pub fn run() -> Result<ExitCode> {
     let args = Args::parse();
     match args.command {
-        Command::Install => {
-            cmd::install::run()?;
+        Command::Install { dry_run } => {
+            cmd::install::run(dry_run)?;
             Ok(ExitCode::SUCCESS)
         }
         Command::Sync { dry_run } => {

@@ -1,11 +1,11 @@
 //! Manifest —— dots.lua 求值结果的纯数据表示。
 //!
 //! core 拥有这份数据结构但**不依赖 mlua**：bin 的 Lua 求值器把 Lua table 翻译成
-//! `Manifest`。sync 消费 mapping 与 Resource，install 消费 Cargo binary declaration。
+//! `Manifest`。sync 消费 mapping 与 Resource，install 消费包安装声明。
 
 use rustc_hash::FxHashMap;
 
-use crate::types::{LinkMode, RepoPath};
+use crate::types::{LinkMode, Os, RepoPath};
 
 /// dots.lua 的全部声明。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,8 +28,21 @@ pub struct Manifest {
     /// 绑定 dots command 生命周期的 hook。
     pub hooks: LifecycleHooks,
 
-    /// 仅由 `dots install` 执行的 Cargo binary declaration。
-    pub cargo_binaries: Vec<CargoBinaryDeclaration>,
+    /// 仅由 `dots install` 执行，按包管理器分组的安装声明。
+    pub install: InstallDeclarations,
+}
+
+/// 系统包先安装，再构建 Cargo binary；不适用当前平台的系统包清单跳过。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct InstallDeclarations {
+    /// Arch 系 Linux 的 pacman 包名。
+    pub pacman: Vec<String>,
+
+    /// macOS 的 Homebrew formula 名称。
+    pub brew: Vec<String>,
+
+    /// 可按声明限定执行平台的 Cargo 安装清单。
+    pub cargo: Vec<CargoBinaryDeclaration>,
 }
 
 /// dots command 暴露的 lifecycle hook 集合。
@@ -132,7 +145,17 @@ pub enum ResourceDeclaration {
 
 /// 一项只由 `dots install` 执行的 Cargo binary declaration。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CargoBinaryDeclaration {
+pub struct CargoBinaryDeclaration {
+    /// 执行平台；None 为所有平台，空列表表示不在任何平台执行。
+    pub platforms: Option<Vec<Os>>,
+
+    /// 安装来源及该来源所需的 Cargo 参数。
+    pub source: CargoBinarySource,
+}
+
+/// Cargo binary 的源码来源及安装参数。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CargoBinarySource {
     /// 通过 Cargo 安装的仓库内 workspace binary。
     Workspace {
         /// 传给 `cargo install --path` 的 package directory；相对路径以仓库根为基准。
@@ -165,7 +188,7 @@ mod tests {
         let m = Manifest::default();
         assert!(m.distribute.is_empty());
         assert!(m.resources.is_empty());
-        assert!(m.cargo_binaries.is_empty());
+        assert_eq!(m.install, InstallDeclarations::default());
         assert!(m.granularity.is_empty());
     }
 }

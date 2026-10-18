@@ -63,8 +63,36 @@ distribute("agent-hook-rules", {
   mode = "file",
 })
 
--- `dots install` 把声明直接映射为 cargo install --path/--bin/--root。
-dots.resource.cargo_binary({
+-- 系统包按平台执行；不适用的包管理器清单直接跳过。
+dots.install.pacman({
+  "starship",
+  "zoxide",
+  "ripgrep",
+  "fd",
+  "bat",
+  "eza",
+  "git-delta",
+  "uv",
+})
+
+local macos_cargo_packages = {
+  "starship",
+  "zoxide",
+  "ripgrep",
+  "fd-find",
+  "bat",
+  "eza",
+  "git-delta",
+  "uv",
+}
+for _, package in ipairs(macos_cargo_packages) do
+  dots.install.cargo({
+    source = package,
+    platforms = { "macos" },
+  })
+end
+
+dots.install.cargo({
   source = {
     path = "cli/crates/agent-hooks",
     binary = "agent-hook",
@@ -72,22 +100,9 @@ dots.resource.cargo_binary({
   root = "~/.local",
 })
 
--- 所有主机共享的 crates.io package inventory；`dots install` 逐项交给 Cargo 安装或升级。
-dots.resource.cargo_binary({
-  source = "uv",
-  binaries = { "uv", "uvx" },
-})
-
-local cargo_binary_packages = {
-  "starship",
+local cargo_packages = {
   "matugen",
-  "zoxide",
   "du-dust",
-  "ripgrep",
-  "fd-find",
-  "bat",
-  "eza",
-  "git-delta",
   "cargo-nextest",
   "cargo-insta",
   "cargo-watch",
@@ -97,6 +112,6 @@ local cargo_binary_packages = {
   "cargo-update",
   "cargo-cache",
 }
-for _, package in ipairs(cargo_binary_packages) do
-  dots.resource.cargo_binary({ source = package })
+for _, package in ipairs(cargo_packages) do
+  dots.install.cargo({ source = package })
 end
