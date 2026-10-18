@@ -125,7 +125,7 @@ export function registerWebTools(pi: ExtensionAPI): void {
     name: "webfetch",
     label: "Web Fetch",
     description:
-      "Fetch a public HTTP(S) page as readable Markdown or text. Supports HTML, plain text, Markdown, JSON and XML; does not execute JavaScript or process PDFs/videos/images. Supply a URL for a fresh download, or responseId plus offset to continue the same cached content. Default page: 30000 UTF-16 characters, at most 40 KiB / 1800 lines. Download limit: 5 MiB; timeout: 30 seconds. Cached pages expire after one hour and may be evicted earlier.",
+      "Fetch a public HTTP(S) page as Markdown or text. Supports HTML, plain text, Markdown, JSON and XML; does not execute JavaScript or process PDFs/videos/images. Supply a URL for a fresh download, or responseId plus offset to continue the same cached content. Default page: 30000 UTF-16 characters, at most 40 KiB / 1800 lines. Download limit: 5 MiB; timeout: 30 seconds. Cached pages expire after one hour and may be evicted earlier.",
     promptSnippet: "Read a webpage, or continue reading cached content",
     parameters: FetchParameters,
     executionMode: "parallel",

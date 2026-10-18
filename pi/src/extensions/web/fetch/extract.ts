@@ -1,5 +1,4 @@
 // Adapted from pi-web-access extract.ts at 6c5afa1d0d43eef8552284ad73f4bd9f0612a378 (MIT).
-import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import type TurndownService from "turndown";
 import { asWebError, WebError } from "../errors.js";
@@ -138,23 +137,18 @@ async function extractHtml(html: string, url: URL): Promise<{ title: string; con
         // Leave malformed author-provided links as text instead of failing the page.
       }
     }
-    for (const element of document.querySelectorAll("script, style, nav, noscript, template")) {
+    for (const element of document.querySelectorAll("script, style, template")) {
       element.remove();
     }
 
-    const fallbackHtml = document.body?.innerHTML ?? "";
-    type ReadabilityDocument = ConstructorParameters<typeof Readability>[0];
-    const article = new Readability(document as unknown as ReadabilityDocument).parse();
     const turndown = await getTurndown();
-    const readableMarkdown = typeof article?.content === "string" ? turndown.turndown(article.content).trim() : "";
-    const fallbackMarkdown = readableMarkdown ? "" : turndown.turndown(fallbackHtml).trim();
-    const content = readableMarkdown || fallbackMarkdown;
+    const content = turndown.turndown(document.body.innerHTML).trim();
 
     if (!content) {
       throw new WebError("invalid_response", "No readable text was found in the HTML response.");
     }
     return {
-      title: article?.title?.trim() || documentTitle || fallbackTitle(url),
+      title: documentTitle || fallbackTitle(url),
       content,
     };
   } catch (error) {
@@ -238,6 +232,6 @@ async function loadTurndown(): Promise<TurndownService> {
     codeBlockStyle: "fenced",
     bulletListMarker: "-",
   });
-  service.remove(["script", "style", "nav", "noscript", "template"]);
+  service.keep(["table"]);
   return service;
 }
