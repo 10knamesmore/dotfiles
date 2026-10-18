@@ -151,6 +151,28 @@ hl.config({
   master = { new_status = "master" },
   scrolling = { column_width = 0.51 },
 
+  group = {
+    groupbar = {
+      enabled = true,
+      disable_when_only = false,
+      stacked = false,
+      render_titles = true,
+      gradients = true,
+      height = 24,
+      font_size = 11,
+      font_weight_active = 600,
+      font_weight_inactive = 400,
+      text_padding = 8,
+      indicator_height = 0,
+      indicator_gap = 0,
+      gaps_in = 6,
+      gaps_out = 4,
+      keep_upper_gap = false,
+      gradient_rounding = 6,
+      gradient_round_only_edges = false,
+    },
+  },
+
   -- ---------- misc / debug ----------
   misc = {
     force_default_wallpaper = -1,
@@ -373,7 +395,6 @@ bind(mainMod .. " + E", "应用启动 · 文件管理器", hl.dsp.exec_cmd(termi
 -- ALT+V 对齐 macOS 的浮动快捷键；SUPER+V 留给 xremap 做粘贴。
 bind("ALT + V", "窗口 · 切换浮动", hl.dsp.window.float({ action = "toggle" }))
 bind(mainMod .. " + R", "应用启动 · 应用启动器", hl.dsp.global("quickshell:launcher"))
-bind(mainMod .. " + S", "布局 · 切换方向", hl.dsp.layout("togglesplit"))
 bind(mainMod .. " + P", "捕获 · 区域截图", hl.dsp.global("quickshell:captureScreenshot"))
 bind(mainMod .. " + SHIFT + P", "捕获 · 窗口截图", hl.dsp.global("quickshell:captureWindow"))
 bind(mainMod .. " + ALT + P", "捕获 · 取色", hl.dsp.global("quickshell:captureColor"))
@@ -425,7 +446,11 @@ for i = 1, 10 do
   local key = i % 10 -- 10 → 键 "0"
   bind(mainMod .. " + " .. key, "工作区 · 切到 " .. i, hl.dsp.focus({ workspace = i }))
   bind(mainMod .. " + SHIFT + " .. key, "工作区 · 移到 " .. i, hl.dsp.window.move({ workspace = tostring(i) }))
-  bind(mainMod .. " + CONTROL + " .. key, "工作区 · 静默移到 " .. i, hl.dsp.window.move({ workspace = tostring(i), silent = true }))
+  bind(
+    mainMod .. " + CONTROL + " .. key,
+    "工作区 · 静默移到 " .. i,
+    hl.dsp.window.move({ workspace = tostring(i), silent = true })
+  )
 end
 
 -- 特殊工作区
@@ -433,9 +458,25 @@ bind(mainMod .. " + M", "暂存区 · 切换", hl.dsp.workspace.toggle_special("
 bind(mainMod .. " + SHIFT + M", "暂存区 · 移入", hl.dsp.window.move({ workspace = "special" }))
 
 -- 窗口分组
-bind(mainMod .. " + G", "分组 · 切换分组", hl.dsp.group.toggle())
-bind(mainMod .. " + TAB", "分组 · 下一个标签", hl.dsp.group.next())
-bind(mainMod .. " + SHIFT + TAB", "分组 · 上一个标签", hl.dsp.group.next({ reverse = true }))
+bind(mainMod .. " + s", "分组 · 切换分组", hl.dsp.group.toggle())
+bind(mainMod .. " + n", "分组 · 下一个标签", hl.dsp.group.next())
+bind(mainMod .. " + CTRL + S", "分组 · 堆叠最近窗口", function()
+  local current = hl.get_active_window()
+  local recent = hl.get_last_window()
+  if not current or not recent or (current.group and current.group == recent.group) then
+    return
+  end
+
+  if not current.group then
+    hl.dispatch(hl.dsp.group.toggle({ window = current }))
+  end
+  -- add 会合并来源窗口的整组；先移出，只堆叠最近聚焦的那个窗口。
+  if recent.group then
+    recent.group:remove(recent)
+  end
+  current.group:add(recent)
+  hl.dispatch(hl.dsp.focus({ window = current }))
+end)
 
 -- 自定义脚本
 bind(mainMod .. " + O", "脚本 · 透明度切换", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/opacity_toggle.sh"))
