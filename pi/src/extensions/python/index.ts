@@ -39,11 +39,9 @@ const EMPTY_ENVIRONMENT_NOTICE =
 const TERMINAL_USE_SKILL = fileURLToPath(
   new URL("./packages/terminal-use/skills/terminal-use/SKILL.md", import.meta.url),
 );
-
 const COMPUTER_USE_SKILL = fileURLToPath(
   new URL("./packages/computer-use/skills/computer-use/SKILL.md", import.meta.url),
 );
-
 const BROWSER_USE_SKILL = fileURLToPath(new URL("./packages/browser-use/skills/browser-use/SKILL.md", import.meta.url));
 const NVIM_USE_SKILL = fileURLToPath(new URL("./packages/nvim-use/skills/nvim-use/SKILL.md", import.meta.url));
 
@@ -53,7 +51,12 @@ const TOOL_DESCRIPTION =
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
 export function registerPython(pi: ExtensionAPI): void {
   pi.on("resources_discover", () => ({
-    skillPaths: [TERMINAL_USE_SKILL, BROWSER_USE_SKILL, NVIM_USE_SKILL, ...(process.platform === "linux" ? [COMPUTER_USE_SKILL] : [])],
+    skillPaths: [
+      TERMINAL_USE_SKILL,
+      BROWSER_USE_SKILL,
+      NVIM_USE_SKILL,
+      ...(process.platform === "linux" ? [COMPUTER_USE_SKILL] : []),
+    ],
   }));
 
   let session: PythonSession | undefined;
