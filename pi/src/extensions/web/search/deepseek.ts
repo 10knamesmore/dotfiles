@@ -1,5 +1,6 @@
 import { asWebError, WebError } from "../errors.js";
 import { requestText } from "../http.js";
+import { boundedText, cleanUrl, displayDate, isRecord, parseJson } from "./response.js";
 import type { SearchRequest, SearchSource } from "./types.js";
 
 const SEARCH_URL = "https://api.deepseek.com/v1/tools/search";
@@ -90,6 +91,7 @@ function parseResults(text: string, limit: number): SearchSource[] {
     if (url === undefined || seen.has(url)) continue;
     seen.add(url);
     const source: SearchSource = {
+      providers: ["deepseek"],
       title: boundedText(item.title, MAX_TITLE_CHARS) || url,
       url,
       summary:
@@ -122,28 +124,6 @@ function searchError(error: unknown): WebError {
   return asWebError(error);
 }
 
-function cleanUrl(raw: unknown): string | undefined {
-  if (typeof raw !== "string") return undefined;
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    url.hash = "";
-    url.searchParams.delete("accessToken");
-    for (const key of [...url.searchParams.keys()]) {
-      if (key.startsWith("utm_")) url.searchParams.delete(key);
-    }
-    return url.toString();
-  } catch {
-    return undefined;
-  }
-}
-
-/** The API dates are RFC 3339; only the publication day is useful for selection. */
-function displayDate(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  return /^(\d{4}-\d{2}-\d{2})T/.exec(value)?.[1];
-}
-
 /** Authority spans 0–4; the API's -1 means unknown and stays absent. */
 function authorityValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 4 ? value : undefined;
@@ -153,20 +133,4 @@ function authorityValue(value: unknown): number | undefined {
 function rerankValue(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 3) return undefined;
   return Math.round(value * 100) / 100;
-}
-
-function boundedText(value: unknown, maximum: number): string {
-  return typeof value === "string" ? value.trim().slice(0, maximum) : "";
-}
-
-function parseJson(value: string): unknown {
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

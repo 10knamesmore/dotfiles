@@ -6,7 +6,7 @@ import { asWebError, WebError } from "./errors.js";
 import { PageCache } from "./fetch/cache.js";
 import { fetchPage } from "./fetch/extract.js";
 import { DEFAULT_PAGE_CHARS, pageContent } from "./fetch/page.js";
-import { searchDeepseek } from "./search/deepseek.js";
+import { searchBlended } from "./search/blend.js";
 import type { SearchSource } from "./search/types.js";
 import { renderWebCall, renderWebResult, type WebToolDetails } from "./render.js";
 
@@ -16,17 +16,16 @@ const SearchParameters = Type.Object(
       minLength: 1,
       maxLength: 128,
       description:
-        "Search query, at most 128 characters; supports site:, -site:, quoted phrases, lang:, and after:/before: date filters.",
+        "Search query, at most 128 characters; supports site:, -site:, quoted phrases, and after:/before:YYYY-MM-DD date filters.",
     }),
     oriQuestion: Type.Optional(
       Type.String({
         minLength: 1,
         maxLength: 128,
-        description:
-          "The user's original question when query is a keyword rewrite; helps the backend understand intent.",
+        description: "The user's original question when query is a keyword rewrite; helps DeepSeek understand intent.",
       }),
     ),
-    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Maximum sources (default: 5)." })),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Maximum sources (default: 8)." })),
   },
   { additionalProperties: false },
 );
@@ -84,11 +83,11 @@ export function registerWebTools(pi: ExtensionAPI): void {
         signal?.throwIfAborted();
         const query = params.query.trim();
         if (!query) throw new WebError("invalid_input", "query must not be blank.");
-        const sources = await searchDeepseek(
+        const sources = await searchBlended(
           {
             query,
             oriQuestion: params.oriQuestion?.trim() || undefined,
-            limit: params.limit ?? 5,
+            limit: params.limit ?? 8,
           },
           signal,
         );
@@ -203,10 +202,11 @@ export default registerWebTools;
 function formatSearch(sources: SearchSource[]): string {
   const sections = sources.map((source, index) => {
     const metadata = [
+      source.providers.join(" + "),
       source.date,
       source.siteName,
-      source.authority !== undefined ? `authority ${source.authority}/4` : undefined,
-      source.rerankScore !== undefined ? `rerank ${source.rerankScore}/3` : undefined,
+      source.authority !== undefined ? `DeepSeek authority ${source.authority}/4` : undefined,
+      source.rerankScore !== undefined ? `DeepSeek rerank ${source.rerankScore}/3` : undefined,
     ]
       .filter(Boolean)
       .join(" · ");
