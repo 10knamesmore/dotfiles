@@ -6,7 +6,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell.Io
 
-// 低频的电源档位调整，只在系统信息展开时读取；写入后以 daemon 回读结果为准。
+// 控制分区可见时读取电源档位；写入后以 daemon 回读结果为准。
 RowLayout {
     id: root
 

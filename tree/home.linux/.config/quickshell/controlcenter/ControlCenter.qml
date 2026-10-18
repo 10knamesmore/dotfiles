@@ -200,7 +200,7 @@ PanelOverlay {
                 }
             }
 
-            SystemInfoCard {
+            SystemInfo {
                 id: systemInfo
                 Layout.fillWidth: true
                 Layout.leftMargin: Tokens.spaceL
@@ -209,7 +209,7 @@ PanelOverlay {
                 Layout.preferredHeight: root.infoHeight
                 Layout.maximumHeight: root.infoHeight
                 visible: root.controlTab
-                showing: root.showing && visible
+                active: root.showing && visible
             }
 
             PowerActions {
