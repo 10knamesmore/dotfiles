@@ -370,7 +370,7 @@ bind(mainMod .. " + D", "窗口 · 关闭", hl.dsp.window.close())
 bind(mainMod .. " + F", "窗口 · 切换全屏", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/toggle_fullscreen.sh"))
 bind(mainMod .. " + T", "面板 · 切换状态栏", hl.dsp.global("quickshell:toggleBar"))
 bind(mainMod .. " + E", "应用启动 · 文件管理器", hl.dsp.exec_cmd(terminal .. " launch_yazi.sh"))
--- float 挪到 ALT+V，对齐 macOS 的 `alt - v`，并腾出 SUPER+V 给 keyd 做粘贴
+-- ALT+V 对齐 macOS 的浮动快捷键；SUPER+V 留给 xremap 做粘贴。
 bind("ALT + V", "窗口 · 切换浮动", hl.dsp.window.float({ action = "toggle" }))
 bind(mainMod .. " + R", "应用启动 · 应用启动器", hl.dsp.global("quickshell:launcher"))
 bind(mainMod .. " + S", "布局 · 切换方向", hl.dsp.layout("togglesplit"))
@@ -490,6 +490,7 @@ hl.on("hyprland.start", function()
   hl.exec_cmd(SCRIPTS .. "/dots-wallpaper")
   hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
   exec_once("hypridle")
+  exec_once("xremap --watch=config,device ~/.config/xremap/config.yml")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
   exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
