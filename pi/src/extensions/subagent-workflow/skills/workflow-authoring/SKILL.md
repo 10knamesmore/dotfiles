@@ -24,6 +24,10 @@ return parallel(files.map(file => () => agent('Audit ' + file, { model: 'high' }
 `meta.name` must be kebab-case; `description` is required; `phases` is
 optional. The header must be a literal - no computed values.
 
+Declare task inputs as literals in the script so Open in editor shows both
+the orchestration and its inputs for review. Supply the source through
+`script` or an absolute `scriptPath`.
+
 ## Globals
 
 - `agent(prompt, opts)` - run one subagent. Returns the schema-validated
@@ -41,7 +45,6 @@ optional. The header must be a literal - no computed values.
   only; inside branches use `opts.phase` instead.
 - `log(message)` - progress line surfaced to the user. `console.log(...values)`
   is an alias that stringifies and joins its arguments before forwarding.
-- `args` - the deep-frozen deterministic input passed at launch.
 
 `options` on the helpers supports `{ concurrency: positiveInteger }`. Omit it:
 the process-wide semaphore already paces all spawns. Pass it only when a
@@ -102,8 +105,8 @@ locale-sensitive APIs, `Intl`, `Math.random`, `Promise.all`/`allSettled`/
 timers, `process`, `require`, `fetch`, shared-memory intrinsics, and dynamic
 `import`. Construct Dates only as `new Date(epochMs)` from one primitive
 finite number (a `Date.UTC` value is fine); strings, Date objects, and
-component arguments are rejected. Anything that varies between runs -
-timestamps, seeds, randomness - must enter through `args`.
+component arguments are rejected. Declare external values such as timestamps
+and random seeds as literals in the script so they remain fixed on resume.
 
 ## Replay and resume
 
@@ -125,7 +128,7 @@ contents are deliberately outside the fingerprint; when such state must
 participate in replay identity, interpolate it (e.g. a revision id) into the
 prompt - a changed prompt already reruns.
 
-On resume, omit `args` to reuse the persisted value; passing `args` overrides
-it (and reruns calls whose payloads change). A `generation.pending` marker
-left by a crash quarantines the run directory: run the workflow fresh and
-delete the quarantined directory rather than removing the marker.
+To change task inputs on resume, edit their literals in the script; calls
+whose payloads change rerun. A `generation.pending` marker left by a crash
+quarantines the run directory: run the workflow fresh and delete the
+quarantined directory rather than removing the marker.

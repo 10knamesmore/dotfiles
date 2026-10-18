@@ -32,6 +32,7 @@ const MAX_WORKFLOW_AGENT_CAP = 1_000;
 
 interface ParsedWorkflowRunInput {
   readonly workflow: ParsedWorkflow;
+  /** Already-decoded JSON input; undefined reuses persisted args on resume. */
   readonly args?: unknown;
   readonly resumeRunId?: string;
   /** Persisted childIds whose journal entries may re-execute despite environment drift. */
@@ -80,8 +81,8 @@ export function startParsedWorkflow(
   const modelTiers = { ...(options.modelTiers ?? readPersonalConfig()["model-tier"]) };
   validateRerunChildIds(input.rerunChildIds, input.resumeRunId);
   const rerunAuthorized = new Set(input.rerunChildIds ?? []);
-  const normalizedInputArgs = normalizeArgs(input.args);
-  if (!input.resumeRunId || input.args !== undefined) validateWorkflowArgs(normalizedInputArgs);
+  const inputArgs = input.args ?? null;
+  if (!input.resumeRunId || input.args !== undefined) validateWorkflowArgs(inputArgs);
   const runner = subagentRunner;
   const root = join(getAgentDir(), "subagent-workflow", "runs");
   const runId =
@@ -155,13 +156,13 @@ export function startParsedWorkflow(
       const persistedCap = store.maxAgentsPerWorkflow;
       validateAgentCap(persistedCap, `Cannot resume workflow ${runId}: persisted maxAgentsPerWorkflow`);
       agentCap = persistedCap;
-      args = input.args === undefined ? readPersistedArgs(existingRunDir) : normalizedInputArgs;
+      args = input.args === undefined ? readPersistedArgs(existingRunDir) : inputArgs;
       generationInputs = {
         ...(input.args !== undefined ? { args: { value: args } } : {}),
         ...(input.rerunChildIds?.length ? { rerunChildIds: input.rerunChildIds } : {}),
       };
     } else {
-      args = normalizedInputArgs;
+      args = inputArgs;
       generationInputs = { args: { value: args } };
     }
     // Every fallible read needed to prepare replay happens before the
@@ -582,6 +583,11 @@ function sortedJournalEntries(journal: WorkflowJournal): JournalEntry[] {
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+export function readWorkflowResumeArgs(cwd: string, runId: string): unknown {
+  const root = join(getAgentDir(), "subagent-workflow", "runs");
+  return readPersistedArgs(resolveResumeRunDir(root, cwd, runId));
 }
 
 function readPersistedArgs(runDir: string): unknown {

@@ -18,7 +18,12 @@ import { errorMessage, isRecord } from "../util.js";
 import { resolveTierModel } from "../runner/model-tier.js";
 import { readPersonalConfig, type ModelTiers } from "@dotfiles/pi-config";
 import { approveLaunch, type ApprovalContext, type LaunchPlan, type WorkflowApprovalPolicy } from "./approval.js";
-import { startParsedWorkflow, WorkflowRunError, type WorkflowRunResult } from "./workflow-runner.js";
+import {
+  readWorkflowResumeArgs,
+  startParsedWorkflow,
+  WorkflowRunError,
+  type WorkflowRunResult,
+} from "./workflow-runner.js";
 
 interface WorkflowLaunchInput {
   plan: LaunchPlan;
@@ -56,7 +61,10 @@ export async function launchWorkflow(
   input: WorkflowLaunchInput,
   approval: WorkflowApproval,
 ): Promise<LaunchedWorkflow> {
-  const approvedPlan = await approveLaunch(input.plan, approval.ctx, approval.policy);
+  const approvedPlan = await approveLaunch(input.plan, approval.ctx, approval.policy, () => {
+    if (input.plan.args !== undefined) return input.plan.args;
+    return input.resumeRunId ? readWorkflowResumeArgs(parent.ctx.cwd, input.resumeRunId) : null;
+  });
   const { workflow, args } = approvedPlan;
   const modelTiers = readPersonalConfig()["model-tier"];
   const modelError = validateLiteralModels(workflow.literalModels, modelTiers, parent.ctx.modelRegistry);
