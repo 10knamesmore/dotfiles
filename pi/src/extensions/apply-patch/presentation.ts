@@ -42,10 +42,10 @@ function isFileExpanded(path: string, context: PatchRenderContext): boolean {
   return expansion.files.get(resolve(context.cwd, path)) ?? expansion.allExpanded;
 }
 
-function toggleFileOnClick(event: TuiMouseEvent, paths: string[], context: PatchRenderContext) {
+function toggleFileOnClick(event: TuiMouseEvent, path: string, context: PatchRenderContext) {
   if (event.type !== "click" || event.button !== "left") return undefined;
-  const expanded = !isFileExpanded(paths[0]!, context);
-  for (const path of paths) fileExpansion(context).files.set(resolve(context.cwd, path), expanded);
+  const expanded = !isFileExpanded(path, context);
+  fileExpansion(context).files.set(resolve(context.cwd, path), expanded);
   context.invalidate();
   return { handled: true };
 }
@@ -146,20 +146,10 @@ class PatchFilePreview extends Box {
   }
 
   toggleOnClick(event: TuiMouseEvent) {
-    return toggleFileOnClick(
-      event,
-      this.file.destination ? [this.file.path, this.file.destination] : [this.file.path],
-      this.context,
-    );
+    return toggleFileOnClick(event, this.file.path, this.context);
   }
 
   configure(theme: Theme, context: PatchRenderContext): void {
-    const expansion = fileExpansion(context);
-    const sourceChoice = expansion.files.get(resolve(context.cwd, this.file.path));
-    // One move preview becomes separate source/destination blocks in the final result.
-    if (this.file.destination && sourceChoice !== undefined) {
-      expansion.files.set(resolve(context.cwd, this.file.destination), sourceChoice);
-    }
     const showDiff = isFileExpanded(this.file.path, context);
     if (this.theme !== theme || this.context.cwd !== context.cwd || this.showDiff !== showDiff) {
       this.theme = theme;
@@ -256,6 +246,10 @@ export function renderPatchResult(
     const additions = change.diff.split("\n").filter((line) => line.startsWith("+")).length;
     const removals = change.diff.split("\n").filter((line) => line.startsWith("-")).length;
     const heading = [title, theme.fg("accent", displayPath(change.path, context.cwd))];
+    if (change.destination) {
+      heading.splice(1, 0, theme.fg("accent", "Move"));
+      heading.push(theme.fg("muted", "→"), theme.fg("accent", displayPath(change.destination, context.cwd)));
+    }
     if (additions) heading.push(theme.fg("toolDiffAdded", `+${additions}`));
     if (removals) heading.push(theme.fg("toolDiffRemoved", `-${removals}`));
     addFileBlock(
@@ -293,6 +287,6 @@ function addFileBlock(
   const expanded = isFileExpanded(path, context);
   const box = new Box(context.outputPad, 1, (line) => theme.bg(background, line));
   box.addChild(new Text(`${disclosureMarker(expanded, theme)} ${heading}`, 0, 0));
-  if (expanded) box.addChild(new Text(renderDiff(diff), 0, 0));
-  container.addChild(new MouseRegion(box, (event) => toggleFileOnClick(event, [path], context)));
+  if (expanded && diff) box.addChild(new Text(renderDiff(diff), 0, 0));
+  container.addChild(new MouseRegion(box, (event) => toggleFileOnClick(event, path, context)));
 }

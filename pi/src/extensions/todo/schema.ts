@@ -33,7 +33,12 @@ export const TodoParameters = Type.Object(
         }),
       ),
     ),
-    reason: Type.Optional(Type.String({ description: "Optional single-line blocker reason" })),
+    reason: Type.Optional(
+      Type.String({
+        description:
+          "Optional explanation for start, done, drop, block, or unblock, saved with each affected task and shown in the UI. Omit to clear the previous explanation.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

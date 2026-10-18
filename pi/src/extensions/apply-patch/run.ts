@@ -9,6 +9,7 @@ import {
 
 export interface PatchFileChange {
   path: string;
+  destination?: string;
   diff: string;
 }
 
@@ -23,25 +24,42 @@ export async function runPatch(
   cwd: string,
   signal: AbortSignal | undefined,
 ): Promise<PatchResult> {
-  const paths = [
-    ...new Set(
-      patch.split("\n").flatMap((line) => {
-        const header = /^\*\*\* (?:Add File|Delete File|Update File|Move to): (.+)$/.exec(line.trim());
-        return header ? [resolve(cwd, header[1]!)] : [];
-      }),
-    ),
-  ];
+  const patchPaths = new Set<string>();
+  const moves = new Map<string, string>();
+  let source: string | undefined;
+  for (const line of patch.split("\n")) {
+    const header = /^\*\*\* (Add File|Delete File|Update File|Move to): (.+)$/.exec(line.trim());
+    if (!header) continue;
+    const path = resolve(cwd, header[2]!);
+    patchPaths.add(path);
+    if (header[1] === "Move to") {
+      if (source) moves.set(source, path);
+    } else {
+      source = header[1] === "Update File" ? path : undefined;
+    }
+  }
+  const paths = [...patchPaths];
   // Resolve aliases before nesting locks: two names for one file must not lock it twice.
   const files = [...new Set(await Promise.all(paths.map(mutationPath)))].sort();
   const apply = async (index: number): Promise<PatchResult> => {
     signal?.throwIfAborted();
     const file = files[index];
     if (file !== undefined) return withFileMutationQueue(file, () => apply(index + 1));
-    const before = await Promise.all(paths.map(fileContents));
+    const before = new Map(await Promise.all(paths.map(async (path) => [path, await fileContents(path)] as const)));
     const result = await pi.exec("codex", ["--codex-run-as-apply-patch", patch], { cwd, signal });
-    const after = await Promise.all(paths.map(fileContents));
-    const changes = paths.flatMap((path, index) => {
-      const { diff } = generateDiffString(before[index]!, after[index]!);
+    const after = new Map(await Promise.all(paths.map(async (path) => [path, await fileContents(path)] as const)));
+    // A later operation may fail after a move has already completed.
+    const completedMoves = new Map(
+      [...moves].filter(([path, destination]) =>
+        before.get(path) !== null && after.get(path) === null && after.get(destination) !== null,
+      ),
+    );
+    const movedDestinations = new Set(completedMoves.values());
+    const changes = paths.flatMap((path): PatchFileChange[] => {
+      if (movedDestinations.has(path)) return [];
+      const destination = completedMoves.get(path);
+      const { diff } = generateDiffString(before.get(path) ?? "", after.get(destination ?? path) ?? "");
+      if (destination) return [{ path, destination, diff }];
       return diff ? [{ path, diff }] : [];
     });
     return { ...result, changes };
@@ -49,12 +67,11 @@ export async function runPatch(
   return apply(0);
 }
 
-/** A missing file is the empty side of a creation or deletion diff. */
-async function fileContents(path: string): Promise<string> {
+async function fileContents(path: string): Promise<string | null> {
   try {
     return (await readFile(path, "utf8")).replace(/\r\n/g, "\n");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
 }

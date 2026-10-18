@@ -31,8 +31,8 @@ export function formatTodoSummary(phases: readonly TodoPhase[], readOnly: boolea
     const phaseClosed = phase.tasks.filter(isClosedTodo).length;
     lines.push(`${phase.name} (${phaseClosed}/${phase.tasks.length}):`);
     for (const task of phase.tasks) {
-      const blocker = task.status === "blocked" && task.blocker ? ` — blocked: ${task.blocker}` : "";
-      lines.push(`  ${taskMarker(task)} ${task.content}${blocker}`);
+      const reason = task.reason ? ` — ${task.reason}` : "";
+      lines.push(`  ${taskMarker(task)} ${task.content}${reason}`);
     }
   }
   return lines.join("\n");

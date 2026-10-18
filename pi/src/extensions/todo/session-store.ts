@@ -5,7 +5,7 @@ import { cloneTodoPhases, parseTodoPhases, type TodoPhase } from "./model.js";
 export const TODO_STATE_ENTRY_TYPE = "dotfiles.pi.todo-state";
 
 /** Current serialized snapshot format. */
-export const TODO_STATE_VERSION = 1;
+export const TODO_STATE_VERSION = 2;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -35,9 +35,7 @@ export class TodoSessionStore {
 
   /** Install a validated state that the caller will return in a successful tool result. */
   public install(phases: readonly TodoPhase[]): void {
-    const next = parseTodoPhases(phases);
-    if (next === undefined) throw new Error("Refusing to install invalid or non-normalized todo state.");
-    this.phases = next;
+    this.phases = cloneTodoPhases(phases);
   }
 
   /**

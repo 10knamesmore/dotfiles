@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { sanitizeTodoDisplayLine, sanitizeTodoDisplayText } from "./display.js";
-import { applyTodoMutation, validateTodoView } from "./mutation.js";
+import { applyTodoMutation } from "./mutation.js";
 import { isClosedTodo, parseTodoPhases, type TodoPhase } from "./model.js";
 import { TodoPresentation } from "./presentation.js";
 import { selectTodoPreview } from "./preview.js";
@@ -49,7 +49,7 @@ function taskTree(phases: readonly TodoPhase[], expanded: boolean): string {
               : task.status === "blocked"
                 ? "!"
                 : "○";
-      const reason = task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
+      const reason = task.reason ? ` — ${task.reason}` : "";
       phaseLines.push(`  ${marker} ${task.content}${reason}`);
     }
     if (phaseLines.length > 0 || expanded) {
@@ -80,8 +80,7 @@ export function registerTodoTool(pi: ExtensionAPI, store: TodoSessionStore, pres
       if (signal?.aborted) throw new Error("Todo operation was cancelled.");
       const readOnly = params.op === "view";
       try {
-        if (readOnly) validateTodoView(params);
-        else store.install(applyTodoMutation(store.snapshot(), params));
+        if (!readOnly) store.install(applyTodoMutation(store.snapshot(), params));
       } catch (error) {
         throw new Error(`Todo operation rejected: ${errorMessage(error)}`, {
           cause: error,

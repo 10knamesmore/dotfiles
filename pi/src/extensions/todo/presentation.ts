@@ -19,19 +19,18 @@ function allTasks(phases: readonly TodoPhase[]): TodoItem[] {
 }
 
 function taskLine(task: TodoItem, theme: Theme): string {
+  const reason = task.reason ? ` — ${task.reason}` : "";
   switch (task.status) {
     case "in_progress":
-      return theme.fg("accent", `  → ${task.content}`);
+      return theme.fg("accent", `  → ${task.content}${reason}`);
     case "completed":
-      return theme.fg("success", `  ✓ ${theme.strikethrough(task.content)}`);
+      return theme.fg("success", `  ✓ ${theme.strikethrough(task.content)}${reason}`);
     case "abandoned":
-      return theme.fg("dim", `  - ${theme.strikethrough(task.content)}`);
-    case "blocked": {
-      const reason = task.blocker ? ` — ${task.blocker}` : "";
+      return theme.fg("dim", `  - ${theme.strikethrough(task.content)}${reason}`);
+    case "blocked":
       return theme.fg("warning", `  ! ${task.content}${reason}`);
-    }
     case "pending":
-      return theme.fg("muted", `  ○ ${task.content}`);
+      return theme.fg("muted", `  ○ ${task.content}${reason}`);
   }
 }
 
@@ -46,7 +45,7 @@ function plainTaskLine(task: TodoItem): string {
           : task.status === "blocked"
             ? "!"
             : "○";
-  const reason = task.status === "blocked" && task.blocker ? ` — ${task.blocker}` : "";
+  const reason = task.reason ? ` — ${task.reason}` : "";
   return `  ${marker} ${task.content}${reason}`;
 }
 

@@ -9,8 +9,8 @@ export interface TodoItem {
   /** Current lifecycle state. */
   status: TodoStatus;
 
-  /** Single-line explanation present only while the task is blocked. */
-  blocker?: string;
+  /** Single-line explanation from the latest explicit status operation. */
+  reason?: string;
 }
 
 /** Ordered group of todo tasks. */
@@ -55,16 +55,16 @@ export function normalizeTodoIdentifier(value: string, label: "phase" | "task"):
   return normalized;
 }
 
-/** Normalize an optional blocker note to a terminal-safe single line. */
-export function normalizeBlockerReason(value: string | undefined): string | undefined {
+/** Normalize an optional status explanation to a terminal-safe single line. */
+export function normalizeTodoReason(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const normalized = value.replace(/\s+/gu, " ").trim();
   if (!normalized) return undefined;
   if (CONTROL_CHARACTER.test(normalized)) {
-    throw new Error("Blocker reason must contain no terminal control characters.");
+    throw new Error("Todo reason must contain no terminal control characters.");
   }
   if (normalized.includes("<!--") || normalized.includes("-->")) {
-    throw new Error("Blocker reason cannot contain HTML comment delimiters.");
+    throw new Error("Todo reason cannot contain HTML comment delimiters.");
   }
   return normalized;
 }
@@ -74,15 +74,15 @@ export function cloneTodoPhases(phases: readonly TodoPhase[]): TodoPhase[] {
   return phases.map((phase) => ({
     name: phase.name,
     tasks: phase.tasks.map((task) =>
-      task.blocker === undefined
+      task.reason === undefined
         ? { content: task.content, status: task.status }
-        : { content: task.content, status: task.status, blocker: task.blocker },
+        : { content: task.content, status: task.status, reason: task.reason },
     ),
   }));
 }
 
 /**
- * Validate persisted or editor-produced state and return a detached copy.
+ * Validate persisted state and return a detached copy.
  *
  * Invalid snapshots are rejected instead of being partially recovered. Phase names
  * are unique, task content is unique across all phases, and at most one task is active.
@@ -125,21 +125,17 @@ export function parseTodoPhases(value: unknown): TodoPhase[] | undefined {
       if (rawTask.status === "in_progress") activeTasks += 1;
       if (activeTasks > 1) return undefined;
 
-      if (rawTask.status === "blocked") {
-        if (rawTask.blocker !== undefined && typeof rawTask.blocker !== "string") return undefined;
-        let blocker: string | undefined;
-        try {
-          blocker = normalizeBlockerReason(rawTask.blocker);
-        } catch {
-          return undefined;
-        }
-        if (blocker !== rawTask.blocker && rawTask.blocker !== undefined) return undefined;
-        tasks.push(blocker === undefined ? { content, status: "blocked" } : { content, status: "blocked", blocker });
-        continue;
+      if (rawTask.reason !== undefined && typeof rawTask.reason !== "string") return undefined;
+      let reason: string | undefined;
+      try {
+        reason = normalizeTodoReason(rawTask.reason);
+      } catch {
+        return undefined;
       }
-
-      if (rawTask.blocker !== undefined) return undefined;
-      tasks.push({ content, status: rawTask.status });
+      if (reason !== rawTask.reason) return undefined;
+      tasks.push(
+        reason === undefined ? { content, status: rawTask.status } : { content, status: rawTask.status, reason },
+      );
     }
     phases.push({ name: phaseName, tasks });
   }

@@ -1,7 +1,7 @@
 import {
   cloneTodoPhases,
   normalizeActiveTask,
-  normalizeBlockerReason,
+  normalizeTodoReason,
   normalizeTodoIdentifier,
   type TodoItem,
   type TodoPhase,
@@ -24,17 +24,11 @@ function findTask(phases: TodoPhase[], rawContent: string): { phase: TodoPhase; 
   throw new Error(`Task ${JSON.stringify(content)} not found. Tasks are referenced by their exact content.`);
 }
 
-function assertNoFields(params: TodoParams, fields: ReadonlyArray<keyof TodoParams>): void {
-  for (const field of fields) {
-    if (params[field] !== undefined) throw new Error(`${params.op} does not accept ${field}.`);
-  }
-}
-
-function assertSingleTarget(params: TodoParams, required: boolean): void {
+function assertSingleTarget(params: TodoParams): void {
   if (params.task !== undefined && params.phase !== undefined) {
     throw new Error(`${params.op} accepts either task or phase, not both.`);
   }
-  if (required && params.task === undefined && params.phase === undefined) {
+  if ((params.op === "block" || params.op === "unblock") && params.task === undefined && params.phase === undefined) {
     throw new Error(`${params.op} requires a task or phase target.`);
   }
 }
@@ -53,12 +47,8 @@ function assertUniqueState(phases: readonly TodoPhase[]): void {
 }
 
 function initialize(params: TodoParams): TodoPhase[] {
-  assertNoFields(params, ["task", "reason"]);
   if (params.list !== undefined && params.items !== undefined) {
     throw new Error("init accepts list or items, not both.");
-  }
-  if (params.list !== undefined && params.phase !== undefined) {
-    throw new Error("init phase is only valid with the flat items form.");
   }
 
   let phases: TodoPhase[];
@@ -94,18 +84,13 @@ function initialize(params: TodoParams): TodoPhase[] {
 }
 
 function targetTasks(phases: TodoPhase[], params: TodoParams): TodoItem[] {
-  assertSingleTarget(params, false);
+  assertSingleTarget(params);
   if (params.task !== undefined) return [findTask(phases, params.task).task];
   if (params.phase !== undefined) return [...findPhase(phases, params.phase).tasks];
   return phases.flatMap((phase) => phase.tasks);
 }
 
-function clearBlocker(task: TodoItem): void {
-  delete task.blocker;
-}
-
 function append(phases: TodoPhase[], params: TodoParams): void {
-  assertNoFields(params, ["list", "task", "reason"]);
   if (params.phase === undefined) throw new Error("append requires a phase name.");
   if (params.items === undefined || params.items.length === 0) throw new Error("append requires at least one task.");
 
@@ -127,8 +112,7 @@ function append(phases: TodoPhase[], params: TodoParams): void {
 }
 
 function remove(phases: TodoPhase[], params: TodoParams): void {
-  assertNoFields(params, ["list", "items", "reason"]);
-  assertSingleTarget(params, false);
+  assertSingleTarget(params);
   if (params.task !== undefined) {
     const hit = findTask(phases, params.task);
     hit.phase.tasks = hit.phase.tasks.filter((task) => task !== hit.task);
@@ -147,6 +131,11 @@ function remove(phases: TodoPhase[], params: TodoParams): void {
  * Any validation error is thrown before the caller swaps or persists state.
  */
 export function applyTodoMutation(current: readonly TodoPhase[], params: TodoParams): TodoPhase[] {
+  function setTaskReason(task: TodoItem, reason: string | undefined): void {
+    if (reason === undefined) delete task.reason;
+    else task.reason = reason;
+  }
+
   if (params.op === "view") throw new Error("view is read-only and cannot be applied as a mutation.");
   if (params.op === "init") {
     const initialized = initialize(params);
@@ -157,7 +146,7 @@ export function applyTodoMutation(current: readonly TodoPhase[], params: TodoPar
   const next = cloneTodoPhases(current);
   switch (params.op) {
     case "start": {
-      assertNoFields(params, ["list", "phase", "items", "reason"]);
+      assertSingleTarget(params);
       if (params.task === undefined) throw new Error("start requires a task.");
       const target = findTask(next, params.task).task;
       for (const phase of next) {
@@ -166,37 +155,33 @@ export function applyTodoMutation(current: readonly TodoPhase[], params: TodoPar
         }
       }
       target.status = "in_progress";
-      clearBlocker(target);
+      setTaskReason(target, normalizeTodoReason(params.reason));
       break;
     }
     case "done":
     case "drop": {
-      assertNoFields(params, ["list", "items", "reason"]);
+      const reason = normalizeTodoReason(params.reason);
       for (const task of targetTasks(next, params)) {
         task.status = params.op === "done" ? "completed" : "abandoned";
-        clearBlocker(task);
+        setTaskReason(task, reason);
       }
       break;
     }
     case "block": {
-      assertNoFields(params, ["list", "items"]);
-      assertSingleTarget(params, true);
-      const blocker = normalizeBlockerReason(params.reason);
+      const reason = normalizeTodoReason(params.reason);
       for (const task of targetTasks(next, params)) {
         if (task.status === "completed" || task.status === "abandoned") continue;
         task.status = "blocked";
-        if (blocker === undefined) clearBlocker(task);
-        else task.blocker = blocker;
+        setTaskReason(task, reason);
       }
       break;
     }
     case "unblock": {
-      assertNoFields(params, ["list", "items", "reason"]);
-      assertSingleTarget(params, true);
+      const reason = normalizeTodoReason(params.reason);
       for (const task of targetTasks(next, params)) {
         if (task.status !== "blocked") continue;
         task.status = "pending";
-        clearBlocker(task);
+        setTaskReason(task, reason);
       }
       break;
     }
@@ -210,10 +195,4 @@ export function applyTodoMutation(current: readonly TodoPhase[], params: TodoPar
 
   normalizeActiveTask(next);
   return next;
-}
-
-/** Validate that a read-only view call carries no mutation fields. */
-export function validateTodoView(params: TodoParams): void {
-  if (params.op !== "view") throw new Error("Expected a view operation.");
-  assertNoFields(params, ["list", "task", "phase", "items", "reason"]);
 }
