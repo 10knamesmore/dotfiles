@@ -2,7 +2,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { SubagentSpec } from "./types.js";
-import { MODEL_TIERS, type ModelTier } from "../../../config/index.js";
+import { MODEL_TIERS, type ModelTier } from "@dotfiles/pi-config";
 
 /** Public requests select a tier; the runner receives its resolved model. */
 export type TierSubagentSpec = Omit<SubagentSpec, "model" | "modelTier"> & {

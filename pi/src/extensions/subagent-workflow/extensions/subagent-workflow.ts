@@ -27,7 +27,7 @@ import {
 } from "../src/store/run-projection.js";
 import { encodeCwd, persistReconciledProjection } from "../src/store/run-store.js";
 import { jsonObject, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
-import { readPersonalConfig } from "../../../config/index.js";
+import { readPersonalConfig } from "@dotfiles/pi-config";
 import { applyWorkflowSettings } from "../src/settings/runtime.js";
 import { registerModelTiersCommand } from "../src/settings/model-tiers-command.js";
 import { registerModelTierGuidance } from "../src/settings/model-tier-guidance.js";

@@ -8,7 +8,7 @@ import {
   readPersonalConfig,
   updatePersonalConfig,
   type ModelTiers,
-} from "../../../../config/index.js";
+} from "@dotfiles/pi-config";
 
 export function registerModelTiersCommand(pi: ExtensionAPI): void {
   pi.registerCommand("model-tiers", {

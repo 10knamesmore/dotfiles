@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isModelTier, getPersonalConfigPath, type ModelTiers } from "../../../../config/index.js";
+import { isModelTier, getPersonalConfigPath, type ModelTiers } from "@dotfiles/pi-config";
 import type { TierSubagentSpec } from "../subagent-spec.js";
 import type { SubagentSpec } from "../types.js";
 

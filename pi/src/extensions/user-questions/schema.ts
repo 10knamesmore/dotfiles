@@ -1,5 +1,5 @@
 import { type Static, Type } from "typebox";
-import { readPersonalConfig } from "../../config/index.js";
+import { readPersonalConfig } from "@dotfiles/pi-config";
 
 const UserQuestionOptionSchema = Type.Object(
   {

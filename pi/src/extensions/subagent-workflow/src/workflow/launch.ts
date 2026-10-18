@@ -16,7 +16,7 @@ import { appendEntrySafely } from "../ui/entry-markers.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { resolveTierModel } from "../runner/model-tier.js";
-import { readPersonalConfig, type ModelTiers } from "../../../../config/index.js";
+import { readPersonalConfig, type ModelTiers } from "@dotfiles/pi-config";
 import { approveLaunch, type ApprovalContext, type LaunchPlan, type WorkflowApprovalPolicy } from "./approval.js";
 import { startParsedWorkflow, WorkflowRunError, type WorkflowRunResult } from "./workflow-runner.js";
 

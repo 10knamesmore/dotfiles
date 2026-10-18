@@ -13,7 +13,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import type { WorkflowSettings } from "../../../../config/index.js";
+import type { WorkflowSettings } from "@dotfiles/pi-config";
 import { reportDiagnostic } from "../diagnostics.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 import { errorMessage } from "../util.js";

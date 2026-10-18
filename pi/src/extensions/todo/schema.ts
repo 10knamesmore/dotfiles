@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
-import { readPersonalConfig } from "../../config/index.js";
+import { readPersonalConfig } from "@dotfiles/pi-config";
 
 /** Operation names accepted by the model-facing todo tool. */
 export const TODO_OPERATIONS = ["init", "start", "done", "drop", "block", "unblock", "append", "rm", "view"] as const;

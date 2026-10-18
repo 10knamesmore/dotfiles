@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readPersonalConfig, updatePersonalConfig } from "../../config/index.js";
+import { readPersonalConfig, updatePersonalConfig } from "@dotfiles/pi-config";
 import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../editor/api.js";
 
 function isOfficialSubscription(ctx: ExtensionContext): boolean {

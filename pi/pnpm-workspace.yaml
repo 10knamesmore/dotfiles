@@ -1,3 +1,5 @@
+packages:
+  - src/config
 allowBuilds:
   "@google/genai": false
   esbuild: false

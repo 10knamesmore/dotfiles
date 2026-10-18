@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readPersonalConfig } from "../../config/index.js";
+import { readPersonalConfig } from "@dotfiles/pi-config";
 import { renderPatchCall, renderPatchResult, type PatchRenderState, type PatchStatus } from "./presentation.ts";
 import { runPatch, type PatchFileChange } from "./run.ts";
 

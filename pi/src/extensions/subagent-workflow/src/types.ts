@@ -6,7 +6,7 @@
  * or registries anywhere - a worker is exactly what its spec says.
  */
 
-import type { ModelTier } from "../../../config/index.js";
+import type { ModelTier } from "@dotfiles/pi-config";
 
 /** Thinking levels mirror pi's own vocabulary. */
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";

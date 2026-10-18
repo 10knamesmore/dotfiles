@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
-import { MODEL_TIERS, getPersonalConfigPath, readPersonalConfig, type ModelTiers } from "../../../../config/index.js";
+import { MODEL_TIERS, getPersonalConfigPath, readPersonalConfig, type ModelTiers } from "@dotfiles/pi-config";
 
 const SELECTION_GUIDANCE = `For subagent and workflow agent() calls, explicitly select model: "max", "high", or "mid" according to the child task. The provider/model-id mappings below are informational; do not pass them as model arguments.
 - mid: first choice for code exploration, repository navigation, search, evidence gathering, initial triage, quick feedback, and well-scoped implementation or edits. Use it for exploration even in large or unfamiliar codebases.

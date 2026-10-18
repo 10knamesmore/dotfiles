@@ -13,7 +13,7 @@ import {
   assertSchemaValue,
   type TierSubagentSpec,
 } from "../subagent-spec.js";
-import { isModelTier, readPersonalConfig } from "../../../../config/index.js";
+import { isModelTier, readPersonalConfig } from "@dotfiles/pi-config";
 import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentStatus, ThinkingLevel } from "../types.js";
 import {

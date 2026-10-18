@@ -1,5 +1,5 @@
 import { cpus } from "node:os";
-import type { WorkflowSettings } from "../../../../config/index.js";
+import type { WorkflowSettings } from "@dotfiles/pi-config";
 import { subagentRunner } from "../runner/runner.js";
 import type { SubagentStatusWidget } from "../ui/status-widget.js";
 

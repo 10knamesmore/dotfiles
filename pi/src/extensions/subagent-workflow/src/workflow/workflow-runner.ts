@@ -8,7 +8,7 @@ import { readRunSnapshot } from "../store/run-snapshot.js";
 import { RunStore } from "../store/run-store.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 import { validateWorkflowAgentOptions, type TierSubagentSpec } from "../subagent-spec.js";
-import { readPersonalConfig, type ModelTiers } from "../../../../config/index.js";
+import { readPersonalConfig, type ModelTiers } from "@dotfiles/pi-config";
 import { resolveTierSpec } from "../runner/model-tier.js";
 import type { SubagentHandle, SubagentResult, SubagentSpec } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
