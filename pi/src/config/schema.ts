@@ -33,6 +33,9 @@ const PersonalConfigSchema = Type.Object(
   {
     language: Type.Optional(Type.String({ minLength: 1 })),
     "subagent-workflow": Type.Optional(WorkflowSettingsSchema),
+    "apply-patch": Type.Optional(
+      Type.Object({ replaceEditAndWrite: Type.Optional(Type.Boolean()) }, { additionalProperties: false }),
+    ),
     openai: Type.Optional(
       Type.Object(
         { fast: Type.Optional(Type.Record(ModelReferenceSchema, Type.Boolean())) },
@@ -60,6 +63,8 @@ export interface PersonalConfig {
   /** User-selected provider/model-id bindings. Unconfigured tiers remain absent. */
   "model-tier": ModelTiers;
   "subagent-workflow": WorkflowSettings;
+  /** Remove edit/write from the active tool set when apply_patch is active. */
+  "apply-patch": { replaceEditAndWrite: boolean };
   /** Priority service by provider/model-id for official OpenAI OAuth; omitted models are off. */
   openai: { fast: Record<string, boolean> };
   [key: string]: unknown;
@@ -76,6 +81,7 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     language: config.language ?? "中文",
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
+    "apply-patch": { replaceEditAndWrite: false, ...config["apply-patch"] },
     openai: { fast: {}, ...config.openai },
   };
 }
