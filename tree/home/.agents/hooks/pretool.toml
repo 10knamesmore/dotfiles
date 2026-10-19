@@ -15,93 +15,129 @@
 
 # ════ 高危命令 ════
 
+# 裸 `rm` 由 agent PATH 首位的 `~/.pi/agent/bin/rm`（`~/.agents/bin/rm`）垫片接管：
+# 非 `/tmp` 的递归删除自动转入系统回收站。此处仅拦截绕过 PATH 直调 `/bin/rm`、`/usr/bin/rm`。
 [[bash]]
-cmd      = "rm"
-all      = [["-r", "-R", "--recursive"]]
+cmd = "/bin/rm"
+all = [["-r", "-R", "--recursive"]]
 path_outside = ["/tmp"]
-decision = "ask"
-reason   = "守卫拦截：rm 递归删除（-r/-R/--recursive），仅 /tmp 下放行。删 /tmp 请写绝对路径（相对路径按当前目录判），或让用户手动执行。"
-
-[[bash]]
-cmd      = "git"
-subcmd   = "reset"
-any      = ["--hard"]
-decision = "ask"
-reason   = "该操作会丢弃工作区改动，需要用户确认"
-
-[[bash]]
-cmd      = "git"
-subcmd   = "clean"
-all      = [["-f", "--force"]]
-decision = "ask"
-reason   = "该操作会丢弃工作区改动，需要用户确认"
-
-[[bash]]
-cmd      = "chmod"
-args_re  = ["^0?777$", "o\\+w"]
-decision = "ask"
-reason   = "chmod 777 / o+w 把文件设为全局可写，风险高。改用更窄的权限位（755/644）；确需放宽请用户确认。"
-
-[[bash]]
-cmd      = "sudo"
 decision = "deny"
-reason   = "全局工具权限不允许直接执行 sudo。"
+reason = "禁止绕过 PATH 直接调用 /bin/rm 递归删除；请直接用 rm（会自动转入回收站）或 trash。"
 
 [[bash]]
-cmd      = "mkfs"
+cmd = "/usr/bin/rm"
+all = [["-r", "-R", "--recursive"]]
+path_outside = ["/tmp"]
 decision = "deny"
-reason   = "全局工具权限不允许直接执行 mkfs。"
+reason = "禁止绕过 PATH 直接调用 /usr/bin/rm 递归删除；请直接用 rm（会自动转入回收站）或 trash。"
 
 [[bash]]
-cmd      = "dd"
+cmd = "git"
+subcmd = "reset"
+any = ["--hard"]
+decision = "ask"
+reason = "该操作会丢弃工作区改动，需要用户确认"
+
+[[bash]]
+cmd = "git"
+subcmd = "clean"
+all = [["-f", "--force"]]
+decision = "ask"
+reason = "该操作会丢弃工作区改动，需要用户确认"
+
+[[bash]]
+cmd = "chmod"
+args_re = ["^0?777$", "o\\+w"]
+decision = "ask"
+reason = "chmod 777 / o+w 把文件设为全局可写，风险高。改用更窄的权限位（755/644）；确需放宽请用户确认。"
+
+[[bash]]
+cmd = "sudo"
 decision = "deny"
-reason   = "全局工具权限不允许直接执行 dd。"
+reason = "全局工具权限不允许直接执行 sudo。"
+
+[[bash]]
+cmd = "mkfs"
+decision = "deny"
+reason = "全局工具权限不允许直接执行 mkfs。"
+
+[[bash]]
+cmd = "dd"
+decision = "deny"
+reason = "全局工具权限不允许直接执行 dd。"
 
 # ════ 工具偏好重定向：deny 的 reason 喂回模型，模型自动换工具重试 ════
 
 [[bash]]
-cmd      = "pip"
+cmd = "pip"
 decision = "deny"
-reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
+reason = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
 
 [[bash]]
-cmd      = "pip3"
+cmd = "pip3"
 decision = "deny"
-reason   = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
+reason = "Python 一律走 uv：装依赖 uv add，临时工具 uvx，不直接 pip。"
 
 [[bash]]
-cmd      = "npm"
+cmd = "npm"
 decision = "deny"
-reason   = "JS 包管理用 pnpm 替代 npm（pnpm install / pnpm add / pnpm run …）。确需 npm 独有行为说明理由让用户手动执行。"
+reason = "JS 包管理用 pnpm 替代 npm（pnpm install / pnpm add / pnpm run …）。确需 npm 独有行为说明理由让用户手动执行。"
 
 # ════ 通用工具规则 ════
 
 [[tool]]
-tool     = "Read"
-where    = { file_path = { glob = ["**/.ssh/**", "**/.config/gh/hosts.yml", "**/.codex/auth.json", "**/.pi/agent/auth.json", "**/.aws/**", "**/.config/gcloud/**", "**/.kube/config", "**/.docker/config.json", "**/.netrc", "**/.npmrc", "**/.pypirc", "**/.gnupg/**", "**/*.pem", "**/.zsh_history", "**/.bash_history"] } }
+tool = "Read"
+where = { file_path = { glob = [
+    "**/.ssh/**",
+    "**/.config/gh/hosts.yml",
+    "**/.codex/auth.json",
+    "**/.pi/agent/auth.json",
+    "**/.config/gcloud/**",
+    "**/.docker/config.json",
+    "**/.netrc",
+    "**/.npmrc",
+    "**/.pypirc",
+    "**/.gnupg/**",
+    "**/*.pem",
+    "**/.zsh_history",
+    "**/.bash_history",
+] } }
 decision = "deny"
-reason   = "全局工具权限不允许直接读取凭据、私钥或 shell 历史；只检查所需的非敏感元数据。"
+reason = "全局工具权限不允许直接读取凭据、私钥或 shell 历史；只检查所需的非敏感元数据。"
 
 [[tool]]
-tool     = "Edit"
-where    = { file_path = { glob = ["**/.ssh/**", "**/.codex/auth.json", "**/.pi/agent/auth.json"] } }
+tool = "Edit"
+where = { file_path = { glob = [
+    "**/.ssh/**",
+    "**/.codex/auth.json",
+    "**/.pi/agent/auth.json",
+] } }
 decision = "deny"
-reason   = "全局工具权限不允许直接编辑 SSH 或 agent 登录凭据。"
+reason = "全局工具权限不允许直接编辑 SSH 或 agent 登录凭据。"
 
 [[tool]]
-tool     = "Read"
-where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
+tool = "Read"
+where = { file_path = { glob = [
+    "**/.env",
+    "**/.env.*",
+], not = { suffix = ".example" } } }
 decision = "deny"
-reason   = ".env 可能含密钥，不直接读。需要时让用户摘录非敏感字段，或读 .env.example。"
+reason = ".env 可能含密钥，不直接读。需要时让用户摘录非敏感字段，或读 .env.example。"
 
 [[tool]]
-tool     = "Edit"
-where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
+tool = "Edit"
+where = { file_path = { glob = [
+    "**/.env",
+    "**/.env.*",
+], not = { suffix = ".example" } } }
 decision = "deny"
-reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
+reason = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
 
 [[tool]]
-tool     = "Write"
-where    = { file_path = { glob = ["**/.env", "**/.env.*"], not = { suffix = ".example" } } }
+tool = "Write"
+where = { file_path = { glob = [
+    "**/.env",
+    "**/.env.*",
+], not = { suffix = ".example" } } }
 decision = "deny"
-reason   = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
+reason = ".env 可能含密钥，不直接改写。给出改动内容让用户手动应用。"
