@@ -63,6 +63,14 @@ distribute("agent-hook-rules", {
   mode = "file",
 })
 
+-- Agent 专用 PATH 垫片（如 rm 递归转回收站）；Pi 原生将 ~/.pi/agent/bin 置于 PATH 首位。
+distribute("agent-bin", {
+  src = "tree/home/.agents/bin",
+  to = { "~/.pi/agent/bin" },
+  mode = "children",
+  required = true,
+})
+
 -- 系统包按平台执行；不适用的包管理器清单直接跳过。
 dots.install.pacman({
   "starship",
@@ -73,6 +81,7 @@ dots.install.pacman({
   "eza",
   "git-delta",
   "uv",
+  "trash-cli",
 })
 
 local macos_cargo_packages = {
