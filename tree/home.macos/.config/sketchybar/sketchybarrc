@@ -62,10 +62,10 @@ popup_row=(
 )
 
 # 左侧导航：只显示真实存在的工作区，活动数字下方显示短线。
-while read -r sid display; do
+for sid in {1..10}; do
   sketchybar --add space "space.$sid" left \
              --set "space.$sid" \
-               space="$sid" display="$display" \
+               space="$sid" \
                icon="$sid" icon.color="$OVERLAY" \
                icon.width=18 icon.align=center \
                icon.padding_left=0 icon.padding_right=0 \
@@ -76,7 +76,7 @@ while read -r sid display; do
                background.padding_left=5 background.padding_right=5 \
                script="$PLUGIN_DIR/space.sh" \
                click_script="yabai -m space --focus $sid"
-done < <(yabai -m query --spaces | jq -r '.[] | "\(.index) \(.display)"')
+done
 
 sketchybar --add item navigation.separator left \
            --set navigation.separator \

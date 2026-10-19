@@ -4,11 +4,11 @@ cmd - j : yabai -m window --focus south || yabai -m display --focus south
 cmd - k : yabai -m window --focus north || yabai -m display --focus north
 cmd - l : yabai -m window --focus east  || yabai -m display --focus east
 
-# move by direction
-cmd + shift - h : yabai -m window --warp west
-cmd + shift - j : yabai -m window --warp south
-cmd + shift - k : yabai -m window --warp north
-cmd + shift - l : yabai -m window --warp east
+# move by direction; swap keeps a focused window's entire stack together
+cmd + shift - h : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap west; else yabai -m window --warp west; fi
+cmd + shift - j : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap south; else yabai -m window --warp south; fi
+cmd + shift - k : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap north; else yabai -m window --warp north; fi
+cmd + shift - l : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap east; else yabai -m window --warp east; fi
 
 # resize windows
 cmd + ctrl - h : yabai -m window --resize right:-50:0   || yabai -m window --resize left:-50:0
@@ -59,8 +59,8 @@ cmd - f : yabai -m window --toggle windowed-fullscreen
 # toggle split mode
 cmd - s : yabai -m window --toggle split
 
-# stack the most recently focused window on the current window
-cmd + ctrl - s : yabai -m window --stack recent
+# stack the focused window's BSP sibling on the current window
+cmd + ctrl - s : yabai -m window --stack sibling
 
 # cycle through windows in the current stack, wrapping at both ends
 cmd - n : yabai -m window --focus stack.next || yabai -m window --focus stack.first

@@ -47,7 +47,10 @@ export function buildDeliveryEnvelope(sections: DeliveryEnvelopeSections, budget
   const limit = Number.isFinite(budget) ? Math.max(0, Math.floor(budget)) : DELIVERY_ENVELOPE_BUDGET;
   if (limit === 0) return "";
 
-  const header = boundedLines(sections.header);
+  const header = boundedLines([
+    'IMPORTANT: This result is for the main agent only; the user cannot see it. Make your user-facing reply self-contained: restate the relevant findings, conclusions, and caveats. Do not use dangling references such as "see the report given" or "as the subagent reported" without including the referenced content.',
+    ...sections.header,
+  ]);
   const failures = boundedLines(sections.failures);
   const recovery = boundedLines(sections.recovery);
   const warnings = boundedLines(sections.warnings);
