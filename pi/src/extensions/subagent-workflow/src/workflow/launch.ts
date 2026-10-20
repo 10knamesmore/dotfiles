@@ -3,7 +3,10 @@
  * and (in background mode) deliver completion by steering the parent turn.
  */
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createDeliveryBody, type DeliveryRunResult } from "../delivery-message.js";
 import type { ParentContext } from "../runner/child.js";
 import { subagentRunner } from "../runner/runner.js";
 import { activityFoldFromSnapshot, type RunActivityFold } from "../store/activity-fold.js";
@@ -111,12 +114,13 @@ export function deliverWorkflowInBackground(
   void execution
     .then(
       (result) => {
-        recordWorkflowCompleted(pi, result);
+        recordWorkflowCompleted(pi, result, { backgroundDelivery: true });
         const message = formatWorkflowDelivery(result);
         try {
           queueAcknowledgedDelivery(pi, {
             sessionId,
             message,
+            runs: [workflowDeliveryResult(result)],
             targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
           });
         } finally {
@@ -125,24 +129,96 @@ export function deliverWorkflowInBackground(
       },
       (error) => {
         const message = formatWorkflowFailure(error);
-        if (error instanceof WorkflowRunError && error.generation !== undefined) {
-          try {
-            queueAcknowledgedDelivery(pi, {
-              sessionId,
-              message,
-              targets: [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }],
-            });
-          } finally {
-            subagentRunner.releaseRunActivity(error.runId);
-          }
-        } else {
-          pi.sendUserMessage(message, { deliverAs: "steer" });
+        try {
+          queueAcknowledgedDelivery(pi, {
+            sessionId,
+            message,
+            runs: [workflowFailureResult(error)],
+            targets:
+              error instanceof WorkflowRunError && error.generation !== undefined
+                ? [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }]
+                : [],
+          });
+        } finally {
+          if (error instanceof WorkflowRunError) subagentRunner.releaseRunActivity(error.runId);
         }
       },
     )
     .catch((error) => {
       reportDiagnostic(`[subagent-workflow] workflow delivery failed: ${safeDeliveryValue(errorMessage(error))}`);
     });
+}
+
+function workflowRecovery(runId: string, runDir: string): string[] {
+  return [
+    `workflow({ scriptPath: ${stringifyDeliveryJson(`${runDir}/script.js`)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
+  ];
+}
+
+function workflowDeliveryArtifacts(runDir: string, hasResult: boolean): NonNullable<DeliveryRunResult["artifacts"]> {
+  return [
+    { label: "Run artifacts", path: runDir },
+    { label: "Workflow script", path: join(runDir, "script.js") },
+    { label: "Run record", path: join(runDir, "run.json") },
+    { label: "Full activity and child results", path: join(runDir, "events.jsonl") },
+    ...(hasResult ? [{ label: "Full workflow result", path: join(runDir, "result.json") }] : []),
+  ].filter((artifact) => existsSync(artifact.path));
+}
+
+function workflowDeliveryActivity(runId: string): DeliveryRunResult["activity"] {
+  const fold = subagentRunner.runActivityFold(runId);
+  if (!fold) return undefined;
+  const tools: Record<string, number> = {};
+  for (const child of fold.children.values()) {
+    for (const [tool, count] of Object.entries(child.tools)) tools[tool] = (tools[tool] ?? 0) + count;
+  }
+  return { tools, complete: fold.complete };
+}
+
+function workflowDeliveryResult(result: WorkflowRunResult): DeliveryRunResult {
+  return {
+    kind: "workflow",
+    runId: result.runId,
+    label: result.meta.name,
+    status: result.failedChildren.length > 0 ? "completed-with-failures" : "completed",
+    ...(result.result === undefined
+      ? {}
+      : { body: createDeliveryBody(result.result, typeof result.result === "string" ? "markdown" : "json") }),
+    failures: formatGroupedFailures(result.failedChildren),
+    recovery: result.failedChildren.length > 0 ? workflowRecovery(result.runId, result.runDir) : [],
+    warnings: result.persistenceWarning ? [result.persistenceWarning] : [],
+    activity: workflowDeliveryActivity(result.runId),
+    artifacts: workflowDeliveryArtifacts(result.runDir, result.result !== undefined),
+  };
+}
+
+function workflowFailureResult(error: unknown): DeliveryRunResult {
+  if (!(error instanceof WorkflowRunError)) {
+    return { kind: "workflow", label: "workflow", status: "failed", failures: [formatFailureText(errorMessage(error))] };
+  }
+  const aborted = error.status === "aborted";
+  return {
+    kind: "workflow",
+    runId: error.runId,
+    label: "workflow",
+    status: error.status,
+    failures: [formatFailureText(error.message), ...formatGroupedFailures(error.failedChildren)],
+    recovery: aborted ? [] : workflowRecovery(error.runId, error.runDir),
+    warnings: [
+      ...(aborted ? ["The workflow was intentionally stopped. Do not resume it unless the user explicitly asks."] : []),
+      ...(error.persistenceWarning ? [error.persistenceWarning] : []),
+    ],
+    activity: workflowDeliveryActivity(error.runId),
+    artifacts: workflowDeliveryArtifacts(error.runDir, false),
+  };
+}
+
+function workflowFailureSections(error: WorkflowRunError): string[] {
+  const failures = formatGroupedFailures(error.failedChildren);
+  if (error.status !== "aborted" && error.failedChildren.length > 0) {
+    failures.push("Note: a failed agent() call resolves to null in the script; guard results before dereferencing.");
+  }
+  return error.status === "aborted" ? failures : [`Error: ${formatFailureText(error.message)}`, ...failures];
 }
 
 export function formatWorkflowFailure(error: unknown): string {
@@ -155,15 +231,11 @@ export function formatWorkflowFailure(error: unknown): string {
   }
   const runId = safeDeliveryValue(error.runId);
   const runDir = safeDeliveryValue(error.runDir);
-  const scriptPath = `${runDir}/script.js`;
   const aborted = error.status === "aborted";
   // The child errors are usually the actionable part: a script-level TypeError
   // like "cannot read properties of null" is the SYMPTOM of an agent() call
   // failing and resolving to null.
-  const failures = formatGroupedFailures(error.failedChildren);
-  if (!aborted && error.failedChildren.length > 0) {
-    failures.push("Note: a failed agent() call resolves to null in the script; guard results before dereferencing.");
-  }
+  const failures = workflowFailureSections(error);
   const activity = formatWorkflowActivity(error.runId, error.runDir);
   return buildDeliveryEnvelope({
     header: [
@@ -172,12 +244,8 @@ export function formatWorkflowFailure(error: unknown): string {
       `Status: ${error.status}`,
       ...(aborted ? ["The workflow was intentionally stopped. Do not resume it unless the user explicitly asks."] : []),
     ],
-    failures: aborted ? failures : [`Error: ${message}`, ...failures],
-    recovery: aborted
-      ? []
-      : [
-          `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(scriptPath)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
-        ],
+    failures,
+    recovery: aborted ? [] : workflowRecovery(runId, runDir).map((command) => `Recovery: ${command}`),
     warnings: error.persistenceWarning ? [`Warning: ${safeDeliveryValue(error.persistenceWarning)}`] : [],
     artifacts: [`Run artifacts: ${runDir}`, ...(activity.artifact ? [activity.artifact] : [])],
     toolActivity: activity.text,
@@ -222,11 +290,17 @@ export function completeWorkflowFailureInline(error: unknown, sessionId: string)
   }
 }
 
-function recordWorkflowCompleted(pi: ExtensionAPI, result: WorkflowRunResult): void {
+function recordWorkflowCompleted(
+  pi: ExtensionAPI,
+  result: WorkflowRunResult,
+  { backgroundDelivery = false }: { backgroundDelivery?: boolean } = {},
+): void {
   appendEntrySafely(pi, "subagent-workflow:run-completed", {
     runId: result.runId,
     runDir: result.runDir,
     generation: result.generation,
+    backgroundDelivery,
+    failedChildCount: result.failedChildren.length,
     phases: result.meta.phases ?? [],
   });
 }
@@ -527,12 +601,7 @@ function formatWorkflowEnvelope(result: WorkflowRunResult): string {
       `Phases: ${stringifyDeliveryJson(result.meta.phases ?? [])}`,
     ],
     failures: formatGroupedFailures(result.failedChildren),
-    recovery:
-      failedCount === 0
-        ? []
-        : [
-            `Recovery: workflow({ scriptPath: ${stringifyDeliveryJson(`${runDir}/script.js`)}, resumeRunId: ${stringifyDeliveryJson(runId)} })`,
-          ],
+    recovery: failedCount === 0 ? [] : workflowRecovery(runId, runDir).map((command) => `Recovery: ${command}`),
     warnings: result.persistenceWarning ? [`Warning: ${safeDeliveryValue(result.persistenceWarning)}`] : [],
     artifacts: [
       ...(resumeSummary.length === 0 ? [`Result artifact: ${artifact}`] : []),

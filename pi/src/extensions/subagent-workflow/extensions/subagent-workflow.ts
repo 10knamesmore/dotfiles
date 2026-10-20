@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ParentContext } from "../src/runner/child.js";
+import { createDeliveryBody, DELIVERY_MESSAGE_TYPE, type DeliveryMessageDetails } from "../src/delivery-message.js";
 import { subagentRunner } from "../src/runner/runner.js";
 import { preflightSubprocessChild } from "../src/runner/subprocess/spawn-child.js";
 import {
@@ -33,6 +34,7 @@ import { registerModelTiersCommand } from "../src/settings/model-tiers-command.j
 import { registerModelTierGuidance } from "../src/settings/model-tier-guidance.js";
 import { fenceDirectlyDeliveredRun, registerSubagentTool, resolveFollowUpSpec } from "../src/tool/subagent-tool.js";
 import { registerEntryMarkers } from "../src/ui/entry-markers.js";
+import { registerDeliveryMessageRenderer } from "../src/ui/delivery-message.js";
 import { registerNavigator, type NavigatorFollowUp, type NavigatorOpenContext } from "../src/ui/navigator/navigator.js";
 import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../../editor/api.js";
 import { FOLLOW_UP_PROMPT_PREFIX } from "../src/ui/navigator/transcript.js";
@@ -239,6 +241,14 @@ export function catchUpUndeliveredRuns(pi: ExtensionAPI, ctx: ExtensionContext, 
     sessionId,
     message,
     catchUp: true,
+    runs: runs.map((run) => ({
+      kind: "run",
+      runId: run.runId,
+      label: run.label,
+      status: run.status,
+      body: createDeliveryBody(`${run.reason}\n\n${run.recommendedAction} ${run.runDir}`, "markdown"),
+      artifacts: [{ label: "Run artifacts", path: run.runDir }],
+    })),
     targets: runs.map((run) => ({ runDir: run.runDir, identity: catchUpIdentity(run) })),
   });
   return runs;
@@ -325,14 +335,6 @@ function persistedRunLabel(record: Record<string, unknown> | undefined): string 
   return "subagent";
 }
 
-function userMessageText(content: string | Array<{ type: string; text?: string }>): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text ?? "")
-    .join("");
-}
-
 export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("resources_discover", () => ({ skillPaths: [WORKFLOW_AUTHORING_SKILL] }));
 
@@ -341,6 +343,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   const settings = readPersonalConfig()["subagent-workflow"];
   applyWorkflowSettings(settings, widget);
   registerEntryMarkers(pi);
+  registerDeliveryMessageRenderer(pi);
   registerModelTiersCommand(pi);
   registerModelTierGuidance(pi);
   registerSubagentTool(pi, selfPath, widget);
@@ -386,8 +389,9 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   });
   let editorContext: ExtensionContext | undefined;
   pi.on("message_start", (event, ctx) => {
-    if (event.message.role !== "user") return;
-    acknowledgeDeliveryMessage(ctx.sessionManager.getSessionId(), userMessageText(event.message.content));
+    if (event.message.role !== "custom" || event.message.customType !== DELIVERY_MESSAGE_TYPE) return;
+    const details = event.message.details as DeliveryMessageDetails;
+    acknowledgeDeliveryMessage(ctx.sessionManager.getSessionId(), details.deliveryId);
   });
   pi.on("session_start", (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();

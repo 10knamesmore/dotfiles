@@ -1,6 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  DELIVERY_MESSAGE_TYPE,
+  type DeliveryMessageDetails,
+  type DeliveryRunResult,
+} from "../delivery-message.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { replaceAtomicFile } from "./atomic-file.js";
@@ -29,7 +35,7 @@ export interface ClaimedDeliveryTarget extends DeliveryTarget {
 
 interface PendingDelivery {
   sessionId: string;
-  message: string;
+  deliveryId: string;
   catchUp: boolean;
   targets: DeliveryTarget[];
 }
@@ -194,12 +200,13 @@ export function retryDeferredPublications(): void {
   }
 }
 
-/** Queue a background message and wait for its matching user message_start before publication. */
+/** Publish markers only after message_start consumes this delivery's custom message. */
 export function queueAcknowledgedDelivery(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: Pick<ExtensionAPI, "sendMessage">,
   request: {
     sessionId: string;
     message: string;
+    runs: readonly DeliveryRunResult[];
     targets: readonly DeliveryTarget[];
     catchUp?: boolean;
   },
@@ -207,7 +214,7 @@ export function queueAcknowledgedDelivery(
   if (closedSessions.has(request.sessionId)) return;
   const pending: PendingDelivery = {
     sessionId: request.sessionId,
-    message: request.message,
+    deliveryId: randomUUID(),
     catchUp: request.catchUp ?? false,
     targets: [...request.targets],
   };
@@ -216,19 +223,27 @@ export function queueAcknowledgedDelivery(
   sessionPending.push(pending);
   pendingDeliveries.set(request.sessionId, sessionPending);
   try {
-    pi.sendUserMessage(request.message, { deliverAs: "steer" });
+    pi.sendMessage<DeliveryMessageDetails>(
+      {
+        customType: DELIVERY_MESSAGE_TYPE,
+        content: request.message,
+        display: true,
+        details: { deliveryId: pending.deliveryId, catchUp: pending.catchUp, runs: request.runs },
+      },
+      { deliverAs: "steer", triggerTurn: true },
+    );
   } catch (error) {
     removePending(pending);
     throw error;
   }
 }
 
-/** Accept exactly one queued delivery whose text appears in the consumed user message. */
-export function acknowledgeDeliveryMessage(sessionId: string, message: string): boolean {
+/** Accept exactly one queued delivery by ID within its originating session. */
+export function acknowledgeDeliveryMessage(sessionId: string, deliveryId: string): boolean {
   retryDeferredPublications();
   const sessionPending = pendingDeliveries.get(sessionId);
   if (!sessionPending) return false;
-  const index = sessionPending.findIndex((pending) => message.includes(pending.message));
+  const index = sessionPending.findIndex((pending) => pending.deliveryId === deliveryId);
   if (index < 0) return false;
   const pending = sessionPending.splice(index, 1)[0];
   if (!pending) return false;

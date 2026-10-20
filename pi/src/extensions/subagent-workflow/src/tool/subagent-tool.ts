@@ -36,6 +36,7 @@ import { buildDeliveryEnvelope } from "../ui/delivery-envelope.js";
 import { chunkDeliveryText, formatFailureText, safeDeliveryValue, stringifyDeliveryJson } from "../ui/delivery-safe.js";
 import type { SubagentStatusWidget } from "../ui/status-widget.js";
 import { reportDiagnostic } from "../diagnostics.js";
+import { createDeliveryBody, type DeliveryRunResult } from "../delivery-message.js";
 import { bindAbort, childLabel, errorMessage } from "../util.js";
 
 export const SubagentToolParameters = Type.Object(
@@ -505,20 +506,65 @@ function queueCompletedRun(
   sessionId: string,
 ): void {
   const { runId, runDir } = handle;
-  recordCompletedRun(pi, handle, result);
+  recordCompletedRun(pi, handle, result, { backgroundDelivery: true });
+  const warning = runner.finalizedRunWarning(runId);
   queueAcknowledgedDelivery(pi, {
     sessionId,
-    message: formatDelivery(runId, runDir, result, runner.finalizedRunWarning(runId)),
+    message: formatDelivery(runId, runDir, result, warning),
+    runs: [subagentDeliveryResult(runner, handle, result, warning)],
     targets: [{ runDir, identity: resultDeliveryIdentity(runId, result) }],
   });
   runner.markDelivered(runId);
 }
 
-function recordCompletedRun(pi: ExtensionAPI, handle: SubagentHandle, result: SubagentResult): void {
+function subagentDeliveryResult(
+  runner: SubagentRunner,
+  handle: SubagentHandle,
+  result: SubagentResult,
+  warning: string | undefined,
+): DeliveryRunResult {
+  const fold = runner.runActivityFold(handle.runId);
+  const activity = fold?.children.get(result.id);
+  const artifacts = [
+    { label: "Run record", path: join(handle.runDir, "run.json") },
+    { label: "Full result and events", path: join(handle.runDir, "events.jsonl") },
+    ...(result.sessionFile ? [{ label: "Child session", path: result.sessionFile }] : []),
+  ].filter((artifact) => existsSync(artifact.path));
+  return {
+    kind: "subagent",
+    runId: handle.runId,
+    label: result.resolved.label,
+    status: result.status,
+    body: result.structured !== undefined
+      ? createDeliveryBody(result.structured, "json")
+      : createDeliveryBody(result.text, "markdown"),
+    failures: result.status === "failed"
+      ? [`Failed child ${result.id} (${result.resolved.label}): ${formatFailureText(result.error ?? "Unknown error")}`]
+      : result.status === "aborted"
+        ? [`Aborted child ${result.id} (${result.resolved.label})`]
+        : [],
+    recovery: result.status === "failed" ? ["Respawn the child with the same prompt and options."] : [],
+    warnings: warning ? [`Run persistence degraded (${warning}); the run directory may be incomplete`] : [],
+    model: `${result.resolved.provider}/${result.resolved.modelId}`,
+    thinkingLevel: result.resolved.thinkingLevel,
+    usage: result.usage,
+    durationMs: Date.now() - handle.startedAt,
+    ...(activity ? { activity: { tools: activity.tools, complete: fold!.complete } } : {}),
+    artifacts,
+  };
+}
+
+function recordCompletedRun(
+  pi: ExtensionAPI,
+  handle: SubagentHandle,
+  result: SubagentResult,
+  { backgroundDelivery = false }: { backgroundDelivery?: boolean } = {},
+): void {
   appendEntrySafely(pi, "subagent-workflow:run-completed", {
     runId: handle.runId,
     runDir: handle.runDir,
     generation: resultDeliveryIdentity(handle.runId, result).generation,
+    backgroundDelivery,
     perChild: [{ id: result.id, status: result.status, label: result.resolved.label }],
     usageTotals: sumUsage([result.usage]),
     durationMs: Date.now() - handle.startedAt,

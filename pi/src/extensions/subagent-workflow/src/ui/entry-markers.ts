@@ -1,9 +1,8 @@
 /**
  * Transcript completion markers.
  *
- * Phase 2a appends context-excluded custom entries for run lifecycle. These
- * renderers turn them into compact, native-looking transcript records so history
- * reads coherently, including on session resume.
+ * Context-excluded lifecycle entries remain available to usage reconstruction.
+ * Background completion is rendered by its delivery message instead.
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
@@ -27,6 +26,9 @@ interface RunStartedData {
 interface RunCompletedData {
   runId: string;
   runDir: string;
+  /** Keep the entry for usage reconstruction; its delivery message renders completion. */
+  backgroundDelivery?: boolean;
+  failedChildCount?: number;
   perChild?: { id: string; status: SubagentStatus; label: string }[];
   usageTotals?: UsageSummary;
   durationMs?: number;
@@ -75,8 +77,10 @@ export function renderRunStarted(data: RunStartedData, theme: ThemeLike, width: 
 export function renderRunCompleted(data: RunCompletedData, theme: ThemeLike, width: number): string[] {
   const cap = Math.max(20, width);
   if (!Array.isArray(data.perChild) || !data.usageTotals) {
-    const marker = theme.fg("success", "●");
-    const text = `${marker} ${theme.bold("workflow")} ${data.runId} ${theme.fg("dim", "· completed")}`;
+    const failedCount = data.failedChildCount ?? 0;
+    const marker = theme.fg(failedCount > 0 ? "warning" : "success", "●");
+    const status = failedCount > 0 ? `completed · ${failedCount} failed children` : "completed";
+    const text = `${marker} ${theme.bold("workflow")} ${data.runId} ${theme.fg("dim", `· ${status}`)}`;
     return [truncateToWidth(text, cap)];
   }
   const counts = countStatuses(data.perChild.map((child) => child?.status));
@@ -105,7 +109,7 @@ export function registerEntryMarkers(pi: ExtensionAPI): void {
     );
   });
   pi.registerEntryRenderer<RunCompletedData>("subagent-workflow:run-completed", (entry, _options, theme: Theme) => {
-    if (!entry.data) return undefined;
+    if (!entry.data || entry.data.backgroundDelivery) return undefined;
     return linesComponent(
       (width) => renderRunCompleted(entry.data as RunCompletedData, theme, width),
       "run-completed marker",

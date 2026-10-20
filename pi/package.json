@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@dotfiles/pi-config": "workspace:*",
+    "@dotfiles/pi-ui": "workspace:*",
     "acorn": "8.17.0",
     "linkedom": "0.18.12",
     "marked": "18.0.11",
