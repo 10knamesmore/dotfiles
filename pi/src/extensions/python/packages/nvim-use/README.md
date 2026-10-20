@@ -4,13 +4,12 @@
 
 ## 使用
 
-Neovim 加载 dotfiles 的 `pi_bridge` 模块后登记实例。在 Pi 中加载 `nvim-use` skill：
+Neovim 加载 dotfiles 的 `pi_bridge` 模块后登记实例。在 Pi 执行 `/nvim`，选择实例并连接；结果追加到会话消息，不触发回复。命令与 `python_repl` 共享同一个 Python worker：
 
 ```python
 import nvim_use as nvim
 
-print(nvim.discover())
-editor = nvim.connect(instance_id="选中的完整实例 ID")
+editor = nvim.current()
 print(editor.run(lambda nv: nv.current.buffer.name))
 print(editor.lsp.clients())
 editor.disconnect()
@@ -24,6 +23,8 @@ editor.disconnect()
 | --- | --- |
 | `discover()` | 读取活实例的登记摘要，不占用连接 |
 | `connect(instance_id=..., timeout=10)` | 按完整 ID 显式连接 |
+| `select(instance_id=..., timeout=10)` | 连接并设为当前选择，成功后释放上一个选择 |
+| `current()` | 取回 `/nvim` 或 `select()` 选定的活连接 |
 | `editor.run(callback, timeout=30)` | 同步 callback 接收原生 `pynvim.Nvim` |
 | `editor.lua(code, *args, timeout=30)` | 原生 `nvim_exec_lua` |
 | `editor.command(command, timeout=30)` | 原生 Ex command |
@@ -35,6 +36,9 @@ editor.disconnect()
 | `editor.lsp.notify(client_id=..., method=..., params=...)` | 原生 LSP notification |
 | `editor.lsp.open_document(client_id=..., uri=...)` | 后台加载并附着指定 client，返回 buffer ID |
 | `editor.lsp.execute_command(client_id=..., command=..., buffer=..., timeout=30)` | 执行客户端或服务端 LSP Command |
+| `editor.showcast.start(title=..., stops=[...])` | 当前代码窗口中发布带高亮与 Markdown 浮窗说明的 tour，不创建 tab 或分屏 |
+| `editor.showcast.toggle_comment()` | 显示／隐藏当前站的说明 |
+| `editor.showcast.stop()` | 结束 tour，清除高亮并恢复按键、原 buffer、视图和 winbar |
 | `editor.disconnect()` | 断开连接，保留 Neovim、buffers 和 LSP |
 
 超时单位是秒。LSP 参数的 `line` / `character` 使用原生 0-based 坐标和 client 编码。`editor_position` 使用 pynvim 光标的 `(1-based row, 0-based UTF-8 byte column)`。
@@ -43,16 +47,18 @@ editor.disconnect()
 
 LSP 错误抛出 `LspError`，原始 ResponseError 保存在 `.response`。LSP 超时或中断取消请求并保留连接。原生 callback 超时或中断会关闭连接；已经执行的操作保留。执行任意阻塞 Python callback 时，Pi worker 的外层超时负责终止无法退出的线程。
 
+Showcast 由 Neovim 管理站点切换，不需要 Python 持续运行。`n/N` 切换站点，`Tab` 切换说明显示，`Enter` 聚焦说明，`Esc` 返回代码，`q` 结束。它使用真实 buffer，保留未保存内容；站点坐标及临时映射的作用范围见 [skill](skills/nvim-use/SKILL.md#showcast带讲解的代码-tour)。
+
 ## 运行时数据与生命周期
 
 - Linux：`$XDG_RUNTIME_DIR/pi-nvim/<instance-id>.json`；此机器的 runtime 目录为 tmpfs。
 - macOS：`$TMPDIR/pi-nvim/<instance-id>.json`。
 - 登记目录权限为 0700，文件为 0600。只存连接地址、实例身份、cwd、当前文件、workspace roots 和 Pi 连接摘要。
 - Neovim 按编辑器事件合并更新登记；正文、光标移动和诊断不写入登记文件。
-- RPC 握手核实实例身份并获取独占连接。socket 关闭后 Neovim 释放 ownership、取消该连接的 LSP 请求。
+- RPC 握手核实实例身份并获取独占连接。socket 关闭后 Neovim 释放 ownership、取消该连接的 LSP 请求并结束 showcast。
 - Python worker 收到 Pi session ID、cwd 和所选模型，在运行用户代码前初始化连接信息。Pi 切换模型时向 worker 发送状态更新：空闲时立即处理，正在执行的 cell 结束后处理。模型变化同步到所有已连接 Neovim，无需再次调用工具。
 - Python 正常退出通过 atexit 断开；被强杀时 socket 关闭触发 Neovim 清理。
-- Python 环境重置后重新连接；Neovim 重启后重新发现新实例 ID。
+- Python 环境重置后重新执行 `/nvim`；会话中的旧连接消息不会恢复连接。Neovim 重启后重新发现新实例 ID。
 
 Python 日志：`NVIM_USE_LOG`，默认系统临时目录的 `nvim-use-<worker-pid>.log`。Neovim 日志：`stdpath('state')/pi-nvim.log`。日志记录连接、操作结果、耗时和错误类别，不记录正文或 LSP payload。
 

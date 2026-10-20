@@ -15,10 +15,12 @@ from ._connection import Connection, bridge, seconds
 from ._diagnostics import event
 from ._discovery import resolve
 from ._lsp import Lsp
+from ._showcast import Showcast
 
 T = TypeVar("T")
 _identity: dict[str, Any] | None = None
 _sessions: dict[str, "Session"] = {}
+_selected: "Session | None" = None
 
 
 def _configure_worker(session_id: str, cwd: str) -> None:
@@ -59,6 +61,7 @@ class Session:
         self._responses_lock = threading.Lock()
         self._connection = Connection(record, identity, self._notification, timeout)
         self.lsp = Lsp(self)
+        self.showcast = Showcast(self)
         event(
             "connect",
             "completed",
@@ -235,6 +238,28 @@ def close_all() -> None:
                 instance_id=session.instance_id,
                 error_type=type(error).__name__,
             )
+
+
+def select(*, instance_id: str, timeout: float = 10) -> Session:
+    """Select the command's active editor, releasing the previously selected one.
+
+    Acquire the new connection first, so a rejected selection keeps the old one.
+    Attachments created separately with connect() are not released.
+    """
+    global _selected
+    session = connect(instance_id=instance_id, timeout=timeout)
+    previous = _selected
+    _selected = session
+    if previous is not None and previous is not session and not previous.closed:
+        previous.disconnect()
+    return session
+
+
+def current() -> Session:
+    """Return the live /nvim selection; selection is lost with the Python worker."""
+    if _selected is None or _selected.closed:
+        raise ConnectionError("No selected Neovim connection. Run /nvim to select one.")
+    return _selected
 
 
 atexit.register(close_all)

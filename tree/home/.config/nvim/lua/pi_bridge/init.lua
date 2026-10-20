@@ -134,6 +134,10 @@ local function release(reason)
   owner = nil
   owner_timer:stop()
   cancel_pending(previous)
+  local showcast = package.loaded["pi_bridge.showcast"]
+  if showcast then
+    showcast.release()
+  end
   log("disconnected", { channel = previous.channel, reason = reason })
   changed()
   if not stopped then
@@ -210,7 +214,7 @@ local function setup()
   if not stat or stat.type ~= "directory" or stat.uid ~= uv.getuid() or not uv.fs_chmod(directory, 448) then
     M.fail("registry_directory_not_private")
   end
-  local instance_id = string.format("%d-%s", uv.os_getpid(), tostring(uv.hrtime()))
+  local instance_id = string.format("%d-%s", uv.os_getpid(), vim.text.hexencode(uv.random(4)))
   local socket = vim.v.servername
   if socket == "" then
     socket = vim.fn.serverstart(directory .. "/" .. instance_id .. ".sock")

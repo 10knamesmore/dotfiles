@@ -6,6 +6,7 @@ import { PythonSession, type PythonSessionStatus, type PythonToolDetails } from 
 import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
 import { describePythonEnvironment, inspectPythonEnvironment, type PythonEnvironment } from "./environment.js";
 import { logPythonEvent } from "./diagnostics.js";
+import { registerNeovimCommand } from "./nvim-command.js";
 
 const Parameters = Type.Object(
   {
@@ -75,6 +76,13 @@ export function registerPython(pi: ExtensionAPI): void {
     runtime.setModel(ctx.model);
     return runtime;
   };
+
+  registerNeovimCommand(pi, (ctx) => {
+    currentContext = ctx;
+    const runtime = (session ??= createSession(ctx));
+    runtime.setModel(ctx.model);
+    return runtime;
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     session = createSession(ctx);
