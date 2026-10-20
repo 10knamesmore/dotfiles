@@ -116,6 +116,17 @@ class CellInfo(TypedDict):
     inverse: bool
 
 
+class MouseModes(TypedDict):
+    x10: bool
+    normal: bool
+    button: bool
+    any: bool
+    utf8: bool
+    sgr: bool
+    urxvt: bool
+    sgr_pixels: bool
+
+
 class ScreenSnapshot(TypedDict):
     session_id: str
     full_size: Size
@@ -127,6 +138,7 @@ class ScreenSnapshot(TypedDict):
     alternate_screen: bool
     application_cursor: bool
     bracketed_paste: bool
+    mouse_modes: MouseModes
     cells: list[list[CellInfo]] | None
     images: list[TerminalImage] | None
     status: ProcessStatus
@@ -204,7 +216,41 @@ class RawEvent(TypedDict):
     data: bytes
 
 
-TerminalEvent = KeyEvent | TextEvent | PasteEvent | RawEvent
+MouseButton = Literal['left', 'middle', 'right']
+MouseModifier = Literal['shift', 'alt', 'ctrl']
+ScrollDirection = Literal['up', 'down', 'left', 'right']
+
+
+class MouseButtonEvent(TypedDict):
+    kind: Literal['mouse']
+    action: Literal['press', 'release']
+    col: int
+    row: int
+    button: MouseButton
+    modifiers: NotRequired[Sequence[MouseModifier]]
+
+
+class MouseMoveEvent(TypedDict):
+    kind: Literal['mouse']
+    action: Literal['move']
+    col: int
+    row: int
+    button: NotRequired[MouseButton | None]
+    modifiers: NotRequired[Sequence[MouseModifier]]
+
+
+class MouseScrollEvent(TypedDict):
+    kind: Literal['mouse']
+    action: Literal['scroll']
+    col: int
+    row: int
+    direction: ScrollDirection
+    steps: NotRequired[int]
+    modifiers: NotRequired[Sequence[MouseModifier]]
+
+
+MouseEvent = MouseButtonEvent | MouseMoveEvent | MouseScrollEvent
+TerminalEvent = KeyEvent | TextEvent | PasteEvent | RawEvent | MouseEvent
 ```
 
 `WaitFor` 要求且只要求 `contains` 或 `regex` 其中一个字段；`source` 默认是 `'screen'`。`cells` 和 `images` 未请求时仍有对应字段，但值为 `None`。
@@ -310,6 +356,7 @@ session.read(
 | `alternate_screen` | `bool` | 是否处于备用屏幕 |
 | `application_cursor` | `bool` | 是否启用 application cursor mode |
 | `bracketed_paste` | `bool` | 是否启用 bracketed paste mode |
+| `mouse_modes` | `MouseModes` | 应用请求的鼠标 DEC 模式位，见[鼠标输入](#鼠标输入) |
 | `cells` | `list[list[CellInfo]] \| None` | 请求样式数据时的逐单元格信息 |
 | `images` | `list[TerminalImage] \| None` | 请求图片时的独立源图快照；无图片时为空列表 |
 | `status` | `ProcessStatus` | 读取时的进程状态 |
@@ -416,7 +463,9 @@ session.paste(text: str) -> None
 session.write(data: bytes) -> None
 ```
 
-`input` 先验证整批事件，再写入 PTY；任一事件非法则整批不发送任何字节。默认 `delay=0` 时仍合并为一次写入。`Up`、`Down`、`Left`、`Right`、`Home`、`End` 会根据会话最近解析到的 application cursor mode 选择普通或 SS3 序列；需要严格控制字节时使用 `write()`。设置 `delay` 后，按事件逐个写入，并在相邻事件的成功写入之间等待指定毫秒数；第一个事件前和最后一个事件后都不等待。它用于模拟逐步的人类输入，不保证 PTY 读取端的 chunk 边界，也不替代等待应用状态。Playwright 的 `pressSequentially(..., {delay})` 使用同样的毫秒单位语义。事件结构见 `TerminalEvent`：
+`input` 先验证整批事件，再写入 PTY；初始验证发现非法事件时，整批不发送任何字节。默认 `delay=0` 时合并为一次写入；被鼠标模式全部过滤时不写入。键盘和鼠标在 emulator 线程按最近解析的终端状态编码；`Up`、`Down`、`Left`、`Right`、`Home`、`End` 根据 application cursor mode 选择普通或 SS3 序列，需要严格控制字节时使用 `write()`。
+
+设置 `delay` 后，按事件逐个编码、写入，在相邻事件处理之间等待指定毫秒数；第一个事件前和最后一个事件后都不等待，被过滤的鼠标事件仍占一个事件间隔。延迟期间的模式变化影响后续事件；若终端被缩小，后续鼠标坐标可能越界并报错，之前的事件已经发送。`delay` 不保证 PTY 读取端的 chunk 边界，也不替代等待应用状态。Playwright 的 `pressSequentially(..., {delay})` 使用同样的毫秒单位语义。事件结构见 `TerminalEvent`：
 
 | `kind` | 必填字段 | 行为 |
 | --- | --- | --- |
@@ -424,6 +473,80 @@ session.write(data: bytes) -> None
 | `text` | `text: str` | UTF-8 字面输入，不自动追加回车 |
 | `paste` | `text: str` | bracketed paste 包裹 |
 | `raw` | `data: bytes` | 原样字节 |
+| `mouse` | `action`、`col`、`row` 及动作字段 | 按当前鼠标模式编码，见下文 |
+
+### 鼠标输入
+
+```python
+session.click(
+    *, col: int, row: int,
+    button: MouseButton = 'left',
+    modifiers: Sequence[MouseModifier] | None = None,
+) -> None
+session.mouse_down(
+    *, col: int, row: int,
+    button: MouseButton = 'left',
+    modifiers: Sequence[MouseModifier] | None = None,
+) -> None
+session.mouse_up(
+    *, col: int, row: int,
+    button: MouseButton = 'left',
+    modifiers: Sequence[MouseModifier] | None = None,
+) -> None
+session.mouse_move(
+    *, col: int, row: int,
+    button: MouseButton | None = None,
+    modifiers: Sequence[MouseModifier] | None = None,
+) -> None
+session.scroll(
+    *, col: int, row: int, direction: ScrollDirection,
+    steps: int = 1,
+    modifiers: Sequence[MouseModifier] | None = None,
+) -> None
+```
+
+- `col` / `row` 为从 0 开始的完整屏幕单元格坐标，不相对 `read(rect=...)`。坐标必须位于当前屏幕内，越界报错，不裁剪。按 `cell_size` 转换为格子中心像素位置，再交给 Ghostty 编码；SGR-Pixels 也使用这个虚拟像素位置。
+- `button` 支持 `left`、`middle`、`right`；`modifiers` 支持 `shift`、`alt`、`ctrl`。按钮、方向和修饰键名称忽略大小写；批量事件的 `kind` / `action` 使用表中小写值。
+- `click` 在同一批次发送 press + release；`mouse_down` / `mouse_up` 分别发送一个动作。SDK 不保存当前鼠标位置或按住状态，拖动的每个 `mouse_move` 都要显式传入 `button`。移动不插值，也不主动合并同格重复事件。
+- `scroll.steps` 必须大于 0，表示滚轮事件次数；应用决定滚动距离。一个 scroll 事件中的所有 steps 连续发送，无 release；需要逐步等待时拆成多个事件。
+- Ghostty 根据应用的有效模式过滤和编码事件，支持 X10、UTF-8、SGR、urxvt、SGR-Pixels。报告关闭时没有鼠标字节；X10 跟踪只报告左/中/右键按下，normal 不报告移动，button 只报告显式带按钮的移动，any 可报告无按钮移动。X10 编码格式无法表示超过 222 的 0 基行列，Ghostty 会过滤这些位置。
+- SDK 不替应用启用鼠标报告，不把滚轮转换为方向键，不提供终端文字选择、历史滚动或桌面鼠标操作。操作完成后应等待应用自身的状态变化，写入成功不表示应用已处理。
+
+上游限制：当前依赖的 [Ghostty UTF-8 鼠标编码](https://github.com/ghostty-org/ghostty/blob/a887df42c56f6de86c0fe6da9c4eeca37931e083/src/input/mouse_encode.zig#L150-L157) 对 Unicode surrogate 坐标使用 `unreachable`。UTF-8 格式下，0 基行或列落在 55263–57310 时可能使进程崩溃；SDK 当前只校验屏幕边界，未额外排除此范围。不要在这类超大网格上使用 UTF-8 鼠标格式。
+
+批量事件：
+
+| `action` | 动作字段 | 含义 |
+| --- | --- | --- |
+| `press` / `release` | 必填 `button` | 按下或松开指定按钮 |
+| `move` | 可选 `button`，默认 `None` | 无按钮移动，或带指定按钮拖动 |
+| `scroll` | 必填 `direction`，可选 `steps`，默认 1 | 指定方向的滚轮事件 |
+
+所有鼠标事件都必填 `col` / `row`，可选 `modifiers`（默认空序列）。scroll 不接受 `button`；其他动作不接受 `direction` / `steps`。
+
+```python
+session.input([
+    {"kind": "mouse", "action": "press", "col": 12, "row": 4, "button": "left"},
+    {"kind": "mouse", "action": "move", "col": 20, "row": 4, "button": "left"},
+    {"kind": "mouse", "action": "release", "col": 20, "row": 4, "button": "left"},
+    {"kind": "mouse", "action": "scroll", "col": 20, "row": 4, "direction": "down", "steps": 3},
+], delay=30)
+```
+
+`read()["mouse_modes"]` 始终包含以下布尔字段：
+
+| 字段 | DEC 模式 | 请求行为 |
+| --- | --- | --- |
+| `x10` | 9 | 左/中/右键按下报告 |
+| `normal` | 1000 | 按下、松开与滚轮报告 |
+| `button` | 1002 | 加上带按钮的移动报告 |
+| `any` | 1003 | 加上无按钮的移动报告 |
+| `utf8` | 1005 | UTF-8 坐标格式 |
+| `sgr` | 1006 | SGR 格式 |
+| `urxvt` | 1015 | urxvt 格式 |
+| `sgr_pixels` | 1016 | SGR 像素格式 |
+
+这些字段是 Ghostty 保存的请求位，供观察应用设置使用。Ghostty 另存有效跟踪模式与格式，混合设置/清除模式时不能按上述布尔值推导最终优先级；SDK 直接让编码器读取有效状态，不自行选择协议。快照与后续输入之间，应用仍可能改变模式。
 
 ### 键名与组合键
 

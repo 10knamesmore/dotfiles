@@ -25,11 +25,11 @@ use pythonize::pythonize;
 use crate::error::TerminalError;
 use crate::images::{ImageSnapshot, encode_png};
 use crate::input::{
-    PyRect, encode_events, encode_key_input, encode_paste, encode_text, parse_cell_size,
-    parse_rect, parse_wait,
+    PyRect, encode_key_input, encode_paste, encode_text, parse_cell_size, parse_events,
+    parse_mouse_button, parse_mouse_modifiers, parse_rect, parse_scroll, parse_wait,
 };
 use crate::manager::global_manager;
-use crate::model::{InputSpec, ScreenSnapshot, SessionInfo};
+use crate::model::{InputSpec, MouseAction, MouseInput, ScreenSnapshot, SessionInfo};
 use crate::session::Session;
 
 const DEFAULT_WORKER_CONTROL_FDS: [i32; 2] = [3, 4];
@@ -137,14 +137,33 @@ impl PySession {
         Ok(())
     }
 
-    fn write_input(&self, input: InputSpec) -> PyResult<()> {
-        self.ensure_open()?;
-        self.inner.write(&input).map_err(terminal_error)
+    fn write_input(&self, py: Python<'_>, input: InputSpec) -> PyResult<()> {
+        self.write_inputs(py, vec![input])
     }
 
-    fn write_inputs(&self, inputs: &[InputSpec]) -> PyResult<()> {
+    fn write_inputs(&self, py: Python<'_>, inputs: Vec<InputSpec>) -> PyResult<()> {
         self.ensure_open()?;
-        self.inner.write_many(inputs).map_err(terminal_error)
+        py.detach(|| self.inner.write_many(inputs))
+            .map_err(terminal_error)
+    }
+
+    fn send_mouse(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        action: MouseAction,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        self.write_input(
+            py,
+            InputSpec::Mouse(MouseInput {
+                col,
+                row,
+                action,
+                modifiers: parse_mouse_modifiers(modifiers)?,
+            }),
+        )
     }
 
     fn close_session(&self, py: Python<'_>, grace_ms: u64) -> PyResult<SessionInfo> {
@@ -296,16 +315,18 @@ impl PySession {
     #[pyo3(name = "input", signature = (events, *, delay = 0.0))]
     fn send_events(&self, py: Python<'_>, events: Bound<'_, PyAny>, delay: f64) -> PyResult<()> {
         self.ensure_open()?;
-        let encoded_events = encode_events(&events)?;
+        let inputs = parse_events(&events)?;
         let delay = input_delay(delay)?;
 
         if delay.is_zero() {
-            return self.write_inputs(&encoded_events);
+            return self.write_inputs(py, inputs);
         }
 
-        for (index, input) in encoded_events.iter().enumerate() {
-            self.write_inputs(std::slice::from_ref(input))?;
-            if index + 1 < encoded_events.len() {
+        self.inner.validate_inputs(&inputs).map_err(terminal_error)?;
+        let count = inputs.len();
+        for (index, input) in inputs.into_iter().enumerate() {
+            self.write_input(py, input)?;
+            if index + 1 < count {
                 py.detach(|| std::thread::sleep(delay));
                 py.check_signals()?;
             }
@@ -314,24 +335,125 @@ impl PySession {
     }
 
     /// Write literal UTF-8 text without appending a newline.
-    fn send_text(&self, text: String) -> PyResult<()> {
-        self.write_input(encode_text(&text))
+    fn send_text(&self, py: Python<'_>, text: String) -> PyResult<()> {
+        self.write_input(py, encode_text(&text))
     }
 
     /// Write one chord with separate modifier names and one US base key; no keys remain held.
     #[pyo3(signature = (*keys))]
-    fn send_key(&self, keys: Vec<String>) -> PyResult<()> {
-        self.write_input(encode_key_input(&keys)?)
+    fn send_key(&self, py: Python<'_>, keys: Vec<String>) -> PyResult<()> {
+        self.write_input(py, encode_key_input(&keys)?)
     }
 
     /// Write text wrapped in bracketed-paste markers.
-    fn paste(&self, text: String) -> PyResult<()> {
-        self.write_input(encode_paste(&text))
+    fn paste(&self, py: Python<'_>, text: String) -> PyResult<()> {
+        self.write_input(py, encode_paste(&text))
     }
 
     /// Write bytes to the PTY master; child termios and the kernel line discipline still apply.
-    fn write(&self, data: Vec<u8>) -> PyResult<()> {
-        self.write_input(InputSpec::Bytes(data))
+    fn write(&self, py: Python<'_>, data: Vec<u8>) -> PyResult<()> {
+        self.write_input(py, InputSpec::Bytes(data))
+    }
+
+    /// Press and release a button at one zero-based cell in the full screen.
+    #[pyo3(signature = (*, col, row, button = "left", modifiers = None))]
+    fn click(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        button: &str,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        let button = parse_mouse_button(button)?;
+        let press = MouseInput {
+            col,
+            row,
+            action: MouseAction::Press(button),
+            modifiers: parse_mouse_modifiers(modifiers)?,
+        };
+        self.write_inputs(
+            py,
+            vec![
+                InputSpec::Mouse(press),
+                InputSpec::Mouse(MouseInput {
+                    action: MouseAction::Release(button),
+                    ..press
+                }),
+            ],
+        )
+    }
+
+    /// Report a press; subsequent moves must specify their held button explicitly.
+    #[pyo3(signature = (*, col, row, button = "left", modifiers = None))]
+    fn mouse_down(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        button: &str,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        self.send_mouse(
+            py,
+            col,
+            row,
+            MouseAction::Press(parse_mouse_button(button)?),
+            modifiers,
+        )
+    }
+
+    /// Report a release at a zero-based cell in the full screen.
+    #[pyo3(signature = (*, col, row, button = "left", modifiers = None))]
+    fn mouse_up(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        button: &str,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        self.send_mouse(
+            py,
+            col,
+            row,
+            MouseAction::Release(parse_mouse_button(button)?),
+            modifiers,
+        )
+    }
+
+    /// Report motion, optionally with one explicitly held button; no position is retained.
+    #[pyo3(signature = (*, col, row, button = None, modifiers = None))]
+    fn mouse_move(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        button: Option<&str>,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        self.send_mouse(
+            py,
+            col,
+            row,
+            MouseAction::Move(button.map(parse_mouse_button).transpose()?),
+            modifiers,
+        )
+    }
+
+    /// Send directional wheel steps at a cell; the application decides how far to scroll.
+    #[allow(clippy::too_many_arguments)] // Keep Python keyword options explicit and discoverable.
+    #[pyo3(signature = (*, col, row, direction, steps = 1, modifiers = None))]
+    fn scroll(
+        &self,
+        py: Python<'_>,
+        col: u16,
+        row: u16,
+        direction: &str,
+        steps: usize,
+        modifiers: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        self.send_mouse(py, col, row, parse_scroll(direction, steps)?, modifiers)
     }
 
     /// Change the PTY and screen dimensions, returning updated metadata.

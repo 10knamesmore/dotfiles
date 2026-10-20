@@ -37,9 +37,26 @@ session.send_key("up")         # 历史或菜单导航
 
 - 多行文本或需要应用按 bracketed paste 接收的内容才用 `paste`；发送前确认 `session.read()["bracketed_paste"] is True`。该状态受应用和 TERM 配置影响，可能动态改变；为当前状态为 False 的应用使用 `send_text`，应用不支持 bracketed paste 时也用 `send_text` 或 `{"kind": "raw", "data": b"..."}`。`paste` 始终发送开始/结束标记，模式关闭时应用可能把标记当按键处理。
 - `input(..., delay=毫秒数)` 用于需要模拟逐个事件输入的 TUI 序列；它只控制 SDK 发出事件的时间间隔，不保证 PTY 读端如何分块，也不保证应用一定接受序列。方向键和 Home/End 会依据最近解析到的 application cursor mode 编码；需要发精确控制序列时使用 `write()`。
-- 整批非法时 `input` 不发送任何内容；只有自己能接受部分生效时才拆成多次调用。
+- `input` 的初始整批验证失败时不发送任何内容。使用 delay 时，发送期间的 resize 仍可能让后续鼠标坐标越界，已发事件无法撤回；拆成多次调用也可能部分生效。
 - 预期输出是字节时不猜编码：`read()` 的文本来自终端 emulator 的屏幕状态，ANSI/VT 控制码可能已被消费，需要原始字节用 `read_raw`。
 - `write()` 成功只表示字节写入了 PTY master，不表示应用已经读取或接受全部内容。canonical 模式仍受系统行规程和 `MAX_CANON` 限制；大块单行输入可能被内核截断或丢弃。先等待应用进入 raw mode 或稳定 ready 状态，SDK 不自动分块改变输入语义。
+
+## 鼠标操作
+
+先等待 TUI 布局稳定，用 `read(cells=True)` 定位目标单元格；`col` / `row` 是完整屏幕的 0 基坐标，不能直接用文本字符串的字符索引替代。下面示例中的位置需按实际界面调整：
+
+```python
+session.click(col=12, row=4)
+session.scroll(col=12, row=4, direction="down", steps=3)
+
+session.input([
+    {"kind": "mouse", "action": "press", "col": 12, "row": 4, "button": "left"},
+    {"kind": "mouse", "action": "move", "col": 20, "row": 4, "button": "left"},
+    {"kind": "mouse", "action": "release", "col": 20, "row": 4, "button": "left"},
+], delay=30)
+```
+
+每个拖动事件显式携带按钮，SDK 不保存按住状态。应用未启用鼠标报告或当前模式不接收该事件时不产生字节，不自动改用键盘；用 `read()["mouse_modes"]` 观察应用请求的模式位，操作后等待应用的实际状态变化。模式位及协议限制见 [API](api.md#鼠标输入)。
 
 ## TUI 与局部读取
 

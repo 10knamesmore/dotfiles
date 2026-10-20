@@ -4,7 +4,7 @@
 
 ## 结构
 
-- `src/` — Rust 公开 Python API 与内部实现：参数校验、按键与 paste 编码、会话注册、PTY 读写、Ghostty 终端状态、图片快照、原始输出环形缓冲。
+- `src/` — Rust 公开 Python API 与内部实现：参数校验、键盘与鼠标输入、会话注册、PTY 读写、Ghostty 终端状态、图片快照、原始输出环形缓冲。
 - `Cargo.toml` / `pyproject.toml` — Rust 与 maturin 构建配置（`module-name = "terminal_use"`）。
 - `build_backend.py` — 将隔离构建环境中的 Zig 放入 PATH，其余打包工作交给 maturin。
 
@@ -26,6 +26,7 @@
 - 不提供整屏 PNG 渲染、Sixel 图片、hyperlink 或剪贴板对象。
 - `terminal_use` 是 Rust 编译出的模块；导入时注册 `atexit` 清理，`close_all` 逐会话终止子进程并回收 PTY。screen emulator 不保留 scrollback，长输出由 bounded raw ring 提供最近原始字节。
 - `session.send_key("ctrl", "c")` 使用与 computer-use 相同的分参数组合键写法和 US 基础键位含义。它只编码本次输入，不保留按住状态；字面文字使用 `send_text()`。终端不支持的组合明确报错，不模拟桌面按键事件。
+- `click`、`mouse_down`、`mouse_up`、`mouse_move`、`scroll` 使用完整屏幕的 0 基单元格坐标，也可通过 `input` 混排鼠标与键盘事件。模式相关编码在 emulator 线程进行，鼠标协议复用 Ghostty；可能阻塞的 PTY 写入留在调用线程。鼠标报告关闭或模式不接收某类事件时不产生字节，不模拟 GUI 选择或滚动历史。`read()["mouse_modes"]` 返回请求模式位，而非推导的有效协议。
 - 公开入口为 `import terminal_use as terminal`。方法签名、返回字段和交互约定见 [terminal-use skill](skills/terminal-use/references/api.md)，流程与故障处理见 [patterns](skills/terminal-use/references/patterns.md)。
 
 ## 与 worker 的集成契约

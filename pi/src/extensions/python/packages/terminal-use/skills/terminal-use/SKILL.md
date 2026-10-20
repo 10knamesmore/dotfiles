@@ -11,6 +11,8 @@ description: 用 python_repl 的 terminal_use 驱动交互式 Unix 终端程序�
 
 键名与 computer-use 采用相同的 US 基础键位表达：忽略大小写，组合键分开传参，如 `session.send_key("ctrl", "c")`。`"A"` 不隐含 Shift；大写用 `session.send_key("shift", "a")`，字面文字用 `session.send_text()`。批量按键事件使用 `{"kind": "key", "keys": ["ctrl", "c"]}`。PTY 只接收本次输入，不保留按住状态；不支持的组合会报错。完整支持范围见 [API](references/api.md)。
 
+鼠标使用完整屏幕的 0 基单元格坐标：`session.click(col=12, row=4)`、`session.scroll(col=12, row=4, direction="down", steps=3)`。拖动由 `mouse_down` → 显式带 `button` 的 `mouse_move` → `mouse_up` 组成，不保存隐含按住状态。Ghostty 按应用模式编码，应用未启用报告时不发送鼠标字节；`read()["mouse_modes"]` 可观察应用请求的模式位。批量 `kind="mouse"` 与完整行为见 [鼠标输入](references/api.md#鼠标输入)。
+
 会话绑定当前 Python worker：worker 重启或 reload 会关闭并丢失全部会话，没有守护进程或跨会话持久化。运行时由 SDK 负责清理：解释器退出时自动关闭所有会话；cell 被取消或超时不等于当前 cell 创建的会话已经关闭。完成一个工作流后显式 `session.close()`，取消后用 `terminal.list()` 检查仍存活的会话。丢弃变量不关闭 PTY；单作用域工作可用 `with terminal.start(...) as session:` 自动关闭。关闭幂等，关闭后仍可检查元数据，但不能继续终端操作。
 
 `python_repl` 工具本身的 `timeout` 是整次 Python 调用的硬上限。`session.read(..., timeout=...)`、`session.wait(..., timeout=...)` 等方法级 timeout 只能占用外层调用的剩余时间，不能延长它；应为后续读取、收尾和异常处理预留时间，不要把方法级 timeout 设得等于或大于外层 timeout。
@@ -21,5 +23,5 @@ description: 用 python_repl 的 terminal_use 驱动交互式 Unix 终端程序�
 
 | 场景 | 文件 |
 | --- | --- |
-| 方法签名、返回字段、wait_for、输入事件与按键名 | [references/api.md](references/api.md) |
+| 方法签名、返回字段、wait_for、键盘与鼠标输入事件 | [references/api.md](references/api.md) |
 | 从启动到收尾的完整流程与故障处理 | [references/patterns.md](references/patterns.md) |

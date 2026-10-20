@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use libghostty_vt::render::{CellIterator, RowIterator};
 use libghostty_vt::screen::Screen;
 use libghostty_vt::terminal::{
-    ColorScheme, ConformanceLevel, DeviceAttributes, DeviceType, Mode, PrimaryDeviceAttributes,
+    ColorScheme, ConformanceLevel, DeviceAttributes, DeviceType, PrimaryDeviceAttributes,
     SecondaryDeviceAttributes, SizeReportSize, TertiaryDeviceAttributes,
 };
 use libghostty_vt::{RenderState, Terminal, TerminalOptions};
@@ -19,9 +19,11 @@ use libghostty_vt::{RenderState, Terminal, TerminalOptions};
 use super::{
     RAW_BUFFER_LIMIT, ScreenGeometry, SharedState, matches_raw, matches_text, process_status,
 };
+use super::input::{InputEncoder, mouse_modes};
 use crate::diagnostics;
+use crate::error::TerminalResult;
 use crate::images;
-use crate::model::{PixelSize, ScreenSnapshot, WaitOutcome, WaitSource, WaitSpec};
+use crate::model::{InputSpec, PixelSize, ScreenSnapshot, WaitOutcome, WaitSource, WaitSpec};
 use crate::palette;
 
 /// Upper bound on decoded image bytes the core retains per screen.
@@ -34,6 +36,12 @@ pub(crate) enum Command {
 
     /// Publish end-of-output only after all earlier chunks have been parsed.
     OutputClosed(Option<String>),
+
+    /// Encode input using terminal state after all preceding Feed commands.
+    EncodeInput {
+        inputs: Vec<InputSpec>,
+        reply: SyncSender<TerminalResult<Vec<u8>>>,
+    },
 
     /// Apply new cell dimensions to the terminal core.
     Resize {
@@ -72,6 +80,7 @@ pub(super) struct EmulatorCore {
     pub(super) cell_iterator: CellIterator<'static>,
     pub(super) shared: Arc<SharedState>,
     pub(super) cell_size: PixelSize,
+    input: InputEncoder,
 }
 
 const DEVICE_ATTRIBUTES: DeviceAttributes = DeviceAttributes {
@@ -200,6 +209,7 @@ impl EmulatorCore {
             cell_iterator,
             shared,
             cell_size,
+            input: InputEncoder::new()?,
         })
     }
 
@@ -207,6 +217,9 @@ impl EmulatorCore {
         while let Ok(command) = commands.recv() {
             match command {
                 Command::Feed(data) => self.feed(&data),
+                Command::EncodeInput { inputs, reply } => {
+                    let _ = reply.send(self.input.encode(&self.terminal, self.cell_size, &inputs));
+                }
                 Command::OutputClosed(error) => {
                     let mut state = self
                         .shared
@@ -280,10 +293,6 @@ impl EmulatorCore {
             state.raw.push_back(byte);
             state.raw_total_bytes += 1;
         }
-        state.application_cursor = self
-            .terminal
-            .mode(Mode::DECCKM)
-            .expect("read application cursor mode");
         state.generation = state.generation.wrapping_add(1);
         drop(state);
         self.shared.changed.notify_all();
@@ -345,6 +354,7 @@ impl EmulatorCore {
             alternate_screen: projection.alternate_screen,
             application_cursor: projection.application_cursor,
             bracketed_paste: projection.bracketed_paste,
+            mouse_modes: mouse_modes(&self.terminal)?,
             images,
         })
     }

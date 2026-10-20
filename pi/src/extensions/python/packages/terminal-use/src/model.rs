@@ -1,8 +1,10 @@
 //! Serializable data types shared by the public Python module and PTY internals.
 
+use libghostty_vt::{key::Mods, mouse::Button};
 use regex::{Regex, bytes::Regex as BytesRegex};
 use serde::Serialize;
 
+use crate::error::{TerminalError, TerminalResult};
 use crate::images::ImageSnapshot;
 
 /// A rectangular terminal region measured in zero-based cells.
@@ -135,6 +137,7 @@ pub(crate) struct ScreenSnapshot {
     pub(crate) alternate_screen: bool,
     pub(crate) application_cursor: bool,
     pub(crate) bracketed_paste: bool,
+    pub(crate) mouse_modes: MouseModes,
     pub(crate) cells: Option<Vec<Vec<CellInfo>>>,
     /// Source images referenced by placements on the active screen; serialized by the Python
     /// boundary as `TerminalImage` objects instead of this Rust form.
@@ -228,10 +231,56 @@ pub(crate) struct DrainOutcome {
     pub(crate) error: Option<String>,
 }
 
-/// One validated input event, retaining key semantics until the session knows its mode.
+/// One parsed input event, encoded against terminal state on the emulator thread.
 pub(crate) enum InputSpec {
     Bytes(Vec<u8>),
     Key(KeySpec),
+    Mouse(MouseInput),
+}
+
+/// Application-requested DEC mode bits, not a derived effective protocol.
+///
+/// Ghostty keeps effective mouse state separately and does not expose it through its read API.
+#[derive(Debug, Serialize)]
+pub(crate) struct MouseModes {
+    pub(crate) x10: bool,
+    pub(crate) normal: bool,
+    pub(crate) button: bool,
+    pub(crate) any: bool,
+    pub(crate) utf8: bool,
+    pub(crate) sgr: bool,
+    pub(crate) urxvt: bool,
+    pub(crate) sgr_pixels: bool,
+}
+
+/// A mouse event at a zero-based cell in the full screen; buttons are explicit per event.
+#[derive(Clone, Copy)]
+pub(crate) struct MouseInput {
+    pub(crate) col: u16,
+    pub(crate) row: u16,
+    pub(crate) action: MouseAction,
+    pub(crate) modifiers: Mods,
+}
+
+/// Wheel steps become repeated presses of Ghostty's directional wheel buttons.
+#[derive(Clone, Copy)]
+pub(crate) enum MouseAction {
+    Press(Button),
+    Release(Button),
+    Move(Option<Button>),
+    Scroll { button: Button, steps: usize },
+}
+
+impl MouseInput {
+    pub(crate) fn validate_position(&self, size: Size) -> TerminalResult<()> {
+        if self.col >= size.cols || self.row >= size.rows {
+            return Err(TerminalError::invalid(format!(
+                "mouse position col={}, row={} is outside the {}x{} terminal",
+                self.col, self.row, size.cols, size.rows
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// A key that may need application-cursor-mode encoding.

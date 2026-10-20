@@ -6,6 +6,7 @@
 //! generations under the shared mutex so an update cannot be lost before sleeping.
 
 mod emulator;
+mod input;
 mod projection;
 
 use std::collections::VecDeque;
@@ -22,7 +23,6 @@ use portable_pty::{Child, ExitStatus, MasterPty, PtySize};
 use self::emulator::Command;
 use crate::diagnostics;
 use crate::error::{TerminalError, TerminalResult};
-use crate::input::encode_input;
 use crate::model::{
     DrainOutcome, InputSpec, PixelSize, ProcessStatus, RawOutput, Rect, ScreenSnapshot,
     SessionInfo, Size, WaitMatcher, WaitSource, WaitSpec,
@@ -60,7 +60,6 @@ struct SessionState {
     raw_start_offset: u64,
     raw_total_bytes: u64,
     raw_dropped_bytes: u64,
-    application_cursor: bool,
     exit: Option<ExitState>,
     reader_done: bool,
     reader_error: Option<String>,
@@ -107,7 +106,6 @@ impl Session {
                 raw_start_offset: 0,
                 raw_total_bytes: 0,
                 raw_dropped_bytes: 0,
-                application_cursor: false,
                 exit: None,
                 reader_done: false,
                 reader_error: None,
@@ -413,21 +411,39 @@ impl Session {
         }
     }
 
-    pub(crate) fn write(&self, input: &InputSpec) -> TerminalResult<()> {
-        self.write_many(std::slice::from_ref(input))
-    }
-
-    pub(crate) fn write_many(&self, inputs: &[InputSpec]) -> TerminalResult<()> {
-        let application_cursor = self
+    /// Validate delayed batches before their first event; encoding also checks the current size.
+    pub(crate) fn validate_inputs(&self, inputs: &[InputSpec]) -> TerminalResult<()> {
+        let state = self
             .shared
             .state
             .lock()
-            .map_err(|_| TerminalError::runtime("terminal state mutex poisoned"))?
-            .application_cursor;
-        let mut payload = Vec::new();
+            .map_err(|_| TerminalError::runtime("terminal state mutex poisoned"))?;
         for input in inputs {
-            encode_input(input, application_cursor, &mut payload);
+            if let InputSpec::Mouse(mouse) = input {
+                mouse.validate_position(Size {
+                    rows: state.rows,
+                    cols: state.cols,
+                })?;
+            }
         }
+        Ok(())
+    }
+
+    pub(crate) fn write_many(&self, inputs: Vec<InputSpec>) -> TerminalResult<()> {
+        let (reply_tx, reply_rx) = sync_channel(1);
+        self.commands
+            .send(Command::EncodeInput {
+                inputs,
+                reply: reply_tx,
+            })
+            .map_err(|_| TerminalError::runtime("terminal emulator thread is not running"))?;
+        let payload = reply_rx
+            .recv()
+            .map_err(|_| TerminalError::runtime("terminal emulator thread stopped"))??;
+        if payload.is_empty() {
+            return Ok(());
+        }
+        // Keep blocking writes off the emulator thread so it can continue draining PTY output.
         let mut writer = self
             .writer
             .lock()

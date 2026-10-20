@@ -1,11 +1,14 @@
-//! Python-facing input parsing and terminal byte encoding.
+//! Python-facing input parsing; terminal-mode-dependent encoding lives in session::input.
 
+use libghostty_vt::{key::Mods, mouse::Button};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyBytes, PyMapping, PyMemoryView, PySequence};
 use pyo3::types::{PyByteArray, PyString};
 
-use crate::model::{CursorKey, InputSpec, KeySpec, PixelSize, Rect, WaitSpec};
+use crate::model::{
+    CursorKey, InputSpec, KeySpec, MouseAction, MouseInput, PixelSize, Rect, WaitSpec,
+};
 
 /// A zero-based terminal-cell rectangle accepted by the Python API.
 #[pyclass(name = "Rect", frozen, module = "terminal_use", from_py_object)]
@@ -135,7 +138,7 @@ pub(crate) fn parse_wait(value: Option<&Bound<'_, PyAny>>) -> PyResult<WaitSpec>
     WaitSpec::new(Some(pattern), &source, is_regex).map_err(value_error)
 }
 
-pub(crate) fn encode_events(events: &Bound<'_, PyAny>) -> PyResult<Vec<InputSpec>> {
+pub(crate) fn parse_events(events: &Bound<'_, PyAny>) -> PyResult<Vec<InputSpec>> {
     if events.is_instance_of::<PyString>()
         || events.is_instance_of::<PyBytes>()
         || events.is_instance_of::<PyByteArray>()
@@ -146,7 +149,7 @@ pub(crate) fn encode_events(events: &Bound<'_, PyAny>) -> PyResult<Vec<InputSpec
     let sequence = events
         .cast::<PySequence>()
         .map_err(|_| type_error("events must be a sequence of event mappings"))?;
-    let mut encoded_events = Vec::with_capacity(sequence.len()?);
+    let mut inputs = Vec::with_capacity(sequence.len()?);
     for index in 0..sequence.len()? {
         let event = sequence.get_item(index)?;
         let mapping = event
@@ -186,15 +189,16 @@ pub(crate) fn encode_events(events: &Bound<'_, PyAny>) -> PyResult<Vec<InputSpec
                     &format!("event {index} data"),
                 )?)
             }
+            "mouse" => InputSpec::Mouse(parse_mouse_event(mapping)?),
             other => {
                 return Err(value_error(format!(
-                    "event {index} has unknown kind {other:?}; expected 'key', 'text', 'paste', or 'raw'"
+                    "event {index} has unknown kind {other:?}; expected 'key', 'text', 'paste', 'raw', or 'mouse'"
                 )));
             }
         };
-        encoded_events.push(input);
+        inputs.push(input);
     }
-    Ok(encoded_events)
+    Ok(inputs)
 }
 
 pub(crate) fn encode_text(text: &str) -> InputSpec {
@@ -214,28 +218,107 @@ pub(crate) fn encode_paste(text: &str) -> InputSpec {
     InputSpec::Bytes(payload)
 }
 
-/// Convert one semantic input event to bytes using the session's current modes.
-pub(crate) fn encode_input(input: &InputSpec, application_cursor: bool, output: &mut Vec<u8>) {
-    match input {
-        InputSpec::Bytes(bytes) => output.extend_from_slice(bytes),
-        InputSpec::Key(KeySpec::Bytes(bytes)) => output.extend_from_slice(bytes),
-        InputSpec::Key(KeySpec::Cursor(key)) => {
-            output.extend_from_slice(match (key, application_cursor) {
-                (CursorKey::Up, false) => b"\x1b[A",
-                (CursorKey::Down, false) => b"\x1b[B",
-                (CursorKey::Left, false) => b"\x1b[D",
-                (CursorKey::Right, false) => b"\x1b[C",
-                (CursorKey::Home, false) => b"\x1b[H",
-                (CursorKey::End, false) => b"\x1b[F",
-                (CursorKey::Up, true) => b"\x1bOA",
-                (CursorKey::Down, true) => b"\x1bOB",
-                (CursorKey::Left, true) => b"\x1bOD",
-                (CursorKey::Right, true) => b"\x1bOC",
-                (CursorKey::Home, true) => b"\x1bOH",
-                (CursorKey::End, true) => b"\x1bOF",
-            })
-        }
+pub(crate) fn parse_mouse_button(name: &str) -> PyResult<Button> {
+    match name.to_ascii_lowercase().as_str() {
+        "left" => Ok(Button::Left),
+        "middle" => Ok(Button::Middle),
+        "right" => Ok(Button::Right),
+        _ => Err(value_error(
+            "mouse button must be 'left', 'middle', or 'right'",
+        )),
     }
+}
+
+pub(crate) fn parse_scroll(direction: &str, steps: usize) -> PyResult<MouseAction> {
+    if steps == 0 {
+        return Err(value_error("scroll steps must be greater than 0"));
+    }
+    let button = match direction.to_ascii_lowercase().as_str() {
+        "up" => Button::Four,
+        "down" => Button::Five,
+        "left" => Button::Six,
+        "right" => Button::Seven,
+        _ => {
+            return Err(value_error(
+                "scroll direction must be 'up', 'down', 'left', or 'right'",
+            ));
+        }
+    };
+    Ok(MouseAction::Scroll { button, steps })
+}
+
+pub(crate) fn parse_mouse_modifiers(names: Option<Vec<String>>) -> PyResult<Mods> {
+    let mut modifiers = Mods::empty();
+    for name in names.into_iter().flatten() {
+        modifiers |= match name.to_ascii_lowercase().as_str() {
+            "shift" => Mods::SHIFT,
+            "alt" => Mods::ALT,
+            "ctrl" => Mods::CTRL,
+            _ => {
+                return Err(value_error(
+                    "mouse modifiers must be 'shift', 'alt', or 'ctrl'",
+                ));
+            }
+        };
+    }
+    Ok(modifiers)
+}
+
+fn parse_mouse_event(mapping: &Bound<'_, PyMapping>) -> PyResult<MouseInput> {
+    let action = extract_string(&required_field(mapping, "action")?, "mouse action")?;
+    let action = match action.as_str() {
+        "press" | "release" | "move" => {
+            ensure_allowed_fields(
+                mapping,
+                &["kind", "action", "col", "row", "button", "modifiers"],
+            )?;
+            let button = optional_field(mapping, "button")?
+                .filter(|value| !value.is_none())
+                .map(|value| parse_mouse_button(&extract_string(&value, "mouse button")?))
+                .transpose()?;
+            match action.as_str() {
+                "press" => MouseAction::Press(
+                    button.ok_or_else(|| value_error("mouse press requires a button"))?,
+                ),
+                "release" => MouseAction::Release(
+                    button.ok_or_else(|| value_error("mouse release requires a button"))?,
+                ),
+                _ => MouseAction::Move(button),
+            }
+        }
+        "scroll" => {
+            ensure_allowed_fields(
+                mapping,
+                &["kind", "action", "col", "row", "direction", "steps", "modifiers"],
+            )?;
+            let direction =
+                extract_string(&required_field(mapping, "direction")?, "scroll direction")?;
+            let steps = optional_field(mapping, "steps")?
+                .map(|value| {
+                    if value.is_instance_of::<PyBool>() {
+                        return Err(type_error("scroll steps must be an int"));
+                    }
+                    value.extract::<usize>()
+                })
+                .transpose()?
+                .unwrap_or(1);
+            parse_scroll(&direction, steps)?
+        }
+        _ => {
+            return Err(value_error(
+                "mouse action must be 'press', 'release', 'move', or 'scroll'",
+            ));
+        }
+    };
+    let modifiers = optional_field(mapping, "modifiers")?
+        .map(|value| value.extract::<Vec<String>>())
+        .transpose()?;
+    Ok(MouseInput {
+        col: extract_u16(&required_field(mapping, "col")?, "mouse col")?,
+        row: extract_u16(&required_field(mapping, "row")?, "mouse row")?,
+        action,
+        modifiers: parse_mouse_modifiers(modifiers)?,
+    })
 }
 
 /// Modifiers belonging only to the current chord, not to the PTY session.
@@ -378,7 +461,7 @@ fn control_code(character: u8) -> PyResult<u8> {
 fn required_field<'py>(mapping: &Bound<'py, PyMapping>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     if !mapping.contains(name)? {
         return Err(value_error(format!(
-            "rect mapping is missing field {name:?}"
+            "mapping is missing field {name:?}"
         )));
     }
     mapping.get_item(name)
