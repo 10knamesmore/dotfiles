@@ -1,196 +1,144 @@
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { OverlayHandle, TUI } from "@earendil-works/pi-tui";
 import { sanitizeTodoDisplayLine } from "./display.js";
-import { cloneTodoPhases, isClosedTodo, type TodoItem, type TodoPhase } from "./model.js";
-import { selectTodoPreview } from "./preview.js";
-import { formatTodoStatus } from "./summary.js";
+import { FLOAT_MAX_HEIGHT, TodoFloat } from "./float.js";
+import { cloneTodoPhases, isClosedTodo, type TodoPhase } from "./model.js";
 
-const TODO_STATUS_KEY = "todo";
-const TODO_WIDGET_KEY = "todo";
-const COLLAPSED_TASK_LIMIT = 6;
-const TODO_AUTO_HIDE_TURNS = 2;
+const FLOAT_WIDTH = {
+  collapsed: { ratio: 0.42, min: 36, max: 60 },
+  expanded: { ratio: 0.6, min: 52, max: 96 },
+} as const;
 
 function errorMessage(error: unknown): string {
   return sanitizeTodoDisplayLine(error instanceof Error ? error.message : String(error));
 }
 
-function allTasks(phases: readonly TodoPhase[]): TodoItem[] {
-  return phases.flatMap((phase) => phase.tasks);
+function floatWidth(columns: number, collapsed: boolean): number {
+  const spec = collapsed ? FLOAT_WIDTH.collapsed : FLOAT_WIDTH.expanded;
+  return Math.min(spec.max, Math.max(spec.min, Math.round(columns * spec.ratio)));
 }
 
-function taskLine(task: TodoItem, theme: Theme): string {
-  const reason = task.reason ? ` — ${task.reason}` : "";
-  switch (task.status) {
-    case "in_progress":
-      return theme.fg("accent", `  → ${task.content}${reason}`);
-    case "completed":
-      return theme.fg("success", `  ✓ ${theme.strikethrough(task.content)}${reason}`);
-    case "abandoned":
-      return theme.fg("dim", `  - ${theme.strikethrough(task.content)}${reason}`);
-    case "blocked":
-      return theme.fg("warning", `  ! ${task.content}${reason}`);
-    case "pending":
-      return theme.fg("muted", `  ○ ${task.content}${reason}`);
-  }
-}
-
-function plainTaskLine(task: TodoItem): string {
-  const marker =
-    task.status === "in_progress"
-      ? "→"
-      : task.status === "completed"
-        ? "✓"
-        : task.status === "abandoned"
-          ? "-"
-          : task.status === "blocked"
-            ? "!"
-            : "○";
-  const reason = task.reason ? ` — ${task.reason}` : "";
-  return `  ${marker} ${task.content}${reason}`;
-}
-
-function selectedTodoLines(phases: readonly TodoPhase[]): Array<{ phase: TodoPhase; tasks: TodoItem[] }> {
-  const selection = selectTodoPreview(phases, COLLAPSED_TASK_LIMIT);
-  return phases
-    .map((phase) => ({
-      phase,
-      tasks: phase.tasks.filter((task) => selection.has(task)),
-    }))
-    .filter((entry) => entry.tasks.length > 0);
-}
-
-function renderPlainLines(phases: readonly TodoPhase[]): string[] {
-  const tasks = allTasks(phases);
-  const closed = tasks.filter(isClosedTodo).length;
-  const lines = [`Todo ${closed}/${tasks.length}`];
-  const visiblePhases = selectedTodoLines(phases);
-  for (const { phase, tasks: visible } of visiblePhases) {
-    const phaseClosed = phase.tasks.filter(isClosedTodo).length;
-    lines.push(`${phase.name} ${phaseClosed}/${phase.tasks.length}`);
-    for (const task of visible) lines.push(plainTaskLine(task));
-  }
-  const hidden = tasks.length - visiblePhases.reduce((count, entry) => count + entry.tasks.length, 0);
-  if (hidden > 0) lines.push(`… ${hidden} more`);
-  return lines;
-}
-
-class TodoPanelComponent {
-  private readonly phases: TodoPhase[];
-
-  public constructor(
-    phases: readonly TodoPhase[],
-    private readonly theme: Theme,
-  ) {
-    this.phases = cloneTodoPhases(phases);
-  }
-
-  public render(width: number): string[] {
-    const tasks = allTasks(this.phases);
-    const closed = tasks.filter(isClosedTodo).length;
-    const lines = [this.theme.fg("accent", this.theme.bold(`Todo ${closed}/${tasks.length}`))];
-    const visible = selectedTodoLines(this.phases);
-    for (const { phase, tasks: phaseTasks } of visible) {
-      const phaseClosed = phase.tasks.filter(isClosedTodo).length;
-      lines.push(this.theme.fg("muted", `${phase.name} ${phaseClosed}/${phase.tasks.length}`));
-      for (const task of phaseTasks) lines.push(taskLine(task, this.theme));
-    }
-    const visibleCount = visible.reduce((count, entry) => count + entry.tasks.length, 0);
-    const hidden = tasks.length - visibleCount;
-    if (hidden > 0) lines.push(this.theme.fg("dim", `… ${hidden} more`));
-    return lines.map((line) => truncateToWidth(line, width));
-  }
-
-  public invalidate(): void {}
-}
-
-/** Owns todo visibility, progress status, and the compact widget. */
+/** Owns the fullscreen todo float and its collapsed/expanded state. */
 export class TodoPresentation {
-  private displayEnabled = true;
-  private autoHidden = false;
-  private hasRefreshed = false;
-  private allTasksWereClosed = false;
-  private turnSequence = 0;
-  private currentTurnSequence = 0;
-  private completionTurnSequence: number | undefined;
-  private completedTurns = 0;
+  private phases: TodoPhase[] = [];
+  private collapsed = false;
+  private tui: TUI | undefined;
+  private overlay: OverlayHandle | undefined;
+  private dismiss: (() => void) | undefined;
+  private mounting = false;
+  private overlayUnavailable = false;
+  private mountGeneration = 0;
 
-  /** Toggle the user-controlled persistent display preference. */
-  public toggleVisibility(
-    ctx: ExtensionContext,
-    phases: readonly TodoPhase[],
-  ): { enabled: boolean; warning: string | undefined } {
-    const currentlyDisplayed = this.displayEnabled && !this.autoHidden && allTasks(phases).length > 0;
-    this.displayEnabled = !currentlyDisplayed;
-    if (this.displayEnabled) this.autoHidden = false;
-    return {
-      enabled: this.displayEnabled,
-      warning: this.refresh(ctx, phases),
-    };
-  }
-
-  /** The same visible summary used by the status bar and prompt editor. */
-  public displayStatus(phases: readonly TodoPhase[]): string | undefined {
-    return this.displayEnabled && !this.autoHidden ? formatTodoStatus(phases) : undefined;
-  }
-
-  /** Record the turn in which a todo mutation may complete the list. */
-  public startTurn(): void {
-    this.turnSequence += 1;
-    this.currentTurnSequence = this.turnSequence;
-  }
-
-  /** Hide a completed list after two subsequent complete turns. */
-  public finishTurn(ctx: ExtensionContext, phases: readonly TodoPhase[]): string | undefined {
-    if (this.completionTurnSequence === undefined || this.currentTurnSequence === this.completionTurnSequence)
-      return undefined;
-
-    this.completedTurns += 1;
-    if (this.completedTurns < TODO_AUTO_HIDE_TURNS) return undefined;
-
-    this.autoHidden = true;
-    this.completionTurnSequence = undefined;
-    return this.refresh(ctx, phases);
-  }
-
-  /**
-   * Refresh status and widget without changing canonical todo state.
-   *
-   * UI failures are returned to the caller because a persisted mutation must not
-   * be reported as failed merely because its optional presentation could not update.
-   */
-  public refresh(ctx: ExtensionContext, phases: readonly TodoPhase[]): string | undefined {
-    const tasks = allTasks(phases);
-    const allTasksClosed = tasks.length > 0 && tasks.every((task) => isClosedTodo(task));
-    if (this.hasRefreshed && !this.allTasksWereClosed && allTasksClosed) {
-      this.completionTurnSequence = this.currentTurnSequence;
-      this.completedTurns = 0;
-      this.autoHidden = false;
-    }
-    if (!allTasksClosed) {
-      this.completionTurnSequence = undefined;
-      this.completedTurns = 0;
-      this.autoHidden = false;
-    }
-    this.allTasksWereClosed = allTasksClosed;
-    this.hasRefreshed = true;
-
+  /** Toggle the float between one active line and the full phase list. */
+  public toggleCollapsed(ctx: ExtensionContext): string | undefined {
     try {
-      const shouldDisplay = this.displayEnabled && !this.autoHidden && tasks.length > 0;
-      ctx.ui.setStatus(TODO_STATUS_KEY, this.displayStatus(phases));
-      if (!shouldDisplay) {
-        ctx.ui.setWidget(TODO_WIDGET_KEY, undefined);
-      } else if (ctx.mode === "tui") {
-        ctx.ui.setWidget(TODO_WIDGET_KEY, (_tui, theme) => new TodoPanelComponent(phases, theme), {
-          placement: "aboveEditor",
-        });
-      } else if (ctx.mode === "rpc") {
-        ctx.ui.setWidget(TODO_WIDGET_KEY, renderPlainLines(phases), {
-          placement: "aboveEditor",
-        });
-      }
+      this.ensureOverlay(ctx);
+      this.flipCollapsed();
       return undefined;
     } catch (error) {
       return `Todo state is intact, but its UI could not refresh: ${errorMessage(error)}`;
     }
+  }
+
+  /** Replace the rendered state; the float follows every todo mutation and branch restore. */
+  public refresh(ctx: ExtensionContext, phases: readonly TodoPhase[]): string | undefined {
+    this.phases = cloneTodoPhases(phases);
+    if (ctx.mode !== "tui") return undefined;
+    try {
+      this.ensureOverlay(ctx);
+      this.syncVisibility();
+      this.tui?.requestRender();
+      return undefined;
+    } catch (error) {
+      return `Todo state is intact, but its UI could not refresh: ${errorMessage(error)}`;
+    }
+  }
+
+  /** Release the overlay interaction. Safe when nothing was mounted. */
+  public dispose(): void {
+    this.mountGeneration += 1;
+    this.dismiss?.();
+    this.dismiss = undefined;
+    this.overlay = undefined;
+    this.tui = undefined;
+    this.phases = [];
+    this.collapsed = false;
+    this.mounting = false;
+    this.overlayUnavailable = false;
+  }
+
+  private ensureOverlay(ctx: ExtensionContext): void {
+    if (this.overlay || this.mounting || this.overlayUnavailable) return;
+    this.mounting = true;
+    const generation = ++this.mountGeneration;
+
+    const interaction = ctx.ui.custom<void>(
+      (tui, theme, _keybindings, done) => {
+        if (tui.mode !== "fullscreen") {
+          this.overlayUnavailable = true;
+          done();
+          return { render: () => [], invalidate: () => {} };
+        }
+        this.tui = tui;
+        this.dismiss = () => done();
+        return new TodoFloat(theme, {
+          readPhases: () => this.phases,
+          isCollapsed: () => this.collapsed,
+          toggleCollapsed: () => this.flipCollapsed(),
+          terminalRows: () => tui.terminal.rows,
+        });
+      },
+      {
+        overlay: true,
+        overlayOptions: () => {
+          const presentation = this;
+          return {
+            anchor: "top-right",
+            // The overlay keeps this object and reads width on every render, so the
+            // getter switches between compact and expanded widths without a remount.
+            get width() {
+              return floatWidth(
+                presentation.tui!.terminal.columns,
+                presentation.collapsed || presentation.allTasksClosed(),
+              );
+            },
+            maxHeight: FLOAT_MAX_HEIGHT,
+            margin: 1,
+            nonCapturing: true,
+          };
+        },
+        onHandle: (handle) => {
+          if (generation !== this.mountGeneration) return;
+          this.overlay = handle;
+          this.mounting = false;
+          this.syncVisibility();
+          this.tui?.requestRender();
+        },
+      },
+    );
+
+    void interaction
+      .catch((error: unknown) => {
+        if (generation !== this.mountGeneration) return;
+        this.overlayUnavailable = true;
+        ctx.ui.notify(`Todo float could not open: ${errorMessage(error)}`, "warning");
+      })
+      .finally(() => {
+        if (generation === this.mountGeneration) this.mounting = false;
+      });
+  }
+
+  private syncVisibility(): void {
+    this.overlay?.setHidden(!this.phases.some((phase) => phase.tasks.length > 0));
+  }
+
+  private allTasksClosed(): boolean {
+    const tasks = this.phases.flatMap((phase) => phase.tasks);
+    return tasks.length > 0 && tasks.every(isClosedTodo);
+  }
+
+  private flipCollapsed(): void {
+    this.collapsed = !this.collapsed;
+    this.tui?.requestRender();
   }
 }

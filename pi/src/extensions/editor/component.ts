@@ -29,7 +29,6 @@ export class PromptEditor extends CustomEditor {
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
     private readonly fastRequested: () => boolean,
-    private readonly todoStatus: () => string | undefined = () => undefined,
     private readonly workflowUsage: () => string | undefined = () => undefined,
   ) {
     super(tui, theme, keybindings);
@@ -94,7 +93,7 @@ export class PromptEditor extends CustomEditor {
       (line) => `${this.borderColor("│")}${line}${this.borderColor("│")}`,
     );
     return [
-      this.frameBorder(lines[0] ?? "", top, width, "╭", "╮", this.todoStatus()),
+      this.frameBorder(lines[0] ?? "", top, width, "╭", "╮"),
       ...sides,
       this.frameBorder(lines[bottom]!, modelAndContext, width, "╰", "╯", this.workflowUsage()),
     ];
@@ -172,11 +171,7 @@ export class PromptEditor extends CustomEditor {
         : rightBudget;
     const rightLabel =
       rightStatus && width >= 32
-        ? truncateToWidth(
-            palette.lavender(sanitizeFooterText(rightStatus)),
-            availableRight,
-            palette.overlay2("…"),
-          )
+        ? truncateToWidth(palette.lavender(sanitizeFooterText(rightStatus)), availableRight, palette.overlay2("…"))
         : "";
     const rightWidth = visibleWidth(rightLabel);
     const budget = Math.max(0, width - visibleWidth(prefix) - (rightLabel ? rightWidth + 6 : 3));

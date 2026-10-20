@@ -17,7 +17,6 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     let navigation: AgentInputNavigation | undefined;
     let readStatus: (() => EditorStatus) | undefined;
     let readFastRequested: (() => boolean) | undefined;
-    let readTodoStatus: (() => string | undefined) | undefined;
     let readWorkflowUsage: (() => string | undefined) | undefined;
     const api: PromptEditorApi = {
       useAgentNavigation: (contribution) => {
@@ -28,9 +27,6 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       },
       useFastRequested: (contribution) => {
         readFastRequested = contribution;
-      },
-      useTodoStatus: (contribution) => {
-        readTodoStatus = contribution;
       },
       useWorkflowUsage: (contribution) => {
         readWorkflowUsage = contribution;
@@ -47,7 +43,6 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         () => readStatus?.(),
         () => currentContext,
         () => readFastRequested?.() ?? false,
-        () => readTodoStatus?.(),
         () => readWorkflowUsage?.(),
       ));
     ctx.ui.setEditorComponent(installedFactory);

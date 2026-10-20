@@ -6,7 +6,6 @@ export interface PromptEditorApi {
   useStatus(readStatus: () => EditorStatus): void;
   /** Whether the model name should carry the OpenAI Fast marker. */
   useFastRequested(readFastRequested: () => boolean): void;
-  useTodoStatus(readTodoStatus: () => string | undefined): void;
   useWorkflowUsage(readWorkflowUsage: () => string | undefined): void;
 }
 

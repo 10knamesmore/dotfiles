@@ -37,18 +37,3 @@ export function formatTodoSummary(phases: readonly TodoPhase[], readOnly: boolea
   }
   return lines.join("\n");
 }
-
-/** Compact status text consumed by Pi's footer data provider. */
-export function formatTodoStatus(phases: readonly TodoPhase[]): string | undefined {
-  const tasks = phases.flatMap((phase) => phase.tasks);
-  if (tasks.length === 0) return undefined;
-  const closed = tasks.filter(isClosedTodo).length;
-  const active = activeTodoTask(phases);
-  if (active) {
-    const chars = Array.from(active.content);
-    const content = chars.length > 60 ? `${chars.slice(0, 59).join("")}…` : active.content;
-    return `todo ${closed}/${tasks.length} · ${content}`;
-  }
-  const blocked = tasks.filter((task) => task.status === "blocked").length;
-  return `todo ${closed}/${tasks.length}${blocked > 0 ? ` · ${blocked} blocked` : ""}`;
-}
