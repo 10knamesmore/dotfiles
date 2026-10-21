@@ -1,5 +1,8 @@
 local opt = vim.opt
 
+-- Rust 诊断来源："bacon-ls" 或 "rust-analyzer"；项目 .nvim.lua 可覆盖。
+vim.g.rust_diagnostics = vim.g.rust_diagnostics or "bacon-ls"
+
 -- 运行 next等 自动写入
 opt.autowrite = true
 
