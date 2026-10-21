@@ -13,13 +13,15 @@ terminal.list_instances() -> list[dict]
 terminal.connect(*, socket: str | None = None, timeout: float = 10.0) -> KittyInstance
 terminal.launch(
     *, cwd: str | None = None,
-    cols: int = 120, rows: int = 40, timeout: float = 20.0,
+    cols: int = 120, rows: int = 40,
+    hidden: bool = False, timeout: float = 20.0,
 ) -> KittyInstance
 ```
 
 - 发现目录：`~/.local/state/kitty/control-*.sock`。每项包含 `socket`、`id`、Kitty `pid` 和 `windows`。连接失败会报错，不自动切换实例。
 - `connect()` 未给 socket 时读取 `KITTY_LISTEN_ON`；缺少该变量时显式传地址或使用 `launch()`。
 - `launch()` 使用 PATH 中的 Kitty 创建独立进程、唯一 socket 和初始 shell；返回前等待 socket 可用。启动超时不关闭已经启动的应用。
+- `hidden=True` 使用 Kitty 的 `--start-as=hidden` 隐藏初始桌面窗口；默认显示。通过 `list_windows()` 和 `attach()` 操作初始 shell。`focus()` 不负责取消隐藏，`open_window()` 仍会新建可见桌面窗口。
 - 实例属性：`socket`、`id`、`pid`。终端窗口内的子进程 PID 与实例 PID 不同。
 - transport timeout 限定每次 IPC 调用；操作失败抛 `RuntimeError`，进程调用超时抛 `subprocess.TimeoutExpired`。
 

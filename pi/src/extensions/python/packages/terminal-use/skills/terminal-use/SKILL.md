@@ -27,6 +27,8 @@ session = kitty.open_window(["some-tui"], cwd="/path/to/project")
 
 `launch()` 创建新的 Kitty 实例和初始 shell；`open_window()` 在该实例中新建桌面窗口。`open_tab()` / `open_split()` 使用实例的当前活动位置。窗口 ID 仅在一个实例内有意义，不跨实例复用。
 
+不显示初始桌面窗口时使用 `terminal.launch(hidden=True)`，再通过 `list_windows()` 和 `attach()` 操作初始 shell。
+
 ## 交互
 
 ```python

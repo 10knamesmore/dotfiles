@@ -13,6 +13,8 @@ session.send_key("ctrl", "c")
 session.focus()
 ```
 
+隐藏启动时使用 `terminal.launch(hidden=True)`，再通过 `kitty.list_windows()` 和 `kitty.attach(window_id=...)` 操作初始 shell。`open_window()` 仍会新建可见桌面窗口。
+
 ## 安装
 
 使用官方 Kitty 0.49.2 或更新版本，`kitty` 与 `kitten` 必须在 PATH 中。macOS 通过 Homebrew 安装和升级：

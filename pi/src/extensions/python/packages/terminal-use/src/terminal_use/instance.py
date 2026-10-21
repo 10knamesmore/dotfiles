@@ -152,6 +152,7 @@ def launch(
     cwd: str | None = None,
     cols: int = 120,
     rows: int = 40,
+    hidden: bool = False,
     timeout: float = 20.0,
 ) -> KittyInstance:
     """Start an independent persistent Kitty with a shell, never a single-instance forwarding client."""
@@ -176,6 +177,8 @@ def launch(
         "--session",
         "none",
     ]
+    if hidden:
+        arguments.append("--start-as=hidden")
     if cwd is not None:
         arguments.extend(("--directory", str(Path(cwd).expanduser().resolve())))
     log_directory = Path.home() / ".local/state/terminal-use"
