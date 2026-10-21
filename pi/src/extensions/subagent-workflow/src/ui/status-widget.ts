@@ -5,23 +5,8 @@
  * Register the factory once and re-render by calling tui.requestRender(), rather
  * than re-registering per update.
  *
- * Re-renders are event-driven and content-gated, never periodic. Pi draws inline
- * rather than on an alternate screen, so every repaint snaps the terminal
- * viewport back to the bottom. A background run can last minutes - exactly when
- * the user wants to scroll back and read - so a timer-driven repaint makes the
- * scrollback unusable for as long as the run lives. Vanilla pi only repaints
- * while it is itself working, and this widget must not be noisier than that
- * while pi sits idle.
- *
- * That constraint rules out animation here: a spinner or a live elapsed clock
- * would change the painted text on its own schedule and force exactly the
- * repaints this avoids. The row therefore carries only event-driven fields, and
- * elapsed time lives in the tool row and the /agents navigator instead.
- *
- * Repaint frequency is only half of it. Removing lines from pi's inline buffer
- * while an overlay (the /agents navigator, an approval prompt) is composited
- * shifts every overlay line up, which lands above pi-tui's previous viewport top
- * and forces the same scrollback-erasing full redraw. See `paint`.
+ * Re-renders are event-driven and skipped when displayed content is unchanged.
+ * Elapsed time lives in the tool row and the /agents navigator.
  */
 
 import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
@@ -35,10 +20,8 @@ import { errorMessage } from "../util.js";
 import {
   childLabel,
   countStatuses,
-  formatDuration,
   formatFullModel,
   formatTokenUsage,
-  spinnerFrame,
   statusGlyph,
   type StatusCounts,
   type ThemeLike,
@@ -49,7 +32,6 @@ const WIDGET_KEY = "subagent-workflow";
 const STATUS_KEY = "subagent-workflow";
 const FALLBACK_ROW_CAP = 6;
 const LABEL_WIDTH = 26;
-const REFRESH_MS = 100;
 
 type WidgetCtx = Pick<ExtensionContext, "ui" | "hasUI">;
 
@@ -204,8 +186,6 @@ export class SubagentStatusWidget {
   /** Painted-content identity, so an unchanged update skips the repaint. */
   private lastSignature: string | undefined;
   private selectedRunId: string | undefined;
-  /** Line count last painted, so a shrink can be held back under an overlay. */
-  private painted = 0;
   private enabled = true;
   private unsubscribeSpawns: (() => void) | undefined;
 
@@ -316,7 +296,6 @@ export class SubagentStatusWidget {
     }
     this.registered = false;
     this.tui = undefined;
-    this.painted = 0;
     this.lastStatus = undefined;
   }
 
@@ -325,7 +304,6 @@ export class SubagentStatusWidget {
     this.ctx = ctx;
     this.registered = false;
     this.tui = undefined;
-    this.painted = 0;
     this.lastStatus = undefined;
   }
 
@@ -460,9 +438,7 @@ export class SubagentStatusWidget {
       this.lastStatus = status;
     }
 
-    // Repaint only when the painted text would actually differ. Event floods
-    // (usage ticks especially) otherwise repaint identical content and snap the
-    // viewport for no visible gain.
+    // Usage events can leave the formatted text unchanged.
     const signature = widgetSignature(views);
     const changed = signature !== this.lastSignature;
     this.lastSignature = signature;
@@ -474,13 +450,9 @@ export class SubagentStatusWidget {
           this.tui = tui;
           return {
             render: (width: number) =>
-              this.paint(
-                renderWidgetLines(this.views(), theme, Math.max(1, width), statusWidgetRowCap(tui.terminal?.rows)),
-                tui,
-              ),
+              renderWidgetLines(this.views(), theme, Math.max(1, width), statusWidgetRowCap(tui.terminal?.rows)),
             invalidate: () => {
-              this.registered = false;
-              this.tui = undefined;
+              // Rendering reads live state; invalidation does not unmount the widget.
             },
           };
         },
@@ -492,48 +464,13 @@ export class SubagentStatusWidget {
     }
   }
 
-  /**
-   * Hold the painted line count steady while an overlay is mounted.
-   *
-   * Dropping lines from pi's inline buffer under a composited overlay moves
-   * every overlay line up, so the first changed line lands above pi-tui's
-   * previous viewport top and it falls back to a full redraw - which erases the
-   * terminal's scrollback. Measured against pi-tui: a one-line shrink is always
-   * safe (overlays reserve a one-row margin), two lines erase at 31 rows or
-   * fewer, three at any height. Growth is always safe, and so is any shrink with
-   * no overlay up.
-   *
-   * Padding back to the previous height costs nothing visible, because the
-   * overlay is covering these rows anyway, and both pi-tui overlay-close paths
-   * request a render - so the real shrink happens a frame later with no overlay
-   * mounted, on the safe path.
-   */
-  private paint(lines: string[], tui: Pick<TUI, "hasOverlay">): string[] {
-    const held =
-      tui.hasOverlay() && lines.length < this.painted
-        ? [...lines, ...Array.from({ length: this.painted - lines.length }, () => "")]
-        : lines;
-    this.painted = held.length;
-    return held;
-  }
-
   private hide(): void {
     this.selectedRunId = undefined;
     if (!this.ctx) return;
     if (this.registered) {
-      // Unregistering removes the widget's lines outright, which is the same
-      // buffer shrink paint() defers - and it bypasses paint() entirely. Stay
-      // mounted until the overlay closes; paint() then returns no lines, which
-      // looks identical to being unregistered, and the next update() or
-      // dispose() reclaims the registration.
-      if (this.tui?.hasOverlay()) {
-        this.tui.requestRender();
-      } else {
-        this.ctx.ui.setWidget(WIDGET_KEY, undefined);
-        this.registered = false;
-        this.tui = undefined;
-        this.painted = 0;
-      }
+      this.ctx.ui.setWidget(WIDGET_KEY, undefined);
+      this.registered = false;
+      this.tui = undefined;
     }
     if (this.lastStatus !== undefined) {
       this.ctx.ui.setStatus(STATUS_KEY, undefined);
@@ -552,7 +489,6 @@ export class SubagentStatusWidget {
       this.lastSignature = undefined;
       this.registered = false;
       this.tui = undefined;
-      this.painted = 0;
       this.lastStatus = undefined;
       try {
         this.ctx?.ui.setWidget(WIDGET_KEY, undefined);
