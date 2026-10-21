@@ -19,9 +19,9 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 echo "编译 dots…"
-cargo build --release --manifest-path "$HERE/cli/Cargo.toml"
+cargo build --release --manifest-path "$HERE/cli/dots/Cargo.toml"
 
-DOTS="$HERE/cli/target/release/dots"
+DOTS="$HERE/cli/dots/target/release/dots"
 echo "运行 dots install…"
 "$DOTS" install
 echo "运行 dots sync…"

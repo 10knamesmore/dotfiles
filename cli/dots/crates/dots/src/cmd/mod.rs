@@ -20,14 +20,14 @@ pub type Result<T> = color_eyre::Result<T>;
 pub fn find_repo_root() -> Result<PathBuf> {
     if let Ok(dir) = std::env::var("DOTFILES_DIR") {
         let path = PathBuf::from(dir);
-        if path.join("dots.lua").exists() || path.join("cli").exists() {
+        if path.join("dots.lua").exists() || path.join("cli/dots").exists() {
             return Ok(path);
         }
     }
-    // 从 cwd 向上查找 dots.lua 或 cli/Cargo.toml 仓库标志。
+    // 从 cwd 向上查找 dots.lua 或 cli/dots/Cargo.toml 仓库标志。
     let mut cur = std::env::current_dir()?;
     loop {
-        if cur.join("dots.lua").exists() || cur.join("cli").join("Cargo.toml").exists() {
+        if cur.join("dots.lua").exists() || cur.join("cli/dots/Cargo.toml").exists() {
             return Ok(cur);
         }
         if !cur.pop() {
@@ -35,7 +35,7 @@ pub fn find_repo_root() -> Result<PathBuf> {
         }
     }
     Err(eyre!(
-        "找不到仓库根（无 $DOTFILES_DIR，且 cwd 向上既无 dots.lua 也无 cli/Cargo.toml）"
+        "找不到仓库根（无 $DOTFILES_DIR，且 cwd 向上既无 dots.lua 也无 cli/dots/Cargo.toml）"
     ))
 }
 

@@ -1,6 +1,6 @@
 -- 具体规则见
--- - cli/crates/dots
--- - cli/crates/dots-core
+-- - cli/dots/crates/dots
+-- - cli/dots/crates/dots-core
 
 -- Pi agent 目录保持真实、逐子项链。~/.pi/agent 下混着 auth.json（凭据）、
 -- settings.json、sessions/、models-store.json、npm/ 等机器本地物；整目录链会把
@@ -112,10 +112,19 @@ end
 
 dots.install.cargo({
   source = {
-    path = "cli/crates/agent-hooks",
+    path = "cli/programs/agent-hooks",
     binary = "agent-hook",
   },
   root = "~/.local",
+})
+
+dots.install.cargo({
+  source = {
+    path = "cli/programs/window-borders",
+    binary = "window-borders",
+  },
+  root = "~/.local",
+  platforms = { "macos" },
 })
 
 local cargo_packages = {

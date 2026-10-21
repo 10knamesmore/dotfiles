@@ -1,6 +1,6 @@
 ## 项目概述
 
-这是一个跨平台 dotfiles 仓库。管理入口是自写的 Rust CLI **`dots`**（源码在 `cli/`）。
+这是一个跨平台 dotfiles 仓库。管理入口是自写的 Rust CLI **`dots`**（源码在 `cli/dots/`）。
 
 核心机制是**声明式 Resource 管理**：仓库即配置的单一真相源——`tree/` 镜像 `$HOME`，`dots.lua` 声明显式 Resource。
 
@@ -21,7 +21,11 @@
 
 ```
 dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.json）
-cli/              # Rust workspace：dots-core（纯逻辑）+ dots（bin）+ agent-hooks（bin: agent-hook，多 agent hooks），lua-api/（类型标注）
+cli/              # 按职责组织管理工具与独立程序，各项目自行构建
+  dots/           # 专属 workspace：crates/dots + crates/dots-core，lua-api/ 类型标注
+  programs/       # 随仓库分发的独立程序，不限定语言、工具链或依赖管理方式
+    agent-hooks/  # 跨平台，binary: agent-hook
+    window-borders/ # 仅 macOS，binary: window-borders
 pi/               # vanilla Pi 的 TypeScript extension source 与 pnpm workspace
 tree/             # ★ 映射根：目录结构即链接声明
   home/           #   → $HOME（跨平台）
@@ -41,7 +45,7 @@ docs/
 
 安装清单按来源分别声明，Lua 无需判断平台：`pacman({...})` 仅在存在 `/etc/arch-release` 的 Linux 上执行，`brew({...})` 仅在 macOS 上执行，其他平台显示跳过。当前平台的管理器不可用或执行失败会报错，不切换来源。两者只补装缺失包，不主动升级已有声明包；pacman 不刷新数据库或执行全系统升级。删除安装声明不卸载软件。
 
-`cargo({source=..., platforms={"macos"}})` 可限定执行平台，只接受 `linux`、`macos`；省略 `platforms` 时在所有平台执行，空表表示全部跳过。字符串 source 表示 crates.io package，table source 表示本地 workspace binary，后者每次强制重建。平台不匹配时显示跳过，不调用 Cargo。
+`cargo({source=..., platforms={"macos"}})` 可限定执行平台，只接受 `linux`、`macos`；省略 `platforms` 时在所有平台执行，空表表示全部跳过。字符串 source 表示 crates.io package，table source 表示本地 Cargo package 的 binary，后者每次强制重建，不要求属于 workspace。平台不匹配时显示跳过，不调用 Cargo。
 
 ## 路径注入
 

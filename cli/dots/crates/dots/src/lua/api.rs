@@ -307,7 +307,7 @@ fn parse_directory_mode(mode: Value) -> mlua::Result<Option<u32>> {
     }
 }
 
-/// 解析 Cargo 安装的平台限制和 workspace/crates.io 来源。
+/// 解析 Cargo 安装的平台限制和本地 package/crates.io 来源。
 fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDeclaration> {
     let platforms = spec
         .get::<Option<Vec<String>>>("platforms")?
@@ -325,7 +325,7 @@ fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDecla
         })
         .transpose()?;
     let source = match spec.get::<Value>("source")? {
-        Value::Table(source) => CargoBinarySource::Workspace {
+        Value::Table(source) => CargoBinarySource::Local {
             path: source.get("path")?,
             binary: source.get("binary")?,
             root: spec.get("root")?,
@@ -347,7 +347,7 @@ fn parse_cargo_binary_declaration(spec: &Table) -> mlua::Result<CargoBinaryDecla
         }
         other => {
             return Err(mlua::Error::external(format!(
-                "dots.install.cargo.source 必须是 crates.io package 字符串或 workspace table，得到 {}",
+                "dots.install.cargo.source 必须是 crates.io package 字符串或本地 package table，得到 {}",
                 other.type_name()
             )));
         }

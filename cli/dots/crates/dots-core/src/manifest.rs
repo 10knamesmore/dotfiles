@@ -165,8 +165,8 @@ pub struct CargoBinaryDeclaration {
 /// Cargo binary 的源码来源及安装参数。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CargoBinarySource {
-    /// 通过 Cargo 安装的仓库内 workspace binary。
-    Workspace {
+    /// 通过本地 Cargo package 安装的 binary；不要求属于 workspace。
+    Local {
         /// 传给 `cargo install --path` 的 package directory；相对路径以仓库根为基准。
         path: String,
 

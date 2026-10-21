@@ -1,0 +1,28 @@
+[package]
+name = "window-borders"
+description = "Event-driven macOS window borders with narrow backing stores"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+signal-hook = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dispatch2 = "0.3"
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
+    "std", "CFArray", "CFCGTypes", "CFDate", "CFDictionary", "CFMachPort",
+    "CFNumber", "CFRunLoop", "CFString", "CFUUID", "libc",
+] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = [
+    "std", "CGContext", "CGGeometry", "CGPath", "CGEvent", "CGEventTypes",
+    "CGWindow", "CGDirectDisplay", "CGDisplayConfiguration", "CGError",
+] }
+
+[profile.release]
+debug = 1
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

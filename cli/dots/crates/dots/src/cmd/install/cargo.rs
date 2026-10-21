@@ -1,4 +1,4 @@
-//! Cargo 安装保留 crates.io 与 workspace 两种来源的命令语义。
+//! Cargo 安装区分 crates.io 与本地 package 两种来源。
 
 use std::path::Path;
 use std::process::Command;
@@ -9,7 +9,7 @@ use dots_core::manifest::{CargoBinaryDeclaration, CargoBinarySource};
 use super::run_install_command;
 use crate::cmd::{Result, absolute_source, absolute_target};
 
-/// 跳过平台不匹配的声明；Workspace 强制重建，crates.io 更新交给 Cargo 判断。
+/// 跳过平台不匹配的声明；本地 package 强制重建，crates.io 更新交给 Cargo 判断。
 pub(super) fn run(
     declaration: &CargoBinaryDeclaration,
     repo_root: &Path,
@@ -18,7 +18,7 @@ pub(super) fn run(
     dry_run: bool,
 ) -> Result<()> {
     let description = match &declaration.source {
-        CargoBinarySource::Workspace { binary, .. } => format!("workspace binary `{binary}`"),
+        CargoBinarySource::Local { binary, .. } => format!("local binary `{binary}`"),
         CargoBinarySource::CratesIo { package, .. } => format!("crates.io package `{package}`"),
     };
     if declaration
@@ -30,7 +30,7 @@ pub(super) fn run(
         return Ok(());
     }
     match &declaration.source {
-        CargoBinarySource::Workspace { path, binary, root } => {
+        CargoBinarySource::Local { path, binary, root } => {
             let path = absolute_source(path, repo_root, home)?;
             let root = absolute_target(root, home)?;
             run_install_command(

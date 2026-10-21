@@ -53,27 +53,27 @@ function scripts(spec) end
 ---@field source string 相对仓库根、绝对或 `~` source file
 ---@field target string 绝对或 `~` target file
 
----@class CargoWorkspaceBinarySource
+---@class CargoLocalBinarySource
 ---@field path string 相对仓库根、绝对或 `~` package directory
 ---@field binary string Cargo binary target 名称
 
 ---@class CargoBinaryInstallBase: DeclarationSpecBase
 ---@field platforms? DotsOs[] 仅在列出的平台执行；省略为所有平台，空表为全部跳过
 
----@class CargoWorkspaceBinaryInstallSpec: CargoBinaryInstallBase
----@field source CargoWorkspaceBinarySource 仓库内 binary source
+---@class CargoLocalBinaryInstallSpec: CargoBinaryInstallBase
+---@field source CargoLocalBinarySource 本地 Cargo package 的 binary source
 ---@field root string 传给 `cargo install --root` 的绝对或 `~` 路径
 
 ---@class CargoCratesIoBinaryInstallSpec: CargoBinaryInstallBase
 ---@field source string crates.io package 名称；由 Cargo 安装到真实 Cargo home
 ---@field binaries? string[] 依次传给 `cargo install --bin` 的 binary target 名称
 
----@alias CargoBinaryInstallSpec CargoWorkspaceBinaryInstallSpec|CargoCratesIoBinaryInstallSpec
+---@alias CargoBinaryInstallSpec CargoLocalBinaryInstallSpec|CargoCratesIoBinaryInstallSpec
 
 ---@class DotsInstall
 ---@field pacman fun(packages: string[]) 仅在存在 /etc/arch-release 的 Linux 上补装缺失包，其他平台跳过
 ---@field brew fun(packages: string[]) 仅在 macOS 上补装缺失的 Homebrew formula，其他平台跳过
----@field cargo fun(spec: CargoBinaryInstallSpec) 在声明适用的平台执行 cargo install；workspace 每次强制重建
+---@field cargo fun(spec: CargoBinaryInstallSpec) 在声明适用的平台执行 cargo install；本地 package 每次强制重建
 
 ---@class ManagedBlockResourceSpec: DeclarationSpecBase
 ---@field target string 绝对或 `~` 文本文件

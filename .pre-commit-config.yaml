@@ -5,19 +5,32 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt --check
-        entry: cargo fmt --manifest-path cli/Cargo.toml --all --check
+        entry: >-
+          bash -ec '
+          cargo fmt --manifest-path cli/dots/Cargo.toml --all --check;
+          cargo fmt --manifest-path cli/programs/agent-hooks/Cargo.toml --all --check;
+          cargo fmt --manifest-path cli/programs/window-borders/Cargo.toml --all --check'
         language: system
         types: [rust]
         pass_filenames: false
       - id: cargo-clippy
         name: cargo clippy
-        entry: cargo clippy --manifest-path cli/Cargo.toml --workspace --all-targets -- -D warnings
+        entry: >-
+          bash -ec '
+          cargo clippy --manifest-path cli/dots/Cargo.toml --workspace --all-targets -- -D warnings;
+          cargo clippy --manifest-path cli/programs/agent-hooks/Cargo.toml --all-targets -- -D warnings;
+          if [ "$(uname -s)" = Darwin ]; then
+            cargo clippy --manifest-path cli/programs/window-borders/Cargo.toml --all-targets -- -D warnings;
+          fi'
         language: system
         types: [rust]
         pass_filenames: false
       - id: cargo-test
         name: cargo test
-        entry: cargo test --manifest-path cli/Cargo.toml --workspace
+        entry: >-
+          bash -ec '
+          cargo test --manifest-path cli/dots/Cargo.toml --workspace;
+          cargo test --manifest-path cli/programs/agent-hooks/Cargo.toml'
         language: system
         types: [rust]
         pass_filenames: false
