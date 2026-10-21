@@ -23,6 +23,7 @@ class ShowcastStop(TypedDict):
     title: str
     comment: str
     highlights: NotRequired[list[ShowcastHighlight]]
+    proposed_text: NotRequired[str]
 
 
 class Showcast:
@@ -38,6 +39,8 @@ class Showcast:
         Highlight ends are exclusive. n/N navigate, Tab toggles the comment,
         Enter focuses it for scrolling, and q restores the original buffer,
         cursor, scroll position and winbar without closing the window.
+        Optional proposed_text previews complete proposed contents on that station.
+        <leader>up toggles the inline diff; leaving the station clears it.
         """
         with self._session._operation("showcast"):
             self._session._connection.call(
@@ -56,4 +59,11 @@ class Showcast:
         with self._session._operation("showcast"):
             self._session._connection.call(
                 lambda nv: bridge(nv, ".showcast", "toggle_comment"), 30
+            )
+
+    def toggle_diff(self) -> None:
+        """Toggle station diffs; the visibility preference persists across stops."""
+        with self._session._operation("showcast"):
+            self._session._connection.call(
+                lambda nv: bridge(nv, ".showcast", "toggle_diff"), 30
             )

@@ -38,7 +38,8 @@ editor.disconnect()
 | `editor.lsp.execute_command(client_id=..., command=..., buffer=..., timeout=30)` | 执行客户端或服务端 LSP Command |
 | `editor.showcast.start(title=..., stops=[...])` | 当前代码窗口中发布带高亮与 Markdown 浮窗说明的 tour，不创建 tab 或分屏 |
 | `editor.showcast.toggle_comment()` | 显示／隐藏当前站的说明 |
-| `editor.showcast.stop()` | 结束 tour，清除高亮并恢复按键、原 buffer、视图和 winbar |
+| `editor.showcast.toggle_diff()` | 显示／隐藏当前站的 diff，开关跨站保留 |
+| `editor.showcast.stop()` | 结束 tour，清除高亮、diff 并恢复按键、原 buffer、视图和 winbar |
 | `editor.disconnect()` | 断开连接，保留 Neovim、buffers 和 LSP |
 
 超时单位是秒。LSP 参数的 `line` / `character` 使用原生 0-based 坐标和 client 编码。`editor_position` 使用 pynvim 光标的 `(1-based row, 0-based UTF-8 byte column)`。
@@ -47,7 +48,34 @@ editor.disconnect()
 
 LSP 错误抛出 `LspError`，原始 ResponseError 保存在 `.response`。LSP 超时或中断取消请求并保留连接。原生 callback 超时或中断会关闭连接；已经执行的操作保留。执行任意阻塞 Python callback 时，Pi worker 的外层超时负责终止无法退出的线程。
 
-Showcast 由 Neovim 管理站点切换，不需要 Python 持续运行。`n/N` 切换站点，`Tab` 切换说明显示，`Enter` 聚焦说明，`Esc` 返回代码，`q` 结束。它使用真实 buffer，保留未保存内容；站点坐标及临时映射的作用范围见 [skill](skills/nvim-use/SKILL.md#showcast带讲解的代码-tour)。
+Showcast 由 Neovim 管理站点切换，不需要 Python 持续运行。`n/N` 切换站点，`Tab` 切换说明显示，`<leader>up` 切换 diff，`Enter` 聚焦说明，`Esc` 返回代码，`q` 结束。它使用真实 buffer，保留未保存内容；站点坐标及临时映射的作用范围见 [skill](skills/nvim-use/SKILL.md#showcast带讲解的代码-tour)。
+
+## 站点 diff 预览
+
+```python
+editor.showcast.start(
+    title="配置修改",
+    stops=[{
+        "buffer": "/absolute/project/config.py",
+        "position": (1, 0),
+        "title": "启用配置",
+        "comment": "绿色虚拟行是拟修改内容，原文未变。",
+        "proposed_text": "enabled = True\n",
+    }],
+)
+editor.showcast.toggle_diff()
+editor.showcast.stop()
+```
+
+站点可选字段 `proposed_text` 是以 LF 分行的完整拟修改文本，不是 patch；空字符串表示删除全部内容。基准是发布 tour 时该 buffer 的内容，包括未保存修改。组装原文时读取 `endofline` 保留末尾换行状态。同一 buffer 的多个站点都与此基准比较，不累积前一站的拟议修改。
+
+Neovim 的 `vim.text.diff` 计算行差异，extmarks 负责显示：删除行用 `DiffDelete` 高亮并标 `-`，新增内容以 `DiffAdd` 虚拟行显示并标 `+`。虚拟行不折行；`nowrap` 下可水平滚动。仅末尾换行不同也会标出末行，但不显示专门的换行符。
+
+进入站点显示该站的 diff，离站清除。`<leader>up` 在代码和 comment buffer 都可切换显示；开关跨站保留，无 diff 的站点不改变开关。`Tab` 独立控制 comment，浮窗定位会避开可见 diff，包括新增虚拟行。同一源码 buffer 的其他窗口也会显示这些装饰。
+
+结束或替换 tour、关闭代码窗口、断开连接时一并清理 diff。源码编辑或 buffer 卸载会使该 buffer 所有站点的 diff 失效，返回站点也不会恢复旧差异；重新读取源码并发布 tour 后才能继续预览。
+
+Diff 没有独立会话，不额外创建 tab、window 或 buffer。原文、undo 历史和磁盘保持不变，原 buffer 仍可编辑。预览没有 apply/accept 操作，实际写入仍由 `apply_patch` 或其他明确写入工具执行；执行前重新读取真实 buffer，保留用户的未保存修改。
 
 ## 运行时数据与生命周期
 
@@ -55,7 +83,7 @@ Showcast 由 Neovim 管理站点切换，不需要 Python 持续运行。`n/N` �
 - macOS：`$TMPDIR/pi-nvim/<instance-id>.json`。
 - 登记目录权限为 0700，文件为 0600。只存连接地址、实例身份、cwd、当前文件、workspace roots 和 Pi 连接摘要。
 - Neovim 按编辑器事件合并更新登记；正文、光标移动和诊断不写入登记文件。
-- RPC 握手核实实例身份并获取独占连接。socket 关闭后 Neovim 释放 ownership、取消该连接的 LSP 请求并结束 showcast。
+- RPC 握手核实实例身份并获取独占连接。socket 关闭后 Neovim 释放 ownership、取消该连接的 LSP 请求并清理 showcast 和 diff 预览。
 - Python worker 收到 Pi session ID、cwd 和所选模型，在运行用户代码前初始化连接信息。Pi 切换模型时向 worker 发送状态更新：空闲时立即处理，正在执行的 cell 结束后处理。模型变化同步到所有已连接 Neovim，无需再次调用工具。
 - Python 正常退出通过 atexit 断开；被强杀时 socket 关闭触发 Neovim 清理。
 - Python 环境重置后重新执行 `/nvim`；会话中的旧连接消息不会恢复连接。Neovim 重启后重新发现新实例 ID。

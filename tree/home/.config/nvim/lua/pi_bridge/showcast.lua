@@ -1,6 +1,7 @@
 --- A connected Pi publishes a tour in the current window; Neovim owns navigation and comments.
 local M = {}
 local api = vim.api
+local diff = require("pi_bridge.diff")
 local namespace = api.nvim_create_namespace("pi_showcast")
 local active
 local finish
@@ -14,6 +15,7 @@ local position_comment
 ---@field title string
 ---@field comment string Markdown
 ---@field highlights? {start: integer[], ["end"]: integer[]}[] Half-open ranges, same units as position
+---@field proposed_text? string Complete proposed buffer contents, separated by LF
 
 local function close_comment(tour)
   local window = tour.comment_window
@@ -24,7 +26,8 @@ local function close_comment(tour)
 end
 
 local function clear_station(tour)
-  if tour.buffer and api.nvim_buf_is_valid(tour.buffer) then
+  if tour.buffer and api.nvim_buf_is_loaded(tour.buffer) then
+    diff.clear(tour.buffer)
     api.nvim_buf_clear_namespace(tour.buffer, namespace, 0, -1)
     api.nvim_buf_call(tour.buffer, function()
       for key, previous in pairs(tour.mappings) do
@@ -37,6 +40,27 @@ local function clear_station(tour)
   end
   tour.mappings = {}
   tour.buffer = nil
+end
+
+local function refresh_diff(tour)
+  diff.clear(tour.buffer)
+  local stop = tour.stops[tour.index]
+  if stop.preview and api.nvim_buf_get_changedtick(tour.buffer) ~= stop.preview.changedtick then
+    stop.preview = nil
+  end
+  if stop.preview and tour.diff_visible then
+    diff.show(stop.preview)
+  end
+end
+
+local function toggle_diff()
+  local tour = active
+  if not tour or not tour.stops[tour.index].preview then
+    return
+  end
+  tour.diff_visible = not tour.diff_visible
+  refresh_diff(tour)
+  position_comment(tour)
 end
 
 local function toggle_comment()
@@ -80,6 +104,7 @@ local function bind_keys(tour, buffer, remember)
       "Showcast: previous stop",
     },
     { "<Tab>", toggle_comment, "Showcast: toggle comment" },
+    { "<leader>up", toggle_diff, "Showcast: toggle diff preview" },
     { "<CR>", focus_comment, "Showcast: focus comment" },
     { "q", finish, "Showcast: end tour" },
   }
@@ -124,6 +149,15 @@ local function highlight_bounds(tour, viewport)
   if #marks == 0 then
     local location = tour.stops[tour.index].position
     include(location[1], location[2] + 1, location[1], location[2] + 1)
+  end
+  for _, span in ipairs(diff.screen_spans(tour.buffer, tour.window)) do
+    local first = span.top - viewport.winrow - viewport.winbar
+    local last = span.bottom - viewport.winrow - viewport.winbar
+    if last >= 0 and first < viewport.height then
+      top = math.min(top or math.huge, math.max(0, first))
+      bottom = math.max(bottom or -1, math.min(viewport.height - 1, last))
+      left = math.min(left or viewport.textoff, span.left - viewport.wincol)
+    end
   end
   if top then
     return { top = top, bottom = bottom, left = left }
@@ -206,7 +240,7 @@ render_comment = function(tour)
     border = "rounded",
     title = string.format(" %s · %d/%d ", tour.title, tour.index, #tour.stops),
     title_pos = "center",
-    footer = " n/N · Tab hide · Enter focus · q end ",
+    footer = " n/N · Tab comment · <leader>up diff · q end ",
     footer_pos = "center",
   })
   tour.comment_window = window
@@ -244,6 +278,7 @@ visit = function(index)
   api.nvim_win_set_buf(tour.window, stop.buffer)
   tour.buffer = stop.buffer
   bind_keys(tour, tour.buffer, true)
+  refresh_diff(tour)
   api.nvim_win_set_cursor(tour.window, stop.position)
   vim.cmd("normal! zvzz")
   for _, range in ipairs(stop.highlights or {}) do
@@ -256,7 +291,7 @@ visit = function(index)
     })
   end
   vim.wo[tour.window].winbar = string.format(
-    "Showcast %d/%d · %s · n/N stops · Tab comment · q end",
+    "Showcast %d/%d · %s · n/N stops · Tab comment · <leader>up diff · q end",
     index,
     #tour.stops,
     tour.title:gsub("%%", "%%%%"):gsub("[%c]", " ")
@@ -274,7 +309,7 @@ finish = function()
   close_comment(tour)
   clear_station(tour)
   if api.nvim_win_is_valid(tour.window) then
-    local original_buffer_exists = api.nvim_buf_is_valid(tour.origin.buffer)
+    local original_buffer_exists = api.nvim_buf_is_loaded(tour.origin.buffer)
     if original_buffer_exists then
       api.nvim_win_set_buf(tour.window, tour.origin.buffer)
     end
@@ -301,6 +336,9 @@ function M.start(channel, title, stops)
       stop.buffer = vim.fn.bufadd(stop.buffer)
     end
     vim.fn.bufload(stop.buffer)
+    if stop.proposed_text ~= nil then
+      stop.preview = diff.prepare(stop.buffer, stop.proposed_text)
+    end
   end
   finish()
   local tour = {
@@ -315,10 +353,40 @@ function M.start(channel, title, stops)
     },
     mappings = {},
     comment_visible = true,
+    diff_visible = true,
     events = api.nvim_create_augroup("PiShowcast", { clear = true }),
   }
   active = tour
   api.nvim_set_hl(0, "PiShowcastRange", { default = true, link = "Visual" })
+  local watched = {}
+  for _, stop in ipairs(stops) do
+    if stop.preview and not watched[stop.buffer] then
+      local buffer = stop.buffer
+      watched[buffer] = true
+      api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP", "BufUnload" }, {
+        group = tour.events,
+        buffer = buffer,
+        callback = function(event)
+          for _, station in ipairs(tour.stops) do
+            if
+              station.buffer == buffer
+              and station.preview
+              and (event.event == "BufUnload" or api.nvim_buf_get_changedtick(buffer) ~= station.preview.changedtick)
+            then
+              station.preview = nil
+            end
+          end
+          if tour.buffer == buffer then
+            diff.clear(buffer)
+            if event.event ~= "BufUnload" then
+              refresh_diff(tour)
+              position_comment(tour)
+            end
+          end
+        end,
+      })
+    end
+  end
   api.nvim_create_autocmd("WinClosed", {
     group = tour.events,
     pattern = tostring(tour.window),
@@ -353,6 +421,11 @@ end
 function M.toggle_comment(channel)
   require("pi_bridge").require_owner(channel)
   toggle_comment()
+end
+
+function M.toggle_diff(channel)
+  require("pi_bridge").require_owner(channel)
+  toggle_diff()
 end
 
 --- Called when the owner leaves; user navigation never requires a Python round trip.
