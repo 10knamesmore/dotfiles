@@ -134,7 +134,7 @@ export class AgentView {
       this.selectBlock(direction * distance);
     } else if (keyId === "g" || keyId === "shift+g") {
       this.focusBlock(keyId === "g" ? 0 : -1);
-    } else if (keyId === "space" || data === " ") {
+    } else if (keyId === "l" || keyId === "space" || data === " ") {
       this.toggleSelected();
     } else if (keyId === "t" || keyId === "o") {
       this.toggleKind(keyId === "t" ? "thinking" : "tool");
@@ -332,7 +332,7 @@ export class AgentView {
       lines.push(selected?.start === row ? selected.selectedHeading : (layout.lines[row] ?? ""));
     }
     const position = this.autoScroll ? (this.isActive() ? "Following latest" : "End of transcript") : "Reading history";
-    lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · Space fold`));
+    lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · l/Space fold`));
     if (this.composer) {
       const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;
       const prefix = `✎ ${kind}: `;

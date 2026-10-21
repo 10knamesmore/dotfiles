@@ -88,7 +88,7 @@ function renderBlock(
   const bodyLimit = Math.max(1, maxLines - 1);
   if (block.kind === "tool") {
     // Keep the status before the path/command, so narrow terminals never hide failure.
-    heading += `  ${theme.fg(toolColor(block), toolStatusLabel(block))}${state.outputOnly ? " · Space details" : ""}  ${theme.bold(block.name)}  ${block.target}`;
+    heading += `  ${theme.fg(toolColor(block), toolStatusLabel(block))}${state.outputOnly ? " · l/Space details" : ""}  ${theme.bold(block.name)}  ${block.target}`;
     if (expanded && !state.outputOnly) {
       if (block.missingCall) body.push(theme.fg("warning", "Invocation not loaded in this history window."));
       if (block.arguments) {
