@@ -45,6 +45,10 @@ function scripts(spec) end
 ---@field source string 相对仓库根、绝对或 `~` source path
 ---@field target string 绝对或 `~` target path
 
+---@class DirectoryResourceSpec: DeclarationSpecBase
+---@field target string 绝对或 `~` 目录路径；只管理目录本身，不拥有其内容
+---@field mode? string 四位八进制权限，如 "0700"；显式声明时持续收敛，省略时保留已有权限
+
 ---@class CopiedFileResourceSpec: DeclarationSpecBase
 ---@field source string 相对仓库根、绝对或 `~` source file
 ---@field target string 绝对或 `~` target file
@@ -80,6 +84,7 @@ function scripts(spec) end
 ---@field unit string systemd user unit 名称
 
 ---@class DotsResource
+---@field directory fun(spec: DirectoryResourceSpec) 声明真实目录；退休后仅删除空目录，非空时保留并报告
 ---@field symlink fun(spec: SymlinkResourceSpec) 声明符号链接
 ---@field copied_file fun(spec: CopiedFileResourceSpec) 声明内容复制文件
 ---@field managed_block fun(spec: ManagedBlockResourceSpec) 声明文本 marker block

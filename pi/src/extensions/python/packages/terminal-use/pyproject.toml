@@ -1,26 +1,12 @@
 [build-system]
-requires = ["maturin>=1,<2", "ziglang==0.15.2"]
-build-backend = "build_backend"
-backend-path = ["."]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
 
 [project]
 name = "terminal-use-sdk"
 version = "0.1.0"
-description = "Unix PTY and terminal screen SDK for Pi's Python worker"
+description = "Control persistent Kitty terminals from Python"
 requires-python = ">=3.12"
 
-[tool.maturin]
-bindings = "pyo3"
+[tool.uv.build-backend]
 module-name = "terminal_use"
-features = ["python-extension"]
-locked = true
-include = [{ path = "build_backend.py", format = "sdist" }]
-
-[tool.uv]
-cache-keys = [
-    { file = "pyproject.toml" },
-    { file = "build_backend.py" },
-    { file = "Cargo.toml" },
-    { file = "Cargo.lock" },
-    { file = "src/**/*.rs" },
-]

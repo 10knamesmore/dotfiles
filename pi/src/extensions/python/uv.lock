@@ -976,7 +976,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.14.6" },
     { name = "regex", specifier = ">=2026.9.10" },
     { name = "requests", specifier = ">=2.34.2" },
-    { name = "terminal-use-sdk", directory = "packages/terminal-use" },
+    { name = "terminal-use-sdk", editable = "packages/terminal-use" },
     { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "tree-sitter-language-pack", specifier = ">=1.20.0" },
 ]
@@ -1470,7 +1470,7 @@ wheels = [
 [[package]]
 name = "terminal-use-sdk"
 version = "0.1.0"
-source = { directory = "packages/terminal-use" }
+source = { editable = "packages/terminal-use" }
 
 [[package]]
 name = "tiktoken"

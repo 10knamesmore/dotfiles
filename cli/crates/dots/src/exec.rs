@@ -64,6 +64,9 @@ pub struct ExecReport {
     /// 从 inventory 遗忘的已不存在 Retired Resource 数。
     pub forgotten: usize,
 
+    /// 因内容或仍有 Desired 子路径而保留的 Retired 目录数。
+    pub retained: usize,
+
     /// 未执行的 Collision 数。
     pub collisions: usize,
 
@@ -75,9 +78,9 @@ pub struct ExecReport {
 }
 
 impl ExecReport {
-    /// 返回本次执行是否没有 Collision、Drift 或 apply failure。
+    /// 返回本次执行是否没有 Collision、Drift、保留目录或 apply failure。
     pub fn is_healthy(&self) -> bool {
-        self.collisions == 0 && self.drift == 0 && self.failures.is_empty()
+        self.collisions == 0 && self.drift == 0 && self.retained == 0 && self.failures.is_empty()
     }
 }
 
@@ -103,19 +106,44 @@ fn execute_with_runtime(
 ) -> ExecReport {
     let mut report = ExecReport::default();
     let blocked_prefixes = execute_conversions(conversions, filesystem, dry_run, &mut report);
+    let mut blocked_directories: Vec<PathBuf> = plan
+        .items
+        .iter()
+        .filter_map(|item| {
+            if matches!(item.desired, Some(ResourceSpec::Directory { .. }))
+                && matches!(
+                    item.action,
+                    PlanAction::Collision { .. } | PlanAction::Drift { .. }
+                )
+            {
+                item.surface.filesystem_path().map(Path::to_path_buf)
+            } else {
+                None
+            }
+        })
+        .collect();
     for item in &plan.items {
         if item.surface.filesystem_path().is_some_and(|path| {
             blocked_prefixes
                 .iter()
                 .any(|prefix| path.starts_with(prefix))
+                || blocked_directories
+                    .iter()
+                    .any(|prefix| path != prefix && path.starts_with(prefix))
         }) {
             report.failures.push(format!(
-                "{}：父容器转换失败，未执行",
+                "{}：父目录 Resource 或容器转换未成功，未执行",
                 item.surface.selector()
             ));
             continue;
         }
+        let failures_before = report.failures.len();
         execute_item(item, filesystem, state, dry_run, runtime, &mut report);
+        if report.failures.len() > failures_before
+            && let Some(ResourceSpec::Directory { target, .. }) = &item.desired
+        {
+            blocked_directories.push(target.as_path().to_owned());
+        }
     }
     report
 }
@@ -209,6 +237,10 @@ fn execute_item(
             }
             report.forgotten += 1;
         }
+        PlanAction::Retain { reason } => {
+            println!("  {} {selector} — {reason}", "retain".yellow());
+            report.retained += 1;
+        }
         PlanAction::Collision { reason } => {
             println!("  {} {selector} — {reason}", "collision".red());
             report.collisions += 1;
@@ -274,6 +306,9 @@ fn apply_resource(
     runtime: &dyn Runtime,
 ) -> Result<()> {
     match resource {
+        ResourceSpec::Directory { target, mode, .. } => {
+            filesystem.ensure_directory(target.as_path(), *mode)
+        }
         ResourceSpec::Symlink { target, source, .. } => {
             prepare_path_for_replace(target.as_path(), filesystem)?;
             filesystem.make_symlink(source.as_path(), target.as_path())
@@ -352,6 +387,9 @@ fn delete_applied(item: &PlanItem, filesystem: &RealFs, runtime: &dyn Runtime) -
         .as_ref()
         .ok_or_else(|| color_eyre::eyre::eyre!("Delete action 缺 Applied Resource"))?;
     match (&applied.surface, &applied.state) {
+        (OwnershipSurface::Path { path }, ResourceState::Directory { .. }) => {
+            filesystem.remove_empty_directory(path)
+        }
         (OwnershipSurface::Path { path }, ResourceState::Symlink { .. })
         | (OwnershipSurface::Path { path }, ResourceState::File { .. }) => {
             filesystem.remove_file(path)
@@ -376,7 +414,19 @@ fn delete_applied(item: &PlanItem, filesystem: &RealFs, runtime: &dyn Runtime) -
 /// 在每个破坏性动作前重新读取 surface，避免 planning 后的外部改动被覆盖或删除。
 fn ensure_observed_unchanged(item: &PlanItem, runtime: &dyn Runtime) -> Result<()> {
     let current = runtime.observe(&item.surface);
-    if current != item.observed {
+    // 目录内容不属于该 Resource；此前计划删除的子项已可改变它，最终由 rmdir 确认空目录。
+    let unchanged = match (&current, &item.observed) {
+        (
+            dots_core::ObservedState::Directory {
+                mode: current_mode, ..
+            },
+            dots_core::ObservedState::Directory {
+                mode: planned_mode, ..
+            },
+        ) => current_mode == planned_mode,
+        _ => current == item.observed,
+    };
+    if !unchanged {
         return Err(color_eyre::eyre::eyre!(
             "Observed State 在 planning 后变化；原为 {:?}，现为 {:?}，请重试",
             item.observed,

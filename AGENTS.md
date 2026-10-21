@@ -35,7 +35,9 @@ docs/
 
 ## dots.lua（例外清单）
 
-只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；共享 AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.hook.before_sync`（真实 sync 在 planning 前执行的具名程序）、`dots.resource.symlink|copied_file|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.install.pacman|brew|cargo`（只由 `dots install` 执行）、`dots.path.exists`（只读条件）。条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
+只写约定盖不住的：`granularity`（粒度覆盖）、`distribute`（一源多落点；共享 AI skills/agents/commands 源统一住 `tree/home/.agents/`）、`scripts{ignore_tree=…}`（子目录默认保树形，列出的才拍平）、`dots.hook.before_sync`（真实 sync 在 planning 前执行的具名程序）、`dots.resource.directory|symlink|copied_file|managed_block|systemd_user_unit`（显式持续 Resource）、`dots.install.pacman|brew|cargo`（只由 `dots install` 执行）、`dots.path.exists`（只读条件）。条目级 `pre`/`post`、任意 shell Action、`dots.file.*`、`dots.cargo.build`、`dots.json.*` 与 toolchain group 均不存在。CLI 不编辑 `dots.lua`。
+
+`directory({target="~/.local/state/kitty", mode="0700"})` 只管理真实目录本身，允许独立声明其子资源。`mode` 是可选的四位八进制字符串：声明后持续收敛权限；省略时保留已有权限，新建遵循 umask。目标为文件或 symlink 时报告冲突，不覆盖。删除声明后，只删除权限仍匹配 Applied 的空目录；本轮计划删除的子资源先于父目录删除。仍有其他内容、无法列出内容或仍承载 Desired 子路径时，显示 `retain`，保留目录与 ownership，sync/status 返回非零；可清理内容后再同步，或用 `dots forget` 放弃 ownership。目录内容从不递归删除。
 
 安装清单按来源分别声明，Lua 无需判断平台：`pacman({...})` 仅在存在 `/etc/arch-release` 的 Linux 上执行，`brew({...})` 仅在 macOS 上执行，其他平台显示跳过。当前平台的管理器不可用或执行失败会报错，不切换来源。两者只补装缺失包，不主动升级已有声明包；pacman 不刷新数据库或执行全系统升级。删除安装声明不卸载软件。
 

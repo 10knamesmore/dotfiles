@@ -59,6 +59,12 @@ impl OwnershipSurface {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ResourceState {
+    /// 真实目录本身；不记录或拥有其内容。
+    Directory {
+        /// 声明管理的 Unix permission bits；None 表示只管理目录存在性。
+        mode: Option<u32>,
+    },
+
     /// 符号链接及其原始 link target。
     Symlink {
         /// `readlink` 应返回的路径。
@@ -100,6 +106,18 @@ pub struct AppliedResource {
 /// Planner 本次希望存在的一项 Resource，包含 executor 所需 payload。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResourceSpec {
+    /// 真实目录；允许其子路径由其他 Resource 或程序管理。
+    Directory {
+        /// 目录位置。
+        target: AbsPath,
+
+        /// 可选的持续权限声明；省略时保留已有权限，新建遵循 umask。
+        mode: Option<u32>,
+
+        /// 产生这项声明的人类可读来源。
+        origin: String,
+    },
+
     /// 符号链接。
     Symlink {
         /// 链接位置。
@@ -172,7 +190,9 @@ impl ResourceSpec {
     /// 返回 Resource 的稳定 ownership identity。
     pub fn surface(&self) -> OwnershipSurface {
         match self {
-            Self::Symlink { target, .. } | Self::File { target, .. } => OwnershipSurface::Path {
+            Self::Directory { target, .. }
+            | Self::Symlink { target, .. }
+            | Self::File { target, .. } => OwnershipSurface::Path {
                 path: target.as_path().to_owned(),
             },
             Self::ManagedBlock { target, marker, .. } => OwnershipSurface::ManagedBlock {
@@ -188,6 +208,7 @@ impl ResourceSpec {
     /// 返回 apply 成功后应写入 Applied Inventory 的状态。
     pub fn desired_state(&self) -> ResourceState {
         match self {
+            Self::Directory { mode, .. } => ResourceState::Directory { mode: *mode },
             Self::Symlink { source, .. } => ResourceState::Symlink {
                 source: source.as_path().to_owned(),
             },
@@ -205,7 +226,8 @@ impl ResourceSpec {
     /// 返回声明来源，用于 ownership conflict 诊断。
     pub fn origin(&self) -> &str {
         match self {
-            Self::Symlink { origin, .. }
+            Self::Directory { origin, .. }
+            | Self::Symlink { origin, .. }
             | Self::File { origin, .. }
             | Self::ManagedBlock { origin, .. }
             | Self::SystemdUserUnit { origin, .. } => origin,

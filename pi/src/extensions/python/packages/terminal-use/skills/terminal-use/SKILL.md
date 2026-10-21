@@ -1,27 +1,70 @@
 ---
 name: terminal-use
-description: 用 python_repl 的 terminal_use 驱动交互式 Unix 终端程序：启动 PTY、等待提示、发送按键与文本、读取屏幕或原始输出。适用于安装器、REPL、TUI 等需要真实终端交互的任务；一次性命令用 bash。
+description: 用 python_repl 的 terminal_use 操作真实 Kitty 终端：发现或启动实例、连接已有程序、读取文字与截图、发送键盘鼠标输入并等待结果。用于交互式 CLI、REPL、TUI 和人工接管
 ---
 
 # Terminal Use
 
-需要与真实终端交互时使用本 skill：用 `python_repl` 运行 Python 并 `import terminal_use as terminal`。不要改用 `python`/`python3`、bash 管道或新增工具。
+通过 `python_repl` 使用 `import terminal_use as terminal`。使用 Session 对象操作终端，不自己实现 socket 协议、VT 解析或键盘编码。
 
-`session = terminal.start([...])` 返回 Session 对象。通过 `session.read()`、`session.send_text(...)`、`session.wait()` 等方法操作，不传字符串 id。`terminal.list()` 返回尚未关闭的 Session 对象；`session.inspect()` 返回当前元数据，`session.id`、`session.pid`、`session.closed` 为只读属性。
+## 选择目标
 
-键名与 computer-use 采用相同的 US 基础键位表达：忽略大小写，组合键分开传参，如 `session.send_key("ctrl", "c")`。`"A"` 不隐含 Shift；大写用 `session.send_key("shift", "a")`，字面文字用 `session.send_text()`。批量按键事件使用 `{"kind": "key", "keys": ["ctrl", "c"]}`。PTY 只接收本次输入，不保留按住状态；不支持的组合会报错。完整支持范围见 [API](references/api.md)。
+```python
+import terminal_use as terminal
 
-鼠标使用完整屏幕的 0 基单元格坐标：`session.click(col=12, row=4)`、`session.scroll(col=12, row=4, direction="down", steps=3)`。拖动由 `mouse_down` → 显式带 `button` 的 `mouse_move` → `mouse_up` 组成，不保存隐含按住状态。Ghostty 按应用模式编码，应用未启用报告时不发送鼠标字节；`read()["mouse_modes"]` 可观察应用请求的模式位。批量 `kind="mouse"` 与完整行为见 [鼠标输入](references/api.md#鼠标输入)。
+instances = terminal.list_instances()       # socket、实例 ID、Kitty PID、窗口概况
+kitty = terminal.connect(socket=instances[0]["socket"])
+windows = kitty.list_windows()
+session = kitty.attach(window_id=windows[0]["id"])
+```
 
-会话绑定当前 Python worker：worker 重启或 reload 会关闭并丢失全部会话，没有守护进程或跨会话持久化。运行时由 SDK 负责清理：解释器退出时自动关闭所有会话；cell 被取消或超时不等于当前 cell 创建的会话已经关闭。完成一个工作流后显式 `session.close()`，取消后用 `terminal.list()` 检查仍存活的会话。丢弃变量不关闭 PTY；单作用域工作可用 `with terminal.start(...) as session:` 自动关闭。关闭幂等，关闭后仍可检查元数据，但不能继续终端操作。
+`terminal.connect()` 不带参数时读取 `KITTY_LISTEN_ON`。未从 Kitty 中启动 Pi 或需要独立工作区时：
 
-`python_repl` 工具本身的 `timeout` 是整次 Python 调用的硬上限。`session.read(..., timeout=...)`、`session.wait(..., timeout=...)` 等方法级 timeout 只能占用外层调用的剩余时间，不能延长它；应为后续读取、收尾和异常处理预留时间，不要把方法级 timeout 设得等于或大于外层 timeout。
+```python
+kitty = terminal.launch(cwd="/path/to/project", cols=120, rows=40)
+session = kitty.open_window(["some-tui"], cwd="/path/to/project")
+```
 
-仅支持 macOS 与 Linux。每个会话只有一条 PTY 流：子进程的 stdout 与 stderr 合并，没有独立通道；文字与 Kitty 图片协议由 Ghostty 核心解析，不启动 GUI。用 `session.read(images=True)` 取得源图快照，再显式 `display_image(image)`；普通文本读取不会自动展示图片。图片不是整屏图文截图，placement 也不保证当前可见，尤其不能用虚拟 placement 推断 Unicode 占位符的屏幕位置。完整字段见 [API](references/api.md#图片快照)。
+`launch()` 创建新的 Kitty 实例和初始 shell；`open_window()` 在该实例中新建桌面窗口。`open_tab()` / `open_split()` 使用实例的当前活动位置。窗口 ID 仅在一个实例内有意义，不跨实例复用。
 
-## 路由
+## 交互
 
-| 场景 | 文件 |
-| --- | --- |
-| 方法签名、返回字段、wait_for、键盘与鼠标输入事件 | [references/api.md](references/api.md) |
-| 从启动到收尾的完整流程与故障处理 | [references/patterns.md](references/patterns.md) |
+```python
+screen = session.read(wait_for={"contains": "ready>"}, timeout=5)
+session.send_text("hello")
+session.send_key("enter")
+screen = session.read(cells=True)
+print(screen["text"])
+# 需要查看图片或排版时再截图
+display_image(session.screenshot())
+```
+
+- 键名使用 US 基础键位；修饰键分开传，例如 `send_key("ctrl", "c")`。`"A"` 不隐含 Shift；字面文字用 `send_text()`，大写按键用 `send_key("shift", "a")`。
+- `paste()` 根据程序当前模式使用 bracketed paste。`write(bytes)` 是原始输入，不是输出读取。
+- 鼠标坐标使用实际终端网格的 0 基列/行：`session.click(col=12, row=4)`。拖动每次 `mouse_move` 显式带 `button`；滚轮用 `scroll(direction="down", steps=3, col=12, row=4)`。程序没有启用相应鼠标报告时返回 `False`。
+- 输入返回只表示编码/提交结果。后续应等待程序的独特提示或状态变化，不使用任意固定 sleep 代替业务条件。
+- `read(rect=...)` 按终端 cell 裁剪文字与 cells；Python 字符索引不等于列坐标。
+- `screenshot()` 返回目标终端分屏的 PNG bytes，使用 `display_image(session.screenshot())` 查看。要求官方 Kitty 0.49.2+，目标在活动 tab 中且未被布局隐藏。SDK 不会自动聚焦；需要切换时显式 `focus()`。不提供源图片导出。
+- 长输出用 `history()`；shell 最近命令输出用 `command_output()`。不提供原始 PTY 输出。
+
+## 生命周期
+
+终端属于 Kitty，不属于 Python worker。worker 重启、cell 取消、变量丢弃均不关闭终端。之后可重新发现并 attach。
+
+```python
+session.focus()              # 展示给用户接管
+session.detach()             # 停用句柄，终端继续运行
+session = kitty.attach(window_id=42)
+session.close()              # 明确关闭终端
+```
+
+不要关闭用户原有终端来清理 Python 状态。`wait()` 等待窗口关闭，不是等待 shell 当前命令；后者使用 `wait_command(after=...)`，详见 API。Kitty 未报告退出码时 status 为 `closed`，不要当作成功退出。关闭后仍可读取最终文字与 cells，但不能再截图；异常终止 Kitty 可能无法保存关闭记录。
+
+`cols/rows` 是期望尺寸，实际尺寸看 `read()["full_size"]` 或 `inspect()`。默认调整窗口/布局，不更改字号；`fit_grid()` 或 `resize(allow_font_resize=True)` 会调整同一桌面窗口所有终端共享的字号，需要明确接受这一影响。
+
+方法级 timeout 必须小于当前 `python_repl` 调用剩余时间，给读取与收尾留余量；超时不会关闭终端。
+
+## 参考
+
+- [API](references/api.md)：方法签名、返回字段、输入事件、尺寸与退出状态。
+- [交互流程](references/patterns.md)：TUI、shell 命令、截图和跨 worker 接管。

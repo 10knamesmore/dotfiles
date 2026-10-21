@@ -1,121 +1,75 @@
-# 交互流程与故障处理
+# 交互流程
 
-## 标准流程
+## 独立 TUI 与人工接管
 
 ```python
 import terminal_use as terminal
 
-session = terminal.start(["python3", "-i"])
-session.read(wait_for={"contains": ">>>"}, timeout=10)
-
-session.send_text("print(40 + 2)\n")
-result = session.read(wait_for={"contains": "42"}, timeout=10)
-print(result["text"])
-
-session.send_text("exit()\n")
-session.wait(timeout=5)
-session.close()
+kitty = terminal.launch(cwd="/path/to/project")
+session = kitty.open_window(["nvim", "."])
+print(session.read()["text"])
+session.send_key("escape")
+session.send_text(":set number")
+session.send_key("enter")
+session.focus()
 ```
 
-启动后先等一个稳定锚点（提示符、菜单、完成标记），再发送输入；不要用 read 轮询循环或 sleep 猜时间。`read(wait_for=...)` 会先检查调用前已经存在的 screen/raw 内容，短 pattern 可能立即命中旧状态；优先使用带上下文的唯一标题、路径或完成标记。正则用 `{"regex": ...}`，匹配对象是 rect 范围内多行拼接的屏幕文本。多键菜单先等待菜单出现，必要时用 `input(..., delay=...)` 发出序列，再等待唯一的确认内容或最终状态；不要把菜单快捷键说明中的通用词当作确认框锚点。
+用户在同一个 Kitty 终端接管。返回 Agent 后重新读取屏幕，不根据旧快照继续发送坐标输入。只在确实要结束该程序时调用 `session.close()`。
 
-需要完整输出时等待结束标记或 `wait` 到进程退出，再 `read` 收尾；命令完成前可能出现看似完成的中间输出。`python_repl` 的外层 timeout 包住整段代码，方法级 `read(..., timeout=...)` / `wait(..., timeout=...)` 不能超过外层调用剩余时间；应保留时间给最后的 `read`、`close` 和错误处理。
-
-## 发送输入
+## shell 命令与退出状态
 
 ```python
-session.input(
-    [
-        {"kind": "text", "text": "answer"},
-        {"kind": "key", "keys": ["enter"]},
-    ],
-    delay=50,  # 毫秒；按事件逐个发送
-)
-session.send_key("ctrl", "c")  # 中断前台进程
-session.send_key("up")         # 历史或菜单导航
+session = kitty.attach(window_id=42)
+command = session.inspect()["command"]
+sequence = command["sequence"] if command is not None else 0
+session.send_text("make")
+session.send_key("enter")
+outcome = session.wait_command(after=sequence, timeout=30)
+print(outcome)
+print(session.command_output())
 ```
 
-- 多行文本或需要应用按 bracketed paste 接收的内容才用 `paste`；发送前确认 `session.read()["bracketed_paste"] is True`。该状态受应用和 TERM 配置影响，可能动态改变；为当前状态为 False 的应用使用 `send_text`，应用不支持 bracketed paste 时也用 `send_text` 或 `{"kind": "raw", "data": b"..."}`。`paste` 始终发送开始/结束标记，模式关闭时应用可能把标记当按键处理。
-- `input(..., delay=毫秒数)` 用于需要模拟逐个事件输入的 TUI 序列；它只控制 SDK 发出事件的时间间隔，不保证 PTY 读端如何分块，也不保证应用一定接受序列。方向键和 Home/End 会依据最近解析到的 application cursor mode 编码；需要发精确控制序列时使用 `write()`。
-- `input` 的初始整批验证失败时不发送任何内容。使用 delay 时，发送期间的 resize 仍可能让后续鼠标坐标越界，已发事件无法撤回；拆成多次调用也可能部分生效。
-- 预期输出是字节时不猜编码：`read()` 的文本来自终端 emulator 的屏幕状态，ANSI/VT 控制码可能已被消费，需要原始字节用 `read_raw`。
-- `write()` 成功只表示字节写入了 PTY master，不表示应用已经读取或接受全部内容。canonical 模式仍受系统行规程和 `MAX_CANON` 限制；大块单行输入可能被内核截断或丢弃。先等待应用进入 raw mode 或稳定 ready 状态，SDK 不自动分块改变输入语义。
+`wait_command` 使用 shell integration；它不会把命令回显或已经存在的提示符当成完成。`session.wait()` 用于等待整个终端关闭。
 
-## 鼠标操作
-
-先等待 TUI 布局稳定，用 `read(cells=True)` 定位目标单元格；`col` / `row` 是完整屏幕的 0 基坐标，不能直接用文本字符串的字符索引替代。下面示例中的位置需按实际界面调整：
+直接运行程序时：
 
 ```python
-session.click(col=12, row=4)
-session.scroll(col=12, row=4, direction="down", steps=3)
-
-session.input([
-    {"kind": "mouse", "action": "press", "col": 12, "row": 4, "button": "left"},
-    {"kind": "mouse", "action": "move", "col": 20, "row": 4, "button": "left"},
-    {"kind": "mouse", "action": "release", "col": 20, "row": 4, "button": "left"},
-], delay=30)
+job = kitty.open_window(["some-interactive-program"])
+job.send_text("answer")
+job.send_key("enter")
+print(job.wait(timeout=10))
+print(job.read()["text"])  # 关闭前保存的最终画面
 ```
 
-每个拖动事件显式携带按钮，SDK 不保存按住状态。应用未启用鼠标报告或当前模式不接收该事件时不产生字节，不自动改用键盘；用 `read()["mouse_modes"]` 观察应用请求的模式位，操作后等待应用的实际状态变化。模式位及协议限制见 [API](api.md#鼠标输入)。
-
-## TUI 与局部读取
-
-- 全屏程序切到备用屏幕时 `read()['alternate_screen']` 为 True，退出后回到主屏。
-- 局部读取：`session.read(rect=(0, 0, 80, 24))`；`cursor` 报告光标位置、可见性及相对 rect 的坐标。
-- 布局依赖窗口尺寸：换行或截断异常时先 `session.resize(cols=..., rows=...)` 再读。
-- `start(cwd=...)` 会同步子进程的 `PWD`，除非 `env` 显式覆盖 `PWD`。其余环境变量默认从 worker 透传，`env` 是覆盖层而不是隔离环境。
-- 需要颜色、样式或逐列布局判断时传 `cells=True`；普通文本和 `contains`/`regex` 匹配使用 `lines`/`text`。宽字符在 `lines`/`text` 中只出现一次，continuation cell 仍保留在 `cells` 中；组合字符附加在 base cell 文本后。Python 字符索引不等于终端列坐标。
-- `foreground` / `background` 是原始 cell 属性；`inverse=True` 时，渲染器需要自行交换可见前景和背景。SDK 会回答 OSC 颜色查询和尺寸查询；像素尺寸由 `start(cell_size=(8, 16))` 的虚拟单元格几何计算，不是实际字体尺寸。
-
-## 观察 Kitty 图片
-
-等应用准备好后，再请求图片快照：
+## 截图调试
 
 ```python
-screen = session.read(images=True)
+screen = session.read(cells=True)
 print(screen["text"])
-for image in screen["images"]:
-    print(image.image_id, image.size, image.placements)
-    display_image(image)
+png = session.screenshot()
+display_image(png)
 ```
 
-- 图片对象包含源图和放置元数据；`display_image()` 展示源图，不绘制终端文字，也不模拟裁剪或遮挡。
-- 同一次读取中的文字与图片状态来自同一次快照；返回后 TUI 继续运行不改变已有图片。需要新画面时重新 `read(images=True)`。
-- `images=[]` 表示当前活动屏幕没有可返回的、被 placement 引用的图片；不等于应用从未上传图片。只有上传而没有 placement 的图片不返回，主屏图片也不会出现在备用屏快照中。
-- 虚拟 placement 表示 Unicode 占位符模式；它不提供具体占位字符的屏幕位置，不能用来断言最终图文布局。普通文字 `rect` 不过滤图片列表。
-- 图片问题先检查虚拟 `cell_size` 和终端行列，再检查源图、placement 与原始协议输出。只有需要核对最终合成画面时，才改用真实 Kitty 窗口截图。
+截图包含该终端分屏实际渲染的文字和图片。目标必须处于活动 tab 且未被布局隐藏；若需要切换，先显式调用 `session.focus()`。截图返回后不随后续重绘变化。保存到文件使用 `Path("/tmp/terminal.png").write_bytes(png)`。
 
-## 原始输出增量读取
+## 跨 Python worker 重连
 
 ```python
-chunk = session.read_raw()
-chunk["data"], chunk["start"], chunk["end"]
-next_chunk = session.read_raw(since=chunk["end"])
+instances = terminal.list_instances()
+print([(item["pid"], item["socket"]) for item in instances])
+kitty = terminal.connect(socket=instances[0]["socket"])
+print(kitty.list_windows())
+session = kitty.attach(window_id=42)
 ```
 
-`dropped_bytes > 0` 表示更早的内容已被环形缓冲丢弃，只能从返回的 `start` 继续。等待 raw 模式只判断当前保留窗口，不会自动等待 pattern 的下一次出现；需要增量语义时用 `read_raw(since=...)` 自己维护偏移。screen emulator 不保留可读 scrollback；长输出需要依赖 raw ring 或让子进程自行写文件。
+worker 重启不会关闭 Kitty。先确认实例与窗口，不把不同实例中的同一个数字 ID 当成同一终端。
 
-## 进程结束、超时与终止
-
-- `wait` 返回后检查 `status`：`{'kind': 'exited', ...}` 才算真实退出；超时不会杀进程。
-- 卡住或需要中断：`session.send_key("ctrl", "c")`，必要时 `session.signal("TERM")`，最后 `session.close()`。
-- `close` 会尝试终止进程并回收 PTY；若进程组或 reader 未在最终等待窗口内结束，返回状态可能仍是 running，但对象已关闭，不能继续终端操作。需要保留最终屏幕时，必须在 `close` 前读取；关闭后仍可 `inspect()` 检查元数据，重复 `close()` 不重复清理。
-- cell 被取消或超时不等于当前 cell 创建的 Session 已关闭；先用 `terminal.list()` 检查，再对不再需要的对象显式 `close()`。丢弃变量不会关闭 PTY，`list()` 可以重新取得对象。
-- 每个会话只有一条 PTY 流，stdout 与 stderr 合并；需要分开时在启动命令里重定向到文件或用 shell 包装。
-
-只在一个作用域内使用时，可以自动关闭：
+## 尺寸与输入
 
 ```python
-with terminal.start(["bash", "--noprofile", "--norc"], env={"PS1": "ready> "}) as shell:
-    shell.read(wait_for={"contains": "ready>"}, timeout=5)
-    shell.send_text("printf 'result=%s\\n' $((40 + 2))\n")
-    print(shell.read(wait_for={"contains": "result=42"}, timeout=5)["text"])
+print(session.resize(cols=120, rows=40))
+print(session.read()["full_size"])
+session.click(col=12, row=4)
 ```
 
-退出作用域时会关闭 Session，即使作用域内出现异常。需要跨 cell 操作时，不要提前退出作用域；保留对象并显式收尾。
-
-## 失败处理
-
-- 对已关闭对象继续终端操作时报 `RuntimeError`：检查 `session.closed` 或 `session.inspect()`，必要时新建会话。worker 重启或 reload 后原有对象和 PTY 都不再可用。
-- 等待超时先读当前屏幕找原因（登录提示、权限、语法错误、分页器），再决定继续发送还是终止。
-- 不要 kill 系统进程做清理：SDK 在解释器退出时 `close_all`；正常结束显式 `close` 即可。若 cell 中途取消，仍应按上一条检查并关闭自己创建的 session。
+窗口管理器可能改变实际尺寸。坐标来自当前快照；缩放字号会影响整个桌面窗口，只有接受该影响时才使用 `fit_grid()` 或 `allow_font_resize=True`。

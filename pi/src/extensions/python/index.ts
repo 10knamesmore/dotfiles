@@ -191,7 +191,7 @@ export function registerPython(pi: ExtensionAPI): void {
       stopping: "stopping",
       exited: "exited",
     };
-    currentContext.ui.setStatus("python", `Python ${labels[status.state]} · Terminals ${status.terminalCount}`);
+    currentContext.ui.setStatus("python", `Python ${labels[status.state]}`);
   }
 
   function notifyEnvironmentCleared(): void {

@@ -1,6 +1,8 @@
 //! Desired、Applied 与 Observed 三方 reconciliation。
 
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use color_eyre::eyre::eyre;
 
@@ -15,6 +17,15 @@ pub enum ObservedState {
 
     /// 该 surface 存在且结构可以精确表示。
     Present(ResourceState),
+
+    /// 真实目录的权限和直接子项；子项只用于判断能否删除，不属于目录 ownership。
+    Directory {
+        /// 当前 Unix permission bits。
+        mode: u32,
+
+        /// 直接子项路径；列举失败仍可管理目录权限，但不能计划删除。
+        entries: Result<Vec<PathBuf>, String>,
+    },
 
     /// 实际对象存在，但类型或 marker 结构无法安全处理。
     Invalid {
@@ -71,7 +82,8 @@ pub fn reconcile(
             action,
         });
     }
-    items.sort_by_key(apply_phase);
+    plan_directory_removals(&mut items);
+    items.sort_by_key(apply_order);
     Ok(Plan { items })
 }
 
@@ -82,6 +94,9 @@ fn classify(
     applied: Option<&AppliedResource>,
     observed: &ObservedState,
 ) -> PlanAction {
+    if let Some(ResourceSpec::Directory { mode, .. }) = desired {
+        return classify_directory(*mode, applied, observed);
+    }
     match (desired, applied) {
         (Some(desired_resource), None) => {
             let desired_state = desired_resource.desired_state();
@@ -93,6 +108,9 @@ fn classify(
                 },
                 ObservedState::Invalid { reason } => PlanAction::Collision {
                     reason: reason.clone(),
+                },
+                ObservedState::Directory { .. } => PlanAction::Collision {
+                    reason: "目标是真实目录，不能用非目录 Resource 替换".to_owned(),
                 },
             }
         }
@@ -121,6 +139,9 @@ fn classify(
                 ObservedState::Invalid { reason } => PlanAction::Drift {
                     reason: reason.clone(),
                 },
+                ObservedState::Directory { .. } => PlanAction::Drift {
+                    reason: "目标是真实目录，不能用非目录 Resource 替换".to_owned(),
+                },
             }
         }
         (None, Some(applied_resource)) => match observed {
@@ -134,8 +155,109 @@ fn classify(
             ObservedState::Invalid { reason } => PlanAction::Drift {
                 reason: reason.clone(),
             },
+            ObservedState::Directory { mode, .. } => {
+                if let ResourceState::Directory { mode: expected } = &applied_resource.state
+                    && expected.is_none_or(|expected| expected == *mode)
+                {
+                    PlanAction::Delete
+                } else {
+                    PlanAction::Drift {
+                        reason: format!("Retired Resource 已变为目录或其权限已改变（{mode:04o}）"),
+                    }
+                }
+            }
         },
         (None, None) => PlanAction::Noop,
+    }
+}
+
+/// 目录的显式 mode 是持续权限声明；已有真实目录的权限差异直接收敛。
+fn classify_directory(
+    mode: Option<u32>,
+    applied: Option<&AppliedResource>,
+    observed: &ObservedState,
+) -> PlanAction {
+    match observed {
+        ObservedState::Missing => PlanAction::Create,
+        ObservedState::Directory { mode: actual, .. } => {
+            if mode.is_some_and(|expected| expected != *actual) {
+                PlanAction::Update
+            } else if applied
+                .is_some_and(|record| record.state == (ResourceState::Directory { mode }))
+            {
+                PlanAction::Noop
+            } else {
+                PlanAction::Adopt
+            }
+        }
+        actual => {
+            let reason = format!("directory Resource 要求真实目录，实际为 {actual:?}");
+            if applied.is_some() {
+                PlanAction::Drift { reason }
+            } else {
+                PlanAction::Collision { reason }
+            }
+        }
+    }
+}
+
+/// 从深到浅确认退休目录可否删除：只认可直接子项的明确 Delete，不接管未声明内容。
+fn plan_directory_removals(items: &mut [PlanItem]) {
+    let mut deleted_paths: BTreeSet<PathBuf> = items
+        .iter()
+        .filter(|item| matches!(item.action, PlanAction::Delete))
+        .filter(|item| !matches!(item.observed, ObservedState::Directory { .. }))
+        .filter_map(|item| match &item.surface {
+            OwnershipSurface::Path { path } => Some(path.clone()),
+            _ => None,
+        })
+        .collect();
+    let desired_paths: Vec<PathBuf> = items
+        .iter()
+        .filter(|item| item.desired.is_some())
+        .filter_map(|item| item.surface.filesystem_path().map(PathBuf::from))
+        .collect();
+    let mut directories: Vec<_> = items
+        .iter_mut()
+        .filter(|item| {
+            item.desired.is_none()
+                && matches!(item.action, PlanAction::Delete)
+                && matches!(item.observed, ObservedState::Directory { .. })
+        })
+        .collect();
+    directories.sort_by_key(|item| Reverse(path_depth(&item.surface)));
+    for item in directories {
+        let OwnershipSurface::Path { path } = &item.surface else {
+            continue;
+        };
+        let ObservedState::Directory { entries, .. } = &item.observed else {
+            continue;
+        };
+        if desired_paths
+            .iter()
+            .any(|child| child != path && child.starts_with(path))
+        {
+            item.action = PlanAction::Retain {
+                reason: "目录仍承载声明中的子路径；保留目录与 ownership".to_owned(),
+            };
+        } else {
+            match entries {
+                Ok(entries) if entries.iter().all(|entry| deleted_paths.contains(entry)) => {
+                    item.action = PlanAction::Delete;
+                    deleted_paths.insert(path.clone());
+                }
+                Ok(_) => {
+                    item.action = PlanAction::Retain {
+                        reason: "目录非空，剩余内容不在删除计划内；保留目录与 ownership".to_owned(),
+                    }
+                }
+                Err(reason) => {
+                    item.action = PlanAction::Retain {
+                        reason: format!("{reason}；保留目录与 ownership"),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -218,17 +340,51 @@ fn ownership_overlaps(left: &ResourceSpec, right: &ResourceSpec) -> bool {
     }
 }
 
-/// 返回固定 apply phase 的排序 key。
+/// 返回固定 apply phase；目录在子资源之前创建，在子资源之后删除。
 fn apply_phase(item: &PlanItem) -> u8 {
     match (&item.action, &item.surface) {
         (PlanAction::Delete, OwnershipSurface::SystemdUserUnit { .. }) => 0,
         (PlanAction::Delete, _) if applied_is_symlink(item) => 1,
+        (PlanAction::Delete, _)
+            if item
+                .applied
+                .as_ref()
+                .is_some_and(|record| matches!(record.state, ResourceState::Directory { .. })) =>
+        {
+            3
+        }
         (PlanAction::Delete | PlanAction::Forget, _) => 2,
-        (PlanAction::Create | PlanAction::Update, OwnershipSurface::SystemdUserUnit { .. }) => 5,
-        (PlanAction::Create | PlanAction::Update, _) if desired_is_symlink(item) => 4,
-        (PlanAction::Create | PlanAction::Update, _) => 3,
-        _ => 3,
+        (PlanAction::Create | PlanAction::Update, _)
+            if matches!(item.desired, Some(ResourceSpec::Directory { .. })) =>
+        {
+            4
+        }
+        (PlanAction::Create | PlanAction::Update, OwnershipSurface::SystemdUserUnit { .. }) => 7,
+        (PlanAction::Create | PlanAction::Update, _) if desired_is_symlink(item) => 6,
+        (PlanAction::Create | PlanAction::Update, _) => 5,
+        _ => 4,
     }
+}
+
+/// 目录删除按深度倒序；创建与其他操作按深度正序，同深度保持 surface 排序。
+fn apply_order(item: &PlanItem) -> (u8, usize) {
+    let phase = apply_phase(item);
+    let depth = path_depth(&item.surface);
+    (
+        phase,
+        if phase == 3 {
+            usize::MAX - depth
+        } else {
+            depth
+        },
+    )
+}
+
+/// 返回 filesystem surface 的路径层数；外部 Resource 为零。
+fn path_depth(surface: &OwnershipSurface) -> usize {
+    surface
+        .filesystem_path()
+        .map_or(0, |path| path.components().count())
 }
 
 /// 返回计划项的 Applied Resource 是否为 symlink。

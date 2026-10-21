@@ -31,7 +31,7 @@ pub fn run() -> Result<bool> {
     render::ok(if converged {
         "Resource 全部已收敛"
     } else {
-        "存在待执行变更、Collision、Drift 或 planning failure"
+        "存在待执行变更、Collision、Drift、保留目录或 planning failure"
     });
     Ok(converged)
 }

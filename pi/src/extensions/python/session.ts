@@ -36,13 +36,10 @@ export interface PythonToolDetails {
   diagnosticsPath?: string;
 }
 
-/** Python lifecycle and owned terminal handles displayed in Pi's status bar. */
+/** Python worker lifecycle displayed in Pi's status bar. */
 export interface PythonSessionStatus {
   /** Worker lifecycle; starting includes preparation of its uv environment. */
   state: "not_started" | "starting" | "running" | "idle" | "stopping" | "exited";
-
-  /** Includes exited terminal children until their handles are closed. */
-  terminalCount: number;
 }
 
 /** Captured text and complete image attachments, including output emitted before a cell failed. */
@@ -72,9 +69,9 @@ interface WorkerInfo {
   environment: PythonEnvironment;
 }
 
-/** One SDK child process group; terminal and browser groups survive a worker SIGINT. */
+/** One SDK-owned browser process group, which survives a worker SIGINT. */
 interface OwnedProcessGroup {
-  kind: "terminal" | "browser";
+  kind: "browser";
   id: string;
   pid: number;
 }
@@ -87,7 +84,7 @@ type WorkerMessage =
   | { type: "completed"; callId: string; outcome: "completed" | "python_error" | "interrupted" }
   | (ImageFile & { type: "image"; callId: string })
   | { type: "input_cleanup_failed"; callId: string; errorType: string }
-  | { type: "process_ownership"; kind: "terminal" | "browser"; action: "opened" | "closed"; id: string; pid: number }
+  | { type: "process_ownership"; kind: "browser"; action: "opened" | "closed"; id: string; pid: number }
   | { type: "startup_error"; reason: string };
 
 interface PendingExecution {
@@ -117,7 +114,7 @@ interface WorkerProcess {
   resolveExited: () => void;
   info?: WorkerInfo;
   pending?: PendingExecution;
-  /** Separate SDK process groups, keyed by kind and ownership id. */
+  /** Separate browser process groups, keyed by ownership id. */
   ownedProcessGroups: Map<string, OwnedProcessGroup>;
   stopping: boolean;
   ended: boolean;
@@ -161,10 +158,7 @@ export class PythonSession {
     else if (worker?.stopping) state = "stopping";
     else if (this.available) state = this.running ? "running" : "idle";
     else if (this.running) state = "starting";
-    return {
-      state,
-      terminalCount: [...(worker?.ownedProcessGroups.values() ?? [])].filter((group) => group.kind === "terminal").length,
-    };
+    return { state };
   }
 
   private changed(): void {
@@ -284,7 +278,7 @@ export class PythonSession {
     return { output, images, details };
   }
 
-  /** Let the worker release virtual input and PTYs before enforcing a bounded shutdown. */
+  /** Let the worker release virtual input and browsers before enforcing a bounded shutdown. */
   public async close(): Promise<void> {
     this.disposed = true;
     this.changed();
@@ -520,9 +514,9 @@ export class PythonSession {
     }
   }
 
-  /** Track the SDK process groups that must be terminated even after the worker exits. */
+  /** Track browser process groups that must be terminated even after the worker exits. */
   private recordProcessOwnership(worker: WorkerProcess, message: ProcessOwnershipMessage): void {
-    const key = `${message.kind}:${message.id}`;
+    const key = message.id;
     if (message.action === "closed") {
       worker.ownedProcessGroups.delete(key);
     } else if (worker.stopping || worker.ended) {
@@ -537,7 +531,6 @@ export class PythonSession {
     } else {
       worker.ownedProcessGroups.set(key, { kind: message.kind, id: message.id, pid: message.pid });
     }
-    this.changed();
     this.log({
       phase: "process_ownership",
       action: message.action,
@@ -566,7 +559,7 @@ export class PythonSession {
     worker.stopping = true;
     this.changed();
     this.log({ phase: "terminate", pid: worker.info?.pid, callId: worker.pending?.callId });
-    // SDK children lead separate groups so interrupting a cell leaves them alive.
+    // SDK-owned browsers lead separate groups so interrupting a cell leaves them alive.
     this.terminateOwnedProcessGroups(worker);
     // Killing the worker group first also stops subprocesses blocked in a native call.
     if (worker.info) this.signalGroup(worker.info.pid, "SIGKILL");
@@ -592,7 +585,7 @@ export class PythonSession {
   private processEnded(worker: WorkerProcess): void {
     if (worker.ended) return;
     worker.ended = true;
-    // A SIGKILLed worker never runs Python cleanup; terminate its separate SDK groups here.
+    // A SIGKILLed worker never runs Python cleanup; terminate its separate browser groups here.
     this.terminateOwnedProcessGroups(worker);
     if (worker.info) {
       this.signalGroup(worker.info.pid, "SIGKILL");
@@ -661,7 +654,7 @@ function parseMessage(line: string): WorkerMessage {
   }
   if (
     message.type === "process_ownership" &&
-    (message.kind === "terminal" || message.kind === "browser") &&
+    message.kind === "browser" &&
     (message.action === "opened" || message.action === "closed") &&
     typeof message.id === "string" &&
     message.id.length > 0 &&

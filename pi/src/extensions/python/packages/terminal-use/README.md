@@ -1,40 +1,70 @@
 # Terminal Use
 
-面向 Python worker 的 Unix PTY 与终端屏幕 SDK。本目录的 Rust crate 直接构建公开 Python 扩展 `terminal_use`。
+Python SDK，用于发现、启动和控制真实 Kitty 终端。终端属于 Kitty，Python worker 重启不关闭窗口；用户与 Agent 操作同一个终端。
 
-## 结构
+```python
+import terminal_use as terminal
 
-- `src/` — Rust 公开 Python API 与内部实现：参数校验、键盘与鼠标输入、会话注册、PTY 读写、Ghostty 终端状态、图片快照、原始输出环形缓冲。
-- `Cargo.toml` / `pyproject.toml` — Rust 与 maturin 构建配置（`module-name = "terminal_use"`）。
-- `build_backend.py` — 将隔离构建环境中的 Zig 放入 PATH，其余打包工作交给 maturin。
+kitty = terminal.launch(cwd="/path/to/project")
+session = kitty.open_window(["nvim", "."])
+screen = session.read(cells=True)
+display_image(session.screenshot())
+session.send_key("ctrl", "c")
+session.focus()
+```
 
-## 构建与维护
+## 安装
 
-- Rust 使用 stable 工具链，仓库不 pin 版本。`libghostty-vt` 通过 Rust bindings 静态链接，绑定的构建脚本下载其固定 revision 的 Ghostty 源码。
-- Rust 或 Python 源码变更后，从仓库根执行 `uv sync --project pi/src/extensions/python --locked`；worker 的 uv 项目依赖本目录，由 maturin 按 lockfile 构建扩展。不要往其他解释器单独安装。已经加载扩展的 worker 需要 reload 才会使用新 binary。
-- `ziglang==0.15.2` 是 Python 的隔离构建依赖，为绑定固定的 Ghostty revision 提供 Zig；无需系统安装 Zig，运行时也不依赖 Zig。首次构建需要访问 Ghostty 源码与 Zig 包依赖。直接运行 Cargo 时，需将该版本的 `zig` 放入 PATH。
-- `TERMINAL_USE_LOG` 指定原生日志文件路径；未设置时写入系统临时目录。日志记录会话生命周期、输入写入结果、图片快照元数据与错误，不记录键名、PTY 输入输出或图片字节。
+使用官方 Kitty 0.49.2 或更新版本，`kitty` 与 `kitten` 必须在 PATH 中。macOS 通过 Homebrew 安装和升级：
 
-## 运行时模型
+```bash
+brew install --cask kitty
+brew upgrade --cask kitty
+```
 
-- 仅支持 macOS 与 Linux。
-- `terminal.start(...)` 返回 `Session` 对象；读取、输入、等待、resize、signal 和 close 均为对象方法。`terminal.list()` 返回尚未关闭的会话对象，`session.inspect()` 返回元数据；`id` 仅用于诊断和 ownership 事件，不接受字符串 id 操作会话。
-- 会话属于创建它的 worker 进程：worker 重启或 reload 后会话丢失，终端随 worker 进程结束；没有 daemon，也没有跨进程持久化。丢弃 Python 对象不关闭会话，可从 `terminal.list()` 重新取得；显式 `session.close()` 或退出 `with terminal.start(...) as session:` 时关闭。所有指向同一会话的对象共享关闭状态，关闭后只能检查元数据或重复关闭。
-- 每个会话只有一条 PTY 流，子进程的 stdout 与 stderr 合并。Ghostty 终端核心在所属线程中解析输出、维护文字与 Kitty 图片状态；不会启动 Ghostty GUI。`read_raw()` 读取 bounded raw ring，默认从保留窗口的最旧字节开始，不等于直接读取最新尾部。
-- `start(cell_size=(8, 16))` 设置 headless 终端的虚拟单元格像素大小；PTY 尺寸、终端尺寸查询与图片布局使用同一套几何。它不代表实际字体或屏幕像素。
-- `read(images=True)` 返回当前活动屏幕中 placement 引用的源图快照，图片对象可直接传给 `display_image()`。快照不随后续重绘、删除或会话关闭改变。图片不是图文合成截图，不根据文字 `rect` 裁剪；虚拟 placement 不提供已解析的占位字符位置，也不等于图片当前可见。
-- 不提供整屏 PNG 渲染、Sixel 图片、hyperlink 或剪贴板对象。
-- `terminal_use` 是 Rust 编译出的模块；导入时注册 `atexit` 清理，`close_all` 逐会话终止子进程并回收 PTY。screen emulator 不保留 scrollback，长输出由 bounded raw ring 提供最近原始字节。
-- `session.send_key("ctrl", "c")` 使用与 computer-use 相同的分参数组合键写法和 US 基础键位含义。它只编码本次输入，不保留按住状态；字面文字使用 `send_text()`。终端不支持的组合明确报错，不模拟桌面按键事件。
-- `click`、`mouse_down`、`mouse_up`、`mouse_move`、`scroll` 使用完整屏幕的 0 基单元格坐标，也可通过 `input` 混排鼠标与键盘事件。模式相关编码在 emulator 线程进行，鼠标协议复用 Ghostty；可能阻塞的 PTY 写入留在调用线程。鼠标报告关闭或模式不接收某类事件时不产生字节，不模拟 GUI 选择或滚动历史。`read()["mouse_modes"]` 返回请求模式位，而非推导的有效协议。
-- 公开入口为 `import terminal_use as terminal`。方法签名、返回字段和交互约定见 [terminal-use skill](skills/terminal-use/references/api.md)，流程与故障处理见 [patterns](skills/terminal-use/references/patterns.md)。
+- Linux 的 Kitty 包由 `dots install` 安装。
+- `dots sync` 的 Python hook 安装 SDK；`dots.lua` 的 directory resource 管理 socket 目录，持续将权限收敛到 `0700`，不管理其中的 socket。
+- `dots.lua` 的 symlink resource 管理 `~/.local/share/terminal-use/bridge.py`，指向 SDK 的 Kitty watcher。
+- 公共 Kitty 配置开启 socket-only IPC，地址为 `~/.local/state/kitty/control-{kitty_pid}.sock`。
 
-## 与 worker 的集成契约
+从仓库根同步安装布局：
 
-worker 启动时调用 Rust 扩展的 `terminal_use._set_lifecycle_hook(callback)` 接管会话所有权事件。回调：
+```bash
+./dots.sh sync
+```
 
-- 每个会话生命周期变化调用一次，参数为 `{'type': 'terminal_ownership', 'action': 'opened' | 'closed', 'id': str, 'pid': 正整数}`。
-- `start` 在原生创建成功后立即发出 `opened`；回调抛错时原生层会尝试关闭该会话，再把回调错误作为主错误抛出。调用方不要把这条失败路径当作一次成功的 ownership 生命周期通知。
-- `session.close()` 在原生清理成功后才发出 `closed`；`close_all` 对每个会话分别发出。重复关闭或通过另一个对象关闭同一会话，不重复发出事件。
-- 只能从注册 lifecycle hook 的线程调用 `start`、`close`、`close_all`；跨线程调用会在创建或销毁会话前失败，原生线程不触碰 Python 回调。
-- 默认保护 worker control fd `[3, 4]`，防止 PTY 子进程继承并污染 worker 协议。Python embedding 可在创建会话前调用 `terminal_use._set_worker_control_fds(sequence)` 覆盖这份 fd 列表；传 `None` 恢复默认值，传空序列表示不额外保护 fd。该函数只设置 `FD_CLOEXEC`，不会创建、移动或替换通信 fd。
+SDK 不下载、编译或修改 Kitty。升级后，已经运行的旧实例需要重启才会使用新版本。
+
+macOS 的官方 Kitty 0.49.2 在新建 OS window 中运行立即退出的程序时可能触发原生崩溃。一次性命令用 bash，`open_window()` 用于持续交互程序。
+
+## 截图
+
+`session.screenshot()` 调用官方 `kitten @ screenshot`，返回目标终端分屏的 PNG bytes。它包含实际渲染的文字、图片与排版，可直接交给 `display_image()`。目标必须位于活动 tab 且未被布局隐藏；SDK 不会自动切换焦点或布局。
+
+`read()` 只返回文字、cells、光标与模式，不提供源图片或 placement 导出。截图必须在窗口关闭前显式获取，关闭记录中只保留文字与 cells。
+
+## 代码结构
+
+```text
+src/terminal_use/
+  instance.py          实例发现、连接、启动与窗口创建
+  session.py           屏幕读取、输入、等待、尺寸与生命周期 API
+  models.py            终端区域坐标
+  transport.py         调用 Kitty 自带 kitten remote-control client
+  bridge.py            在 Kitty 进程内读取屏幕、编码输入、记录关闭事件
+```
+
+SDK 不创建 PTY，不解析 VT 输出，不注册 worker 进程组 ownership，也没有退出时自动关闭终端的 hook。环境变量默认来自 Kitty，`env` 参数覆盖新终端的指定变量。
+
+## 生命周期与状态
+
+- 实例由 socket 定位，连接后获得 Kitty 进程内的唯一实例 ID；终端由实例 ID 与 window ID 定位。
+- `detach()` 仅停用 Python 句柄；`close()` 明确关闭 Kitty window。
+- 全局 watcher 为窗口保存最终文字与 cells。关闭记录位于 `~/.local/state/terminal-use/<instance-id>/<window-id>.json`；包含终端内容，应按用户数据管理。SDK 不自动删除这些记录。
+- `wait()` 等待窗口关闭，超时不杀进程。Kitty 报告退出状态时返回 `exited` 和退出码/信号；没有报告时返回 `closed`，不推断退出成功。尤其不能保证极短命程序的退出码。进程可能已退出而后台程序仍持有终端，所以窗口关闭和主进程退出是两个事件。
+- `wait_command()` 使用 shell integration 的命令序号与退出状态。只有启用了 shell integration 的 shell 命令有此信息。
+- 连接需要正在运行的 Kitty。已有 Session 可以在 Kitty 退出后读取其已保存的最终快照；跨 worker 重连适用于仍运行的实例。
+- 原始 PTY 输出、raw offset、reader drain、emulator generation 和虚拟 cell size 不属于此 SDK。
+- SDK 启动的 Kitty 将诊断写入 `~/.local/state/terminal-use/control-<socket-id>.log`。
+
+完整 API 与交互流程见 [skill](skills/terminal-use/SKILL.md)。

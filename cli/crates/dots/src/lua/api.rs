@@ -138,6 +138,23 @@ fn register_resources(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     let dots: Table = lua.globals().get("dots")?;
     let resource = lua.create_table()?;
 
+    let directory_builder = builder.clone();
+    resource.set(
+        "directory",
+        lua.create_function(move |_, spec: Table| {
+            if enabled(&spec)? {
+                directory_builder
+                    .borrow_mut()
+                    .resources
+                    .push(ResourceDeclaration::Directory {
+                        target: spec.get("target")?,
+                        mode: parse_directory_mode(spec.get("mode")?)?,
+                    });
+            }
+            Ok(())
+        })?,
+    )?;
+
     let symlink_builder = builder.clone();
     resource.set(
         "symlink",
@@ -267,6 +284,27 @@ fn register_path_queries(lua: &Lua) -> mlua::Result<()> {
 /// 解析 Resource、lifecycle hook 与 Cargo binary 共用的 `enabled` 字段。
 fn enabled(spec: &Table) -> mlua::Result<bool> {
     Ok(spec.get::<Option<bool>>("enabled")?.unwrap_or(true))
+}
+
+/// 接受四位八进制字符串，避免 Lua 十进制整数与 Unix mode 混淆。
+fn parse_directory_mode(mode: Value) -> mlua::Result<Option<u32>> {
+    match mode {
+        Value::Nil => Ok(None),
+        Value::String(value)
+            if value.as_bytes().len() == 4
+                && value
+                    .as_bytes()
+                    .iter()
+                    .all(|digit| matches!(digit, b'0'..=b'7')) =>
+        {
+            u32::from_str_radix(&value.to_str()?, 8)
+                .map(Some)
+                .map_err(mlua::Error::external)
+        }
+        _ => Err(mlua::Error::external(
+            "dots.resource.directory.mode 必须是四位八进制字符串，如 \"0700\"",
+        )),
+    }
 }
 
 /// 解析 Cargo 安装的平台限制和 workspace/crates.io 来源。

@@ -254,6 +254,11 @@ fn compile_declaration(
     home: &Path,
 ) -> crate::Result<Vec<ResourceSpec>> {
     match declaration {
+        ResourceDeclaration::Directory { target, mode } => Ok(vec![ResourceSpec::Directory {
+            target: AbsPath::new(absolute_target(target, home)?),
+            mode: *mode,
+            origin: "dots.resource.directory".to_owned(),
+        }]),
         ResourceDeclaration::Symlink { source, target } => {
             let source = absolute_source(source, repo_root, home)?;
             let target = absolute_target(target, home)?;
@@ -467,8 +472,25 @@ fn observe_path(path: &Path) -> ObservedState {
             },
         };
     }
+    if metadata.file_type().is_dir() {
+        let entries = fs::read_dir(path)
+            .and_then(|entries| {
+                entries
+                    .map(|entry| entry.map(|entry| entry.path()))
+                    .collect::<std::io::Result<Vec<_>>>()
+            })
+            .map(|mut entries| {
+                entries.sort();
+                entries
+            })
+            .map_err(|error| format!("无法列出目录 {}：{error}", path.display()));
+        return ObservedState::Directory {
+            mode: metadata.permissions().mode() & 0o7777,
+            entries,
+        };
+    }
     ObservedState::Invalid {
-        reason: format!("{} 是真实目录或不支持的节点类型", path.display()),
+        reason: format!("{} 是不支持的节点类型", path.display()),
     }
 }
 
@@ -574,13 +596,33 @@ fn find_container_conversions(
     filesystem: &dyn FileSystem,
 ) -> Vec<ContainerConversion> {
     let mut by_target = BTreeMap::new();
+    let declared_directories: BTreeSet<_> = desired
+        .iter()
+        .filter_map(|resource| match resource {
+            ResourceSpec::Directory { target, .. } => Some(target.as_path()),
+            _ => None,
+        })
+        .collect();
     for resource in desired {
         let Some(path) = resource.surface().filesystem_path().map(Path::to_path_buf) else {
             continue;
         };
+        // 显式目录若被其他节点占据，应报告冲突；不能借其子资源触发隐式容器转换。
+        if declared_directories.iter().any(|directory| {
+            path.starts_with(directory)
+                && !matches!(
+                    filesystem.classify(directory),
+                    NodeKind::Dir | NodeKind::Missing
+                )
+        }) {
+            continue;
+        }
         let mut ancestors: Vec<PathBuf> = path.ancestors().skip(1).map(Path::to_path_buf).collect();
         ancestors.reverse();
         for ancestor in ancestors {
+            if declared_directories.contains(ancestor.as_path()) {
+                continue;
+            }
             if let NodeKind::Symlink { target } = filesystem.classify(&ancestor)
                 && target.starts_with(repo_root)
             {

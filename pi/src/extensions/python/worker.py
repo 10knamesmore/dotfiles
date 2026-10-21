@@ -4,7 +4,6 @@ import code
 from collections.abc import Callable
 from contextlib import chdir
 from dataclasses import dataclass
-from functools import partial
 from importlib import metadata
 import io
 import json
@@ -73,34 +72,31 @@ def send_event(event: dict[str, object]) -> None:
         frame = frame[os.write(WORKER_EVENT_FD, frame):]
 
 
-def handle_process_ownership(kind: Literal["terminal", "browser"], event: dict[str, object]) -> None:
-    """Forward an SDK process-group ownership change without terminal or browser content."""
+def handle_browser_ownership(event: dict[str, object]) -> None:
+    """Forward a browser process-group ownership change without browser content."""
     action = event.get("action")
     session_id = event.get("id")
     pid = event.get("pid")
     if action not in ("opened", "closed") or not isinstance(session_id, str) or not session_id:
-        raise ValueError(f"malformed {kind} ownership event: {event!r}")
+        raise ValueError(f"malformed browser ownership event: {event!r}")
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-        raise ValueError(f"{kind} ownership event for {session_id!r} has no positive pid")
-    send_event({"type": "process_ownership", "kind": kind, "action": action, "id": session_id, "pid": pid})
+        raise ValueError(f"browser ownership event for {session_id!r} has no positive pid")
+    send_event({"type": "process_ownership", "kind": "browser", "action": action, "id": session_id, "pid": pid})
 
 
-def install_process_ownership_hooks() -> None:
-    """Register required SDK process groups with the controller before running user code."""
+def install_browser_ownership_hook() -> None:
+    """Register browser process groups with the controller before running user code."""
     try:
-        from terminal_use import _set_lifecycle_hook as terminal_hook, _set_worker_control_fds
         from browser_use import _set_lifecycle_hook as browser_hook
     except ImportError as error:
-        reason = f"a required process-owning Python SDK is not importable: {error}"
+        reason = f"the required browser-use Python SDK is not importable: {error}"
         try:
             send_event({"type": "startup_error", "reason": reason})
         except OSError:
             # The event pipe may already be gone; stderr still carries the reason.
             pass
         raise SystemExit(reason) from error
-    _set_worker_control_fds((WORKER_REQUEST_FD, WORKER_EVENT_FD))
-    terminal_hook(partial(handle_process_ownership, "terminal"))
-    browser_hook(partial(handle_process_ownership, "browser"))
+    browser_hook(handle_browser_ownership)
 
 
 @dataclass
@@ -252,7 +248,7 @@ def main() -> None:
     os.setpgid(0, 0)
     _ = signal.signal(signal.SIGINT, handle_sigint)
     # Resolve native SDKs before user code can shadow them from the call cwd.
-    install_process_ownership_hooks()
+    install_browser_ownership_hook()
     interpreter = SessionInterpreter()
     runtime = CellRuntime(interpreter)
     # An empty import path follows each call's cwd instead of pinning the startup directory.

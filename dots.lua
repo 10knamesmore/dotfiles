@@ -24,12 +24,20 @@ dots.hook.before_sync({
   program = "pnpm",
   args = { "run", "update:pi" },
 })
--- 构建本地 PyO3 wheel
+-- 安装 Python SDK 与本地原生扩展。
 dots.hook.before_sync({
   name = "prepare Pi Python environment",
   cwd = dots.repo .. "/pi/src/extensions/python",
   program = "uv",
   args = { "sync", "--locked" },
+})
+dots.resource.directory({
+  target = "~/.local/state/kitty",
+  mode = "0700",
+})
+dots.resource.symlink({
+  source = "pi/src/extensions/python/packages/terminal-use/src/terminal_use/bridge.py",
+  target = "~/.local/share/terminal-use/bridge.py",
 })
 
 -- Pi 逐个加载 extension；jiti 沿 source realpath 从 pi/node_modules 解析依赖。
@@ -73,6 +81,7 @@ distribute("agent-bin", {
 
 -- 系统包按平台执行；不适用的包管理器清单直接跳过。
 dots.install.pacman({
+  "kitty",
   "starship",
   "zoxide",
   "ripgrep",

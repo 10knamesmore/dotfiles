@@ -10,12 +10,12 @@ pub struct Plan {
 }
 
 impl Plan {
-    /// 返回 Plan 是否不存在 Collision 或 Drift。
+    /// 返回 Plan 是否不存在 Collision、Drift 或无法删除的 Retired Resource。
     pub fn is_healthy(&self) -> bool {
         self.items.iter().all(|item| {
             !matches!(
                 item.action,
-                PlanAction::Collision { .. } | PlanAction::Drift { .. }
+                PlanAction::Collision { .. } | PlanAction::Drift { .. } | PlanAction::Retain { .. }
             )
         })
     }
@@ -59,7 +59,7 @@ pub enum PlanAction {
     /// Ownership Surface 尚不存在，创建 Desired Resource。
     Create,
 
-    /// Observed 仍匹配 Applied，可以安全更新到 Desired。
+    /// 更新到 Desired；普通 Resource 要求仍匹配 Applied，目录显式权限直接收敛。
     Update,
 
     /// Retired Resource 仍匹配 Applied，安全删除。
@@ -67,6 +67,12 @@ pub enum PlanAction {
 
     /// Retired Resource 已不存在，只需从 Applied Inventory 移除。
     Forget,
+
+    /// Retired 目录仍含有内容或承载 Desired 子路径，保留对象与 ownership。
+    Retain {
+        /// 无法安全删除目录的原因。
+        reason: String,
+    },
 
     /// 尚未拥有的 surface 被不同状态占据。
     Collision {

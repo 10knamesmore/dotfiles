@@ -95,6 +95,35 @@ impl RealFs {
         fs::create_dir_all(path).wrap_err_with(|| format!("建目录失败：{}", path.display()))?;
         Ok(())
     }
+
+    /// 创建真实目录，并只在显式声明 mode 时设置权限；不替换其他节点类型。
+    pub fn ensure_directory(&self, path: &Path, mode: Option<u32>) -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_dir() => {}
+            Ok(_) => {
+                return Err(eyre!(
+                    "directory Resource 不能覆盖非目录：{}",
+                    path.display()
+                ));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                self.make_dir_all(path)?
+            }
+            Err(error) => return Err(error.into()),
+        }
+        if let Some(mode) = mode {
+            fs::set_permissions(path, fs::Permissions::from_mode(mode))
+                .wrap_err_with(|| format!("设置目录权限 {mode:04o} 失败：{}", path.display()))?;
+        }
+        Ok(())
+    }
+
+    /// 仅移除空目录；目录中的用户数据、socket 或其他子项始终保留。
+    pub fn remove_empty_directory(&self, path: &Path) -> Result<()> {
+        fs::remove_dir(path).wrap_err_with(|| format!("删除空目录失败：{}", path.display()))
+    }
 }
 
 impl FileSystem for RealFs {

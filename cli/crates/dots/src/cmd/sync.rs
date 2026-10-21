@@ -7,7 +7,7 @@ use crate::realfs::RealFs;
 use crate::reconciliation::{load_configuration, prepare_configuration};
 use crate::render;
 
-/// 运行 sync，并返回最终是否没有 Collision、Drift、脚本冲突或 apply failure。
+/// 运行 sync，并返回最终是否没有 Collision、Drift、保留目录、脚本冲突或 apply failure。
 pub fn run(dry_run: bool) -> Result<bool> {
     render::header(if dry_run {
         "dots sync · dry-run"
@@ -39,11 +39,12 @@ pub fn run(dry_run: bool) -> Result<bool> {
         prepared.state.save(&prepared.repo_root)?;
     }
     render::ok(&format!(
-        "{} 变更 · {} 接管 · {} 删除 · {} 遗忘 · {} collision · {} drift · {} 失败",
+        "{} 变更 · {} 接管 · {} 删除 · {} 遗忘 · {} 保留 · {} collision · {} drift · {} 失败",
         report.changed,
         report.adopted,
         report.deleted,
         report.forgotten,
+        report.retained,
         report.collisions,
         report.drift,
         report.failures.len()

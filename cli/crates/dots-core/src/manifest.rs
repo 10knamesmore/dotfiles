@@ -106,6 +106,15 @@ pub struct RootSpec {
 /// Lua 显式声明的一项 sync Resource；路径仍保持面向配置的字符串形式。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResourceDeclaration {
+    /// 只管理真实目录本身，不拥有其内容。
+    Directory {
+        /// 目标绝对路径或 `~` 路径。
+        target: String,
+
+        /// 可选的 Unix permission bits。
+        mode: Option<u32>,
+    },
+
     /// 符号链接。
     Symlink {
         /// source；相对路径以仓库根为基准。

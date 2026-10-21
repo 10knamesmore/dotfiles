@@ -29,4 +29,4 @@ browser-use-sdk = { path = "packages/browser-use", editable = true }
 computer-use-sdk = { path = "packages/computer-use" }
 nvim-use-sdk = { path = "packages/nvim-use", editable = true }
 pi-repl-tools = { path = "packages/pi-repl-tools" }
-terminal-use-sdk = { path = "packages/terminal-use" }
+terminal-use-sdk = { path = "packages/terminal-use", editable = true }
