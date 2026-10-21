@@ -174,22 +174,25 @@ local function label(text)
   return text:gsub("[%c]", " "):gsub("%%", "%%%%")
 end
 
---- Return the statusline's disconnected, connected, or active-operation label.
+--- Return the statusline's editor PID, connection state, model and active operation.
 ---@return string
 function M.statusline()
-  if not owner then
-    return "Pi —"
+  local marker = "Pi — "
+  if owner then
+    marker = owner.operation and "Pi ◌ " or "Pi ● "
   end
-  local parts = {}
-  local model = owner.identity.model
-  if model ~= vim.NIL then
-    parts[#parts + 1] = label(model.name)
+  local parts = { tostring(uv.os_getpid()) }
+  if owner then
+    local model = owner.identity.model
+    if model ~= vim.NIL then
+      parts[#parts + 1] = label(model.name)
+    end
+    parts[#parts + 1] = label(owner.identity.session_id:sub(1, 8))
+    if owner.operation then
+      parts[#parts + 1] = label(owner.operation)
+    end
   end
-  parts[#parts + 1] = label(owner.identity.session_id:sub(1, 8))
-  if owner.operation then
-    parts[#parts + 1] = label(owner.operation)
-  end
-  return (owner.operation and "Pi ◌ " or "Pi ● ") .. table.concat(parts, " · ")
+  return marker .. table.concat(parts, " · ")
 end
 
 local function setup()

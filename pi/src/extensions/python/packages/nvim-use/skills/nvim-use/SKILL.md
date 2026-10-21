@@ -24,7 +24,7 @@ editor = nvim.select(instance_id="从 discover 选择的完整 ID")
 
 每个 Neovim 只接受一个 Pi 会话。连接在 Python cells 之间保持。`select()` 成功后释放之前选中的连接；需要同时操作多个实例时，用 `connect()` 独立连接。
 
-`discover()` 返回登记摘要，包括 `instance_id`、`pid`、`socket`、`cwd`、`current_file`、`workspace_roots`、`connection`。状态栏显示当前模型、会话短 ID 和操作状态，模型切换后自动同步。用户可在 Neovim 执行 `:PiConnection` 查看连接及模型详情、`:PiDisconnect` 断开。占用中的实例需要原连接释放后才能连接。
+`discover()` 返回登记摘要，包括 `instance_id`、`pid`、`socket`、`cwd`、`current_file`、`workspace_roots`、`connection`。
 
 ## Showcast：带讲解的代码 tour
 
@@ -59,14 +59,14 @@ Tour 直接复用当前代码窗口，切换真实 buffer，不新建 tab 或分
 
 高亮离开 viewport，或上下都容不下边框与一行说明时，浮窗自动隐藏；空间恢复后重新显示。这个自动显隐不改变 `Tab` 设置。重新定位保留说明 buffer 和阅读位置。手动关闭说明窗口会进入隐藏状态，`Tab` 可重新打开。
 
-| 按键 | 行为 |
-| --- | --- |
-| `n` / `N` | 下一站 / 上一站，到边界停留 |
-| `Tab` | 显示或隐藏 comment；隐藏状态跨站保留 |
-| `<leader>up` | 显示或隐藏当前站的 diff；隐藏状态跨站保留，无 diff 的站点不改变开关 |
-| `Enter` | 聚焦 comment，可用 `j/k`、`Ctrl-f/Ctrl-b` 滚动 |
-| `Esc`（comment 内） | 返回代码窗口 |
-| `q` | 结束 tour，在原窗口恢复开始前的 buffer、光标、滚动位置和 winbar |
+| 按键                | 行为                                                                |
+| ------------------- | ------------------------------------------------------------------- |
+| `n` / `N`           | 下一站 / 上一站，到边界停留                                         |
+| `Tab`               | 显示或隐藏 comment；隐藏状态跨站保留                                |
+| `<leader>up`        | 显示或隐藏当前站的 diff；隐藏状态跨站保留，无 diff 的站点不改变开关 |
+| `Enter`             | 聚焦 comment，可用 `j/k`、`Ctrl-f/Ctrl-b` 滚动                      |
+| `Esc`（comment 内） | 返回代码窗口                                                        |
+| `q`                 | 结束 tour，在原窗口恢复开始前的 buffer、光标、滚动位置和 winbar     |
 
 按键临时绑定到当前站的代码 buffer 和说明 buffer。离开站点恢复原代码 buffer 的映射；同一 buffer 在其他窗口中也使用这些临时映射。新 tour 替换旧 tour，关闭代码窗口或断开 Pi 时清理高亮与映射。结束 tour 不关闭代码窗口；若原 buffer 已被删除或卸载，保留当前 buffer 并恢复 winbar。
 
