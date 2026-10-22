@@ -230,6 +230,7 @@ export function renderPatchCall(patch: string, theme: Theme, context: PatchRende
 export function renderPatchResult(
   status: PatchStatus | undefined,
   changes: PatchFileChange[],
+  output: string,
   isPartial: boolean,
   theme: Theme,
   context: PatchRenderContext,
@@ -271,6 +272,9 @@ export function renderPatchResult(
           `${label} · Files may be partially modified; inspect them before retrying.`,
         );
   container.addChild(new Text(`${changes.length ? "" : `${title} · `}${summary}`, context.outputPad, 0));
+  if (status !== "applied" && output) {
+    container.addChild(new Text(theme.fg("toolOutput", output), context.outputPad, 0));
+  }
   return list;
 }
 

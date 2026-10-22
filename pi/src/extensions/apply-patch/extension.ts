@@ -64,6 +64,7 @@ export default function applyPatchExtension(pi: ExtensionAPI): void {
         return renderPatchResult(
           result.details?.status,
           result.details?.changes ?? [],
+          result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n"),
           options.isPartial,
           theme,
           context,
