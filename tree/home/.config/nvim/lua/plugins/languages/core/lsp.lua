@@ -298,7 +298,6 @@ return {
         "stylua",
         "shfmt",
         "shellcheck",
-        "yamllint",
         "hadolint",
       },
     },

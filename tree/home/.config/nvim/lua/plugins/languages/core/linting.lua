@@ -13,7 +13,6 @@ return {
         fish = { "fish" },
         sh = { "shellcheck" },
         bash = { "shellcheck" },
-        yaml = { "yamllint" },
         dockerfile = { "hadolint" },
         -- 使用 "*" 对所有文件类型运行 linter
         -- ['*'] = { 'global linter' },
