@@ -21,13 +21,14 @@ session = kitty.attach(window_id=windows[0]["id"])
 `terminal.connect()` 不带参数时读取 `KITTY_LISTEN_ON`。未从 Kitty 中启动 Pi 或需要独立工作区时：
 
 ```python
-kitty = terminal.launch(cwd="/path/to/project", cols=120, rows=40)
-session = kitty.open_window(["some-tui"], cwd="/path/to/project")
+session = terminal.launch(
+    ["some-tui"], cwd="/path/to/project", cols=120, rows=40
+)
 ```
 
-`launch()` 创建新的 Kitty 实例和初始 shell；`open_window()` 在该实例中新建桌面窗口。`open_tab()` / `open_split()` 使用实例的当前活动位置。窗口 ID 仅在一个实例内有意义，不跨实例复用。
+`launch()` 创建新的 Kitty 实例，在唯一的初始桌面窗口运行指定程序，并返回该终端的 `Session`；省略程序参数时运行默认 shell。通过 `kitty = session.instance` 获取实例。只有需要额外桌面窗口时才调用 `kitty.open_window()`；`open_tab()` / `open_split()` 使用实例的当前活动位置。窗口 ID 仅在一个实例内有意义，不跨实例复用。
 
-不显示初始桌面窗口时使用 `terminal.launch(hidden=True)`，再通过 `list_windows()` 和 `attach()` 操作初始 shell。
+不显示初始桌面窗口时使用 `session = terminal.launch(hidden=True)`，直接通过返回的 `Session` 操作初始 shell。
 
 ## 交互
 
@@ -56,7 +57,7 @@ display_image(session.screenshot())
 ```python
 session.focus()              # 展示给用户接管
 session.detach()             # 停用句柄，终端继续运行
-session = kitty.attach(window_id=42)
+session = session.instance.attach(window_id=session.window_id)
 session.close()              # 明确关闭终端
 ```
 

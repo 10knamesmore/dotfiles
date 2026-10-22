@@ -5,15 +5,14 @@ Python SDK，用于发现、启动和控制真实 Kitty 终端。终端属于 Ki
 ```python
 import terminal_use as terminal
 
-kitty = terminal.launch(cwd="/path/to/project")
-session = kitty.open_window(["nvim", "."])
+session = terminal.launch(["nvim", "."], cwd="/path/to/project")
 screen = session.read(cells=True)
 display_image(session.screenshot())
 session.send_key("ctrl", "c")
 session.focus()
 ```
 
-隐藏启动时使用 `terminal.launch(hidden=True)`，再通过 `kitty.list_windows()` 和 `kitty.attach(window_id=...)` 操作初始 shell。`open_window()` 仍会新建可见桌面窗口。
+`launch()` 只创建一个桌面窗口并返回其 `Session`；省略程序参数时运行默认 shell。通过 `session.instance` 管理该 Kitty 实例，只有需要额外桌面窗口时才调用 `open_window()`。隐藏初始窗口使用 `terminal.launch(hidden=True)`，仍通过返回的 `Session` 操作终端。
 
 ## 安装
 

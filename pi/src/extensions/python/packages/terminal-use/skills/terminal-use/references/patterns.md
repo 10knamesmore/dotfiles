@@ -5,8 +5,7 @@
 ```python
 import terminal_use as terminal
 
-kitty = terminal.launch(cwd="/path/to/project")
-session = kitty.open_window(["nvim", "."])
+session = terminal.launch(["nvim", "."], cwd="/path/to/project")
 print(session.read()["text"])
 session.send_key("escape")
 session.send_text(":set number")
@@ -19,7 +18,7 @@ session.focus()
 ## shell 命令与退出状态
 
 ```python
-session = kitty.attach(window_id=42)
+session = terminal.launch(cwd="/path/to/project")
 command = session.inspect()["command"]
 sequence = command["sequence"] if command is not None else 0
 session.send_text("make")
@@ -31,10 +30,10 @@ print(session.command_output())
 
 `wait_command` 使用 shell integration；它不会把命令回显或已经存在的提示符当成完成。`session.wait()` 用于等待整个终端关闭。
 
-直接运行程序时：
+直接在新的独立 Kitty 窗口运行程序时：
 
 ```python
-job = kitty.open_window(["some-interactive-program"])
+job = terminal.launch(["some-interactive-program"])
 job.send_text("answer")
 job.send_key("enter")
 print(job.wait(timeout=10))

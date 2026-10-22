@@ -148,17 +148,20 @@ def list_instances() -> list[dict[str, Any]]:
 
 
 def launch(
+    argv: Sequence[str] | None = None,
     *,
     cwd: str | None = None,
     cols: int = 120,
     rows: int = 40,
     hidden: bool = False,
     timeout: float = 20.0,
-) -> KittyInstance:
-    """Start an independent persistent Kitty with a shell, never a single-instance forwarding client."""
+) -> Session:
+    """Start an independent Kitty and return its initial terminal, running argv or the default shell."""
     duration(timeout, "timeout")
     if timeout == 0 or cols <= 0 or rows <= 0:
         raise ValueError("timeout, cols and rows must be positive")
+    if argv is not None and (not argv or isinstance(argv, str)):
+        raise ValueError("argv must be a nonempty sequence of program arguments")
     SOCKET_DIRECTORY.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = SOCKET_DIRECTORY / f"control-{uuid.uuid4().hex}.sock"
     arguments = [
@@ -181,6 +184,8 @@ def launch(
         arguments.append("--start-as=hidden")
     if cwd is not None:
         arguments.extend(("--directory", str(Path(cwd).expanduser().resolve())))
+    if argv is not None:
+        arguments.extend(("--", *argv))
     log_directory = Path.home() / ".local/state/terminal-use"
     log_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     log_path = log_directory / f"{path.stem}.log"
@@ -197,6 +202,8 @@ def launch(
         if time.monotonic() >= deadline:
             raise TimeoutError(f"Kitty did not create {path}; startup log: {log_path}")
         time.sleep(0.05)
-    return connect(
+    instance = connect(
         socket=f"unix:{path}", timeout=max(0.001, deadline - time.monotonic())
     )
+    (initial_window,) = instance.list_windows()
+    return instance.attach(window_id=initial_window["id"])
