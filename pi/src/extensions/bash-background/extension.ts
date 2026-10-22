@@ -195,7 +195,6 @@ function backgroundReport(started: BackgroundProcess): string {
     `log: ${started.logPath}`,
     'The process appends its exit to the log as "[pi-bash-bg] exited with code <n>".',
     "An exit notification will arrive as a steered message and trigger a turn when idle. Do not poll for completion.",
-    "This session kills the process when it shuts down.",
   ].join("\n");
 }
 
