@@ -289,6 +289,7 @@ export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
   private disposed = false;
+  private disposal: Promise<void> | undefined;
 
   public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
@@ -347,12 +348,10 @@ export class ClaudeFooterComponent implements Component {
   }
 
   /** Stop git watchers, debounce timers, and any running git process. */
-  public dispose(): void {
-    if (this.disposed) {
-      return;
-    }
-
+  public dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
     this.disposed = true;
-    this.options.git.dispose();
+    this.disposal = this.options.git.dispose();
+    return this.disposal;
   }
 }

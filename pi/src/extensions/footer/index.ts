@@ -50,7 +50,7 @@ class FooterRuntime {
   }
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
-  public startSession(ctx: ExtensionContext): void {
+  public async startSession(ctx: ExtensionContext): Promise<void> {
     this.currentContext = ctx;
     this.modelDuration.reset();
     this.modelResponse.reset();
@@ -64,7 +64,7 @@ class FooterRuntime {
     this.lastPublishedActivity = undefined;
     this.updateSpinner();
     this.stopIdle();
-    this.component?.dispose();
+    await this.component?.dispose();
     this.component = undefined;
     if (ctx.mode !== "tui") return;
 
@@ -263,7 +263,7 @@ class FooterRuntime {
   }
 
   /** Dispose every component-owned watcher/process before Pi replaces the extension runtime. */
-  public shutdown(ctx: ExtensionContext): void {
+  public async shutdown(ctx: ExtensionContext): Promise<void> {
     this.currentContext = ctx;
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
@@ -272,7 +272,7 @@ class FooterRuntime {
     this.activeTools.clear();
     this.updateSpinner();
     this.stopIdle();
-    this.component?.dispose();
+    await this.component?.dispose();
     this.component = undefined;
     ctx.ui.setFooter(undefined);
   }

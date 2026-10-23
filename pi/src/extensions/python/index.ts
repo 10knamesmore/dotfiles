@@ -4,8 +4,7 @@ import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-w
 import { Type } from "typebox";
 import { PythonSession, type PythonSessionStatus, type PythonToolDetails } from "./session.js";
 import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
-import { describePythonEnvironment, inspectPythonEnvironment, type PythonEnvironment } from "./environment.js";
-import { logPythonEvent } from "./diagnostics.js";
+import { describePythonEnvironment, readPythonEnvironment } from "./environment.js";
 import { registerNeovimCommand } from "./nvim-command.js";
 
 const Parameters = Type.Object(
@@ -50,7 +49,8 @@ const TOOL_DESCRIPTION =
   "Execute Python code in a repl environment. Variables, functions, and imports survive calls. Call summarize() to inspect retained objects. Runs in cwd for this call, defaulting to the session directory; Working directory changes are restored after each call. Host environment variables are inherited unchanged; stdin is unavailable.use display_image(image) to display image; accepts a file path, encoded image bytes, or an image object.";
 
 /** Register one persistent Python environment per live Pi session, including independent subagent sessions. */
-export function registerPython(pi: ExtensionAPI): void {
+export async function registerPython(pi: ExtensionAPI): Promise<void> {
+  const environment = await readPythonEnvironment();
   pi.on("resources_discover", () => ({
     skillPaths: [
       TERMINAL_USE_SKILL,
@@ -62,7 +62,6 @@ export function registerPython(pi: ExtensionAPI): void {
 
   let session: PythonSession | undefined;
   let currentContext: ExtensionContext | undefined;
-  const inspectionController = new AbortController();
 
   const createSession = (ctx: ExtensionContext): PythonSession => {
     currentContext = ctx;
@@ -70,7 +69,6 @@ export function registerPython(pi: ExtensionAPI): void {
       ctx.sessionManager.getSessionId(),
       ctx.cwd,
       notifyEnvironmentCleared,
-      updateEnvironment,
       updateStatus,
     );
     runtime.setModel(ctx.model);
@@ -84,40 +82,14 @@ export function registerPython(pi: ExtensionAPI): void {
     return runtime;
   });
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
     session = createSession(ctx);
     if (hasPythonHistory(ctx)) notifyEnvironmentCleared();
-    const sessionId = ctx.sessionManager.getSessionId();
-    const started = Date.now();
-    logPythonEvent({ sessionId, phase: "environment_inspection_start" });
-    try {
-      const environment = await inspectPythonEnvironment(pi.exec, ctx.cwd, inspectionController.signal);
-      if (inspectionController.signal.aborted) return;
-      updateEnvironment(environment);
-      logPythonEvent({
-        sessionId,
-        phase: "environment_inspection_end",
-        durationMs: Date.now() - started,
-        interpreter: {
-          executable: environment.executable,
-          version: environment.version,
-        },
-        packageCount: environment.packages.length,
-      });
-    } catch (error) {
-      logPythonEvent({
-        sessionId,
-        phase: "environment_inspection_failed",
-        durationMs: Date.now() - started,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
   });
   pi.on("model_select", (event) => {
     session?.setModel(event.model);
   });
   pi.on("session_shutdown", async () => {
-    inspectionController.abort();
     await session?.close();
     session = undefined;
     currentContext?.ui.setStatus("python", undefined);
@@ -142,7 +114,7 @@ export function registerPython(pi: ExtensionAPI): void {
   const tool: ToolDefinition<typeof Parameters, PythonToolDetails | undefined> = {
     name: PYTHON_TOOL_NAME,
     label: "Python",
-    description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment()}`,
+    description: `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment(environment)}`,
     promptSnippet: "Run Python calculations and data analysis with variables preserved across calls",
     promptGuidelines: [
       "Use python_repl for Python calculations and structured data analysis. Reuse variables from earlier python_repl calls",
@@ -204,13 +176,6 @@ export function registerPython(pi: ExtensionAPI): void {
       },
       { deliverAs: "steer" },
     );
-  }
-
-  function updateEnvironment(environment: PythonEnvironment): void {
-    const description = `${TOOL_DESCRIPTION}\n\n${describePythonEnvironment(environment)}`;
-    if (description === tool.description) return;
-    tool.description = description;
-    pi.registerTool(tool);
   }
 }
 

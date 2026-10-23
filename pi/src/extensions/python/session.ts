@@ -8,12 +8,7 @@ import { StringDecoder } from "node:string_decoder";
 import type { Api, ImageContent, Model } from "@earendil-works/pi-ai";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail } from "@earendil-works/pi-coding-agent";
 import { logPythonEvent } from "./diagnostics.js";
-import {
-  isPythonEnvironment,
-  pythonWorkerArguments,
-  STARTUP_TIMEOUT_MS,
-  type PythonEnvironment,
-} from "./environment.js";
+import { pythonWorkerArguments, STARTUP_TIMEOUT_MS } from "./environment.js";
 
 const INTERRUPT_GRACE_MS = 1_000;
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
@@ -38,7 +33,7 @@ export interface PythonToolDetails {
 
 /** Python worker lifecycle displayed in Pi's status bar. */
 export interface PythonSessionStatus {
-  /** Worker lifecycle; starting includes preparation of its uv environment. */
+  /** Lifecycle of the worker launched from the environment prepared by dots sync. */
   state: "not_started" | "starting" | "running" | "idle" | "stopping" | "exited";
 }
 
@@ -66,7 +61,6 @@ interface SubmittedResult {
 
 interface WorkerInfo {
   pid: number;
-  environment: PythonEnvironment;
 }
 
 /** One SDK-owned browser process group, which survives a worker SIGINT. */
@@ -142,7 +136,6 @@ export class PythonSession {
     private readonly sessionId: string,
     private readonly sessionCwd: string,
     private readonly onStateLost: () => void,
-    private readonly onEnvironmentReady: (environment: PythonEnvironment) => void,
     private readonly onStatusChanged: (status: PythonSessionStatus) => void,
   ) {}
 
@@ -476,14 +469,11 @@ export class PythonSession {
     if (message.type === "ready") {
       if (worker.info) throw new Error("Python sent duplicate readiness.");
       worker.info = message;
-      this.onEnvironmentReady(message.environment);
       worker.resolveReady(message);
       this.changed();
       this.log({
         phase: "ready",
         pid: message.pid,
-        interpreter: { executable: message.environment.executable, version: message.environment.version },
-        packageCount: message.environment.packages.length,
       });
       return;
     }
@@ -623,8 +613,7 @@ function parseMessage(line: string): WorkerMessage {
   if (
     message.type === "ready" &&
     Number.isSafeInteger(message.pid) &&
-    (message.pid as number) > 0 &&
-    isPythonEnvironment(message.environment)
+    (message.pid as number) > 0
   )
     return message as unknown as WorkerMessage;
   if (

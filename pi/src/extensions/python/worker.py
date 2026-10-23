@@ -4,12 +4,10 @@ import code
 from collections.abc import Callable
 from contextlib import chdir
 from dataclasses import dataclass
-from importlib import metadata
 import io
 import json
 import linecache
 import os
-import platform
 import signal
 import sys
 import threading
@@ -234,15 +232,6 @@ def execute_cell(
     send_event({"type": "completed", "callId": call_id, "outcome": interpreter.outcome})
 
 
-def describe_environment() -> dict[str, object]:
-    """Report this interpreter and all installed distributions, including transitive dependencies."""
-    packages = sorted(
-        ({"name": distribution.metadata["Name"], "version": distribution.version} for distribution in metadata.distributions()),
-        key=lambda package: package["name"].casefold(),
-    )
-    return {"executable": sys.executable, "version": platform.python_version(), "packages": packages}
-
-
 def main() -> None:
     """Read one LF-delimited request at a time until the controller closes fd3."""
     os.setpgid(0, 0)
@@ -253,7 +242,7 @@ def main() -> None:
     runtime = CellRuntime(interpreter)
     # An empty import path follows each call's cwd instead of pinning the startup directory.
     sys.path.insert(0, "")
-    send_event({"type": "ready", "pid": os.getpid(), "environment": describe_environment()})
+    send_event({"type": "ready", "pid": os.getpid()})
     with os.fdopen(WORKER_REQUEST_FD, "rb") as requests:
         for number, frame in enumerate(requests, start=1):
             request = cast(dict[str, object], json.loads(frame.decode("utf-8")))
@@ -264,7 +253,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--describe-environment"]:
-        print(json.dumps(describe_environment(), ensure_ascii=False))
-    else:
-        main()
+    main()

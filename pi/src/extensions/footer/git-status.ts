@@ -1,7 +1,7 @@
 import { execFile, type ChildProcess, type ExecFileException } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
-import { watch, type FSWatcher } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
+import { subscribe, type AsyncSubscription } from "@parcel/watcher";
 import { sanitizeFooterText } from "./format.js";
 
 const REFRESH_DEBOUNCE_MS = 500;
@@ -141,11 +141,6 @@ interface PorcelainStatus {
 const EMPTY_DIFF: GitDiffStat = { files: 0, added: 0, deleted: 0 };
 
 const UNAVAILABLE: GitStatusSnapshot = { kind: "unavailable" };
-
-function pathIsInside(parent: string, child: string): boolean {
-  const path = relative(parent, child);
-  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
-}
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -357,8 +352,9 @@ export class GitStatusCache {
   private refreshInFlight = false;
   private refreshPending = false;
   private disposed = false;
-  private watchedPaths: GitPaths | undefined;
-  private readonly watchers = new Set<FSWatcher>();
+  /** Pending subscriptions stay owned so shutdown also closes watchers still being initialized. */
+  private readonly watchers = new Map<string, Promise<AsyncSubscription>>();
+  private disposal: Promise<void> | undefined;
   private readonly processes = new Set<ChildProcess>();
 
   public constructor(
@@ -389,23 +385,22 @@ export class GitStatusCache {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = undefined;
     }
-    this.clearWatchers();
-    this.watchedPaths = undefined;
     this.installSnapshot(UNAVAILABLE);
     if (this.refreshInFlight) this.refreshPending = true;
     else void this.refresh();
   }
 
   /** Close every resource owned by the cache. Safe to call more than once. */
-  public dispose(): void {
-    if (this.disposed) return;
+  public dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
     this.disposed = true;
     this.generation += 1;
     if (this.refreshTimer !== undefined) clearTimeout(this.refreshTimer);
     this.refreshTimer = undefined;
-    this.clearWatchers();
     for (const process of this.processes) process.kill();
     this.processes.clear();
+    this.disposal = this.clearWatchers();
+    return this.disposal;
   }
 
   private installSnapshot(next: GitStatusSnapshot): void {
@@ -440,10 +435,21 @@ export class GitStatusCache {
       const paths = await this.discoverPaths(cwd);
       if (this.disposed || generation !== this.generation) return;
       if (!paths) {
+        await this.clearWatchers();
         this.installSnapshot(UNAVAILABLE);
         return;
       }
-      this.installWatchers(paths);
+      const ignoredOutput = await this.runGit(
+        ["-C", paths.repositoryRoot, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
+        cwd,
+      );
+      if (this.disposed || generation !== this.generation) return;
+      if (ignoredOutput === undefined) {
+        this.installSnapshot(UNAVAILABLE);
+        return;
+      }
+      await this.installWatchers(paths, ignoredOutput.split("\0").filter(Boolean), generation);
+      if (this.disposed || generation !== this.generation) return;
       const statusOutput = await this.runGit(
         [
           "-C",
@@ -482,6 +488,11 @@ export class GitStatusCache {
       const operation = await readOperationState(paths.gitDirectory);
       if (this.disposed || generation !== this.generation) return;
       this.installSnapshot(buildSnapshot(status, staged, unstaged, operation));
+    } catch (error) {
+      if (!this.disposed && generation === this.generation) {
+        this.installSnapshot(UNAVAILABLE);
+        console.error("[pi-footer] Git monitoring failed:", error);
+      }
     } finally {
       this.refreshInFlight = false;
       if (this.refreshPending && !this.disposed) {
@@ -506,57 +517,69 @@ export class GitStatusCache {
     };
   }
 
-  private installWatchers(paths: GitPaths): void {
-    if (
-      this.watchedPaths?.repositoryRoot === paths.repositoryRoot &&
-      this.watchedPaths.gitDirectory === paths.gitDirectory &&
-      this.watchedPaths.commonGitDirectory === paths.commonGitDirectory
-    ) {
-      return;
+  /** Git expands ignore rules; the native watcher skips those paths before walking their subtrees. */
+  private async installWatchers(paths: GitPaths, ignoredPaths: string[], generation: number): Promise<void> {
+    const roots = new Map<string, string[]>([
+      [
+        paths.repositoryRoot,
+        [
+          resolve(paths.repositoryRoot, ".git"),
+          paths.gitDirectory,
+          paths.commonGitDirectory,
+          ...ignoredPaths.map((path) => resolve(paths.repositoryRoot, path)),
+        ],
+      ],
+    ]);
+    // Worktrees have their own HEAD/index, while refs and stash belong to the common directory.
+    for (const directory of new Set([paths.gitDirectory, paths.commonGitDirectory])) {
+      roots.set(directory, ["objects", "worktrees"].map((name) => resolve(directory, name)));
     }
-    this.clearWatchers();
-    this.watchedPaths = paths;
-    this.watchPath(paths.repositoryRoot);
-    if (!pathIsInside(paths.repositoryRoot, paths.gitDirectory)) this.watchPath(paths.gitDirectory);
-    if (
-      paths.commonGitDirectory !== paths.gitDirectory &&
-      !pathIsInside(paths.repositoryRoot, paths.commonGitDirectory)
-    ) {
-      this.watchPath(paths.commonGitDirectory);
-    }
-  }
-
-  private watchPath(path: string, recursive: boolean = true, generation: number = this.generation): void {
-    if (!this.isCurrentWatchBinding(path, generation)) return;
-    try {
-      const watcher = watch(path, { recursive }, () => {
-        if (this.isCurrentWatchBinding(path, generation)) this.scheduleRefresh();
-      });
-      this.watchers.add(watcher);
-      watcher.on("error", () => {
-        this.watchers.delete(watcher);
-        watcher.close();
-        if (!this.isCurrentWatchBinding(path, generation)) return;
-        if (recursive) this.watchPath(path, false, generation);
-        else this.scheduleRefresh();
-      });
-    } catch {
-      if (recursive && this.isCurrentWatchBinding(path, generation)) this.watchPath(path, false, generation);
-    }
-  }
-
-  private isCurrentWatchBinding(path: string, generation: number): boolean {
-    if (this.disposed || generation !== this.generation || !this.watchedPaths) return false;
-    return (
-      path === this.watchedPaths.repositoryRoot ||
-      path === this.watchedPaths.gitDirectory ||
-      path === this.watchedPaths.commonGitDirectory
+    const desired = new Map(
+      [...roots].map(([path, ignore]) => [JSON.stringify([generation, path, ignore]), { path, ignore }]),
     );
+    for (const [key, pending] of this.watchers) {
+      if (desired.has(key)) continue;
+      // Keep the subscription owned until its asynchronous close finishes.
+      await (await pending).unsubscribe();
+      this.watchers.delete(key);
+    }
+    for (const [key, { path, ignore }] of desired) {
+      if (this.disposed || generation !== this.generation) return;
+      if (this.watchers.has(key)) continue;
+      const pending = subscribe(
+        path,
+        (error) => {
+          if (this.disposed || generation !== this.generation || !this.watchers.has(key)) return;
+          if (error) {
+            this.installSnapshot(UNAVAILABLE);
+            console.error("[pi-footer] Git watcher failed:", error);
+            return;
+          }
+          this.scheduleRefresh();
+        },
+        {
+          // Git returns literal paths; brackets and other glob characters belong to their names.
+          ignore: ignore.map(
+            (ignoredPath) =>
+              new RegExp(`^${relative(path, ignoredPath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/|$)`),
+          ),
+          backend: process.platform === "darwin" ? "fs-events" : "inotify",
+        },
+      );
+      this.watchers.set(key, pending);
+      try {
+        await pending;
+      } catch (error) {
+        this.watchers.delete(key);
+        throw error;
+      }
+    }
   }
 
-  private clearWatchers(): void {
-    for (const watcher of this.watchers) watcher.close();
+  private async clearWatchers(): Promise<void> {
+    const pending = [...this.watchers.values()];
     this.watchers.clear();
+    await Promise.all(pending.map(async (subscription) => (await subscription).unsubscribe()));
   }
 
   private runGit(args: readonly string[], cwd: string): Promise<string | undefined> {

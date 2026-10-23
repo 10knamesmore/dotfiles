@@ -15,8 +15,6 @@ interface PythonEvent {
   action?: string;
   resourceKind?: "terminal" | "browser";
   resourceId?: string;
-  interpreter?: { executable: string; version: string };
-  packageCount?: number;
 }
 
 /** Record process and execution metadata without copying code, output, or variables. */
