@@ -1,4 +1,4 @@
-import { highlightCode, type Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import {
   mixColors,
   stripTerminalSequences,
@@ -9,9 +9,10 @@ import {
   type Component,
 } from "@earendil-works/pi-tui";
 import type { ReportRow, ReportTone } from "./report.js";
+import type { SourceDocument } from "./source-layout.js";
 
 export type PageContent =
-  { kind: "report"; rows: ReportRow[] } | { kind: "source"; body: string; format: "text" | "json" };
+  { kind: "report"; rows: ReportRow[] } | ({ kind: "source" } & SourceDocument);
 
 const valueColors: Record<ReportTone, ThemeColor> = {
   value: "text",
@@ -64,23 +65,19 @@ export class ContextAppearance {
   }
 }
 
-/** Cache wrapping and syntax highlighting; theme invalidation rebuilds both. */
-export class ContextContent implements Component {
+export class ContextReport implements Component {
   private cachedWidth = 0;
   private cachedLines: string[] | undefined;
 
   public constructor(
-    private readonly content: PageContent,
+    private readonly rows: ReportRow[],
     private readonly appearance: ContextAppearance,
   ) {}
 
   public render(width: number): string[] {
     if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
     this.cachedWidth = width;
-    this.cachedLines =
-      this.content.kind === "report"
-        ? this.reportLines(this.content.rows, width)
-        : this.sourceLines(this.content.body, this.content.format, width);
+    this.cachedLines = this.reportLines(this.rows, width);
     return this.cachedLines;
   }
 
@@ -139,18 +136,5 @@ export class ContextContent implements Component {
       }
     }
     return lines;
-  }
-
-  private sourceLines(body: string, format: "text" | "json", width: number): string[] {
-    const { theme } = this.appearance;
-    const highlighted = highlightCode(stripTerminalSequences(body), format === "json" ? "json" : "xml");
-    const gutterWidth = String(highlighted.length).length;
-    return highlighted.flatMap((line, index) =>
-      wrapTextWithAnsi(line, Math.max(1, width - gutterWidth - 3)).map((part, continuation) => {
-        const number = continuation === 0 ? String(index + 1).padStart(gutterWidth) : " ".repeat(gutterWidth);
-        const gutter = theme.fg("dim", `${number} │ `);
-        return this.appearance.fill(gutter + part, width);
-      }),
-    );
   }
 }

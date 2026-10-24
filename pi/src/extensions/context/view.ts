@@ -1,8 +1,10 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Input, fuzzyFilter, ScrollView, stripTerminalSequences } from "@earendil-works/pi-tui";
 import { contextNavigationAction } from "./controls.js";
-import { ContextAppearance, ContextContent, type PageContent } from "./presentation.js";
+import { ContextAppearance, ContextReport, type PageContent } from "./presentation.js";
 import { field, heading, note } from "./report.js";
+import { SourceLayouts } from "./source-layout.js";
+import { SourceContent } from "./source-view.js";
 import {
   changesReport,
   formatBytes,
@@ -19,10 +21,9 @@ interface InspectionPage {
   content: PageContent;
 }
 
-interface DetailView {
-  content: ContextContent;
-  scroll: ScrollView;
-}
+type DetailView =
+  | { kind: "report"; content: ContextReport; scroll: ScrollView }
+  | { kind: "source"; content: SourceContent; scroll: ScrollView };
 
 interface FilterEditor {
   input: Input;
@@ -115,6 +116,10 @@ export async function inspectContext(
   await ctx.ui.custom<void>(
     (tui, theme, keybindings, done) => {
       const appearance = new ContextAppearance(theme);
+      const sourceLayouts = new SourceLayouts(theme, (error) => {
+        ctx.ui.notify(`Context layout failed: ${error.message}`, "error");
+        done();
+      });
       const items = pages.map((page, index) => ({
         index,
         page,
@@ -135,10 +140,12 @@ export async function inspectContext(
       // Unlike SelectList, /agents lets the viewport move independently of the selected item.
       const listScroll = new ScrollView(
         {
-          render(width) {
+          render(width): string[] {
             if (!filtered.length) return [theme.fg("muted", " No matching sections or messages.")];
-            return filtered.map(({ page }, index) => {
-              const selected = cursor === index;
+            const start = listScroll.scrollTop;
+            const visibleItems = filtered.slice(start, start + listScroll.viewportHeight);
+            return visibleItems.map(({ page }, offset) => {
+              const selected = cursor === start + offset;
               const marker = theme.fg(selected ? "accent" : "muted", selected ? "❯ " : "  ");
               const group = theme.fg(selected ? "accent" : "muted", `${page.group.padEnd(9)} `);
               const label = theme.style(stripTerminalSequences(page.label), { fg: "text", bold: selected });
@@ -157,8 +164,14 @@ export async function inspectContext(
       const detailView = (index: number): DetailView => {
         let detail = details.get(index);
         if (!detail) {
-          const content = new ContextContent(pages[index]!.content, appearance);
-          detail = { content, scroll: new ScrollView(content, { scrollbar: "hidden" }) };
+          const page = pages[index]!.content;
+          if (page.kind === "source") {
+            const content = new SourceContent(index, page, sourceLayouts, appearance, () => tui.requestRender());
+            detail = { kind: "source", content, scroll: content.scroll };
+          } else {
+            const content = new ContextReport(page.rows, appearance);
+            detail = { kind: "report", content, scroll: new ScrollView(content, { scrollbar: "hidden" }) };
+          }
           details.set(index, detail);
         }
         return detail;
@@ -209,21 +222,32 @@ export async function inspectContext(
           const index = pageStack.at(-1);
           const isList = index === undefined;
           const scroll = activeScroll();
-          const lines = scroll.render(innerWidth);
+          const detail = isList ? undefined : detailView(index);
           const maxRows = Math.max(1, Math.floor(tui.terminal.rows * 0.9) - 5);
-          const height = Math.min(Math.max(1, lines.length), maxRows);
-          scroll.updateLayout(lines.length, height, () => tui.requestRender());
-          if (isList) {
-            if (restoreListScroll !== undefined) {
-              listScroll.scrollTo(restoreListScroll);
-              restoreListScroll = undefined;
-            } else if (followCursor) {
-              listScroll.scrollTo(cursor - Math.floor(height / 2));
-              followCursor = false;
+          let visible: string[];
+          let position: string;
+          if (detail?.kind === "source") {
+            visible = detail.content.renderViewport(innerWidth, maxRows);
+            position = detail.content.position;
+          } else {
+            const detailLines = isList ? [] : scroll.render(innerWidth);
+            const contentHeight = isList ? Math.max(1, filtered.length) : detailLines.length;
+            const height = Math.min(Math.max(1, contentHeight), maxRows);
+            scroll.updateLayout(contentHeight, height, () => tui.requestRender());
+            if (isList) {
+              if (restoreListScroll !== undefined) {
+                listScroll.scrollTo(restoreListScroll);
+                restoreListScroll = undefined;
+              } else if (followCursor) {
+                listScroll.scrollTo(cursor - Math.floor(height / 2));
+                followCursor = false;
+              }
             }
+            visible = isList
+              ? listScroll.render(innerWidth)
+              : detailLines.slice(scroll.scrollTop, scroll.scrollTop + height);
+            position = `${scroll.scrollTop + 1}–${Math.min(scroll.scrollTop + height, contentHeight)}/${contentHeight}`;
           }
-          const visible = lines.slice(scroll.scrollTop, scroll.scrollTop + height);
-          const position = `${scroll.scrollTop + 1}–${Math.min(scroll.scrollTop + height, lines.length)}/${lines.length}`;
           let status: string[];
           if (filterEditor) {
             status = filterEditor.input.render(innerWidth);
@@ -322,8 +346,14 @@ export async function inspectContext(
         },
         invalidate() {
           appearance.refresh();
+          const themeChanged = sourceLayouts.updateTheme(theme);
           filterEditor?.input.invalidate();
-          for (const detail of details.values()) detail.content.invalidate();
+          for (const detail of details.values()) {
+            if (detail.kind === "report" || themeChanged) detail.content.invalidate();
+          }
+        },
+        dispose() {
+          sourceLayouts.dispose();
         },
       };
     },
