@@ -1,3 +1,4 @@
+mod bluetooth;
 mod capture;
 mod network_routes;
 mod network_status;
@@ -21,6 +22,8 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Manage Bluetooth devices through an interactive JSON-lines BlueZ session.
+    Bluetooth,
     /// Supervise the capture server across Quickshell reloads.
     Capture,
     #[command(hide = true)]
@@ -66,6 +69,7 @@ fn output_disconnected(error: &anyhow::Error) -> bool {
 
 async fn run() -> Result<bool> {
     match Arguments::parse().command {
+        Command::Bluetooth => bluetooth::run().await?,
         Command::Capture => capture::launch().await?,
         Command::CaptureServer => capture::serve().await?,
         Command::CapturePicker { allow_token } => return capture::pick(allow_token).await,
