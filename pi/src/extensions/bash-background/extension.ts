@@ -35,9 +35,8 @@ import {
   getAgentDir,
   getShellConfig,
 } from "@earendil-works/pi-coding-agent";
-import { Box, Text, TruncatedText } from "@earendil-works/pi-tui";
+import { Box, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { createExpandableMessageRenderer } from "@dotfiles/pi-ui/expandable-message";
 
 const DEFAULT_FOREGROUND_TIMEOUT_SECONDS = 120;
 const BACKGROUND_EXIT_MESSAGE = "bash-background:exit";
@@ -94,38 +93,54 @@ export function registerBashBackground(pi: ExtensionAPI): void {
   pi.on("session_start", () => {
     lifetime = { active: true, processes: new Set<number>() };
   });
-  pi.registerMessageRenderer<BackgroundExitMessage>(
-    BACKGROUND_EXIT_MESSAGE,
-    createExpandableMessageRenderer<BackgroundExitMessage>((message, { expanded, outputPad }, theme) => {
-      const result = message.details!;
-      const color = result.timedOut || result.signal !== null ? "warning" : result.code === 0 ? "success" : "error";
-      const heading = `${theme.fg("muted", expanded ? "▼" : "▶")} ${theme.bold("Background bash")} ${theme.fg("dim", "·")} ${theme.fg(color, backgroundExitStatus(result))}`;
-      const command = stripVTControlCharacters(result.command);
-      const box = new Box(outputPad, 1, (text) => theme.bg("customMessageBg", text));
-      box.addChild(new Text(heading, 0, 0));
-      box.addChild(expanded ? new Text(command, 0, 0) : new TruncatedText(command.replace(/\s+/g, " "), 0, 0));
-      if (expanded) {
-        box.addChild(
-          new Text(
-            theme.fg(
-              "dim",
-              `PID ${result.pid} · ${result.signal === null ? `exit ${result.code ?? "unknown"}` : result.signal}\nLog ${result.logPath}`,
-            ),
-            0,
-            0,
-          ),
-        );
-      }
-      return box;
-    }),
-  );
-  // Renderers, prompt metadata, and description are Pi's; only execution is ours.
+  pi.registerMessageRenderer<BackgroundExitMessage>(BACKGROUND_EXIT_MESSAGE, (message, { outputPad }, theme) => {
+    const result = message.details!;
+    const color = result.timedOut || result.signal !== null ? "warning" : result.code === 0 ? "success" : "error";
+    const heading = `${theme.bold("Background bash")} ${theme.fg("dim", "·")} ${theme.fg(color, backgroundExitStatus(result))}`;
+    const command = stripVTControlCharacters(result.command);
+    const box = new Box(outputPad, 1, (text) => theme.bg("customMessageBg", text));
+    box.addChild(new Text(heading, 0, 0));
+    box.addChild(new Text(command, 0, 0));
+    box.addChild(
+      new Text(
+        theme.fg(
+          "dim",
+          `PID ${result.pid} · ${result.signal === null ? `exit ${result.code ?? "unknown"}` : result.signal}\nLog ${result.logPath}`,
+        ),
+        0,
+        0,
+      ),
+    );
+    return box;
+  });
+  // Foreground rendering and prompt metadata remain Pi's.
   const builtInBash = createBashToolDefinition(process.cwd());
 
   pi.registerTool<typeof bashSchema, BashBackgroundDetails | undefined>({
     ...builtInBash,
     description: `${builtInBash.description} Foreground commands default to a ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS}-second timeout; set timeout explicitly to override it. With background: true the command runs detached with no default timeout and the call returns its pid instead of waiting; use it for long-running commands such as dev servers or watchers. An exit notification arrives as a steered message and triggers a turn when idle; do not poll for completion.`,
     parameters: bashSchema,
+
+    renderCall(params, theme, context) {
+      if (params.background !== true) return builtInBash.renderCall!(params, theme, context);
+      const command = stripVTControlCharacters(params.command ?? "");
+      const timeout = params.timeout === undefined ? "" : theme.fg("muted", ` (timeout ${params.timeout}s)`);
+      return new Text(
+        `${theme.fg("toolTitle", theme.bold(`$ ${command}`))} ${theme.fg("accent", "[background]")}${timeout}`,
+        0,
+        0,
+      );
+    },
+
+    renderResult(result, options, theme, context) {
+      const started = result.details?.background;
+      if (started === undefined) return builtInBash.renderResult!(result, options, theme, context);
+      return new Text(
+        `\n${theme.fg("toolOutput", `↗ started · PID ${started.pid}`)}\n${theme.fg("dim", `Log ${started.logPath}`)}`,
+        0,
+        0,
+      );
+    },
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const settings = readShellToolSettings(ctx);
