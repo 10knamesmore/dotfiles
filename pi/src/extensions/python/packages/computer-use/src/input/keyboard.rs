@@ -230,10 +230,12 @@ fn text_chunk(characters: &[char], codes: Vec<u32>) -> PyResult<TextChunk> {
         let _ = write!(source, "<T{index:03}> = {};", index + 9);
     }
     // XWayland rejects maps without compatibility and virtual-modifier components.
+    // Standard indicators keep XWayland's indicator queries valid after a keymap change.
     // The catch-all must match unmodified keys so libxkbcommon retains it when serializing.
     source.push_str(
         "}; xkb_types \"text\" { include \"complete\" }; \
          xkb_compatibility \"text\" { \
+         include \"complete\" \
          interpret Any+AnyOfOrNone(all) { action = NoAction(); }; \
          }; xkb_symbols \"text\" {",
     );
