@@ -21,6 +21,11 @@ Button {
     opacity: enabled ? 1 : 0.3
     scale: down ? 0.92 : primary && hovered ? 1.04 : 1
 
+    HoverHandler {
+        enabled: root.enabled
+        cursorShape: Qt.PointingHandCursor
+    }
+
     background: Rectangle {
         radius: root.primary ? height / 2 : Tokens.radiusS
         color: root.primary ? Colors.mauve : root.hovered || root.visualFocus ? Colors.overlay(0.07) : "transparent"

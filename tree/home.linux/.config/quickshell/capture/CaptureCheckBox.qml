@@ -8,6 +8,10 @@ CheckBox {
     implicitHeight: 32
     implicitWidth: label.implicitWidth + 28
     Accessible.name: text
+    HoverHandler {
+        enabled: root.enabled
+        cursorShape: Qt.PointingHandCursor
+    }
     indicator: Rectangle {
         width: 18
         height: 18

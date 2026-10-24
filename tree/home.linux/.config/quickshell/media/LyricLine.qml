@@ -25,6 +25,11 @@ Button {
     Accessible.name: line.text
     Accessible.description: "跳转到这句歌词"
 
+    HoverHandler {
+        enabled: root.enabled
+        cursorShape: Qt.PointingHandCursor
+    }
+
     background: Rectangle {
         radius: Tokens.radiusS
         color: root.hovered || root.visualFocus ? Colors.overlay(0.035) : "transparent"

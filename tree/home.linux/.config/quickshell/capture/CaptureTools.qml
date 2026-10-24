@@ -92,6 +92,10 @@ Rectangle {
                     checked: root.surface.ink === modelData
                     Accessible.name: "标注颜色 " + modelData
                     onClicked: root.surface.ink = modelData
+                    HoverHandler {
+                        enabled: swatch.enabled
+                        cursorShape: Qt.PointingHandCursor
+                    }
                     background: Rectangle {
                         color: swatch.modelData
                         radius: 5

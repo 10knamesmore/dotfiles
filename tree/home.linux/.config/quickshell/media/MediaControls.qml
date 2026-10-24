@@ -51,6 +51,11 @@ ColumnLayout {
             ToolTip.visible: pressed
             ToolTip.text: root.formatTime(value)
 
+            HoverHandler {
+                enabled: progress.enabled
+                cursorShape: Qt.PointingHandCursor
+            }
+
             background: Rectangle {
                 x: progress.leftPadding
                 y: (progress.height - height) / 2

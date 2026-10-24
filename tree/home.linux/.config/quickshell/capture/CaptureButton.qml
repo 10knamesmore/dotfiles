@@ -15,6 +15,10 @@ Button {
     Accessible.name: text
     ToolTip.visible: hovered && hint !== ""
     ToolTip.text: hint
+    HoverHandler {
+        enabled: root.enabled
+        cursorShape: Qt.PointingHandCursor
+    }
     background: Rectangle {
         radius: 7
         color: root.down ? Colors.surface2 : root.checked || root.accent ? Colors.blue : root.hovered ? Colors.surface1 : Colors.surface0

@@ -119,7 +119,17 @@ pub fn prepare_configuration(
             }
         }
     }
-    let plan = reconcile(desired, &state.resources, &observed)?;
+    let applied_for_plan: Vec<_> = state
+        .resources
+        .iter()
+        .filter(|resource| {
+            !conversions.iter().any(|conversion| {
+                resource.surface.filesystem_path() == Some(conversion.target.as_path())
+            })
+        })
+        .cloned()
+        .collect();
+    let plan = reconcile(desired, &applied_for_plan, &observed)?;
     Ok(PreparedReconciliation {
         repo_root,
         home,

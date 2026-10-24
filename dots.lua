@@ -31,6 +31,13 @@ dots.hook.before_sync({
   program = "uv",
   args = { "sync", "--locked" },
 })
+-- Pi 启动只读清单；包版本在下次 sync 后更新。
+dots.hook.before_sync({
+  name = "write Pi Python environment manifest",
+  cwd = dots.repo .. "/pi/src/extensions/python",
+  program = "uv",
+  args = { "run", "--no-sync", "--", "python", "environment_manifest.py" },
+})
 dots.resource.directory({
   target = "~/.local/state/kitty",
   mode = "0700",
@@ -82,6 +89,7 @@ distribute("agent-bin", {
 -- 系统包按平台执行；不适用的包管理器清单直接跳过。
 dots.install.pacman({
   "kitty",
+  "shader-slang",
   "starship",
   "zoxide",
   "ripgrep",

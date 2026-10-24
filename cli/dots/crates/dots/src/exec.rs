@@ -105,7 +105,7 @@ fn execute_with_runtime(
     runtime: &dyn Runtime,
 ) -> ExecReport {
     let mut report = ExecReport::default();
-    let blocked_prefixes = execute_conversions(conversions, filesystem, dry_run, &mut report);
+    let blocked_prefixes = execute_conversions(conversions, filesystem, state, dry_run, &mut report);
     let mut blocked_directories: Vec<PathBuf> = plan
         .items
         .iter()
@@ -152,6 +152,7 @@ fn execute_with_runtime(
 fn execute_conversions(
     conversions: &[ContainerConversion],
     filesystem: &RealFs,
+    state: &mut State,
     dry_run: bool,
     report: &mut ExecReport,
 ) -> Vec<PathBuf> {
@@ -176,7 +177,12 @@ fn execute_conversions(
             )),
         };
         match result {
-            Ok(()) => report.changed += 1,
+            Ok(()) => {
+                state.remove_resource(&OwnershipSurface::Path {
+                    path: conversion.target.clone(),
+                });
+                report.changed += 1;
+            }
             Err(error) => {
                 blocked.push(conversion.target.clone());
                 report.failures.push(format!(

@@ -82,6 +82,11 @@ ColumnLayout {
                 root.followCurrent();
             }
 
+            HoverHandler {
+                enabled: returnToCurrent.enabled
+                cursorShape: Qt.PointingHandCursor
+            }
+
             background: Rectangle {
                 radius: Tokens.radiusS
                 color: returnToCurrent.hovered || returnToCurrent.visualFocus ? Colors.overlay(0.07) : "transparent"

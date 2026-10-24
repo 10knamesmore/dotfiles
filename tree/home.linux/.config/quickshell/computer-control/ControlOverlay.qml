@@ -115,6 +115,10 @@ PanelWindow {
                     Accessible.name: text
                     Accessible.description: "断开当前桌面控制并释放 agent 输入"
                     Accessible.pressed: down
+                    HoverHandler {
+                        enabled: disconnectButton.enabled
+                        cursorShape: Qt.PointingHandCursor
+                    }
                     background: Rectangle {
                         radius: 15
                         color: disconnectButton.down ? "#8c98d2" : disconnectButton.hovered ? "#c6ceff" : "#b4befe"

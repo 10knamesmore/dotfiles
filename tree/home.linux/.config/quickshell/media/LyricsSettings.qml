@@ -73,6 +73,11 @@ Popup {
                     console.debug("[media-panel] lyrics offset reset");
                 }
 
+                HoverHandler {
+                    enabled: resetOffset.enabled
+                    cursorShape: Qt.PointingHandCursor
+                }
+
                 background: Rectangle {
                     radius: Tokens.radiusS
                     color: resetOffset.hovered || resetOffset.visualFocus ? Colors.overlay(0.07) : "transparent"
@@ -116,6 +121,11 @@ Popup {
         leftPadding: 0
         rightPadding: 0
         hoverEnabled: true
+
+        HoverHandler {
+            enabled: toggle.enabled
+            cursorShape: Qt.PointingHandCursor
+        }
 
         contentItem: Text {
             text: toggle.text

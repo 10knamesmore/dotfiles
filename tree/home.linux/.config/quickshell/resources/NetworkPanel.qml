@@ -72,6 +72,17 @@ PanelOverlay {
                 palette.windowText: Colors.text
                 width: parent.width
 
+                HoverHandler {
+                    enabled: interfacePicker.enabled
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                HoverHandler {
+                    parent: interfacePicker.popup.contentItem
+                    enabled: interfacePicker.enabled
+                    cursorShape: Qt.PointingHandCursor
+                }
+
                 background: Rectangle {
                     border.color: interfacePicker.activeFocus ? Colors.teal : Colors.overlay(Tokens.borderAlpha)
                     border.width: 1
