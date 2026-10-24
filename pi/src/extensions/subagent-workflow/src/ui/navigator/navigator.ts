@@ -1,7 +1,7 @@
 /**
- * The /agents full-screen navigator overlay and its command registration.
+ * The /agents input-area navigator and its command registration.
  *
- * `/agents` and `/workflows` open the same three-level overlay:
+ * `/agents` and `/workflows` open the same three-level browser:
  *   runs ──enter/l──▶ run detail ──enter/l──▶ agent transcript
  *        ◀──esc/h───            ◀──esc/h────
  *
@@ -22,7 +22,6 @@ import { reportDiagnostic } from "../../diagnostics.js";
 import { errorMessage } from "../../util.js";
 import { formatTokenUsage, hasTokenUsage, type ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
-import { suppressInlineImages } from "../suppress-inline-images.js";
 import { AgentView } from "./agent-view.js";
 import {
   cycleFilter,
@@ -236,7 +235,6 @@ function openNavigator(
         disposeAgentView();
         if (timer) clearInterval(timer);
         timer = undefined;
-        restoreImages();
       };
       const finish = () => {
         cleanup();
@@ -370,12 +368,6 @@ function openNavigator(
         rerender();
       };
 
-      // Inline images paint over overlays (see suppress-inline-images.ts);
-      // hide them while the navigator is up. Registered last: anything above
-      // that throws would reject the factory without running dispose, and the
-      // patch would then outlive the overlay.
-      const restoreImages = suppressInlineImages(tui);
-
       const component: Component & { dispose?(): void } = {
         render: (width: number) => {
           const maxTotal = navigatorRowBudget(tui);
@@ -406,7 +398,6 @@ function openNavigator(
 
       return component;
     },
-    { overlay: true, overlayOptions: { width: "90%", maxHeight: "90%", anchor: "center", margin: 1 } },
   );
 }
 
@@ -500,7 +491,7 @@ function navigatorRowBudget(tui: TUI): number {
   return Math.max(8, Math.floor((tui.terminal?.rows ?? 24) * 0.9));
 }
 
-/** Approximate selectable rows in one overlay viewport, excluding box chrome and headers. */
+/** Approximate selectable rows in one navigator viewport, excluding box chrome and headers. */
 function navigationPageSize(tui: TUI): number {
   return Math.max(1, navigatorRowBudget(tui) - 7);
 }

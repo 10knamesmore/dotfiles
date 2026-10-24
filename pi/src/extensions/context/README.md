@@ -1,6 +1,6 @@
 # Context Inspector
 
-`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。命令直接打开导航列表，首项为总览；有 provider payload 时，第二项为最近一次观察的 **Full request JSON**。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
+`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器在输入区域打开，不使用悬浮层。命令直接打开导航列表，首项为总览；有 provider payload 时，第二项为最近一次观察的 **Full request JSON**。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
 
 分区标题使用整行背景条，字段标签、数值和说明分色；增删改分别使用成功、错误和警告色。JSON 与 prompt 标签使用语法高亮并显示行号。列表按内容类别标注，选中项使用整行背景。颜色跟随当前 Pi 主题。
 

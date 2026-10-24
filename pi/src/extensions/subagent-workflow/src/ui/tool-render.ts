@@ -4,8 +4,7 @@
  * Every run is background: the tool returns as soon as its child starts, so the
  * details it attaches are a launch receipt - who was spawned, on what model -
  * and never change afterwards. Live progress, tokens, and elapsed time live in
- * the /agents navigator, a full-screen overlay whose repaints always land inside
- * the viewport.
+ * the /agents navigator in the input area.
  *
  * That split is deliberate. Pi draws inline, and pi-tui escalates to a full
  * redraw - which erases the terminal's scrollback and snaps the view to the
@@ -15,10 +14,6 @@
  * ticking elapsed) would therefore repaint the whole screen on every render any
  * component asks for, for the rest of the session, and the user could never
  * scroll back.
- *
- * Overlays are exempt for their own repaints only. Shrinking the base line
- * buffer while one is mounted shifts every overlay line up and forces the same
- * full redraw - see `paint` in ./status-widget.ts.
  */
 
 import { wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";

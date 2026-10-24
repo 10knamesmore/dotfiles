@@ -29,6 +29,8 @@ export class ContextAppearance {
   public section!: Color;
   public selected!: Color;
   public stripe!: Color;
+  private frameWidth = 0;
+  private framedRows = new Map<string, string>();
 
   public constructor(public readonly theme: Theme) {
     this.refresh();
@@ -39,6 +41,7 @@ export class ContextAppearance {
     this.section = mixColors(this.surface, this.theme.colors.accent, 0.16);
     this.selected = mixColors(this.surface, this.theme.colors.accent, 0.3);
     this.stripe = mixColors(this.surface, this.theme.colors.text, 0.045);
+    this.framedRows.clear();
   }
 
   public fill(text: string, width: number, background = this.surface): string {
@@ -49,11 +52,19 @@ export class ContextAppearance {
 
   public panel(body: string[], width: number, title: string, help: string): string[] {
     const inner = Math.max(1, width - 4);
-    const frame = (line: string) =>
-      this.fill(`${this.theme.fg("border", "│")} ${this.fill(line, inner)} ${this.theme.fg("border", "│")}`, width);
+    if (this.frameWidth !== width) this.framedRows.clear();
+    this.frameWidth = width;
+    const nextFramedRows = new Map<string, string>();
+    const frame = (line: string) => {
+      const rendered =
+        this.framedRows.get(line) ??
+        this.fill(`${this.theme.fg("border", "│")} ${this.fill(line, inner)} ${this.theme.fg("border", "│")}`, width);
+      nextFramedRows.set(line, rendered);
+      return rendered;
+    };
     const edge = (left: string, right: string) =>
       this.fill(this.theme.fg("border", `${left}${"─".repeat(Math.max(0, width - 2))}${right}`), width);
-    return [
+    const lines = [
       edge("┌", "┐"),
       frame(
         this.fill(this.theme.style(stripTerminalSequences(title), { fg: "accent", bold: true }), inner, this.selected),
@@ -62,6 +73,8 @@ export class ContextAppearance {
       frame(this.fill(this.theme.fg("muted", help), inner, this.section)),
       edge("└", "┘"),
     ];
+    this.framedRows = nextFramedRows;
+    return lines;
   }
 }
 

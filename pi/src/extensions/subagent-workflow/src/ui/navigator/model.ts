@@ -4,7 +4,7 @@
  * Runs owned by this process render from the runner's synchronous in-memory
  * projection. Non-owned runs render from durable snapshots. `isLive` is used
  * only to pin active runs to the top of the list; live handles (steer/stop and
- * transcript following) remain in the overlay shell.
+ * transcript following) remain in the navigator.
  */
 
 import { join } from "node:path";
@@ -205,7 +205,7 @@ export class NavigatorState {
     return undefined;
   }
 
-  /** Pop one level. Returns false when already at the run list (caller closes the overlay). */
+  /** Pop one level. Returns false when already at the run list (caller closes the navigator). */
   back(): boolean {
     if (this.stack.length <= 1) return false;
     this.stack.pop();

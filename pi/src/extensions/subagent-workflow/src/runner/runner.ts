@@ -490,7 +490,7 @@ export class SubagentRunner {
   get(id: string): SubagentHandle | undefined {
     return this.handles.get(id);
   }
-  /** Live handles belonging to a run, for the navigator's live overlay. */
+  /** Live handles belonging to a run, for the navigator. */
   runHandles(runId: string): SubagentHandle[] {
     return [...this.handles.values()].filter((handle) => handle.runId === runId);
   }

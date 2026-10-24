@@ -9,6 +9,8 @@ export class SourceContent implements Component {
   private viewportKey: string | undefined;
   private revision = 0;
   private requestedRevision = -1;
+  private decoratedWidth = 0;
+  private decoratedRows = new Map<number, string>();
 
   public constructor(
     private readonly documentId: number,
@@ -66,15 +68,33 @@ export class SourceContent implements Component {
         this.appearance.fill(index === 0 ? this.appearance.theme.fg("muted", "Preparing source…") : "", width),
       );
     }
-    return viewport.lines.slice(scrollTop - viewport.firstRow, end - viewport.firstRow).map(({ text, sourceLine }) => {
-      const number = sourceLine === undefined ? "" : String(sourceLine);
-      const gutter = this.appearance.theme.fg("dim", `${number.padStart(viewport.gutterWidth)} │ `);
-      return this.appearance.fill(gutter + text, width);
-    });
+    if (this.decoratedWidth !== width) this.decoratedRows.clear();
+    this.decoratedWidth = width;
+    const nextDecoratedRows = new Map<number, string>();
+    const lines = viewport.lines
+      .slice(scrollTop - viewport.firstRow, end - viewport.firstRow)
+      .map(({ text, sourceLine }, offset) => {
+        const row = scrollTop + offset;
+        let decorated = this.decoratedRows.get(row);
+        if (decorated === undefined) {
+          const number = sourceLine === undefined ? "" : String(sourceLine);
+          const gutter = this.appearance.theme.fg("dim", `${number.padStart(viewport.gutterWidth)} │ `);
+          decorated = this.appearance.fill(gutter + text, width);
+        }
+        nextDecoratedRows.set(row, decorated);
+        return decorated;
+      });
+    this.decoratedRows = nextDecoratedRows;
+    return lines;
   }
 
   public invalidate(): void {
     this.revision++;
     this.viewport = undefined;
+    this.invalidateAppearance();
+  }
+
+  public invalidateAppearance(): void {
+    this.decoratedRows.clear();
   }
 }

@@ -349,7 +349,8 @@ export async function inspectContext(
           const themeChanged = sourceLayouts.updateTheme(theme);
           filterEditor?.input.invalidate();
           for (const detail of details.values()) {
-            if (detail.kind === "report" || themeChanged) detail.content.invalidate();
+            if (detail.kind === "source" && !themeChanged) detail.content.invalidateAppearance();
+            else detail.content.invalidate();
           }
         },
         dispose() {
@@ -357,6 +358,5 @@ export async function inspectContext(
         },
       };
     },
-    { overlay: true, overlayOptions: { width: "90%", maxHeight: "90%", anchor: "center", margin: 1 } },
   );
 }
