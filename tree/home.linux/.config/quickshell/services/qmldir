@@ -1,4 +1,5 @@
 singleton AudioService 1.0 AudioService.qml
+singleton BluetoothService 1.0 BluetoothService.qml
 singleton MediaService 1.0 MediaService.qml
 singleton NetworkService 1.0 NetworkService.qml
 singleton WeatherService 1.0 WeatherService.qml

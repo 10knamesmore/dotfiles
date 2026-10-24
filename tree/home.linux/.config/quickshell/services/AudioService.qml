@@ -1,59 +1,57 @@
 pragma Singleton
 
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.Pipewire
 
-// 音量服务。读取由 PipeWire defaultAudioSink 事件驱动，写入统一通过带 -l 1.0 上限的 wpctl。
-// 不提供图标函数：各消费者图标字形不同（waybar pulseaudio vs nerdfont），自行决定。
 Singleton {
     id: root
 
+    readonly property bool ready: Pipewire.ready
+    readonly property var devices: Pipewire.nodes.values.filter(node => node.audio && !node.isStream)
+    readonly property var outputs: devices.filter(node => node.isSink)
+    readonly property var inputs: devices.filter(node => !node.isSink)
     readonly property var sink: Pipewire.defaultAudioSink
-    readonly property int volume: sink && sink.audio ? Math.round(sink.audio.volume * 100) : 0
-    readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
+    readonly property var source: Pipewire.defaultAudioSource
+    readonly property int volume: sink?.audio ? Math.round(sink.audio.volume * 100) : 0
+    readonly property bool muted: sink?.audio?.muted ?? false
 
-    // PipeWire 节点属性需 tracker 才会实时同步，否则 volume 恒为 0
+    // 节点被 tracker 持有时，音量和设备属性才会订阅 PipeWire 更新。
     PwObjectTracker {
-        objects: root.sink ? [root.sink] : []
+        objects: root.devices
     }
 
-    // 设为绝对百分比（0~100）
-    function setVolume(pct) {
-        let v = Math.max(0, Math.min(100, pct)) / 100;
-        _setProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", v.toFixed(2)];
-        _setProc.running = true;
+    function setDeviceVolume(node, percent) {
+        node.audio.volume = Math.max(0, Math.min(100, percent)) / 100;
     }
 
-    // 相对增减（deltaPct 可正可负，单位 %）
-    function step(deltaPct) {
-        let sign = deltaPct >= 0 ? (Math.abs(deltaPct) + "%+") : (Math.abs(deltaPct) + "%-");
-        _setProc.command = ["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", sign];
-        _setProc.running = true;
+    function setVolume(percent) {
+        if (sink)
+            setDeviceVolume(sink, percent);
+    }
+
+    function step(deltaPercent) {
+        setVolume(volume + deltaPercent);
     }
 
     function toggleMute() {
-        _muteProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"];
-        _muteProc.running = true;
+        if (sink)
+            sink.audio.muted = !sink.audio.muted;
     }
 
-    Process {
-        id: _setProc
-        onExited: exitCode => {
-            if (exitCode === 0)
-                console.info("[audio] set-volume completed:", command[5]);
-            else
-                console.warn("[audio] set-volume failed, exit:", exitCode);
-        }
+    function selectDevice(node) {
+        if (node.isSink)
+            Pipewire.preferredDefaultAudioSink = node;
+        else
+            Pipewire.preferredDefaultAudioSource = node;
     }
 
-    Process {
-        id: _muteProc
-        onExited: exitCode => {
-            if (exitCode === 0)
-                console.info("[audio] mute toggle completed");
-            else
-                console.warn("[audio] mute toggle failed, exit:", exitCode);
-        }
+    function bluetoothOutput(address) {
+        return outputs.find(node => node.properties["api.bluez5.address"] === address) ?? null;
+    }
+
+    function deviceFormat(node) {
+        const properties = node.properties;
+        return [properties["api.bluez5.profile"], properties["api.bluez5.codec"]]
+            .filter(value => !!value).join(" · ").toUpperCase();
     }
 }

@@ -15,3 +15,4 @@
 - 变量命名, 注释， prose, 类型/api/函数/模块设计 都必须以`human facing`为第一原则， 没有达到`作为0先验知识的人类维护者能一眼看出来大致意思`就是不合格
 - 我关注代码美学与架构设计, 生产代码都需注意相关的 naming/模块设计/层次关系/高内聚低耦合(封装边界)/生命周期/底层不要依赖上层
 - prefer `rg`/`fd` than `grep` / `find`, 前者尊重gitignore
+- when designing frontend, dont use label/desciption/subtitle, let the layout describe it self

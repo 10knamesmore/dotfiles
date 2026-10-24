@@ -1,4 +1,5 @@
 Dropdown 1.0 Dropdown.qml
+ActionButton 1.0 ActionButton.qml
 FadeOutListItem 1.0 FadeOutListItem.qml
 PanelOverlay 1.0 PanelOverlay.qml
 PanelBorderGlow 1.0 PanelBorderGlow.qml

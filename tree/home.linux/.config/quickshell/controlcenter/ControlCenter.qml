@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import "../bluetooth"
+import "../audio"
 import "../clipboard"
 import "../components"
 import "../display"
@@ -22,13 +23,14 @@ PanelOverlay {
     readonly property string currentPage: PanelState.controlCenterPage
     readonly property bool controlTab: PanelState.controlCenterTab === 0
     readonly property bool inDetail: controlTab && currentPage !== "home"
-    readonly property real targetInfoHeight: controlTab ? Math.min(systemInfo.implicitHeight, root.height * 0.35) : 0
+    readonly property real targetInfoHeight: currentPage === "home" ? Math.min(systemInfo.implicitHeight, root.height * 0.35) : 0
     property real infoHeight: targetInfoHeight
     readonly property real pageHeight: currentPage === "home" ? overview.implicitHeight : currentPage === "effects" ? effects.implicitHeight : 520
     readonly property var pages: ({
             home: homePage,
             network: networkPage,
             bluetooth: bluetoothPage,
+            audio: audioPage,
             notifications: notificationPage,
             clipboard: clipboardPage,
             display: displayPage,
@@ -208,7 +210,7 @@ PanelOverlay {
                 Layout.bottomMargin: visible ? 12 : 0
                 Layout.preferredHeight: root.infoHeight
                 Layout.maximumHeight: root.infoHeight
-                visible: root.controlTab
+                visible: root.currentPage === "home"
                 active: root.showing && visible
             }
 
@@ -244,6 +246,15 @@ PanelOverlay {
             BluetoothPage {
                 anchors.fill: parent
                 showing: bluetoothPage.showing
+            }
+        }
+
+        CenterPage {
+            id: audioPage
+            name: "audio"
+            AudioPage {
+                anchors.fill: parent
+                showing: audioPage.showing
             }
         }
 

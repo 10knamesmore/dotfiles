@@ -1,13 +1,14 @@
 import "../theme"
+import "../audio"
+import "../components"
 import "../state"
 import "../services"
 import "../screen-effects"
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Quickshell.Bluetooth
 
-// 控制首页只展示连接摘要和常用亮度；滑块与详情入口分层，不删减原有设置。
+// 首页提供连接、声音和亮度的快捷操作，设备详情在对应子页管理。
 Flickable {
     id: root
 
@@ -43,11 +44,56 @@ Flickable {
             }
 
             ConnectionCard {
-                icon: Bluetooth.defaultAdapter?.enabled ? "󰂯" : "󰂲"
+                icon: BluetoothService.powered ? "󰂯" : "󰂲"
                 label: "蓝牙"
-                status: Bluetooth.defaultAdapter?.enabled ? "已开启" : "已关闭"
-                connected: Bluetooth.defaultAdapter?.enabled ?? false
+                status: !BluetoothService.ready ? "服务未就绪" : BluetoothService.connectedDevices.length
+                    ? BluetoothService.connectedDevices.map(device => device.name).join("、")
+                    : BluetoothService.powered ? "未连接设备" : "已关闭"
+                connected: BluetoothService.connectedDevices.length > 0
                 onClicked: PanelState.openControlCenter("bluetooth")
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: audioControls.implicitHeight + Tokens.spaceL * 2
+            radius: Tokens.radiusM
+            color: Colors.withAlpha(Colors.surface1, Tokens.cardAlpha)
+            border.width: 1
+            border.color: Colors.overlay(0.05)
+
+            ColumnLayout {
+                id: audioControls
+                anchors.fill: parent
+                anchors.margins: Tokens.spaceL
+                spacing: Tokens.spaceS
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: "󰕾"
+                        color: Colors.peach
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.icon
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: AudioService.sink?.description ?? "没有声音输出"
+                        elide: Text.ElideRight
+                        color: Colors.text
+                        font.family: Fonts.family
+                        font.pixelSize: Fonts.body
+                    }
+                    ActionButton {
+                        text: "声音 ›"
+                        accent: Colors.peach
+                        onClicked: PanelState.openControlCenter("audio")
+                    }
+                }
+                DeviceVolume {
+                    Layout.fillWidth: true
+                    node: AudioService.sink
+                }
             }
         }
 

@@ -5,9 +5,8 @@ import "../../state"
 import "../../services"
 import "../components"
 import QtQuick
-import Quickshell.Bluetooth
 
-// 四个功能入口与最右侧控制首页 handle 共用顶栏模块；只高亮自身，不移动、缩放或弹出提示。
+// 功能入口与最右侧控制首页共用顶栏模块。
 BarModule {
     id: root
 
@@ -31,8 +30,15 @@ BarModule {
         EntryButton {
             page: "bluetooth"
             label: "蓝牙"
-            icon: Bluetooth.defaultAdapter?.enabled ? "󰂯" : "󰂲"
-            iconColor: Bluetooth.defaultAdapter?.enabled ? Colors.blue : Colors.overlay1
+            icon: BluetoothService.powered ? "󰂯" : "󰂲"
+            iconColor: BluetoothService.connectedDevices.length > 0 ? Colors.blue : Colors.overlay1
+        }
+
+        EntryButton {
+            page: "audio"
+            label: "声音"
+            icon: AudioService.muted ? "󰝟" : "󰕾"
+            iconColor: AudioService.sink && !AudioService.muted ? Colors.peach : Colors.overlay1
         }
 
         EntryButton {
