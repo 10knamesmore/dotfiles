@@ -1,5 +1,7 @@
 import "../../theme"
 import "../../state"
+import "../../services"
+import "../../calendar/weather/WeatherFormat.js" as WeatherFormat
 import "../components"
 import QtQuick
 import Quickshell
@@ -9,8 +11,10 @@ BarModule {
     id: root
 
     property bool showDate: false
-    readonly property real compactWidth: timeText.implicitWidth + (showDate ? 0 : secondsText.implicitWidth) + horizontalPadding * 2
-    readonly property real hoverWidth: timeText.implicitWidth + (showDate ? 0 : dateText.implicitWidth) + horizontalPadding * 2
+    readonly property var currentWeather: WeatherService.weather ? WeatherService.weather.current : null
+    readonly property string weatherSummary: currentWeather ? WeatherService.wmoDesc(currentWeather.code) + " " + WeatherFormat.temperature(currentWeather.temp) : ""
+    readonly property real compactWidth: timeText.implicitWidth + (showDate ? 0 : secondsText.implicitWidth) + weatherText.implicitWidth + horizontalPadding * 2
+    readonly property real hoverWidth: timeText.implicitWidth + (showDate ? 0 : dateText.implicitWidth) + weatherText.implicitWidth + horizontalPadding * 2
 
     function openCalendar() {
         PanelState.closeAll();
@@ -22,7 +26,7 @@ BarModule {
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: "日历"
-    Accessible.description: Qt.formatDateTime(clock.date, "yyyy/MM/dd ddd HH:mm:ss")
+    Accessible.description: Qt.formatDateTime(clock.date, "yyyy/MM/dd ddd HH:mm:ss") + (currentWeather ? "，" + WeatherService.cityName + " " + weatherSummary : "")
     Accessible.checkable: true
     Accessible.checked: PanelState.calendarOpen
     Accessible.onPressAction: root.openCalendar()
@@ -39,8 +43,18 @@ BarModule {
     Row {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
+        height: timeText.implicitHeight
         spacing: 0
 
+        Text {
+            id: weatherText
+            anchors.baseline: timeText.baseline
+            text: root.currentWeather ? WeatherService.wmoIcon(root.currentWeather.code, root.currentWeather.isDay) + " " + root.weatherSummary + "  " : ""
+            color: Colors.text
+            font.family: Fonts.family
+            font.pixelSize: Fonts.bodyLarge
+            font.weight: Font.ExtraBold
+        }
         Text {
             id: timeText
             text: root.showDate ? Qt.formatDate(clock.date, "dddd, MMMM d, yyyy") + " 󰃰" : Qt.formatTime(clock.date, "HH:mm")
@@ -51,6 +65,7 @@ BarModule {
         }
         Text {
             id: secondsText
+            anchors.baseline: timeText.baseline
             text: Qt.formatTime(clock.date, ":ss")
             visible: !root.showDate
             width: implicitWidth * (1 - root.detailProgress)
@@ -63,6 +78,7 @@ BarModule {
         }
         Text {
             id: dateText
+            anchors.baseline: timeText.baseline
             text: "  " + Qt.formatDate(clock.date, "MM/dd ddd")
             visible: !root.showDate
             width: implicitWidth * root.detailProgress
