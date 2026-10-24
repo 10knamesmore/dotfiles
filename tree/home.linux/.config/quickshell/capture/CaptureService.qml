@@ -5,8 +5,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 所有屏幕共用一次捕获和录制会话。持有 Python 后端、临时截图和 Portal 请求；
-// 浮层读取 snapshot/mode，状态栏读取 recordingState。成功导出或取消后回收原图。
+// 所有屏幕共用捕获会话。QML 持有冻结帧，Rust 后端管理桌面元数据、图片导出与录屏；
+// 成功导出或取消时销毁浮层，释放帧缓冲并清理临时导出文件。
 Singleton {
     id: root
 
@@ -16,6 +16,9 @@ Singleton {
     property string target: "region"
     property var snapshot: null
     property string snapshotId: ""
+    property var capturedScreens: []
+    property real captureStartedAt: 0
+    readonly property bool framesReady: snapshot !== null && capturedScreens.length === snapshot.screens.length
     property string activeScreen: ""
     property var picker: null
     property bool exporting: false
@@ -53,6 +56,7 @@ Singleton {
         const previous = snapshotId;
         snapshot = null;
         snapshotId = "";
+        capturedScreens = [];
         if (previous && ready)
             send({
                 type: "release",
@@ -61,11 +65,20 @@ Singleton {
     }
 
     function capture() {
+        captureStartedAt = Date.now();
         snapshotId = "capture-" + (++requestSerial);
         send({
             type: "snapshot",
             requestId: snapshotId
         });
+    }
+
+    function frameReady(screenName) {
+        capturedScreens = capturedScreens.concat([screenName]);
+        if (framesReady) {
+            PanelState.closeAll();
+            console.info("[capture] frames ready displays=" + capturedScreens.length + " elapsed_ms=" + (Date.now() - captureStartedAt));
+        }
     }
 
     // mode 切换复用同一张冻结原图，不截到自己的工具条。
@@ -207,11 +220,10 @@ Singleton {
                 });
                 return;
             }
-            snapshot = event;
             const pointer = event.pointer;
             const screen = event.screens.find(s => pointer.x >= s.x && pointer.y >= s.y && pointer.x < s.x + s.width && pointer.y < s.y + s.height);
             activeScreen = (screen || event.screens[0]).name;
-            PanelState.closeAll();
+            snapshot = event;
             break;
         case "exported":
             if (event.requestId !== snapshotId)
@@ -295,9 +307,10 @@ Singleton {
 
     Process {
         id: backend
-        command: ["python3", "-u", Quickshell.shellPath("capture/backend/launcher.py")]
+        command: ["desktop-backend", "capture"]
         running: true
         stdinEnabled: true
+        onStarted: console.info("[capture] backend launcher started")
         stdout: SplitParser {
             onRead: line => root.receive(JSON.parse(line))
         }
@@ -310,6 +323,7 @@ Singleton {
             root.mode = "";
             root.snapshot = null;
             root.snapshotId = "";
+            root.capturedScreens = [];
             root.picker = null;
             if (root.waitingForOldBackend) {
                 restartAfterReload.restart();

@@ -72,6 +72,8 @@ Rectangle {
 
         RowLayout {
             visible: CaptureService.mode === "screenshot" || CaptureService.mode === "portal"
+            Layout.fillWidth: true
+            uniformCellSizes: true
             spacing: 7
             Repeater {
                 model: [
@@ -90,6 +92,7 @@ Rectangle {
                 ]
                 CaptureButton {
                     required property var modelData
+                    Layout.fillWidth: true
                     text: modelData.label
                     checkable: true
                     checked: CaptureService.target === modelData.id
@@ -100,11 +103,6 @@ Rectangle {
                             root.surface.selectOutput();
                     }
                 }
-            }
-            Text {
-                text: CaptureService.target === "region" ? "拖动框选 · 边缘调整 · 内部移动" : CaptureService.target === "window" ? "点击窗口" : "点击要捕获的显示器"
-                color: Colors.subtext0
-                font.pixelSize: 12
             }
         }
 

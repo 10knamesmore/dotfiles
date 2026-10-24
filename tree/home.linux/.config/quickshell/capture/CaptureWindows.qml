@@ -11,6 +11,7 @@ Scope {
             id: overlay
             required property var modelData
             screen: Quickshell.screens.find(s => s.name === modelData.name) || null
+            // 先映射透明窗口以初始化 Qt 渲染资源，所有屏幕取到单帧后才显示编辑器。
             visible: CaptureService.visible
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
@@ -26,6 +27,12 @@ Scope {
             CaptureSurface {
                 anchors.fill: parent
                 screenInfo: overlay.modelData
+                captureScreen: overlay.screen
+                opacity: CaptureService.framesReady ? 1 : 0
+                onImageReadyChanged: {
+                    if (imageReady)
+                        CaptureService.frameReady(screenInfo.name);
+                }
             }
         }
     }

@@ -135,6 +135,15 @@ dots.install.cargo({
   platforms = { "macos" },
 })
 
+dots.install.cargo({
+  source = {
+    path = "cli/programs/desktop-backend",
+    binary = "desktop-backend",
+  },
+  root = "~/.local",
+  platforms = { "linux" },
+})
+
 local cargo_packages = {
   "matugen",
   "du-dust",

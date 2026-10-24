@@ -10,6 +10,7 @@ Item {
     id: root
 
     required property var screenInfo
+    required property var captureScreen
     readonly property bool active: CaptureService.activeScreen === screenInfo.name
     readonly property real displayScale: width / screenInfo.pixelWidth
     property rect selection: Qt.rect(0, 0, 0, 0)
@@ -23,12 +24,14 @@ Item {
     property var draft: null
     property var pixelateSource: null
     property var sourcePixels: null
+    property var sourceGrab: null
+    property string sourceImageUrl: ""
+    property bool readingSourcePixels: false
     property string pixelateImageUrl: ""
     property var pixelateGrab: null
     property int pixelateSerial: 0
     property bool preparingPixelation: false
     readonly property bool imageReady: artwork.imageReady
-    readonly property string originalImageUrl: "file://" + screenInfo.image
     property string dragKind: ""
     property point dragStart: Qt.point(0, 0)
     property rect dragSelection: Qt.rect(0, 0, 0, 0)
@@ -184,7 +187,7 @@ Item {
     function sample(point) {
         if (!imageReady || !sourcePixels)
             return false;
-        // 从原始 PNG 读像素，不读取被 Qt DPR 放大的显示缓冲。
+        // 从原图读像素，不读取被 Qt DPR 放大的显示缓冲。
         const index = (Math.floor(point.y) * sourcePixels.width + Math.floor(point.x)) * 4;
         const data = sourcePixels.data;
         const pixel = [data[index], data[index + 1], data[index + 2]];
@@ -194,33 +197,26 @@ Item {
         return true;
     }
 
-    // Qt 会把 targetSize 再乘窗口有效 DPR。Wayland 分数缩放下 Screen 的 DPR
-    // 可能取整，必须读实际窗口；saveToFile 则不受虚拟 QML baseUrl 影响。
-    function grabArtwork(completed) {
-        const pixelRatio = root.Window.window.devicePixelRatio;
-        const started = artwork.grabToImage(completed, Qt.size(Math.round(screenInfo.pixelWidth / pixelRatio), Math.round(screenInfo.pixelHeight / pixelRatio)));
-        if (!started) {
-            CaptureService.errorText = "无法读取标注画布";
-            console.error("[capture] artwork grab failed");
-            completed(null);
-        }
-    }
-
-    function renderArtwork(path, completed) {
-        grabArtwork(result => {
-            const saved = result !== null && result.saveToFile(path);
-            if (result && !saved) {
-                CaptureService.errorText = "无法生成标注图片";
-                console.error("[capture] artwork save failed");
+    function readImage(item, region, completed) {
+        const readback = readbackComponent.createObject(root, {
+            capturedItem: item,
+            region: region,
+            coordinateScale: displayScale,
+            windowPixelRatio: root.Window.window.devicePixelRatio
+        }) as CaptureReadback;
+        readback.read(result => {
+            if (!result) {
+                CaptureService.errorText = "无法读取截图画面";
+                console.error("[capture] image readback failed");
             }
-            completed(saved);
+            completed(result);
         });
     }
 
     function preparePixelation() {
         const serial = ++pixelateSerial;
         preparingPixelation = true;
-        grabArtwork(result => {
+        readImage(artwork, Qt.rect(0, 0, screenInfo.pixelWidth, screenInfo.pixelHeight), result => {
             if (serial !== pixelateSerial || tool !== "pixelate")
                 return;
             if (!result) {
@@ -246,20 +242,29 @@ Item {
     }
 
     function loadSourcePixels() {
-        if (!pixelReader.available || sourcePixels || !pickingColor)
+        if (!pixelReader.available || !imageReady || sourcePixels || readingSourcePixels || !pickingColor)
             return;
-        pixelReader.loadImage(originalImageUrl);
-        acceptSourcePixels();
+        readingSourcePixels = true;
+        readImage(artwork.frozenImage, Qt.rect(0, 0, screenInfo.pixelWidth, screenInfo.pixelHeight), result => {
+            readingSourcePixels = false;
+            if (!result)
+                return;
+            sourceGrab = result;
+            sourceImageUrl = result.url.toString();
+            pixelReader.loadImage(sourceImageUrl);
+            acceptSourcePixels();
+        });
     }
 
     function acceptSourcePixels() {
-        if (sourcePixels || !pixelReader.isImageLoaded(originalImageUrl))
+        if (sourcePixels || !sourceImageUrl || !pixelReader.isImageLoaded(sourceImageUrl))
             return;
-        sourcePixels = pixelReader.getContext("2d").createImageData(originalImageUrl);
+        sourcePixels = pixelReader.getContext("2d").createImageData(sourceImageUrl);
         sample(pointer);
     }
 
     onPickingColorChanged: loadSourcePixels()
+    onImageReadyChanged: loadSourcePixels()
 
     onToolChanged: {
         if (tool === "pixelate") {
@@ -307,18 +312,21 @@ Item {
             }
         } else if (CaptureService.mode === "screenshot" && hasSelection) {
             commitText();
-            const path = screenInfo.image + ".annotated.bmp";
+            const crop = {
+                x: 0,
+                y: 0,
+                width: selection.width,
+                height: selection.height
+            };
+            const path = screenInfo.exportPath;
             CaptureService.exporting = true;
-            renderArtwork(path, saved => {
-                if (saved)
-                    CaptureService.exportImage(path, {
-                        x: selection.x,
-                        y: selection.y,
-                        width: selection.width,
-                        height: selection.height
-                    }, action);
-                else
+            readImage(artwork, selection, result => {
+                if (result && result.saveToFile(path)) {
+                    CaptureService.exportImage(path, crop, action);
+                } else {
+                    CaptureService.errorText = "无法生成截图图片";
                     CaptureService.exporting = false;
+                }
             });
         }
     }
@@ -350,10 +358,15 @@ Item {
     CaptureArtwork {
         id: artwork
         anchors.fill: parent
-        source: root.originalImageUrl
+        screen: root.captureScreen
         annotations: root.annotations
         draft: root.draft
         coordinateScale: root.displayScale
+    }
+
+    Component {
+        id: readbackComponent
+        CaptureReadback {}
     }
 
     // 只在取色或马赛克需要时读取像素，不创建整屏显示缓冲，也不参与画面导出。
@@ -434,8 +447,9 @@ Item {
     MouseArea {
         id: pointerArea
         anchors.fill: parent
+        enabled: CaptureService.framesReady
         hoverEnabled: true
-        // 选区只依赖尺寸，可在底图异步解码时开始；录制和导出期间仍拦截桌面点击。
+        // 录制和导出期间仍拦截桌面点击。
         cursorShape: CaptureService.mode.startsWith("record-") ? Qt.ArrowCursor : root.tool === "text" ? Qt.IBeamCursor : Qt.CrossCursor
         onPressed: mouse => {
             if (CaptureService.exporting || root.preparingPixelation || CaptureService.mode.startsWith("record-"))

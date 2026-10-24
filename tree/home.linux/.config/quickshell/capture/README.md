@@ -4,9 +4,9 @@ Quickshell 内完成截图、原位标注、取色和录屏来源选择，不启
 
 ## 依赖与接入
 
-- Quickshell、Qt 6.11+、Python 3.11+、Pillow、`grim`、`wl-clipboard`、`xdg-user-dirs`。
+- Quickshell（含 `Quickshell.Wayland.ScreencopyView`）、Qt 6.11+、`desktop-backend`、`wl-clipboard`、`xdg-user-dirs`。
 - 录屏另需 `gpu-screen-recorder`、`xdg-desktop-portal`、`xdg-desktop-portal-hyprland`、PipeWire，以及用于识别 Portal 调用者的 `busctl`。音频通过 PulseAudio 接口读取默认输出与默认输入，使用 PipeWire 时需 `pipewire-pulse`。
-- `dots sync` 分发配置与 `dots-capture-picker`，不安装这些系统依赖。安装依赖后重新加载 Quickshell。
+- `dots install` 构建并安装 `desktop-backend`；`dots sync` 分发配置与 `dots-capture-picker`。其余系统依赖需先安装，再重新加载 Quickshell。
 - `~/.config/hypr/xdph.conf` 指定自定义 picker；Portal 服务的 `PATH` 须包含 `$DOTS_SCRIPTS`。更新 Portal 后重启对应用户服务；重启会中断现有屏幕共享。
 
 窗口录制要求 Portal 正确处理窗口尺寸变化。已验证 GSR 6.1.3 与 [XDPH e87ae78](https://github.com/hyprwm/xdg-desktop-portal-hyprland/commit/e87ae7823e7bf0601385220c69b5a3b245123fc5)；XDPH 发行包 `1.4.1-2` 在窗口缩放时会花屏，需要更新，不能用矩形录制代替真窗口录制。
@@ -38,10 +38,14 @@ Quickshell 内完成截图、原位标注、取色和录屏来源选择，不启
 
 ## 生命周期与屏幕共享
 
-原图与标注中间文件位于当前 Hyprland 会话的私有运行时目录，完成、取消或后端退出时清理。复制后的剪贴板由 `wl-copy` 持有，不依赖浮层继续存在。
+`ScreencopyView` 通过 Wayland 获取各显示器的单帧缓冲，直接作为冻结底图；不调用 `grim`，不生成整屏临时图片。所有显示器的帧就绪后显示编辑器，模式切换复用这些帧。完成或取消时销毁浮层并释放帧缓冲。
+
+导出时，`CaptureReadback` 只把选区内的底图与标注合成为原分辨率 BMP。Rust 后端使用 `image` 在后台线程中去除 Qt DPR 对齐产生的补齐边缘并编码 PNG，再保存或交给 `wl-copy`。取色与马赛克按需回读冻结帧，不重新截屏。
+
+临时选区 BMP 位于当前 Hyprland 会话的私有运行时目录，完成、取消或后端退出时清理。复制后的剪贴板由 `wl-copy` 持有，不依赖浮层继续存在。
 
 自定义 picker 同样接管浏览器等应用的 Portal 屏幕共享请求，因此使用这些请求时 Quickshell 必须运行。每次请求都需要明确选择，不使用记忆授权或预先批准的来源。正在编辑截图时，新共享请求会被拒绝，完成当前操作后重试。
 
-后端只停止自己启动的录屏进程，不按名称结束其他录像。Quickshell 的 Process 会在重载时强制结束它跟踪的进程，因此它跟踪 `backend/launcher.py`；真正的后端在输入管道关闭后完成录制保存与临时文件清理。
+后端源码位于 `cli/programs/desktop-backend/src/capture/`，只停止自己启动的录屏进程，不按名称结束其他录像。Quickshell 的 Process 会在重载时强制结束它跟踪的进程，因此它跟踪外层 `desktop-backend capture`；内部 `capture-server` 在输入管道关闭后完成录制保存与临时文件清理。
 
 诊断写入 Quickshell 日志，前缀为 `[capture]` 和 `[capture-backend]`。界面只展示结构化状态对应的提示，不直接显示后端内部错误。

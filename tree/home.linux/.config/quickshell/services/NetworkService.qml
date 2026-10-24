@@ -4,7 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 默认 IPv4 网卡的状态；libnm 和内核路由通知驱动更新，不轮询外部命令。
+// 默认 IPv4 网卡的状态；由 Rust 后端的 NetworkManager D-Bus 和 rtnetlink 事件驱动更新。
 Singleton {
     id: root
 
@@ -24,7 +24,7 @@ Singleton {
     readonly property string statusIcon: disconnected ? "󰤮" : connectionType === "wifi" ? ["󰤟", "󰤢", "󰤥", "󰤨"][Math.min(3, Math.floor(signalStrength / 25))] : "󰈀"
 
     Process {
-        command: ["/usr/bin/python3", "-u", Quickshell.shellPath("services/network-status/watch.py")]
+        command: ["desktop-backend", "network-status"]
         running: true
 
         stdout: SplitParser {

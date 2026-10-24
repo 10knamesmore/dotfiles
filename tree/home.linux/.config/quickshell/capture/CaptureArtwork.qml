@@ -1,44 +1,49 @@
+pragma ComponentBehavior: Bound
+
 import "Annotations.js" as Drawing
 import QtQuick
+import Quickshell.Wayland
 
-// 冻结底图只上传一次；已提交的标注仅在编辑历史变化时重绘。
+// Wayland 单帧缓冲直接作为冻结底图；已提交的标注仅在编辑历史变化时重绘。
 // 拖动只更新图形包围框内的透明画布，三个图层一起用于原分辨率导出。
 Item {
     id: root
 
-    required property url source
+    required property var screen
     required property var annotations
     required property var draft
     required property real coordinateScale // 原图物理像素到此 Item 逻辑坐标的比例。
-    readonly property bool imageReady: background.status === Image.Ready
+    readonly property bool imageReady: background.hasContent
+    property alias frozenImage: background
 
     function repaintDraft() {
         draftCanvas.redraw();
     }
 
-    Image {
+    ScreencopyView {
         id: background
         anchors.fill: parent
-        source: root.source
-        asynchronous: true
-        cache: false
-        smooth: false
+        captureSource: root.screen
+        live: false
+        paintCursor: false
     }
 
-    Canvas {
-        id: committedCanvas
+    Loader {
         anchors.fill: parent
-        renderTarget: Canvas.Image
-        smooth: false
-        property var annotations: root.annotations
-        onAnnotationsChanged: requestPaint()
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.reset();
-            ctx.clearRect(0, 0, width, height);
-            ctx.scale(root.coordinateScale, root.coordinateScale);
-            for (const annotation of annotations)
-                Drawing.draw(ctx, annotation);
+        active: root.annotations.length > 0
+        sourceComponent: Canvas {
+            renderTarget: Canvas.Image
+            smooth: false
+            property var annotations: root.annotations
+            onAnnotationsChanged: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                ctx.clearRect(0, 0, width, height);
+                ctx.scale(root.coordinateScale, root.coordinateScale);
+                for (const annotation of annotations)
+                    Drawing.draw(ctx, annotation);
+            }
         }
     }
 

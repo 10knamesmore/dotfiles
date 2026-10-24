@@ -24,7 +24,7 @@ Scope {
             Component.onCompleted: ResourceStats.setStatus(modelData, "waiting")
 
             Process {
-                command: ["python3", "-u", Quickshell.shellPath("services/resource-monitor/collect.py"), sampler.modelData]
+                command: ["desktop-backend", "resource-monitor", sampler.modelData]
                 running: true
 
                 stderr: SplitParser {

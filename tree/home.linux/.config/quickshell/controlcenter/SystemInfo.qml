@@ -50,34 +50,18 @@ Flickable {
     Process {
         id: packageReader
 
-        command: ["sh", "-c", [
-            "norm(){ \"$@\" | grep -oE '[0-9]+(\\.[0-9]+){1,2}' | head -n1; }",
-            "echo \"KERNEL:$(uname -r)\"",
-            "echo \"PKG:$(pacman -Q | wc -l)\"",
-            "echo \"WM:$(hyprctl version -j | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"version\"])')\"",
-            "echo \"NVIM:$(norm nvim --version)\"",
-            "echo \"NODE:$(norm node --version)\"",
-            "echo \"PYTHON:$(norm python3 --version)\"",
-            "echo \"RUST:$(norm rustc --version)\""
-        ].join(" && ")]
+        command: ["desktop-backend", "system-info"]
 
-        stdout: SplitParser {
-            onRead: data => {
-                if (data.startsWith("KERNEL:")) {
-                    root.kernel = data.substring(7).trim();
-                } else if (data.startsWith("PKG:")) {
-                    root.packageCount = parseInt(data.substring(4));
-                } else if (data.startsWith("WM:")) {
-                    root.wmVersion = data.substring(3).trim();
-                } else if (data.startsWith("NVIM:")) {
-                    root.nvimVersion = data.substring(5).trim();
-                } else if (data.startsWith("NODE:")) {
-                    root.nodeVersion = data.substring(5).trim();
-                } else if (data.startsWith("PYTHON:")) {
-                    root.pythonVersion = data.substring(7).trim();
-                } else if (data.startsWith("RUST:")) {
-                    root.rustVersion = data.substring(5).trim();
-                }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const info = JSON.parse(text);
+                root.kernel = info.kernel;
+                root.packageCount = info.packageCount;
+                root.wmVersion = info.wmVersion;
+                root.nvimVersion = info.nvimVersion;
+                root.nodeVersion = info.nodeVersion;
+                root.pythonVersion = info.pythonVersion;
+                root.rustVersion = info.rustVersion;
             }
         }
     }
