@@ -2,24 +2,24 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { WebError } from "../errors.js";
-import type { FetchedPage } from "./extract.js";
+import type { WebDocument } from "../readers/reader.js";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 128;
 const MAX_CACHE_BYTES = 128 * 1024 * 1024;
 const RESPONSE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-/** Immutable downloaded content, addressable across reloads until expiry or cache eviction. */
-export interface CachedPage extends FetchedPage {
+/** Immutable reader output, addressable across reloads until expiry or cache eviction. */
+export interface CachedPage extends WebDocument {
   responseId: string;
   fetchedAt: number;
 }
 
-/** On-disk public-page cache. Each fetch gets a new ID so pagination never switches to a newer download. */
+/** Each read gets a new ID so pagination never switches to a newer version of the content. */
 export class PageCache {
   constructor(private readonly directory: string) {}
 
-  async save(page: FetchedPage): Promise<CachedPage> {
+  async save(page: WebDocument): Promise<CachedPage> {
     const cached: CachedPage = { ...page, responseId: randomUUID(), fetchedAt: Date.now() };
     const text = JSON.stringify(cached);
     if (Buffer.byteLength(text) > MAX_CACHE_BYTES)
@@ -110,7 +110,7 @@ function isCachedPage(value: unknown): value is CachedPage {
     Number.isFinite(page.fetchedAt) &&
     typeof page.url === "string" &&
     typeof page.title === "string" &&
-    typeof page.contentType === "string" &&
+    (page.format === "markdown" || page.format === "text") &&
     typeof page.content === "string"
   );
 }

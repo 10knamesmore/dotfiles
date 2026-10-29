@@ -6,7 +6,7 @@ import { WebError } from "../errors.js";
 type LookupAddress = { address: string; family: number };
 
 /**
- * Reject non-public destinations before native fetch resolves the hostname again.
+ * Reject non-public HTTP destinations before native fetch resolves the hostname again.
  * This is a DNS policy check, not connection-level DNS pinning.
  */
 export async function validatePublicUrl(rawUrl: string | URL, signal: AbortSignal): Promise<URL> {

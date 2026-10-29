@@ -1,11 +1,11 @@
 // Adapted from pi-web-access extract.ts at 6c5afa1d0d43eef8552284ad73f4bd9f0612a378 (MIT).
 import { parseHTML } from "linkedom";
 import type TurndownService from "turndown";
-import { asWebError, WebError } from "../errors.js";
+import { WebError } from "../errors.js";
 import { readResponseText } from "../http.js";
+import type { WebDocument, WebReader } from "./reader.js";
 import { validatePublicUrl } from "./ssrf.js";
 
-const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -21,71 +21,51 @@ const PASSTHROUGH_TYPES = new Set([
   "text/xml",
 ]);
 
-export interface FetchedPage {
-  url: string;
-  title: string;
-  contentType: string;
-  content: string;
-}
-
 interface FetchResult {
   response: Response;
   finalUrl: URL;
 }
 
-/** Fetch and extract a public text webpage without browser rendering or hosted fallbacks. */
-export async function fetchPage(url: string, signal?: AbortSignal): Promise<FetchedPage> {
-  const startedAt = Date.now();
-  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const requestSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+export const httpReader: WebReader = {
+  supports: (url) => url.protocol === "http:" || url.protocol === "https:",
+  read: readHttpDocument,
+};
 
-  try {
-    requestSignal.throwIfAborted();
-    const { response, finalUrl } = await fetchFollowingRedirects(url, requestSignal);
-    checkDeadline(requestSignal, startedAt);
+async function readHttpDocument(url: URL, signal: AbortSignal): Promise<WebDocument> {
+  const { response, finalUrl } = await fetchFollowingRedirects(url, signal);
+  if (!response.ok) {
+    discardBody(response);
+    throw new WebError("http", `Remote server returned HTTP ${response.status}.`, response.status);
+  }
 
-    if (!response.ok) {
-      discardBody(response);
-      throw new WebError("http", `Remote server returned HTTP ${response.status}.`, response.status);
-    }
+  const contentType = normalizedContentType(response);
+  if (!isSupportedContentType(contentType)) {
+    discardBody(response);
+    const label = contentType || "missing Content-Type";
+    throw new WebError("unsupported", `Unsupported response content type: ${label}.`);
+  }
 
-    const contentType = normalizedContentType(response);
-    if (!isSupportedContentType(contentType)) {
-      discardBody(response);
-      const label = contentType || "missing Content-Type";
-      throw new WebError("unsupported", `Unsupported response content type: ${label}.`);
-    }
-
-    const content = await readResponseText(response, MAX_RESPONSE_BYTES);
-    checkDeadline(requestSignal, startedAt);
-
-    if (!HTML_TYPES.has(contentType)) {
-      return {
-        url: finalUrl.toString(),
-        title: extractTextTitle(content, finalUrl),
-        contentType,
-        content,
-      };
-    }
-
-    const extracted = await extractHtml(content, finalUrl);
-    checkDeadline(requestSignal, startedAt);
+  const content = await readResponseText(response, MAX_RESPONSE_BYTES);
+  signal.throwIfAborted();
+  if (!HTML_TYPES.has(contentType)) {
     return {
       url: finalUrl.toString(),
-      title: extracted.title,
-      contentType,
-      content: extracted.content,
+      title: extractTextTitle(content, finalUrl),
+      format: contentType.includes("markdown") ? "markdown" : "text",
+      content,
     };
-  } catch (error) {
-    if (signal?.aborted) throw asWebError(error, signal);
-    if (deadline.aborted || Date.now() - startedAt >= REQUEST_TIMEOUT_MS) {
-      throw new WebError("timeout", "Webpage request timed out.");
-    }
-    throw asWebError(error, signal);
   }
+
+  const extracted = await extractHtml(content, finalUrl);
+  return {
+    url: finalUrl.toString(),
+    title: extracted.title,
+    format: "markdown",
+    content: extracted.content,
+  };
 }
 
-async function fetchFollowingRedirects(url: string, signal: AbortSignal): Promise<FetchResult> {
+async function fetchFollowingRedirects(url: URL, signal: AbortSignal): Promise<FetchResult> {
   let current = await validatePublicUrl(url, signal);
 
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
@@ -202,13 +182,6 @@ function fallbackTitle(url: URL): string {
     return decodeURIComponent(segment);
   } catch {
     return segment;
-  }
-}
-
-function checkDeadline(signal: AbortSignal, startedAt: number): void {
-  signal.throwIfAborted();
-  if (Date.now() - startedAt >= REQUEST_TIMEOUT_MS) {
-    throw new WebError("timeout", "Webpage request timed out.");
   }
 }
 

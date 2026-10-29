@@ -2,6 +2,7 @@
 export type WebErrorCode =
   | "invalid_input"
   | "authentication"
+  | "command"
   | "network"
   | "timeout"
   | "cancelled"

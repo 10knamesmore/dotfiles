@@ -4,8 +4,8 @@ import { Type } from "typebox";
 import { logWebEvent } from "./diagnostics.js";
 import { asWebError, WebError } from "./errors.js";
 import { PageCache } from "./fetch/cache.js";
-import { fetchPage } from "./fetch/extract.js";
 import { DEFAULT_PAGE_CHARS, pageContent } from "./fetch/page.js";
+import { readWebDocument } from "./readers/select.js";
 import { searchBlended } from "./search/blend.js";
 import type { SearchSource } from "./search/types.js";
 import { renderWebCall, renderWebResult, type WebToolDetails } from "./render.js";
@@ -36,7 +36,8 @@ const FetchParameters = Type.Object(
       Type.String({
         minLength: 1,
         maxLength: 8_192,
-        description: "Public HTTP(S) URL to fetch. Supply exactly one of url or responseId.",
+        description:
+          "HTTP(S) URL to read. GitHub uses local gh authentication. Supply exactly one of url or responseId.",
       }),
     ),
     responseId: Type.Optional(
@@ -124,7 +125,7 @@ export function registerWebTools(pi: ExtensionAPI): void {
     name: "webfetch",
     label: "Web Fetch",
     description:
-      "Fetch a public HTTP(S) page as Markdown or text. Supports HTML, plain text, Markdown, JSON and XML; does not execute JavaScript or process PDFs/videos/images. Supply a URL for a fresh download, or responseId plus offset to continue the same cached content. Default page: 30000 UTF-16 characters, at most 40 KiB / 1800 lines. Download limit: 5 MiB; timeout: 30 seconds. Cached pages expire after one hour and may be evicted earlier.",
+      "Read a URL as Markdown or text. GitHub repository, blob, tree, issue and pull-request URLs use local gh authentication to read README, files, directories or discussions including reviews, without full diffs. Other URLs use public HTTP(S), supporting HTML, text, Markdown, JSON and XML without JavaScript rendering or PDF/video/image extraction. Reader failures are reported without switching methods. Supply url for fresh content, or responseId plus offset to continue cached content. Default page: 30000 UTF-16 characters, at most 40 KiB / 1800 lines. HTTP download or individual gh output limit: 5 MiB; read timeout: 30 seconds. Cached content expires after one hour and may be evicted earlier.",
     promptSnippet: "Read a webpage, or continue reading cached content",
     parameters: FetchParameters,
     executionMode: "parallel",
@@ -137,11 +138,11 @@ export function registerWebTools(pi: ExtensionAPI): void {
         if ((params.url === undefined) === (params.responseId === undefined)) {
           throw new WebError("invalid_input", "Supply exactly one of url or responseId.");
         }
-        const downloaded = params.url === undefined ? undefined : await fetchPage(params.url, signal);
+        const document = params.url === undefined ? undefined : await readWebDocument(params.url, signal);
         signal?.throwIfAborted();
         let page;
         try {
-          page = downloaded === undefined ? await cache.read(params.responseId!) : await cache.save(downloaded);
+          page = document === undefined ? await cache.read(params.responseId!) : await cache.save(document);
         } catch (error) {
           if (error instanceof WebError) throw error;
           throw new WebError("storage", "Page cache could not be read or written.");
@@ -155,7 +156,7 @@ export function registerWebTools(pi: ExtensionAPI): void {
         const header = [
           `Title: ${page.title.slice(0, 500)}`,
           `URL: ${page.url}`,
-          `Content type: ${page.contentType}`,
+          `Format: ${page.format}`,
           `responseId: ${page.responseId}`,
           `Characters ${slice.offset}–${slice.offset + slice.text.length} of ${slice.totalChars}. ${continuation}`,
         ].join("\n");
