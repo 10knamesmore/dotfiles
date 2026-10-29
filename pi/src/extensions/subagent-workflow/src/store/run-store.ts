@@ -127,6 +127,7 @@ interface RunRecord {
   runId: string;
   kind: "subagent" | "workflow";
   createdAt: string;
+  /** Parent responsible for the current generation's controls and result delivery. */
   parent: { sessionId: string; sessionFile?: string };
   children: ChildRecord[];
   phases?: Array<{ title: string; detail?: string }>;
@@ -196,6 +197,7 @@ export class RunStore {
   private record: RunRecord;
   private status: RunStatus = { status: "pending", children: {} };
   private readonly runId: string;
+  private readonly launchingParent: RunRecord["parent"];
   private openedSnapshot?: RunSnapshot;
   private runOwnership?: RunOwnership;
   /** Ownership acquisition is attempted exactly once during construction. */
@@ -212,6 +214,7 @@ export class RunStore {
     options: RunStoreOptions = {},
   ) {
     this.runId = runId;
+    this.launchingParent = { sessionId: parentSessionId, sessionFile: parentSessionFile };
     const root = options.rootDir ?? join(getAgentDir(), "subagent-workflow", "runs");
     this.runDir = options.existingRunDir ?? join(root, encodeCwd(parentCwd), runId);
     this.sessionsDir = join(this.runDir, "sessions");
@@ -251,7 +254,7 @@ export class RunStore {
       runId,
       kind,
       createdAt: new Date().toISOString(),
-      parent: { sessionId: parentSessionId, sessionFile: parentSessionFile },
+      parent: this.launchingParent,
       children: [],
       phases: options.phases?.map((phase) => ({ ...phase })),
       delivery: {
@@ -345,7 +348,8 @@ export class RunStore {
   /**
    * Publish one prepared execution generation behind a durable pending marker.
    * Callers must finish journal, usage, and persisted-input reads before
-   * entering this commit.
+   * entering this commit. The committed generation belongs to the parent
+   * that opened this store, including resumes from another session.
    */
   startWorkflowGeneration(
     script: string,
@@ -381,6 +385,7 @@ export class RunStore {
         const nextGeneration = this.record.delivery.generation + 1;
         const nextRecord: RunRecord = {
           ...this.record,
+          parent: this.launchingParent,
           delivery: {
             generation: nextGeneration,
           },

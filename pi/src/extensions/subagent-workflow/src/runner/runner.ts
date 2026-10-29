@@ -125,7 +125,8 @@ class Handle implements SubagentHandle {
     });
   }
   emit(event: SubagentEvent): void {
-    this.store.recordEvent(event);
+    // Context belongs to the live session and is cleared when that session closes.
+    if (event.type !== "context") this.store.recordEvent(event);
     this.runner.publishChildEvent({
       runId: this.runId,
       runDir: this.runDir,
@@ -160,6 +161,9 @@ class Handle implements SubagentHandle {
     this.runner.childFinished(this.runId);
   }
   async steer(text: string): Promise<void> {
+    if (!this.isLive || this.externalCancellationRequested || this.sessionDisposal) {
+      throw new Error(`Child ${this.id} is ending or already ended; use subagent.followUp for a new turn`);
+    }
     if (this.session) return this.session.steer(text);
     this.steering.push(text);
   }
@@ -275,6 +279,7 @@ class Handle implements SubagentHandle {
     // Clear the public session reference before awaiting extension shutdown so
     // no navigator action can reuse a session being torn down.
     this.session = undefined;
+    this.emit({ type: "context", id: this.id, contextUsage: undefined });
     // Defer shutdown by one microtask so reentrant shutdown handlers always see
     // sessionDisposal and cannot retire this handle before teardown completes.
     const disposal = Promise.resolve().then(async () => {
@@ -309,6 +314,9 @@ class Handle implements SubagentHandle {
   subscribe(listener: (event: SubagentEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+  get contextUsage() {
+    return this.session?.contextUsage;
   }
 }
 
@@ -772,6 +780,9 @@ export class SubagentRunner {
   private subscribe(handle: Handle): void {
     const session = handle.session;
     const unsubscribe = session?.subscribe((event) => {
+      if (event.type === "context_usage") {
+        handle.emit({ type: "context", id: handle.id, contextUsage: event.contextUsage });
+      }
       if (event.type === "tool_execution_start") {
         const activityEvent = {
           type: "activity" as const,

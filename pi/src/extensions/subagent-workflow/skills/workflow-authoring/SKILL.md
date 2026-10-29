@@ -132,3 +132,29 @@ To change task inputs on resume, edit their literals in the script; calls
 whose payloads change rerun. A `generation.pending` marker left by a crash
 quarantines the run directory: run the workflow fresh and delete the
 quarantined directory rather than removing the marker.
+
+## Observe and control a run
+
+The parent calls `agents` outside the workflow script:
+
+```js
+agents({ action: "list", status: "live" })
+agents({ action: "peek", runId })
+agents({ action: "peek", runId, childId, messages: 6 })
+agents({ action: "send_message", runId, childId, message: "Focus on the storage module." })
+agents({ action: "stop", runId, childId })
+agents({ action: "stop", runId })
+```
+
+Views include orchestrated runs for the current parent session and cwd.
+Resuming a workflow assigns its new generation to the resuming parent session.
+`list` and run-level `peek` accept `offset` and `limit` for pagination.
+Child-level `peek` includes bounded transcript and result previews plus full
+artifact paths. Completion is pushed to the parent; use these views for
+inspection, not polling.
+
+`send_message` queues steering for a pending or running child; acceptance
+does not confirm consumption. Stopping one child makes its `agent()` call
+resolve to `null`, so the workflow can continue. Stop the run to cancel the
+workflow and its children together. Controls require the owning Pi process.
+Finished children use `subagent.followUp` to start a new turn.

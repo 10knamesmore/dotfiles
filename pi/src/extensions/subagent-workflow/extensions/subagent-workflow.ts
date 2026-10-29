@@ -33,11 +33,12 @@ import { applyWorkflowSettings } from "../src/settings/runtime.js";
 import { registerModelTiersCommand } from "../src/settings/model-tiers-command.js";
 import { registerModelTierGuidance } from "../src/settings/model-tier-guidance.js";
 import { fenceDirectlyDeliveredRun, registerSubagentTool, resolveFollowUpSpec } from "../src/tool/subagent-tool.js";
+import { registerAgentsTool } from "../src/tool/agents-tool.js";
 import { registerEntryMarkers } from "../src/ui/entry-markers.js";
 import { registerDeliveryMessageRenderer } from "../src/ui/delivery-message.js";
-import { registerNavigator, type NavigatorFollowUp, type NavigatorOpenContext } from "../src/ui/navigator/navigator.js";
+import { registerNavigator, type NavigatorFollowUp } from "../src/ui/navigator/navigator.js";
 import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "../../editor/api.js";
-import { FOLLOW_UP_PROMPT_PREFIX } from "../src/ui/navigator/transcript.js";
+import { FOLLOW_UP_PROMPT_PREFIX } from "../src/store/session-transcript.js";
 import { SubagentStatusWidget } from "../src/ui/status-widget.js";
 import { safeDeliveryValue } from "../src/ui/delivery-safe.js";
 import { SubagentUsageFooter } from "../src/ui/usage-footer.js";
@@ -347,6 +348,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   registerModelTiersCommand(pi);
   registerModelTierGuidance(pi);
   registerSubagentTool(pi, selfPath, widget);
+  registerAgentsTool(pi);
   const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => {
     usageFooter.trackRun(run.runDir, ctx);
     widget.observeWorkflowStarted(run, ctx);

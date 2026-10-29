@@ -17,7 +17,7 @@ import {
 } from "../child.js";
 import type { SchemaCapture } from "../schema-tool.js";
 import type { SubagentSpec } from "../../types.js";
-import { buildChildArgs } from "./child-args.js";
+import { buildChildArgs, PARENT_AGENT_TOOLS } from "./child-args.js";
 import { RpcChildSession } from "./rpc-child-session.js";
 import { spawnChildRpc, type ChildRpc } from "./rpc-transport.js";
 import { readToolReport, SHIM_SPEC_ENV, type ShimToolReport } from "./shim-contract.js";
@@ -151,7 +151,7 @@ export async function spawnSubprocessChild(
     // but if a report still lists them (extension installed under a name the
     // exclusion missed) refuse the spawn rather than allow child trees to
     // recurse. Mirrors the in-process activeTools assertion.
-    const guardBreach = report.activeTools.filter((name) => name === "subagent" || name === "workflow");
+    const guardBreach = report.activeTools.filter((name) => PARENT_AGENT_TOOLS.includes(name));
     if (guardBreach.length > 0) {
       throw new Error(`Recursion guard: child still exposes ${guardBreach.join(", ")} despite the exclusion.`);
     }

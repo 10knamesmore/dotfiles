@@ -33,8 +33,8 @@ import {
 } from "./controls.js";
 import { NavigatorModel, NavigatorState } from "./model.js";
 import { pageRunDetail, renderRunDetail, renderRunList, scrollRunDetail, scrollRunList } from "./render.js";
-import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
-import { readSessionMessages, type TranscriptMessage } from "./transcript.js";
+import type { ChildRow, RunDetail, RunSummary } from "../../store/run-reader.js";
+import { readSessionMessages, type TranscriptMessage } from "../../store/session-transcript.js";
 
 export type NavigatorOpenContext = Pick<
   ExtensionContext,

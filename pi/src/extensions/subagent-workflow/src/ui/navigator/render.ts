@@ -23,7 +23,7 @@ import {
 import { sumUsage } from "../../store/run-store.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import { orderedChildren, scrollDistance, type FilterMode, type ScrollAmount } from "./controls.js";
-import type { ChildRow, RunDetail, RunSummary } from "./store-read.js";
+import type { ChildRow, RunDetail, RunSummary } from "../../store/run-reader.js";
 
 const LABEL_MAX = 30;
 const MODEL_MAX = 22;

@@ -63,7 +63,7 @@ interface WorkflowToolServices {
 
 const DESCRIPTION = `Execute deterministic JavaScript orchestration over subagents. Use workflow when results feed later spawns, when you need phases, pipelines, or resumable control flow, or for more than about eight independent items; up to that many independent one-shot tasks are just that many subagent calls in one turn. You must read the workflow-authoring skill before calling this tool: it defines the script format, globals, agent options, determinism rules, and resume semantics.
 
-Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. (In a host with no interactive UI the call instead blocks and returns the result inline.)`;
+Every run is background: the call returns as soon as the workflow starts and completion arrives later as a steered parent message, so do not wait or poll - end the turn and continue when the message arrives. Use agents to list, peek, stop a run or child, or send_message to a live child. (In a host with no interactive UI the call instead blocks and returns the result inline.)`;
 
 /**
  * UI-side launch receipt rendered for the workflow tool row.

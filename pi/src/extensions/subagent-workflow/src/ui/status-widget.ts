@@ -21,6 +21,7 @@ import {
   childLabel,
   countStatuses,
   formatFullModel,
+  formatContextUsage,
   formatTokenUsage,
   statusGlyph,
   type StatusCounts,
@@ -63,6 +64,8 @@ export interface WidgetRunView {
   counts: StatusCounts;
   startedAt: number;
   usage: UsageSummary;
+  /** Each workflow child keeps its own named context; direct spawns use the run label. */
+  contexts: string[];
   /** Whether this row owns keyboard selection from the editor. */
   selected?: boolean;
 }
@@ -80,8 +83,13 @@ function phaseView(run: Pick<TrackedRun, "kind" | "phases" | "currentPhase">): s
   return `${sanitizeTerminalText(run.currentPhase)}${position}`;
 }
 
-function runUsage(run: TrackedRun): UsageSummary {
-  return sumUsage(run.usage.values());
+function runContexts(run: TrackedRun): string[] {
+  return run.handles.flatMap((handle) => {
+    if (handle.status !== "running" || !handle.contextUsage) return [];
+    const context = formatContextUsage(handle.contextUsage);
+    const label = truncateToWidth(sanitizeTerminalText(childLabel(handle.spec)), LABEL_WIDTH, "…", true);
+    return [run.kind === "workflow" ? `${label} ${context}` : context];
+  });
 }
 
 function modelDisplay(model: string | undefined, thinking: ThinkingLevel | undefined): string | undefined {
@@ -143,8 +151,9 @@ export function renderWidgetLines(
     const model = run.model ? theme.fg("dim", run.model) : "";
     const phase = run.phase ? theme.fg("dim", run.phase) : "";
     const progress = theme.fg("dim", run.counts.total > 0 ? `${run.counts.done}/${run.counts.total}` : "starting");
+    const context = run.contexts.length > 0 ? theme.fg("dim", run.contexts.join(" · ")) : "";
+    const metadata = [context, model, phase, progress].filter((part) => part.length > 0).join("  ");
     const usage = theme.fg("dim", formatTokenUsage(run.usage));
-    const metadata = [model, phase, progress].filter((part) => part.length > 0).join("  ");
     lines.push(truncateToWidth(`${cursor} ${glyph} ${label}  ${metadata}  ${usage}`, cap));
   }
   if (runs.length > maxRows) lines.push(truncateToWidth(theme.fg("dim", `  +${runs.length - maxRows} more runs`), cap));
@@ -171,6 +180,7 @@ function widgetSignature(runs: WidgetRunView[]): string {
       run.counts.total,
       run.counts.running,
       run.counts.failed,
+      run.contexts,
       formatTokenUsage(run.usage),
       run.selected === true,
     ]),
@@ -414,7 +424,8 @@ export class SubagentStatusWidget {
       model: runModelDisplay(run),
       counts: countStatuses(run.handles.map((handle) => handle.status)),
       startedAt: run.startedAt,
-      usage: runUsage(run),
+      usage: sumUsage(run.usage.values()),
+      contexts: runContexts(run),
       selected: runId === this.selectedRunId,
     }));
   }
@@ -438,7 +449,7 @@ export class SubagentStatusWidget {
       this.lastStatus = status;
     }
 
-    // Usage events can leave the formatted text unchanged.
+    // Context updates can leave the formatted text unchanged.
     const signature = widgetSignature(views);
     const changed = signature !== this.lastSignature;
     this.lastSignature = signature;

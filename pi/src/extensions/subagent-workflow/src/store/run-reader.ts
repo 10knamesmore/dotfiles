@@ -1,10 +1,10 @@
-/** Three-state data source dispatcher for the /agents navigator. */
+/** Shared live and persisted run views for the navigator and agent control tool. */
 
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { subagentRunner } from "../../runner/runner.js";
-import { runOwnerIsLive } from "../../store/lease.js";
+import { subagentRunner } from "../runner/runner.js";
+import { runOwnerIsLive } from "./lease.js";
 import {
   cloneRunProjection,
   corruptRunDetail,
@@ -14,12 +14,12 @@ import {
   reconcileDeadOwnerProjection,
   snapshotSaysLive,
   type RunProjection,
-} from "../../store/run-projection.js";
-import { encodeCwd } from "../../store/run-store.js";
-import { readRunSnapshot, type RunSnapshot } from "../../store/run-snapshot.js";
+} from "./run-projection.js";
+import { encodeCwd } from "./run-store.js";
+import { readRunSnapshot, type RunSnapshot } from "./run-snapshot.js";
 
-export type { ChildRow, RunDetail, RunRecordFile, RunStatusFile, RunSummary } from "../../store/run-projection.js";
-import type { RunDetail, RunSummary } from "../../store/run-projection.js";
+export type { ChildRow, RunDetail, RunRecordFile, RunStatusFile, RunSummary } from "./run-projection.js";
+import type { RunDetail, RunSummary } from "./run-projection.js";
 
 export interface ReadOptions {
   /** Extract a workflow's display name from its script.js contents. */

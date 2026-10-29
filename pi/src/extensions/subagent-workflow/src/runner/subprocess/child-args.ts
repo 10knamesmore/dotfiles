@@ -24,8 +24,8 @@ export interface ChildProcessConfig {
   shimPath?: string;
 }
 
-/** Tools children must never expose: the recursion guard, now per-process. */
-const RECURSION_GUARD_TOOLS = ["subagent", "workflow"];
+/** Creation and control belong to the parent process. */
+export const PARENT_AGENT_TOOLS = ["subagent", "workflow", "agents"];
 
 export function buildChildArgs(config: ChildProcessConfig): string[] {
   for (const name of [...(config.tools ?? []), ...(config.excludeTools ?? [])]) {
@@ -34,7 +34,7 @@ export function buildChildArgs(config: ChildProcessConfig): string[] {
     if (name.includes(","))
       throw new Error(`Tool name ${JSON.stringify(name)} contains a comma and cannot cross the pi CLI boundary`);
   }
-  const excludeTools = [...new Set([...(config.excludeTools ?? []), ...RECURSION_GUARD_TOOLS])];
+  const excludeTools = [...new Set([...(config.excludeTools ?? []), ...PARENT_AGENT_TOOLS])];
   const args = [
     "--mode",
     "rpc",

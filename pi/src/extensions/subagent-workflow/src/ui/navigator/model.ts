@@ -18,7 +18,7 @@ import {
   type ReadOptions,
   type RunDetail,
   type RunSummary,
-} from "./store-read.js";
+} from "../../store/run-reader.js";
 
 export class NavigatorModel {
   constructor(

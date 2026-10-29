@@ -9,7 +9,7 @@ import type { ResolvedSpec, SubagentStatus, UsageSummary } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { formatTokens } from "./format.js";
-import { runsDirFor, type RunRecordFile, type RunStatusFile } from "./navigator/store-read.js";
+import { runsDirFor, type RunRecordFile, type RunStatusFile } from "../store/run-reader.js";
 
 export const USAGE_STATUS_KEY = "subagent-workflow:usage";
 

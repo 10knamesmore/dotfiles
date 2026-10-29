@@ -20,6 +20,9 @@ export type RunKind = "subagent" | "workflow";
 export interface RunSummary {
   runId: string;
   runDir: string;
+  parentSessionId?: string;
+  /** Human-only navigator follow-ups must stay out of model-facing run views. */
+  directDelivery?: boolean;
   kind: RunKind;
   /** Epoch ms; used for newest-first ordering. */
   createdAt: number;
@@ -86,6 +89,8 @@ export interface RunRecordFile {
   runId?: string;
   kind?: string;
   createdAt?: string;
+  parent?: { sessionId?: string };
+  directDelivery?: boolean;
   children?: Array<{
     id?: string;
     spec?: SubagentSpec;
@@ -303,6 +308,8 @@ function buildSnapshotSummary(
     summary: {
       runId,
       runDir,
+      parentSessionId: run.parent?.sessionId,
+      directDelivery: run.directDelivery,
       kind,
       createdAt: parseTimestamp(run.createdAt) || mtimeMs(runDir),
       label: labelForRun(kind, run.children, snapshot, options),

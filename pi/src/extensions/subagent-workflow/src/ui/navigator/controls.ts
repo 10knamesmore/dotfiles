@@ -11,7 +11,7 @@
 
 import type { SubagentStatus } from "../../types.js";
 import type { ThemeLike } from "../format.js";
-import type { ChildRow, RunDetail } from "./store-read.js";
+import type { ChildRow, RunDetail } from "../../store/run-reader.js";
 
 /** The three navigator levels. */
 export type Level = "runs" | "run" | "agent";

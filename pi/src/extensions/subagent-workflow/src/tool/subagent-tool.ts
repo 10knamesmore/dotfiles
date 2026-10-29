@@ -65,7 +65,8 @@ export type SubagentToolInput = Static<typeof SubagentToolParameters>;
 const OPTION_FIELDS = Object.keys(PublicSubagentOptionFields) as Array<keyof typeof PublicSubagentOptionFields>;
 
 export type ValidatedSubagentInput =
-  { type: "spawn"; spec: TierSubagentSpec } | { type: "followUp"; id: string; prompt: string; label?: string };
+  | { type: "spawn"; spec: TierSubagentSpec }
+  | { type: "followUp"; id: string; prompt: string; label?: string };
 
 /**
  * Top-level fields a follow-up may not set.
@@ -338,7 +339,7 @@ export function registerSubagentTool(
     label: "Subagent",
     parameters: SubagentToolParameters,
     description:
-      "Spawn one ad-hoc child. beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The call returns as soon as the child starts and its result arrives later as a steered message, end the turn and continue when the message arrives. Compose each child for the task at hand, DO NOT orchestrate multiple agents (include yourself) to modify files in the same path.",
+      "Spawn one ad-hoc child. beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The call returns as soon as the child starts and its result arrives later as a steered message, end the turn and continue when the message arrives. Use agents to list, peek, stop, or send_message to live children. Compose each child for the task at hand, DO NOT orchestrate multiple agents (include yourself) to modify files in the same path.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try {
@@ -535,14 +536,18 @@ function subagentDeliveryResult(
     runId: handle.runId,
     label: result.resolved.label,
     status: result.status,
-    body: result.structured !== undefined
-      ? createDeliveryBody(result.structured, "json")
-      : createDeliveryBody(result.text, "markdown"),
-    failures: result.status === "failed"
-      ? [`Failed child ${result.id} (${result.resolved.label}): ${formatFailureText(result.error ?? "Unknown error")}`]
-      : result.status === "aborted"
-        ? [`Aborted child ${result.id} (${result.resolved.label})`]
-        : [],
+    body:
+      result.structured !== undefined
+        ? createDeliveryBody(result.structured, "json")
+        : createDeliveryBody(result.text, "markdown"),
+    failures:
+      result.status === "failed"
+        ? [
+            `Failed child ${result.id} (${result.resolved.label}): ${formatFailureText(result.error ?? "Unknown error")}`,
+          ]
+        : result.status === "aborted"
+          ? [`Aborted child ${result.id} (${result.resolved.label})`]
+          : [],
     recovery: result.status === "failed" ? ["Respawn the child with the same prompt and options."] : [],
     warnings: warning ? [`Run persistence degraded (${warning}); the run directory may be incomplete`] : [],
     model: `${result.resolved.provider}/${result.resolved.modelId}`,

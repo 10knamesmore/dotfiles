@@ -5,8 +5,10 @@
  */
 
 import type { AssistantMessage, AssistantMessageEvent, Message } from "@earendil-works/pi-ai";
+import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 import type { UsageSummary } from "../../types.js";
-import { isRecord } from "../../util.js";
+import { errorMessage, isRecord } from "../../util.js";
+import { reportDiagnostic } from "../../diagnostics.js";
 import type { ChildSession, ChildSessionEvent } from "../child-session.js";
 import type { ChildRpc } from "./rpc-transport.js";
 
@@ -38,6 +40,21 @@ function isRpcState(value: unknown): value is RpcState {
     value.pendingMessageCount >= 0 &&
     (value.sessionFile === undefined || typeof value.sessionFile === "string")
   );
+}
+
+function contextUsageFromStats(stats: unknown): ContextUsage | undefined {
+  if (!isRecord(stats)) throw new Error("Child RPC get_session_stats response was malformed");
+  const usage = stats.contextUsage;
+  if (usage === undefined) return undefined;
+  if (
+    !isRecord(usage) ||
+    (usage.tokens !== null && typeof usage.tokens !== "number") ||
+    typeof usage.contextWindow !== "number" ||
+    (usage.percent !== null && typeof usage.percent !== "number")
+  ) {
+    throw new Error("Child RPC get_session_stats contextUsage was malformed");
+  }
+  return { tokens: usage.tokens, contextWindow: usage.contextWindow, percent: usage.percent };
 }
 
 const KNOWN_ASSISTANT_UPDATE_TYPES = new Set([
@@ -230,6 +247,10 @@ export class RpcChildSession implements ChildSession {
    * mid-turn still exposes its newest result and counts its billed usage. */
   latestAssistant: AssistantMessage | undefined;
   readonly usage: UsageSummary = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 };
+  contextUsage: ContextUsage | undefined;
+  /** Invalidates replies requested before newer context, compaction, or shutdown. */
+  private contextRevision = 0;
+  private compacting = false;
   private readonly listeners = new Set<(event: ChildSessionEvent) => void>();
   private readonly promptAttemptListeners = new Set<(event: PromptAttemptEvent) => void>();
   private startupSessionFile: string | undefined;
@@ -249,6 +270,7 @@ export class RpcChildSession implements ChildSession {
       // Frames before the validated idle snapshot belong to startup and must not
       // contaminate the first prompt's assistant, usage, attempts, or subscribers.
       if (!this.lifecycleEventsEnabled) return;
+      this.observeContextChange(event);
       const classified = childSessionEvent(event);
       if (classified) this.handleEvent(classified);
     });
@@ -257,6 +279,7 @@ export class RpcChildSession implements ChildSession {
       this.exitError = new Error(
         `Child pi process exited before settling (code ${exit.code ?? "null"}, signal ${exit.signal ?? "null"}). Stderr: ${rpc.stderrTail() || "(empty)"}`,
       );
+      this.clearContextUsage();
       // A prompt awaiting its turn must fail, never hang, on child death.
       this.turn?.fail(this.exitError);
     });
@@ -276,6 +299,7 @@ export class RpcChildSession implements ChildSession {
     if (session.exitError) throw session.exitError;
     session.startupSessionFile = state.sessionFile;
     session.lifecycleEventsEnabled = true;
+    await session.refreshContextUsage();
     return session;
   }
 
@@ -327,6 +351,8 @@ export class RpcChildSession implements ChildSession {
 
   async abort(): Promise<void> {
     if (this.exitError) return; // Aborting a dead child is complete by definition.
+    // Pi resumes queued messages after abort unless the queue is cleared first.
+    await this.rpc.request({ type: "clear_queue" }, { timeoutMs: CONTROL_REQUEST_TIMEOUT_MS });
     await this.rpc.request({ type: "abort" }, { timeoutMs: CONTROL_REQUEST_TIMEOUT_MS });
   }
 
@@ -339,6 +365,7 @@ export class RpcChildSession implements ChildSession {
    * outlives a fast-exiting leader is a bounded orphan. */
   async dispose(): Promise<void> {
     if (this.disposal) return this.disposal;
+    this.clearContextUsage();
     const disposal = Promise.resolve().then(async () => {
       this.rpc.kill("SIGTERM");
       const escalate = setTimeout(() => this.rpc.kill("SIGKILL"), DISPOSE_KILL_GRACE_MS);
@@ -424,6 +451,54 @@ export class RpcChildSession implements ChildSession {
 
   private emitPromptAttempt(event: PromptAttemptEvent): void {
     for (const listener of this.promptAttemptListeners) listener(event);
+  }
+
+  private publishContextUsage(contextUsage: ContextUsage | undefined): void {
+    this.contextUsage = contextUsage;
+    for (const listener of this.listeners) listener({ type: "context_usage", contextUsage });
+  }
+
+  private clearContextUsage(): void {
+    this.contextRevision += 1;
+    this.publishContextUsage(undefined);
+  }
+
+  private async refreshContextUsage(): Promise<void> {
+    const revision = ++this.contextRevision;
+    await this.rpc.request(
+      { type: "get_session_stats" },
+      {
+        timeoutMs: CONTROL_REQUEST_TIMEOUT_MS,
+        // Apply in wire order: a later compaction frame must invalidate this snapshot.
+        onResponse: (stats) => {
+          if (revision === this.contextRevision) this.publishContextUsage(contextUsageFromStats(stats));
+        },
+      },
+    );
+  }
+
+  private observeContextChange(event: Record<string, unknown>): void {
+    if (this.disposal || this.exitError) return;
+    if (event.type === "compaction_start") {
+      this.compacting = true;
+      this.clearContextUsage();
+      return;
+    }
+    if (event.type === "compaction_end") {
+      this.compacting = false;
+    } else if (event.type === "entry_appended") {
+      // Boundary hooks can commit a compaction without a compaction_start event.
+      if (isRecord(event.entry) && event.entry.type === "compaction") this.clearContextUsage();
+    } else if (event.type !== "message_end" && event.type !== "turn_end" && event.type !== "agent_start") {
+      return;
+    }
+    if (this.compacting) return;
+    const revision = this.contextRevision + 1;
+    void this.refreshContextUsage().catch((error: unknown) => {
+      if (revision !== this.contextRevision) return;
+      this.clearContextUsage();
+      reportDiagnostic(`[subagent-workflow] child context read failed: ${errorMessage(error)}`);
+    });
   }
 
   private handleEvent(event: ChildSessionEvent): void {

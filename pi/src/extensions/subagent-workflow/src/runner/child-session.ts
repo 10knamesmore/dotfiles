@@ -1,4 +1,5 @@
 import type { AssistantMessage, AssistantMessageEvent, Message } from "@earendil-works/pi-ai";
+import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 import type { UsageSummary } from "../types.js";
 
 /** Events consumed at the subprocess child-session seam. Pi coding-agent custom,
@@ -17,6 +18,7 @@ export type ChildSessionEvent =
   | { type: "message_update"; opaqueAssistantMessageUpdate: OpaqueAssistantMessageUpdate }
   | { type: "message_end"; message: Message }
   | { type: "agent_start" }
+  | { type: "context_usage"; contextUsage: ContextUsage | undefined }
   | { type: "agent_settled" };
 
 /**
@@ -39,6 +41,8 @@ export interface ChildSession {
   /** Cumulative assistant usage folded at message arrival so totals remain
    * monotonic across pi-side transcript compaction. */
   readonly usage: UsageSummary;
+  /** Pi's current context-window estimate, refreshed from lifecycle events. */
+  readonly contextUsage: ContextUsage | undefined;
   /** Child-written session file reported by the subprocess at startup. */
   readonly sessionFile: string | undefined;
   /** Asynchronous subprocess disposal: SIGTERM the group, escalate to a group

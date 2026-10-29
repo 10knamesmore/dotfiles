@@ -7,6 +7,7 @@
  */
 
 import type { SubagentStatus, UsageSummary } from "../types.js";
+import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 
 export { childLabel } from "../util.js";
 
@@ -64,6 +65,12 @@ export function formatTokens(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
   return `${Math.max(0, Math.round(count))}`;
+}
+
+/** Pi reports an unknown token count after compaction until a fresh assistant response. */
+export function formatContextUsage(usage: Pick<ContextUsage, "tokens" | "contextWindow">): string {
+  const kilotokens = (tokens: number) => `${Number((tokens / 1_000).toFixed(1))}k`;
+  return `${usage.tokens === null ? "?" : kilotokens(usage.tokens)}/${kilotokens(usage.contextWindow)}`;
 }
 
 /** Format cumulative usage as `in:<input + cacheRead> out:<output>`, matching the distribution footer. */

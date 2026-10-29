@@ -9,7 +9,7 @@ import {
   UNTRUSTED_FIELD_MAX,
   type SanitizedTerminalTail,
 } from "../sanitize.js";
-import { FOLLOW_UP_PROMPT_PREFIX, type TranscriptMessage } from "./transcript.js";
+import { FOLLOW_UP_PROMPT_PREFIX, type TranscriptMessage } from "../../store/session-transcript.js";
 
 /** Only a persisted terminal result can identify final output, including validated JSON. */
 export type TranscriptResult = Pick<SubagentResult, "status" | "text" | "structured">;

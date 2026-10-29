@@ -13,7 +13,7 @@ import {
   type TranscriptResult,
 } from "./transcript-blocks.js";
 import { renderTranscript, type TranscriptLayout } from "./transcript-render.js";
-import type { TranscriptMessage } from "./transcript.js";
+import type { TranscriptMessage } from "../../store/session-transcript.js";
 
 interface AgentHeader {
   label: string;

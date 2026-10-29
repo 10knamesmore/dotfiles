@@ -7,6 +7,7 @@
  */
 
 import type { ModelTier } from "@dotfiles/pi-config";
+import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 
 /** Thinking levels mirror pi's own vocabulary. */
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -112,6 +113,7 @@ export type SubagentEvent =
   | { type: "status"; id: string; status: SubagentStatus }
   | { type: "activity"; id: string; description: string } // e.g. current tool call
   | { type: "usage"; id: string; usage: UsageSummary }
+  | { type: "context"; id: string; contextUsage: ContextUsage | undefined }
   | { type: "result"; id: string; result: SubagentResult };
 
 /** Handle to a spawned child, owned by the runner. */
@@ -125,6 +127,8 @@ export interface SubagentHandle {
   resolved: ResolvedSpec | undefined; // undefined until construction completes
   status: SubagentStatus;
   startedAt: number;
+  /** Pi's current context estimate; unavailable before startup and after session disposal. */
+  readonly contextUsage: ContextUsage | undefined;
   /** Resolves with the terminal result (never rejects; failures are results). */
   result: Promise<SubagentResult>;
   /** Send a steering message to the child mid-run (buffered until ready). */

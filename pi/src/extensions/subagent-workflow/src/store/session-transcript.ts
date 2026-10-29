@@ -2,7 +2,7 @@
 
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { isRecord } from "../../util.js";
+import { isRecord } from "../util.js";
 
 /** Minimal structural view of pi's AgentMessage union (role + content parts). */
 export interface TranscriptMessage {
