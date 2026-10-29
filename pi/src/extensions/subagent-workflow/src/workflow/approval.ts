@@ -18,6 +18,7 @@ import type { WorkflowSettings } from "@dotfiles/pi-config";
 import { reportDiagnostic } from "../diagnostics.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
 import { errorMessage } from "../util.js";
+import { writeWorkflowEditorProject } from "./editor-project.js";
 import { parseWorkflowScript, type ParsedWorkflow } from "./parser.js";
 
 /** Run mode; mirrors pi's ExtensionMode, which the package does not re-export. */
@@ -60,6 +61,7 @@ async function editWorkflowDraft(draft: WorkflowDraft, ctx: ApprovalContext): Pr
   try {
     await writeFile(scriptPath, draft.script, "utf8");
     await writeFile(argsPath, draft.argsJson, "utf8");
+    await writeWorkflowEditorProject(directory);
     reportDiagnostic(`[subagent-workflow] opening workflow editor: ${command}`);
     await ctx.ui.custom<void>(async (tui, _theme, _keybindings, done) => {
       tui.stop();
