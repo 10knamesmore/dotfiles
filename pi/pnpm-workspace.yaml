@@ -3,7 +3,6 @@ packages:
   - src/ui
 allowBuilds:
   "@google/genai": false
-  "@parcel/watcher": false
   esbuild: false
   protobufjs: false
 confirmModulesPurge: false

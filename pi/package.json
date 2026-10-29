@@ -14,7 +14,6 @@
   "dependencies": {
     "@dotfiles/pi-config": "workspace:*",
     "@dotfiles/pi-ui": "workspace:*",
-    "@parcel/watcher": "2.6.0",
     "acorn": "8.17.0",
     "linkedom": "0.18.12",
     "marked": "18.0.11",
