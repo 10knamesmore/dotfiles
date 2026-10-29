@@ -17,15 +17,16 @@ function statusText(status) {
 
 /**
  * 根据提供商与状态说明下一步操作。
- * @param {string} provider 提供商标识 codex 或 deepseek。
+ * @param {string} provider 提供商标识 codex、deepseek 或 openai。
  * @param {string} status 采集状态码。
  * @returns {string}
  */
 function statusDetails(provider, status) {
+    const apiKeyVariable = provider === "openai" ? "OPENAI_SESSION_KEY" : "DEEPSEEK_API_KEY";
     switch (status) {
     case "loading": return "正在读取…";
-    case "missing_credentials": return provider === "codex" ? "请先使用 codex login 登录订阅账号" : "请为桌面进程配置 DEEPSEEK_API_KEY";
-    case "auth_required": return provider === "codex" ? "请使用 codex login 更新登录凭据" : "请检查 DEEPSEEK_API_KEY 是否有效";
+    case "missing_credentials": return provider === "codex" ? "请先使用 codex login 登录订阅账号" : "请为桌面进程配置 " + apiKeyVariable;
+    case "auth_required": return provider === "codex" ? "请使用 codex login 更新登录凭据" : "请检查 " + apiKeyVariable + " 是否有效";
     case "no_weekly_limit": return "接口未返回标准 Codex 周额度";
     case "network_error": return "网络连接失败，下一分钟自动重试";
     case "rate_limited": return "请求受限，下一分钟自动重试";

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""读取 Codex 周额度与 DeepSeek 余额，输出供顶栏消费的结构化状态。
+"""读取 Codex 周额度、DeepSeek 与 OpenAI 余额，输出顶栏状态。
 
-只读 $CODEX_HOME/auth.json（默认 ~/.codex）与 DEEPSEEK_API_KEY；不刷新或写回凭据。
+凭据来自 $CODEX_HOME/auth.json（默认 ~/.codex）、DEEPSEEK_API_KEY 与 OPENAI_SESSION_KEY。
 HTTP 请求继承桌面进程的代理设置，凭据不进入命令行，日志不包含响应正文。
 """
 
@@ -32,7 +32,9 @@ def get_json(url: str, token: str, headers: dict | None = None) -> dict:
 
 def codex_usage() -> dict:
     """读取标准 Codex 七天窗口；按窗口时长识别，不假设它位于 secondary。"""
-    auth_path = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "auth.json"
+    auth_path = (
+        Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "auth.json"
+    )
     try:
         auth = json.loads(auth_path.read_text())
         token = auth["tokens"]["access_token"]
@@ -79,12 +81,31 @@ def deepseek_balance() -> dict:
     }
 
 
+def openai_balance() -> dict:
+    """读取平台账户可用美元余额；credit_grants 要求网页登录的 Session Key。"""
+    token = os.environ.get("OPENAI_SESSION_KEY")
+    if not token:
+        return {"status": "missing_credentials"}
+    data = get_json("https://api.openai.com/v1/dashboard/billing/credit_grants", token)
+    return {
+        "status": "ok",
+        "balanceUsd": float(data["total_available"]),
+    }
+
+
+PROVIDER_READERS = {
+    "codex": codex_usage,
+    "deepseek": deepseek_balance,
+    "openai": openai_balance,
+}
+
+
 def collect(provider: str) -> tuple[str, dict]:
     """独立采集一个提供商；失败仅输出状态码，不泄漏后端错误文本。"""
     started = time.monotonic()
     http_status = None
     try:
-        result = codex_usage() if provider == "codex" else deepseek_balance()
+        result = PROVIDER_READERS[provider]()
     except urllib.error.HTTPError as error:
         http_status = error.code
         if error.code in (401, 403):
@@ -110,5 +131,5 @@ def collect(provider: str) -> tuple[str, dict]:
 
 
 if __name__ == "__main__":
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        print(json.dumps(dict(pool.map(collect, ("codex", "deepseek")))))
+    with ThreadPoolExecutor(max_workers=len(PROVIDER_READERS)) as pool:
+        print(json.dumps(dict(pool.map(collect, PROVIDER_READERS))))

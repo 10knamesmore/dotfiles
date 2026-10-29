@@ -4,13 +4,14 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// 为所有显示器共享 Codex / DeepSeek 状态；启动及每分钟运行一次只读采集。
+// 为所有显示器共享 AI 额度与余额；启动及每分钟运行一次只读采集。
 // 每次结果覆盖旧状态，失败时不把上次额度伪装成当前数据；不提供手动刷新。
 Singleton {
     id: root
 
     property var codex: ({ "status": "loading" })
     property var deepseek: ({ "status": "loading" })
+    property var openai: ({ "status": "loading" })
     readonly property bool refreshing: collector.running
 
     Process {
@@ -23,9 +24,11 @@ Singleton {
                     const result = JSON.parse(text);
                     root.codex = result.codex;
                     root.deepseek = result.deepseek;
+                    root.openai = result.openai;
                 } catch (error) {
                     root.codex = { "status": "unavailable" };
                     root.deepseek = { "status": "unavailable" };
+                    root.openai = { "status": "unavailable" };
                     console.warn("[ai-usage] invalid collector output");
                 }
             }
@@ -37,6 +40,7 @@ Singleton {
             if (exitCode !== 0) {
                 root.codex = { "status": "unavailable" };
                 root.deepseek = { "status": "unavailable" };
+                root.openai = { "status": "unavailable" };
                 console.warn("[ai-usage] collector exited", exitCode);
             }
         }

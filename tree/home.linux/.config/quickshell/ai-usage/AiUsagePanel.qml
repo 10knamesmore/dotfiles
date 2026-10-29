@@ -11,6 +11,7 @@ PanelOverlay {
 
     readonly property var codex: AiUsageService.codex
     readonly property var deepseek: AiUsageService.deepseek
+    readonly property var openai: AiUsageService.openai
 
     showing: PanelState.aiUsageOpen
     panelWidth: 400
@@ -33,7 +34,7 @@ PanelOverlay {
         anchors.margins: Tokens.spaceL
         spacing: Tokens.spaceM
         Accessible.role: Accessible.Grouping
-        Accessible.name: "Codex week 额度详情"
+        Accessible.name: "AI 额度与余额详情"
 
         Text {
             width: parent.width
@@ -56,6 +57,15 @@ PanelOverlay {
             width: parent.width
             visible: root.deepseek.status !== "ok"
             text: "DS：" + UsageFormat.statusDetails("deepseek", root.deepseek.status)
+            color: Colors.subtext0
+            font.family: Fonts.family
+            font.pixelSize: Fonts.body
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            width: parent.width
+            visible: root.openai.status !== "ok"
+            text: "OpenAI：" + UsageFormat.statusDetails("openai", root.openai.status)
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.body
