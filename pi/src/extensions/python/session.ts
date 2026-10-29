@@ -31,12 +31,6 @@ export interface PythonToolDetails {
   diagnosticsPath?: string;
 }
 
-/** Python worker lifecycle displayed in Pi's status bar. */
-export interface PythonSessionStatus {
-  /** Lifecycle of the worker launched from the environment prepared by dots sync. */
-  state: "not_started" | "starting" | "running" | "idle" | "stopping" | "exited";
-}
-
 /** Captured text and complete image attachments, including output emitted before a cell failed. */
 export interface PythonExecutionResult {
   output: string;
@@ -136,26 +130,10 @@ export class PythonSession {
     private readonly sessionId: string,
     private readonly sessionCwd: string,
     private readonly onStateLost: () => void,
-    private readonly onStatusChanged: (status: PythonSessionStatus) => void,
   ) {}
 
   public get available(): boolean {
     return !this.disposed && this.worker?.info !== undefined && !this.worker.stopping && !this.worker.ended;
-  }
-
-  /** Metadata remains readable even when Python holds the GIL or is waiting in native code. */
-  public status(): PythonSessionStatus {
-    const worker = this.worker;
-    let state: PythonSessionStatus["state"] = "not_started";
-    if (this.disposed || worker?.ended) state = "exited";
-    else if (worker?.stopping) state = "stopping";
-    else if (this.available) state = this.running ? "running" : "idle";
-    else if (this.running) state = "starting";
-    return { state };
-  }
-
-  private changed(): void {
-    this.onStatusChanged(this.status());
   }
 
   /** Update idle workers immediately; active cells consume the change when they finish. */
@@ -189,7 +167,6 @@ export class PythonSession {
     if (this.running) throw new Error("Python calls must execute sequentially.");
     this.running = true;
     const started = Date.now();
-    this.changed();
     let directory: string | undefined;
     let worker: WorkerProcess | undefined;
     let outcome: PythonOutcome = "startup_error";
@@ -253,7 +230,6 @@ export class PythonSession {
         }
       }
       this.running = false;
-      this.changed();
     }
     const details: PythonToolDetails = {
       outcome,
@@ -274,7 +250,6 @@ export class PythonSession {
   /** Let the worker release virtual input and browsers before enforcing a bounded shutdown. */
   public async close(): Promise<void> {
     this.disposed = true;
-    this.changed();
     const worker = this.worker;
     if (!worker || worker.ended) return;
     this.log({ phase: "shutdown", pid: worker.info?.pid });
@@ -342,7 +317,6 @@ export class PythonSession {
       logPath,
     };
     this.worker = worker;
-    this.changed();
     const decoder = new StringDecoder("utf8");
     let buffer = "";
     worker.events.on("data", (chunk: Buffer) => {
@@ -470,7 +444,6 @@ export class PythonSession {
       if (worker.info) throw new Error("Python sent duplicate readiness.");
       worker.info = message;
       worker.resolveReady(message);
-      this.changed();
       this.log({
         phase: "ready",
         pid: message.pid,
@@ -483,7 +456,6 @@ export class PythonSession {
     if (message.type === "started") {
       if (pending.started) throw new Error("Python started a call twice.");
       pending.started = true;
-      this.changed();
       clearTimeout(pending.timer);
       pending.timer = setTimeout(() => this.interrupt(worker, "timed_out"), pending.timeoutSeconds * 1000);
       this.log({ phase: "code_started", callId: pending.callId, pid: worker.info?.pid });
@@ -547,7 +519,6 @@ export class PythonSession {
   private terminate(worker: WorkerProcess): void {
     if (worker.ended || worker.stopping) return;
     worker.stopping = true;
-    this.changed();
     this.log({ phase: "terminate", pid: worker.info?.pid, callId: worker.pending?.callId });
     // SDK-owned browsers lead separate groups so interrupting a cell leaves them alive.
     this.terminateOwnedProcessGroups(worker);
@@ -586,7 +557,6 @@ export class PythonSession {
     worker.requests.destroy();
     // Keep reading: pipe-buffered ownership events may arrive after the exit event.
     worker.resolveExited();
-    this.changed();
   }
 
   private signalGroup(pid: number, signal: NodeJS.Signals): void {

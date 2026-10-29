@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { PythonSession, type PythonSessionStatus, type PythonToolDetails } from "./session.js";
+import { PythonSession, type PythonToolDetails } from "./session.js";
 import { executionText, renderPythonCall, renderPythonResult } from "./render.js";
 import { describePythonEnvironment, readPythonEnvironment } from "./environment.js";
 import { registerNeovimCommand } from "./nvim-command.js";
@@ -61,22 +61,18 @@ export async function registerPython(pi: ExtensionAPI): Promise<void> {
   }));
 
   let session: PythonSession | undefined;
-  let currentContext: ExtensionContext | undefined;
 
   const createSession = (ctx: ExtensionContext): PythonSession => {
-    currentContext = ctx;
     const runtime = new PythonSession(
       ctx.sessionManager.getSessionId(),
       ctx.cwd,
       notifyEnvironmentCleared,
-      updateStatus,
     );
     runtime.setModel(ctx.model);
     return runtime;
   };
 
   registerNeovimCommand(pi, (ctx) => {
-    currentContext = ctx;
     const runtime = (session ??= createSession(ctx));
     runtime.setModel(ctx.model);
     return runtime;
@@ -92,16 +88,12 @@ export async function registerPython(pi: ExtensionAPI): Promise<void> {
   pi.on("session_shutdown", async () => {
     await session?.close();
     session = undefined;
-    currentContext?.ui.setStatus("python", undefined);
-    currentContext = undefined;
   });
   pi.on("session_tree", async (event, ctx) => {
     if (event.newLeafId === event.oldLeafId) return;
-    currentContext = ctx;
     const hadEnvironment = session?.available;
     await session?.close();
     session = createSession(ctx);
-    updateStatus(session.status());
     if (hadEnvironment || hasPythonHistory(ctx)) notifyEnvironmentCleared();
   });
   pi.on("tool_result", (event) => {
@@ -124,7 +116,6 @@ export async function registerPython(pi: ExtensionAPI): Promise<void> {
     executionMode: "sequential",
     async execute(callId, params, signal, onUpdate, ctx) {
       if (!params.code.trim()) throw new Error("code must not be blank.");
-      currentContext = ctx;
       const runtime = (session ??= createSession(ctx));
       runtime.setModel(ctx.model);
       onUpdate?.({
@@ -152,19 +143,6 @@ export async function registerPython(pi: ExtensionAPI): Promise<void> {
     renderResult: renderPythonResult,
   };
   pi.registerTool(tool);
-
-  function updateStatus(status: PythonSessionStatus): void {
-    if (!currentContext?.hasUI) return;
-    const labels: Record<PythonSessionStatus["state"], string> = {
-      not_started: "not started",
-      starting: "starting",
-      running: "running",
-      idle: "idle",
-      stopping: "stopping",
-      exited: "exited",
-    };
-    currentContext.ui.setStatus("python", `Python ${labels[status.state]}`);
-  }
 
   function notifyEnvironmentCleared(): void {
     // Use the live message queue so the active tool loop and saved history receive the same notice.
