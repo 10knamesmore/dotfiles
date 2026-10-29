@@ -4,19 +4,19 @@ import { inspectContext } from "./view.js";
 
 export default function contextInspector(pi: ExtensionAPI): void {
   let current: ContextSnapshot | undefined;
-  let previous: ContextSnapshot | undefined;
   let latestPayload: PayloadSnapshot | undefined;
-  let previousPayload: PayloadSnapshot | undefined;
   let awaitingResponse = false;
   let promptSources: Pick<BuildSystemPromptOptions, "contextFiles" | "skills"> = {};
+  let requestNumber = 0;
+  let payloadNumber = 0;
 
   const clear = () => {
     current = undefined;
-    previous = undefined;
     latestPayload = undefined;
-    previousPayload = undefined;
     awaitingResponse = false;
     promptSources = {};
+    requestNumber = 0;
+    payloadNumber = 0;
   };
   pi.on("session_start", clear);
   pi.on("session_tree", clear);
@@ -32,11 +32,10 @@ export default function contextInspector(pi: ExtensionAPI): void {
 
   pi.on("context_with_system", (event, ctx) => {
     if (ctx.mode !== "tui") return;
-    previous = current;
     current = captureContext(
       event,
       { ...promptSources, cwd: ctx.cwd },
-      (previous?.number ?? 0) + 1,
+      ++requestNumber,
       ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "none",
       ctx.getSystemPrompt(),
     );
@@ -45,8 +44,7 @@ export default function contextInspector(pi: ExtensionAPI): void {
 
   pi.on("before_provider_request", (event, ctx) => {
     if (ctx.mode !== "tui") return;
-    previousPayload = latestPayload;
-    latestPayload = capturePayload(event.payload, (previousPayload?.number ?? 0) + 1);
+    latestPayload = capturePayload(event.payload, ++payloadNumber);
   });
 
   pi.on("message_end", (event) => {
@@ -64,7 +62,7 @@ export default function contextInspector(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("context", {
-    description: "Inspect the last request, context sources and changes (memory-only)",
+    description: "Inspect the last request and context sources (memory-only)",
     handler: async (_args, ctx) => {
       if (ctx.mode !== "tui") {
         ctx.ui.notify("/context requires the interactive terminal UI.", "info");
@@ -75,13 +73,7 @@ export default function contextInspector(pi: ExtensionAPI): void {
         return;
       }
       // Freeze the view while a running agent continues collecting the next request.
-      await inspectContext(
-        ctx,
-        structuredClone(current),
-        previous && structuredClone(previous),
-        latestPayload && structuredClone(latestPayload),
-        previousPayload && structuredClone(previousPayload),
-      );
+      await inspectContext(ctx, structuredClone(current), latestPayload && structuredClone(latestPayload));
     },
   });
 }

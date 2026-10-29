@@ -6,7 +6,6 @@ import { field, heading, note } from "./report.js";
 import { SourceLayouts } from "./source-layout.js";
 import { SourceContent } from "./source-view.js";
 import {
-  changesReport,
   formatBytes,
   overviewReport,
   payloadReport,
@@ -72,9 +71,7 @@ const keyboardPage: InspectionPage = {
 export async function inspectContext(
   ctx: ExtensionCommandContext,
   current: ContextSnapshot,
-  previous: ContextSnapshot | undefined,
   payload: PayloadSnapshot | undefined,
-  previousPayload: PayloadSnapshot | undefined,
 ): Promise<void> {
   const pages: InspectionPage[] = [
     {
@@ -91,17 +88,12 @@ export async function inspectContext(
           } satisfies InspectionPage,
         ]
       : []),
-    {
-      label: "Since previous request",
-      group: "Changes",
-      content: { kind: "report", rows: changesReport(previous, current) },
-    },
     { label: "Context files and skill evidence", group: "Sources", content: { kind: "report", rows: current.sources } },
     ...entryPages([current.runtimePrompt], "Prompt"),
     {
-      label: "Independent timeline and changes",
+      label: "Independent timeline",
       group: "Provider",
-      content: { kind: "report", rows: payloadReport(payload, previousPayload) },
+      content: { kind: "report", rows: payloadReport(payload) },
     },
     ...entryPages(payload?.entries ?? [], "Payload"),
     ...entryPages(current.prompt, "Prompt"),

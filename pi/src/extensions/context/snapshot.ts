@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { getCurrentSystemMessage, getCurrentTools, type Usage } from "@earendil-works/pi-ai";
 import {
@@ -6,19 +5,17 @@ import {
   type BuildSystemPromptOptions,
   type ContextWithSystemEvent,
 } from "@earendil-works/pi-coding-agent";
-import { change, field, heading, note, type ReportRow } from "./report.js";
+import { field, heading, note, type ReportRow } from "./report.js";
 
 export interface ContextEntry {
-  key: string;
   label: string;
   body: string;
   format: "text" | "json";
   /** UTF-8 size of raw text or compact JSON, before JSON is pretty-printed for display. */
   bytes: number;
-  fingerprint: string;
 }
 
-/** Two request observations are retained in memory; session changes discard both. */
+/** The latest request observation is retained in memory; session changes discard it. */
 export interface ContextSnapshot {
   number: number;
   capturedAt: number;
@@ -45,21 +42,19 @@ export interface PayloadSnapshot {
   bytes: number;
 }
 
-export function contextEntry(key: string, label: string, body: string): ContextEntry {
+export function contextEntry(label: string, body: string): ContextEntry {
   return {
-    key,
     label,
     body,
     format: "text",
     bytes: Buffer.byteLength(body, "utf8"),
-    fingerprint: createHash("sha256").update(body).digest("hex"),
   };
 }
 
-function jsonEntry(key: string, label: string, value: unknown): ContextEntry {
+function jsonEntry(label: string, value: unknown): ContextEntry {
   const json = JSON.stringify(value);
   return {
-    ...contextEntry(key, label, json),
+    ...contextEntry(label, json),
     body: JSON.stringify(value, null, 2),
     format: "json",
   };
@@ -77,9 +72,9 @@ export function captureContext(
   if (system) {
     const content =
       typeof system.content === "string" ? system.content : system.content.map((block) => block.text).join("\n");
-    if (content) prompt.push(contextEntry("content", "Base and appended instructions", content));
+    if (content) prompt.push(contextEntry("Base and appended instructions", content));
     for (const [name, text] of Object.entries(system.sections ?? {})) {
-      if (text !== null) prompt.push(contextEntry(`section:${name}`, name, text));
+      if (text !== null) prompt.push(contextEntry(name, text));
     }
   }
 
@@ -127,7 +122,7 @@ export function captureContext(
                 isError: message.isError,
               }
             : { role: message.role, content: message.content };
-      const entry = jsonEntry(String(messages.length + 1), `#${messages.length + 1} · ${label}`, content);
+      const entry = jsonEntry(`#${messages.length + 1} · ${label}`, content);
       messages.push(entry);
     }
   }
@@ -166,9 +161,9 @@ export function captureContext(
     number,
     capturedAt: Date.now(),
     selectedModel,
-    runtimePrompt: contextEntry("runtime-prompt", "Runtime prompt · session configuration", runtimePrompt),
+    runtimePrompt: contextEntry("Runtime prompt · session configuration", runtimePrompt),
     prompt,
-    tools: getCurrentTools(event.messages).map((tool) => jsonEntry(tool.name, tool.name, tool)),
+    tools: getCurrentTools(event.messages).map((tool) => jsonEntry(tool.name, tool)),
     messages,
     sources,
   };
@@ -179,8 +174,8 @@ export function capturePayload(payload: unknown, number: number): PayloadSnapsho
   const fields: unknown = JSON.parse(serialized);
   const entries =
     fields !== null && typeof fields === "object" && !Array.isArray(fields)
-      ? Object.entries(fields).map(([key, value]) => jsonEntry(key, key, value))
-      : [jsonEntry("payload", "Provider payload", fields)];
+      ? Object.entries(fields).map(([key, value]) => jsonEntry(key, value))
+      : [jsonEntry("Provider payload", fields)];
   return {
     number,
     capturedAt: Date.now(),
@@ -194,75 +189,12 @@ export function formatBytes(bytes: number): string {
   return `${bytes.toLocaleString("en-US")} B`;
 }
 
-export function compareEntries(previous: ContextEntry[], current: ContextEntry[]): ReportRow[] {
-  const before = new Map(previous.map((entry) => [entry.key, entry]));
-  const after = new Map(current.map((entry) => [entry.key, entry]));
-  return [
-    ...current.flatMap((entry) => {
-      const old = before.get(entry.key);
-      if (!old) return [change("added", `${entry.label} · ${formatBytes(entry.bytes)}`)];
-      if (old.fingerprint === entry.fingerprint) return [];
-      return [change("changed", `${entry.label} · ${formatBytes(old.bytes)} → ${formatBytes(entry.bytes)}`)];
-    }),
-    ...previous.filter((entry) => !after.has(entry.key)).map((entry) => change("removed", entry.label)),
-  ];
-}
-
-/** Match message content as a multiset so compaction does not mark every shifted index as edited. */
-function unmatchedMessages(left: ContextEntry[], right: ContextEntry[]): ContextEntry[] {
-  const remaining = new Map<string, number>();
-  for (const entry of right) remaining.set(entry.fingerprint, (remaining.get(entry.fingerprint) ?? 0) + 1);
-  return left.filter((entry) => {
-    const count = remaining.get(entry.fingerprint) ?? 0;
-    if (count === 0) return true;
-    remaining.set(entry.fingerprint, count - 1);
-    return false;
-  });
-}
-
-export function changesReport(previous: ContextSnapshot | undefined, current: ContextSnapshot): ReportRow[] {
-  if (!previous) return [note("No previous request captured in this session branch.")];
-  const added = unmatchedMessages(current.messages, previous.messages);
-  const removed = unmatchedMessages(previous.messages, current.messages);
-  const section = (title: string, changes: ReportRow[]) => [
-    heading(title),
-    ...(changes.length ? changes : [note("Unchanged")]),
-  ];
-  return [
-    heading(`Requests #${previous.number} → #${current.number}`),
-    field(
-      "Selected model",
-      current.selectedModel,
-      previous.selectedModel === current.selectedModel ? "unchanged" : `was ${previous.selectedModel}`,
-    ),
-    ...section("Runtime prompt", compareEntries([previous.runtimePrompt], [current.runtimePrompt])),
-    ...section("Transcript prompt · before projections", compareEntries(previous.prompt, current.prompt)),
-    ...section("Transcript tools · before hidden-tool filtering", compareEntries(previous.tools, current.tools)),
-    heading("Transcript messages"),
-    field("Added / removed", `+${added.length} / −${removed.length}`, undefined, "number"),
-    ...added.map((entry) => change("added", `${entry.label} · ${formatBytes(entry.bytes)}`)),
-    ...removed.map((entry) => change("removed", `${entry.label} · ${formatBytes(entry.bytes)}`)),
-    note("Content matching ignores positions; edits appear as removal + addition."),
-  ];
-}
-
-export function payloadReport(
-  current: PayloadSnapshot | undefined,
-  previous: PayloadSnapshot | undefined,
-): ReportRow[] {
+export function payloadReport(current: PayloadSnapshot | undefined): ReportRow[] {
   if (!current) return [note("No provider payload observed.")];
-  const changes = previous ? compareEntries(previous.entries, current.entries) : [];
   return [
     heading(`Provider observation #${current.number}`),
     field("Captured", new Date(current.capturedAt).toLocaleString()),
     field("Compact JSON", formatBytes(current.bytes), undefined, "number"),
-    heading("Changes"),
-    ...(previous
-      ? [
-          field("Compared with", `#${previous.number}`, new Date(previous.capturedAt).toLocaleString()),
-          ...(changes.length ? changes : [note("Unchanged")]),
-        ]
-      : [note("No previous provider observation.")]),
     heading("Observation scope"),
     note("This hook includes main requests, retries and cache warming."),
     note("Pi supplies no request identity here. Payload observations are not attributed to a context snapshot."),

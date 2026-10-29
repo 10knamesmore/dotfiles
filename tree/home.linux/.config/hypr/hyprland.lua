@@ -44,12 +44,12 @@ end
 -- ============================================================
 
 hl.env("XCURSOR_SIZE", "24")
-hl.env("XMODIFIERS", "@im=fcitx")
+-- hl.env("XMODIFIERS", "@im=fcitx")
 hl.env("XDG_MENU_PREFIX", "arch-")
 hl.env("LIBVA_DRIVER_NAME", "nvidia") -- NVIDIA 硬件加速
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("QT_STYLE_OVERRIDE", "Breeze")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("AQ_DRM_DEVICES", "/dev/dri/card0:/dev/dri/card1")
 hl.env("WEBKIT_DISABLE_DMABUF_RENDERER", "1") -- NVIDIA 上 WebKit 渲染
 
@@ -210,8 +210,7 @@ hl.curve("shellStandard", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } }
 -- spring 动画在中途打断时保持速度连续。
 -- 无回弹 ⟺ dampening ≥ 临界阻尼 2√(stiffness·mass)（源码 Spring.cpp: GAMMA<OMEGA0 才振荡）
 -- 改 stiffness 必须同步改 dampening，否则重新变欠阻尼、又开始过冲
--- easy：稳重无弹，给工作区切换用；临界 2√150≈24.5
-hl.curve("easy", { type = "spring", mass = 1, stiffness = 150, dampening = 24.5 })
+hl.curve("easy", { type = "spring", mass = 1, stiffness = 250, dampening = 30 })
 -- snappy：高刚度=固有频率高=到位快，给窗口移动用；临界 2√200≈28.3
 hl.curve("snappy", { type = "spring", mass = 1, stiffness = 200, dampening = 28.3 })
 
@@ -239,10 +238,10 @@ hl.animation({ leaf = "fade", enabled = true, speed = 3.03, bezier = "quick" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
 
--- scrolling 布局：工作区水平滑动 + 淡入 + spring，跟手感强且过渡更柔
-hl.animation({ leaf = "workspaces", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
-hl.animation({ leaf = "workspacesIn", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
-hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy", style = "slidefade" })
+-- 负位移比例反转工作区竖向滑动方向
+hl.animation({ leaf = "workspaces", enabled = true, speed = 7, spring = "easy", style = "slidevert -100%" })
+hl.animation({ leaf = "workspacesIn", enabled = true, speed = 7, spring = "easy", style = "slidevert -100%" })
+hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy", style = "slidevert -100%" })
 
 -- ============================================================
 -- 设备配置
@@ -327,6 +326,20 @@ hl.window_rule({
   immediate = true, -- 撕裂换低延迟，不想要就删这行
 })
 
+-- `proton run xxx.exe` 或非 Steam 快捷方式启动的游戏，class 是 steam_proton，
+-- 拿不到上面那条规则。放任它被平铺会和游戏自己要求的窗口尺寸互相拉扯，整屏闪；
+-- 强制全屏则会黑屏（Kirikiri + Wine 的 present 链在窗口被重置后断掉），所以只浮动。
+hl.window_rule({
+  name = "proton-game-fullscreen",
+  match = { class = "^(steam_proton|limelight_lj\\.exe|limelight_lj_ai\\.exe)$" },
+  float = true,
+  no_blur = true,
+  no_anim = true,
+  no_shadow = true,
+  no_dim = true,
+  opaque = true,
+})
+
 -- ============================================================
 -- Layer rules
 -- ============================================================
@@ -409,37 +422,20 @@ bind(mainMod .. " + l", "焦点切换 · →", hl.dsp.focus({ direction = "right
 bind(mainMod .. " + k", "焦点切换 · ↑", hl.dsp.focus({ direction = "up" }), { repeating = true })
 bind(mainMod .. " + j", "焦点切换 · ↓", hl.dsp.focus({ direction = "down" }), { repeating = true })
 
--- 移动窗口（按当前布局自动分流脚本）
-bind(mainMod .. " + SHIFT + H", "移动窗口 · ←", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift h"))
-bind(mainMod .. " + SHIFT + J", "移动窗口 · ↓", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift j"))
-bind(mainMod .. " + SHIFT + K", "移动窗口 · ↑", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift k"))
-bind(mainMod .. " + SHIFT + L", "移动窗口 · →", hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh shift l"))
-
--- 调整尺寸（binde 等价：repeating = true）
-bind(
-  mainMod .. " + CONTROL + H",
-  "调整大小 · ←",
-  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl h"),
-  { repeating = true }
-)
-bind(
-  mainMod .. " + CONTROL + J",
-  "调整大小 · ↓",
-  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl j"),
-  { repeating = true }
-)
-bind(
-  mainMod .. " + CONTROL + K",
-  "调整大小 · ↑",
-  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl k"),
-  { repeating = true }
-)
-bind(
-  mainMod .. " + CONTROL + L",
-  "调整大小 · →",
-  hl.dsp.exec_cmd(SCRIPTS .. "/hypr/layout_dispatch.sh ctrl l"),
-  { repeating = true }
-)
+local windowActions = dofile(HOME .. "/.config/hypr/window-actions.lua")
+for _, direction in ipairs({
+  { key = "H", name = "left", arrow = "←" },
+  { key = "J", name = "down", arrow = "↓" },
+  { key = "K", name = "up", arrow = "↑" },
+  { key = "L", name = "right", arrow = "→" },
+}) do
+  bind(mainMod .. " + SHIFT + " .. direction.key, "移动窗口 · " .. direction.arrow, function()
+    return windowActions.move(direction.name)
+  end)
+  bind(mainMod .. " + CONTROL + " .. direction.key, "调整大小 · " .. direction.arrow, function()
+    return windowActions.resize(direction.name)
+  end, { repeating = true })
+end
 
 -- 工作区切换 / 移动窗口 / silent 移动
 for i = 1, 10 do
@@ -529,11 +525,12 @@ end
 
 hl.on("hyprland.start", function()
   hl.exec_cmd(SCRIPTS .. "/dots-wallpaper")
-  hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
+  -- hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
   exec_once("hypridle")
   exec_once("xremap --watch=config,device ~/.config/xremap/config.yml")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
+  hl.exec_cmd('"' .. HOME .. '/.cargo/bin/rime-wayland" serve') -- 数据目录锁保证单实例
   exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
   hl.exec_cmd("clash-verge") -- tauri 单实例
   exec_once("google-chrome-stable", "chrome") -- Chrome 进程名是 chrome

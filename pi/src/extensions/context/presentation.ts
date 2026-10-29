@@ -21,8 +21,6 @@ const valueColors: Record<ReportTone, ThemeColor> = {
   warning: "warning",
   error: "error",
 };
-const changeColors = { added: "success", removed: "error", changed: "warning" } as const;
-const changeMarkers = { added: "+", removed: "−", changed: "~" } as const;
 
 export class ContextAppearance {
   public surface!: Color;
@@ -132,13 +130,6 @@ export class ContextReport implements Component {
               : " ".repeat(indent);
           lines.push(this.appearance.fill(prefix + line, width, background));
         });
-      } else if (row.kind === "change") {
-        const color = changeColors[row.operation];
-        const background = mixColors(this.appearance.surface, theme.colors[color], 0.1);
-        const text = theme.fg(color, `${changeMarkers[row.operation]} ${stripTerminalSequences(row.text)}`);
-        for (const line of wrapTextWithAnsi(text, Math.max(1, width - 2))) {
-          lines.push(this.appearance.fill(` ${line}`, width, background));
-        }
       } else {
         for (const line of wrapTextWithAnsi(
           theme.fg("muted", stripTerminalSequences(row.text)),
