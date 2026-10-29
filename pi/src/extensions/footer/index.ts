@@ -50,7 +50,7 @@ class FooterRuntime {
   }
 
   /** Install a fresh component for a started, resumed, forked, or reloaded TUI session. */
-  public async startSession(ctx: ExtensionContext): Promise<void> {
+  public startSession(ctx: ExtensionContext): void {
     this.currentContext = ctx;
     this.modelDuration.reset();
     this.modelResponse.reset();
@@ -64,7 +64,7 @@ class FooterRuntime {
     this.lastPublishedActivity = undefined;
     this.updateSpinner();
     this.stopIdle();
-    await this.component?.dispose();
+    this.component?.dispose();
     this.component = undefined;
     if (ctx.mode !== "tui") return;
 
@@ -204,6 +204,7 @@ class FooterRuntime {
     this.throughput.endTurn(modelMilliseconds - this.lastTurnModelMilliseconds);
     this.lastTurnModelMilliseconds = modelMilliseconds;
     this.hitRate.endTurn();
+    this.component?.refreshGit();
     this.component?.requestRender();
   }
 
@@ -252,18 +253,11 @@ class FooterRuntime {
   /** Refresh context-derived fields after a non-model session change. */
   public contextChanged(ctx: ExtensionContext): void {
     this.updateContext(ctx);
-    this.component?.refreshGit();
     this.component?.requestRender();
   }
 
-  /** Refresh repository state after a tool or direct user shell command may have changed files. */
-  public repositoryMayHaveChanged(ctx: ExtensionContext): void {
-    this.updateContext(ctx);
-    this.component?.refreshGit();
-  }
-
-  /** Dispose every component-owned watcher/process before Pi replaces the extension runtime. */
-  public async shutdown(ctx: ExtensionContext): Promise<void> {
+  /** Stop component-owned timers and processes before Pi replaces the extension runtime. */
+  public shutdown(ctx: ExtensionContext): void {
     this.currentContext = ctx;
     this.treeSummaryProviderActive = false;
     this.modelDuration.finish();
@@ -272,7 +266,7 @@ class FooterRuntime {
     this.activeTools.clear();
     this.updateSpinner();
     this.stopIdle();
-    await this.component?.dispose();
+    this.component?.dispose();
     this.component = undefined;
     ctx.ui.setFooter(undefined);
   }
@@ -380,8 +374,6 @@ export function registerFooter(pi: ExtensionAPI): void {
     runtime.nextUserOperation(ctx);
   });
   pi.on("input", (_event, ctx) => runtime.nextUserOperation(ctx));
-  pi.on("tool_execution_end", (_event, ctx) => runtime.repositoryMayHaveChanged(ctx));
-  pi.on("user_bash", (_event, ctx) => runtime.repositoryMayHaveChanged(ctx));
   pi.on("session_shutdown", (_event, ctx) => runtime.shutdown(ctx));
 }
 

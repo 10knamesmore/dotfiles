@@ -289,7 +289,6 @@ export class ClaudeFooterComponent implements Component {
   private readonly username = currentUsername();
   private readonly host = shortHostname();
   private disposed = false;
-  private disposal: Promise<void> | undefined;
 
   public constructor(private readonly options: ClaudeFooterComponentOptions) {}
 
@@ -301,12 +300,9 @@ export class ClaudeFooterComponent implements Component {
     this.options.git.setCwd(ctx.sessionManager.getCwd());
   }
 
-  /**
-   * Refresh repository state after Pi reports a lifecycle or tool-completion
-   * event.
-   */
+  /** Refresh repository state after a turn's tool executions have finished. */
   public refreshGit(): void {
-    this.options.git.refreshForEvent();
+    this.options.git.requestRefresh();
   }
 
   /** Repaint while this component still belongs to the active TUI session. */
@@ -347,11 +343,10 @@ export class ClaudeFooterComponent implements Component {
     // The footer reads current state from its sources during every render.
   }
 
-  /** Stop git watchers, debounce timers, and any running git process. */
-  public dispose(): Promise<void> {
-    if (this.disposal) return this.disposal;
+  /** Stop the git refresh timer and any running git process. */
+  public dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
-    this.disposal = this.options.git.dispose();
-    return this.disposal;
+    this.options.git.dispose();
   }
 }
