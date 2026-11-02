@@ -13,9 +13,9 @@ export interface AgentControlRow {
 
 /** Frozen display data for one control operation; renderers never read live runs. */
 export interface AgentsToolSnapshot {
-  action: "list" | "peek" | "stop" | "send_message";
+  action: "list" | "peek" | "stop" | "wait" | "send_message";
   target?: string;
-  /** Actual child/run status returned by stop. */
+  /** Actual terminal run status returned by stop or wait. */
   status?: SubagentStatus;
   rows: AgentControlRow[];
   activity?: string;
@@ -53,7 +53,7 @@ export function renderAgentsCall(
     const snapshot = state.snapshot;
     const status = state.isError ? "failed"
       : !state.settled ? "pending"
-      : snapshot?.action === "stop" ? snapshot.status! : "completed";
+      : snapshot?.action === "stop" || snapshot?.action === "wait" ? snapshot.status! : "completed";
     const operation = action ? ` · ${sanitizeTerminalText(action)}` : "";
     const target = snapshot?.target ? ` · ${sanitizeTerminalText(snapshot.target)}` : "";
     return wrapTextWithAnsi(

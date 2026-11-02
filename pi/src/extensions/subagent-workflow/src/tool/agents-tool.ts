@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   truncateHead,
@@ -29,9 +30,10 @@ const Action = Type.Union([
       "Read run progress and child IDs, or a child's recent transcript and result. Previews are bounded; full records are under artifacts.",
   }),
   Type.Literal("stop", { description: "Cancel the selected run or child." }),
+  Type.Literal("wait", { description: "Wait until the selected run reaches a terminal status." }),
   Type.Literal("send_message", { description: "Send instructions to a pending or running child." }),
 ], {
-  description: "Inspect or control existing work. Completion is pushed automatically; do not poll.",
+  description: "Inspect and control existing work. Completion is pushed automatically; wait is the explicit run-level synchronization point.",
 });
 const Status = Type.Union([
   Type.Literal("pending"),
@@ -46,13 +48,14 @@ const Parameters = Type.Object(
     action: Action,
     runId: Type.Optional(Type.String({
       minLength: 1,
-      description: "Required except for list. stop and send_message require the Pi process that owns this run.",
+      description:
+        "Required except for list. stop, wait, and send_message require the Pi process that owns this run.",
     })),
     childId: Type.Optional(
       Type.String({
         minLength: 1,
         description:
-          "Select one child for peek/stop; required for send_message. Omit to target the entire run; stopping it also cancels future workflow work. " +
+          "Select one child for peek/stop; required for send_message. wait is run-level only and rejects childId. Omit to target the entire run; stopping it also cancels future workflow work. " +
           "Stopping one child makes its agent() call return null; the workflow may continue. Finished children use subagent.followUp for a new turn.",
       }),
     ),
@@ -140,6 +143,16 @@ const Output = Type.Union([
     artifacts: Type.Array(Type.String()),
   }),
   Type.Object({
+    action: Type.Literal("wait"),
+    run: RunOverview,
+    children: Type.Array(ChildOverview),
+    total: Type.Number(),
+    phases: Type.Array(Type.String()),
+    recentProgress: Type.Array(Type.String()),
+    resultPreview: Type.Optional(Type.String()),
+    artifacts: Type.Array(Type.String()),
+  }),
+  Type.Object({
     action: Type.Literal("stop"),
     runId: Type.String(),
     childId: Type.Optional(Type.String()),
@@ -177,6 +190,9 @@ function validateInput(input: Input): void {
       break;
     case "stop":
       allowed = ["action", "runId", "childId"];
+      break;
+    case "wait":
+      allowed = ["action", "runId"];
       break;
     case "send_message":
       allowed = ["action", "runId", "childId", "message"];
@@ -258,6 +274,60 @@ function page<T>(items: T[], offset = 0, limit = 20) {
   };
 }
 
+function runArtifacts(run: RunSummary): string[] {
+  return [
+    join(run.runDir, "run.json"),
+    join(run.runDir, "events.jsonl"),
+    ...(run.kind === "workflow" ? [join(run.runDir, "result.json")] : []),
+  ];
+}
+
+function runResultPreview(run: RunSummary, detail: ReturnType<typeof readRunDetail>): string | undefined {
+  if (run.kind === "workflow") {
+    try {
+      return preview(readFileSync(join(run.runDir, "result.json"), "utf8"), 8_000);
+    } catch {
+      return undefined;
+    }
+  }
+  const results = detail.children.flatMap((child) => {
+    if (!child.result) return [];
+    return [
+      child.result.structured === undefined
+        ? child.result.text
+        : JSON.stringify(child.result.structured, null, 2),
+    ];
+  });
+  return results.length > 0 ? preview(results.join("\n"), 8_000) : undefined;
+}
+
+async function waitForRun(runId: string, signal?: AbortSignal): Promise<void> {
+  const completion = subagentRunner.waitRun(runId);
+  if (!signal) {
+    await completion;
+    return;
+  }
+  if (signal.aborted) throw new Error("Wait aborted");
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = (): void => signal.removeEventListener("abort", abort);
+    const abort = (): void => {
+      cleanup();
+      reject(new Error("Wait aborted"));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    void completion.then(
+      () => {
+        cleanup();
+        resolve();
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
 interface ActionResult {
   output: Output;
   snapshot: AgentsToolSnapshot;
@@ -294,6 +364,19 @@ function resultSnapshot(input: Input, output: Output, target?: string): AgentsTo
       output.child.childId,
       ...output.artifacts,
     ];
+  } else if (output.action === "wait") {
+    snapshot.status = output.run.status;
+    snapshot.rows = output.children.map((child) => ({
+      name: child.label,
+      status: child.status,
+      metadata: child.model,
+    }));
+    snapshot.quote = output.resultPreview;
+    snapshot.expandedLines = [
+      ...output.recentProgress,
+      ...output.children.flatMap((child) => [child.childId, ...(child.activity ? [child.activity] : [])]),
+      ...output.artifacts,
+    ];
   } else if (output.action === "send_message") {
     snapshot.quote = input.message!.trim();
     snapshot.expandedLines = [output.runId, output.childId];
@@ -311,6 +394,7 @@ async function executeAction(
   input: Input,
   ctx: ExtensionContext,
   onUpdate: AgentToolUpdateCallback<AgentsToolSnapshot | undefined> | undefined,
+  signal: AbortSignal | undefined,
 ): Promise<ActionResult> {
   validateInput(input);
   const runs = sessionRuns(ctx);
@@ -350,6 +434,28 @@ async function executeAction(
     if (rows) snapshot.rows = rows;
     return { output, snapshot };
   };
+
+  if (input.action === "wait") {
+    await waitForRun(run.runId, signal);
+    const detail = readRunDetail(run.runDir, run.runId, { ...readOptions, bypassCache: true });
+    if (isLiveStatus(detail.status)) {
+      throw new Error(`Run ${run.runId} is still active in another process; wait requires its owning Pi process`);
+    }
+    const finalRun = sessionRuns(ctx).find((candidate) => candidate.runId === run.runId);
+    if (!finalRun) throw new Error(`Run ${run.runId} disappeared before wait completed`);
+    const resultPreview = runResultPreview(finalRun, detail);
+    const artifacts = runArtifacts(finalRun).filter(existsSync);
+    return finish({
+      action: "wait",
+      run: runOverview(finalRun),
+      children: detail.children.map((row) => childOverview(finalRun.runId, row)),
+      total: detail.children.length,
+      phases: detail.phases.map((phase) => preview(phase.title)),
+      recentProgress: detail.narrator.slice(-10).map((line) => preview(line.text)),
+      ...(resultPreview ? { resultPreview } : {}),
+      artifacts,
+    });
+  }
 
   if (input.action === "peek") {
     if (child) {
@@ -428,8 +534,8 @@ export function registerAgentsTool(pi: ExtensionAPI): void {
     parameters: Parameters,
     outputSchema: Output,
     executionMode: "sequential",
-    async execute(_toolCallId, input, _signal, onUpdate, ctx): Promise<AgentToolResult<AgentsToolSnapshot | undefined>> {
-      const { output, snapshot } = await executeAction(input, ctx, onUpdate);
+    async execute(_toolCallId, input, signal, onUpdate, ctx): Promise<AgentToolResult<AgentsToolSnapshot | undefined>> {
+      const { output, snapshot } = await executeAction(input, ctx, onUpdate, signal);
       const text = JSON.stringify(output, null, 2);
       const clipped = truncateHead(text, { maxBytes: 48_000, maxLines: 1_500 });
       return {

@@ -59,7 +59,7 @@ export interface WidgetRunView {
   label: string;
   /** Formatted current-phase segment for workflow rows, e.g. "Research (2/3)". */
   phase?: string;
-  /** One model, or a comma-separated list when a workflow mixes models. */
+  /** Direct subagent model; workflow child models are shown in the expanded run detail. */
   model?: string;
   counts: StatusCounts;
   startedAt: number;
@@ -421,7 +421,7 @@ export class SubagentStatusWidget {
       kind: run.kind,
       label: run.label,
       phase: phaseView(run),
-      model: runModelDisplay(run),
+      model: run.kind === "subagent" ? runModelDisplay(run) : undefined,
       counts: countStatuses(run.handles.map((handle) => handle.status)),
       startedAt: run.startedAt,
       usage: sumUsage(run.usage.values()),

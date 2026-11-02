@@ -603,6 +603,16 @@ export class SubagentRunner {
     const live = [...this.handles.values()].filter((handle) => handle.runId === runId && handle.isLive);
     await Promise.all(live.map((handle) => handle.abort()));
   }
+  /** Wait for an entire run without changing its lifecycle. */
+  async waitRun(runId: string): Promise<void> {
+    const registered = this.runControllers.get(runId);
+    if (registered) {
+      await registered.execution.catch(() => undefined);
+      return;
+    }
+    const live = [...this.handles.values()].filter((handle) => handle.runId === runId && handle.isLive);
+    await Promise.all(live.map((handle) => handle.result));
+  }
   /** Whether the run has live work or a registered workflow loop in THIS process; guards same-process duplicate resume. */
   isRunActive(runId: string): boolean {
     if (this.runControllers.has(runId)) return true;

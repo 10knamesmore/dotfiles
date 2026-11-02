@@ -339,7 +339,7 @@ export function registerSubagentTool(
     label: "Subagent",
     parameters: SubagentToolParameters,
     description:
-      "Spawn one ad-hoc child. beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The call returns as soon as the child starts and its result arrives later as a steered message, end the turn and continue when the message arrives. Use agents to list, peek, stop, or send_message to live children. Compose each child for the task at hand, DO NOT orchestrate multiple agents (include yourself) to modify files in the same path.",
+      "Spawn one ad-hoc child. beyond that, or when results must feed later spawns, or you need phases, pipelines, or resumable control flow, use workflow instead. The call returns as soon as the child starts and its result arrives later as a steered message, end the turn and continue when the message arrives. Use agents to list, peek, wait for an entire run, stop, or send_message to live children. Compose each child for the task at hand, DO NOT orchestrate multiple agents (include yourself) to modify files in the same path.",
     async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<Detailed> {
       let input: ValidatedSubagentInput;
       try {

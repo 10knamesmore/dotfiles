@@ -141,6 +141,7 @@ The parent calls `agents` outside the workflow script:
 agents({ action: "list", status: "live" })
 agents({ action: "peek", runId })
 agents({ action: "peek", runId, childId, messages: 6 })
+agents({ action: "wait", runId })
 agents({ action: "send_message", runId, childId, message: "Focus on the storage module." })
 agents({ action: "stop", runId, childId })
 agents({ action: "stop", runId })
@@ -151,7 +152,8 @@ Resuming a workflow assigns its new generation to the resuming parent session.
 `list` and run-level `peek` accept `offset` and `limit` for pagination.
 Child-level `peek` includes bounded transcript and result previews plus full
 artifact paths. Completion is pushed to the parent; use these views for
-inspection, not polling.
+inspection, not polling. `wait` is the only blocking control: it waits for the
+entire run, whether it is a subagent or workflow, and never accepts `childId`.
 
 `send_message` queues steering for a pending or running child; acceptance
 does not confirm consumption. Stopping one child makes its `agent()` call

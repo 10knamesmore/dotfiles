@@ -59,9 +59,9 @@ ks() {
 # 📁 文件/目录显示增强（使用 eza）
 # ================================
 alias ls="eza --icons --git --group-directories-first"
-alias la='eza -lahHiM --icons --git --group-directories-first'
-alias l='eza -lh --icons --git --group-directories-first'
-alias ll='eza -lh --icons --git --group-directories-first'
+alias la='eza -lahHiM --icons --git --group-directories-first --created --modified --time-style=iso'
+alias l='eza -lh --icons --git --group-directories-first --created --modified --time-style=iso'
+alias ll='eza -lh --icons --git --group-directories-first --created --modified --time-style=iso'
 tree() {
     local level=${1:-2}
     eza -T --icons --git --level="${level}"
@@ -114,4 +114,4 @@ alias zja="zellij attach"
 # ================================
 # AI
 # ================================
-alias cc="codex --profile ftai"
+alias cc='PATH="$HOME/.agents/bin:$PATH" codex --profile ftai'
