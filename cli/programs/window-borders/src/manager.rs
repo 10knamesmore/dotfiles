@@ -102,6 +102,13 @@ impl WindowManager {
             .copied()
             .collect::<BTreeSet<_>>();
         affected.extend(changes.created);
+        // Yabai emits its signal after changing a window, but the signal does
+        // not carry a window ID. Re-read every tracked target so a window
+        // created at its initial position is moved with its border when yabai
+        // places it in the tree.
+        if changes.stack_refresh {
+            affected.extend(&previous_ids);
+        }
         let refresh_displays = changes.spaces || changes.displays;
         if refresh_displays {
             self.displays = Displays::read(self.connection)?;
