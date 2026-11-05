@@ -12,6 +12,7 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 import {
   clamp,
   countStatuses,
+  formatContextUsage,
   formatDuration,
   formatTokenUsage,
   hasTokenUsage,
@@ -27,8 +28,10 @@ import type { ChildRow, RunDetail, RunSummary } from "../../store/run-reader.js"
 
 const LABEL_MAX = 30;
 const MODEL_MAX = 22;
+const CONTEXT_WIDTH = 11;
 const ELAPSED_WIDTH = 6;
 const USAGE_WIDTH = 20;
+type ContextUsageView = { tokens: number | null; contextWindow: number };
 
 /** Compact relative age: "12s", "5m", "3h", "2d". */
 function formatAge(ms: number): string {
@@ -210,6 +213,7 @@ export function renderRunDetail(
   now: number,
   maxLines: number,
   focusRow?: number,
+  liveContextUsage: ReadonlyMap<string, ContextUsageView> = new Map(),
 ): string[] {
   const cap = Math.max(20, width);
   const order = orderedChildren(detail, filter);
@@ -218,7 +222,7 @@ export function renderRunDetail(
     lines.push(theme.fg("dim", "  This run directory could not be read."));
     return lines;
   }
-  const body = buildDetailBody(detail, order, cursor, theme, cap, now);
+  const body = buildDetailBody(detail, order, cursor, theme, cap, now, liveContextUsage);
   if (body.length === 0) {
     lines.push(theme.fg("dim", "  No agents match this filter."));
     return lines;
@@ -261,6 +265,7 @@ function buildDetailBody(
   theme: ThemeLike,
   cap: number,
   now: number,
+  liveContextUsage: ReadonlyMap<string, ContextUsageView>,
 ): DisplayRow[] {
   if (detail.kind !== "workflow") {
     return order.map((child, index) => ({
@@ -268,7 +273,7 @@ function buildDetailBody(
       childIndex: index,
     }));
   }
-  return buildWorkflowBody(detail, order, cursor, theme, cap, now);
+  return buildWorkflowBody(detail, order, cursor, theme, cap, now, liveContextUsage);
 }
 
 function buildWorkflowBody(
@@ -278,6 +283,7 @@ function buildWorkflowBody(
   theme: ThemeLike,
   cap: number,
   now: number,
+  liveContextUsage: ReadonlyMap<string, ContextUsageView>,
 ): DisplayRow[] {
   return buildWorkflowLayout(detail, order).map((row): DisplayRow => {
     if (row.kind === "phase") {
@@ -290,7 +296,10 @@ function buildWorkflowBody(
       };
     }
     return {
-      text: truncateToWidth(`  ${renderChildRow(row.child, row.childIndex === cursor, theme, now)}`, cap),
+      text: truncateToWidth(
+        `  ${renderChildRow(row.child, row.childIndex === cursor, theme, now, liveContextUsage.get(row.child.id))}`,
+        cap,
+      ),
       childIndex: row.childIndex,
     };
   });
@@ -355,7 +364,13 @@ function narratorFor(detail: RunDetail, title: string): string[] {
   return logs;
 }
 
-function renderChildRow(child: ChildRow, selected: boolean, theme: ThemeLike, now: number): string {
+function renderChildRow(
+  child: ChildRow,
+  selected: boolean,
+  theme: ThemeLike,
+  now: number,
+  contextUsage?: ContextUsageView,
+): string {
   const glyph = statusGlyph(child.status, theme, now, child.status === "running");
   const label = truncateToWidth(sanitizeTerminalText(child.label), LABEL_MAX, "…", true);
   const styledLabel = selected ? theme.fg("accent", theme.bold(label)) : label;
@@ -373,6 +388,7 @@ function renderChildRow(child: ChildRow, selected: boolean, theme: ThemeLike, no
         ),
       ),
     );
+  if (contextUsage) cells.push(theme.fg("dim", padStart(formatContextUsage(contextUsage), CONTEXT_WIDTH)));
   // Elapsed and token usage are right-aligned in fixed columns so the
   // trailing activity/result text starts at the same column on every row.
   const elapsed = child.startedAt !== undefined ? formatDuration((child.endedAt ?? now) - child.startedAt) : "";

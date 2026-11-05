@@ -440,11 +440,26 @@ function renderContent(
   if (state.level === "run" && state.runId) {
     const detail = model.detail(state.runId);
     const actions = actionsFor(detail);
+    const liveContextUsage = new Map<string, { tokens: number | null; contextWindow: number }>();
+    for (const handle of subagentRunner.runHandles(detail.runId)) {
+      const usage = handle.contextUsage;
+      if (usage) liveContextUsage.set(handle.id, { tokens: usage.tokens, contextWindow: usage.contextWindow });
+    }
     // Refresh renders re-read the detail, and live rows reorder as children
     // start; pin the cursor to the selected child's identity, not its index.
     state.reconcileChildren(orderedChildren(detail, state.filter));
     return {
-      lines: renderRunDetail(detail, state.cursor, state.filter, theme, inner, now, budget, state.scroll),
+      lines: renderRunDetail(
+        detail,
+        state.cursor,
+        state.filter,
+        theme,
+        inner,
+        now,
+        budget,
+        state.scroll,
+        liveContextUsage,
+      ),
       footer: footerHint(
         {
           level: "run",

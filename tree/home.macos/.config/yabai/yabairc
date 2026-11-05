@@ -31,7 +31,7 @@ yabai -m config \
     bottom_padding 8 \
     left_padding 10 \
     right_padding 10 \
-    window_gap 12 \
+    window_gap 6 \
     layout bsp \
     mouse_modifier cmd \
     mouse_action1 move \
@@ -43,8 +43,16 @@ yabai -m rule --add app="小米互联服务" manage=off
 
 yabai -m signal --add event=window_destroyed active=yes action="yabai -m query --windows --window &> /dev/null || yabai -m window --focus mouse &> /dev/null || yabai -m window --focus recent &> /dev/null"
 
-# JankyBorder settings, 用来给窗口加边框
-# https://github.com/FelixKratz/JankyBorders/wiki/Man-Page
-borders active_color=0xffcba6f7 inactive_color=0xff45475a width=5.0 hidpi=on &
+# 在 yabai 完成状态更新后刷新 stack 序号。
+for event in window_focused window_created window_destroyed window_moved window_resized space_changed display_changed; do
+    yabai -m signal --add event="$event" label="window-borders-$event" \
+        action="pkill -USR1 -x window-borders"
+done
+# 窗口边框；分辨率随所在显示器自动调整。
+"$HOME/.local/bin/window-borders" \
+    --active-color 0xffcba6f7 \
+    --inactive-color 0xff45475a \
+    --width 2 \
+    --yabai-stack &
 
 echo "yabai configuration loaded.."

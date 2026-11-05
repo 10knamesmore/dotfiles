@@ -6,6 +6,8 @@ use objc2_core_graphics::{CGWindowListCopyWindowInfo, CGWindowListOption, kCGWin
 
 use super::{Connection, TargetWindow, check, displays::Displays, ffi::*, owned, window_array};
 
+const PROCESS_NOT_FOUND: i32 = -600;
+
 const DOCUMENT: u64 = 1 << 0;
 const FLOATING: u64 = 1 << 1;
 const ATTACHED: u64 = 1 << 7;
@@ -162,14 +164,16 @@ impl Connection {
         let mut process = ProcessSerialNumber::default();
         let mut owner = 0;
         unsafe {
-            check(
-                _SLPSGetFrontProcess(&mut process),
-                "get foreground application",
-            )?;
-            check(
-                SLSGetConnectionIDForPSN(self.id, &process, &mut owner),
-                "get foreground connection",
-            )?;
+            // A foreground process can disappear before this lookup. Leave
+            // every border inactive until the next focus notification.
+            match _SLPSGetFrontProcess(&mut process) {
+                PROCESS_NOT_FOUND => return Ok(None),
+                result => check(result, "get foreground application")?,
+            }
+            match SLSGetConnectionIDForPSN(self.id, &process, &mut owner) {
+                PROCESS_NOT_FOUND => return Ok(None),
+                result => check(result, "get foreground connection")?,
+            }
             let spaces = CFArray::from_retained_objects(
                 &displays
                     .screens
