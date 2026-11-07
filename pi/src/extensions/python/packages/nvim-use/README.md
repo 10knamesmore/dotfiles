@@ -98,7 +98,7 @@ Python 日志：`NVIM_USE_LOG`，默认系统临时目录的 `nvim-use-<worker-p
 uv sync --project pi/src/extensions/python --locked
 uvx ty check --python pi/src/extensions/python/.venv/bin/python pi/src/extensions/python/packages/nvim-use/src/nvim_use
 pnpm --dir pi run typecheck
-stylua --check tree/home/.config/nvim/lua/pi_bridge
+stylua --check tree/home/.config/nvim/lua/builtins/pi-bridge/lua/pi_bridge
 ```
 
 Pi `/reload` 后新 worker 加载包与 skill。Neovim 重启加载 bridge 和 lualine 组件。
