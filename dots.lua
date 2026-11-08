@@ -24,6 +24,12 @@ dots.hook.before_sync({
   program = "pnpm",
   args = { "run", "update:pi" },
 })
+dots.hook.before_sync({
+  name = "build Pi Design editor",
+  cwd = dots.repo .. "/pi",
+  program = "pnpm",
+  args = { "run", "build:design" },
+})
 -- 安装 Python SDK 与本地原生扩展。
 dots.hook.before_sync({
   name = "prepare Pi Python environment",

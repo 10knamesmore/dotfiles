@@ -12,6 +12,7 @@ dependencies = [
     "nvim-use-sdk",
     "openai>=3.19.2",
     "pillow>=12.3.0",
+    "pi-design-sdk",
     "pi-repl-tools",
     "psutil>=7.2.2",
     "rapidfuzz>=3.14.6",
@@ -30,4 +31,5 @@ browser-use-sdk = { path = "packages/browser-use", editable = true }
 computer-use-sdk = { path = "packages/computer-use" }
 nvim-use-sdk = { path = "packages/nvim-use", editable = true }
 pi-repl-tools = { path = "packages/pi-repl-tools" }
+pi-design-sdk = { path = "../design/native" }
 terminal-use-sdk = { path = "packages/terminal-use", editable = true }

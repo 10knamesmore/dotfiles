@@ -16,5 +16,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/extensions/design/web", "src/extensions/design/react"]
 }

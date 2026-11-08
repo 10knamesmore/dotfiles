@@ -1,6 +1,8 @@
 packages:
   - src/config
   - src/ui
+  - src/extensions/design/web
+  - src/extensions/design/react
 allowBuilds:
   "@google/genai": false
   esbuild: false

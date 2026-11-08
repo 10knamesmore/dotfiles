@@ -1213,6 +1213,11 @@ wheels = [
 ]
 
 [[package]]
+name = "pi-design-sdk"
+version = "0.1.0"
+source = { directory = "../design/native" }
+
+[[package]]
 name = "pi-python-worker"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1225,6 +1230,7 @@ dependencies = [
     { name = "numpy" },
     { name = "nvim-use-sdk" },
     { name = "openai" },
+    { name = "pi-design-sdk" },
     { name = "pi-repl-tools" },
     { name = "pillow" },
     { name = "psutil" },
@@ -1246,6 +1252,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "nvim-use-sdk", editable = "packages/nvim-use" },
     { name = "openai", specifier = ">=3.19.2" },
+    { name = "pi-design-sdk", directory = "../design/native" },
     { name = "pi-repl-tools", directory = "packages/pi-repl-tools" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psutil", specifier = ">=7.2.2" },

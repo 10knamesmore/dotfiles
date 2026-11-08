@@ -8,7 +8,9 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter @pi-design/react --filter @pi-design/editor run typecheck",
+    "build:design": "pnpm --filter @pi-design/react run build && pnpm --filter @pi-design/editor run build",
+    "typecheck:design": "tsc --noEmit -p src/extensions/design/tsconfig.json && pnpm --filter @pi-design/react --filter @pi-design/editor run typecheck",
     "update:pi": "pnpm update --latest --no-save @earendil-works/pi-ai @earendil-works/pi-coding-agent @earendil-works/pi-tui"
   },
   "dependencies": {
