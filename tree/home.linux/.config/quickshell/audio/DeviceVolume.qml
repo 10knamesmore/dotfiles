@@ -13,8 +13,7 @@ RowLayout {
     enabled: node?.ready ?? false
 
     ActionButton {
-        text: root.node?.isSink ? (root.node?.audio?.muted ? "󰝟" : "󰕾")
-            : (root.node?.audio?.muted ? "󰍭" : "󰍬")
+        text: root.node?.isSink ? (root.node?.audio?.muted ? "󰝟" : "󰕾") : (root.node?.audio?.muted ? "󰍭" : "󰍬")
         Accessible.name: root.node?.audio?.muted ? "取消静音" : "静音"
         Accessible.checkable: true
         Accessible.checked: root.node?.audio?.muted ?? false

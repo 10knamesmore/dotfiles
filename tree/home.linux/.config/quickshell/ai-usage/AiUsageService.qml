@@ -9,9 +9,15 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    property var codex: ({ "status": "loading" })
-    property var deepseek: ({ "status": "loading" })
-    property var openai: ({ "status": "loading" })
+    property var codex: ({
+            "status": "loading"
+        })
+    property var deepseek: ({
+            "status": "loading"
+        })
+    property var openai: ({
+            "status": "loading"
+        })
     readonly property bool refreshing: collector.running
 
     Process {
@@ -26,9 +32,15 @@ Singleton {
                     root.deepseek = result.deepseek;
                     root.openai = result.openai;
                 } catch (error) {
-                    root.codex = { "status": "unavailable" };
-                    root.deepseek = { "status": "unavailable" };
-                    root.openai = { "status": "unavailable" };
+                    root.codex = {
+                        "status": "unavailable"
+                    };
+                    root.deepseek = {
+                        "status": "unavailable"
+                    };
+                    root.openai = {
+                        "status": "unavailable"
+                    };
                     console.warn("[ai-usage] invalid collector output");
                 }
             }
@@ -38,9 +50,15 @@ Singleton {
         }
         onExited: exitCode => {
             if (exitCode !== 0) {
-                root.codex = { "status": "unavailable" };
-                root.deepseek = { "status": "unavailable" };
-                root.openai = { "status": "unavailable" };
+                root.codex = {
+                    "status": "unavailable"
+                };
+                root.deepseek = {
+                    "status": "unavailable"
+                };
+                root.openai = {
+                    "status": "unavailable"
+                };
                 console.warn("[ai-usage] collector exited", exitCode);
             }
         }

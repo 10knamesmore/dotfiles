@@ -91,7 +91,6 @@ Popup {
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
-
             }
 
             MediaButton {
@@ -101,7 +100,6 @@ Popup {
                 label: "歌词提前 0.1 秒"
                 onClicked: root.adjustOffset(0.1)
             }
-
         }
 
         Text {
@@ -110,7 +108,6 @@ Popup {
             font.family: Fonts.family
             font.pixelSize: Fonts.xs
         }
-
     }
 
     component LanguageToggle: CheckBox {
@@ -159,13 +156,9 @@ Popup {
                         duration: Tokens.animFast
                         easing.type: Easing.OutCubic
                     }
-
                 }
-
             }
-
         }
-
     }
 
     enter: Transition {
@@ -175,7 +168,6 @@ Popup {
             to: 1
             duration: 150
         }
-
     }
 
     exit: Transition {
@@ -184,7 +176,5 @@ Popup {
             to: 0
             duration: 100
         }
-
     }
-
 }

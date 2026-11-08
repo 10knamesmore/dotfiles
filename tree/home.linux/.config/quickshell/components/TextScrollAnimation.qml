@@ -15,7 +15,9 @@ SequentialAnimation {
     loops: Animation.Infinite
     onStopped: progress = 0
 
-    PauseAnimation { duration: 1000 }
+    PauseAnimation {
+        duration: 1000
+    }
     NumberAnimation {
         target: root
         property: "progress"
@@ -23,7 +25,9 @@ SequentialAnimation {
         to: 1
         duration: root.travelDuration
     }
-    PauseAnimation { duration: 1000 }
+    PauseAnimation {
+        duration: 1000
+    }
     NumberAnimation {
         target: root
         property: "progress"

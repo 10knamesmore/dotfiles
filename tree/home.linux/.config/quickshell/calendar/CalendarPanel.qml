@@ -162,7 +162,6 @@ PanelOverlay {
                         }
                     }
                 }
-
             }
 
             Rectangle {
@@ -187,9 +186,7 @@ PanelOverlay {
                         font.pixelSize: Fonts.small
                         horizontalAlignment: Text.AlignHCenter
                     }
-
                 }
-
             }
 
             // ── 日期网格 ──
@@ -257,7 +254,6 @@ PanelOverlay {
                                 font.family: Fonts.family
                                 font.pixelSize: Fonts.xs
                             }
-
                         }
 
                         MouseArea {
@@ -271,13 +267,9 @@ PanelOverlay {
                             ColorAnimation {
                                 duration: 150
                             }
-
                         }
-
                     }
-
                 }
-
             }
 
             WeatherButton {
@@ -300,7 +292,6 @@ PanelOverlay {
             transform: Translate {
                 y: (1 - col.opacity) * 12
             }
-
         }
 
         WeatherPanel {
@@ -309,7 +300,5 @@ PanelOverlay {
             entranceProgress: root.panel.revealProgress
             now: root.currentDate.getTime()
         }
-
     }
-
 }

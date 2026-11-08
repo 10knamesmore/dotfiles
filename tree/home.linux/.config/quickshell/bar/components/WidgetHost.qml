@@ -63,8 +63,7 @@ Loader {
     }
     Component {
         id: cNetSpeed
-        NetSpeedModule {
-        }
+        NetSpeedModule {}
     }
     // 普通型
     Component {
@@ -75,13 +74,11 @@ Loader {
     }
     Component {
         id: cClock
-        ClockModule {
-        }
+        ClockModule {}
     }
     Component {
         id: cAiUsage
-        AiUsageModule {
-        }
+        AiUsageModule {}
     }
     Component {
         id: cCapture
@@ -89,22 +86,18 @@ Loader {
     }
     Component {
         id: cCpu
-        CpuModule {
-        }
+        CpuModule {}
     }
     Component {
         id: cMemory
-        MemoryModule {
-        }
+        MemoryModule {}
     }
     Component {
         id: cControlCenter
-        ControlCenterModule {
-        }
+        ControlCenterModule {}
     }
     Component {
         id: cBattery
-        BatteryModule {
-        }
+        BatteryModule {}
     }
 }

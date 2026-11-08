@@ -163,9 +163,7 @@ BarModule {
 
         AnimatedCaption {
             active: root.captionVisible
-            width: root.headerInPanel
-                ? Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0))
-                : root.compactCaptionWidth
+            width: root.headerInPanel ? Math.max(0, row.width - identityTag.width - root.coverWidth - volumeText.width - root.volumeReveal * 6 - root.detailProgress * 6 * (root.player ? 1 : 0)) : root.compactCaptionWidth
             height: 28
             anchors.verticalCenter: parent.verticalCenter
             textColor: root.detailProgress > 0 ? Colors.pink : Colors.text

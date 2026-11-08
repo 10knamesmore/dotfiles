@@ -51,7 +51,6 @@ Singleton {
 
     function deviceFormat(node) {
         const properties = node.properties;
-        return [properties["api.bluez5.profile"], properties["api.bluez5.codec"]]
-            .filter(value => !!value).join(" · ").toUpperCase();
+        return [properties["api.bluez5.profile"], properties["api.bluez5.codec"]].filter(value => !!value).join(" · ").toUpperCase();
     }
 }

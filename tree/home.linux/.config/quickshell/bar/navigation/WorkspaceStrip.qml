@@ -95,8 +95,20 @@ Item {
 
         SequentialAnimation {
             id: inkMotion
-            NumberAnimation { target: activeMarker; property: "stretch"; to: 10; duration: 90; easing.type: Easing.OutCubic }
-            NumberAnimation { target: activeMarker; property: "stretch"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                target: activeMarker
+                property: "stretch"
+                to: 10
+                duration: 90
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: activeMarker
+                property: "stretch"
+                to: 0
+                duration: 200
+                easing.type: Easing.OutCubic
+            }
         }
     }
 }

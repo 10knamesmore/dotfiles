@@ -74,13 +74,9 @@ Button {
                         ColorAnimation {
                             duration: Tokens.animFast
                         }
-
                     }
-
                 }
-
             }
-
         }
 
         Text {
@@ -106,7 +102,6 @@ Button {
             color: Colors.subtext0
             wrapMode: Text.Wrap
         }
-
     }
 
     Behavior on opacity {
@@ -114,7 +109,5 @@ Button {
             duration: 280
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

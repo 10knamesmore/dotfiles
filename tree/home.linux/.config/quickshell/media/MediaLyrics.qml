@@ -20,7 +20,7 @@ ColumnLayout {
 
     function scrollToCurrent(animated) {
         if (!active || !hasLyrics || !autoFollow)
-            return ;
+            return;
 
         scrollMotion.stop();
         const before = lyricsView.contentY;
@@ -99,7 +99,6 @@ ColumnLayout {
                 color: Colors.mauve
                 verticalAlignment: Text.AlignVCenter
             }
-
         }
 
         MediaButton {
@@ -111,7 +110,6 @@ ColumnLayout {
             Accessible.description: settings.opened ? "已展开" : "已收起"
             onClicked: settings.opened ? settings.close() : settings.open()
         }
-
     }
 
     Item {
@@ -163,7 +161,6 @@ ColumnLayout {
                     root.seekRequested(Math.max(0, modelData.time - LyricsState.lyricsOffset));
                 }
             }
-
         }
 
         ColumnLayout {
@@ -187,9 +184,7 @@ ColumnLayout {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.small
             }
-
         }
-
     }
 
     LyricsSettings {
@@ -229,5 +224,4 @@ ColumnLayout {
 
         target: LyricsState
     }
-
 }

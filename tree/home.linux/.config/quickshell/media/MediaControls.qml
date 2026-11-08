@@ -20,7 +20,7 @@ ColumnLayout {
 
     function togglePlaying() {
         if (!player || !player.canTogglePlaying)
-            return ;
+            return;
 
         console.info("[media-panel] toggle playback:", player.dbusName);
         player.togglePlaying();
@@ -75,9 +75,7 @@ ColumnLayout {
                     NumberAnimation {
                         duration: Tokens.animFast
                     }
-
                 }
-
             }
 
             handle: Rectangle {
@@ -100,18 +98,14 @@ ColumnLayout {
                     NumberAnimation {
                         duration: Tokens.animFast
                     }
-
                 }
 
                 Behavior on scale {
                     NumberAnimation {
                         duration: Tokens.animFast
                     }
-
                 }
-
             }
-
         }
 
         RowLayout {
@@ -136,9 +130,7 @@ ColumnLayout {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.xs
             }
-
         }
-
     }
 
     RowLayout {
@@ -205,7 +197,5 @@ ColumnLayout {
                 console.info("[media-panel] loop:", root.player.loopState);
             }
         }
-
     }
-
 }

@@ -13,7 +13,7 @@ ColumnLayout {
     property real entranceProgress: 1
     readonly property var weather: WeatherService.weather
     readonly property var upcomingHours: weather ? Format.upcomingHours(weather.hourly, now) : []
-    readonly property var today: weather ? weather.daily.find((day) => {
+    readonly property var today: weather ? weather.daily.find(day => {
         return day.date === Format.dateKey(now);
     }) || null : null
     readonly property bool stale: weather !== null && (now - weather.current.observedAt > 3.6e+06 || now - WeatherService.weatherUpdatedAt > 3.6e+06)
@@ -40,7 +40,6 @@ ColumnLayout {
             font.pixelSize: Fonts.body
             horizontalAlignment: Text.AlignHCenter
         }
-
     }
 
     Loader {
@@ -80,7 +79,6 @@ ColumnLayout {
                         font.family: Fonts.family
                         font.pixelSize: Fonts.caption
                     }
-
                 }
 
                 RowLayout {
@@ -111,7 +109,6 @@ ColumnLayout {
                             font.family: Fonts.family
                             font.pixelSize: Fonts.caption
                         }
-
                     }
 
                     Item {
@@ -125,7 +122,6 @@ ColumnLayout {
                         font.pixelSize: Fonts.display1
                         Accessible.ignored: true
                     }
-
                 }
 
                 Rectangle {
@@ -146,7 +142,6 @@ ColumnLayout {
                 transform: Translate {
                     y: (1 - overview.reveal) * 14
                 }
-
             }
 
             HourlyForecast {
@@ -161,7 +156,6 @@ ColumnLayout {
                 transform: Translate {
                     y: (1 - hourlyForecast.entranceProgress) * 18
                 }
-
             }
 
             RowLayout {
@@ -194,11 +188,8 @@ ColumnLayout {
                 transform: Translate {
                     y: (1 - forecastDetails.reveal) * 22
                 }
-
             }
-
         }
-
     }
 
     NumberAnimation {
@@ -255,9 +246,6 @@ ColumnLayout {
                 enabled: !WeatherService.refreshing
                 onClicked: WeatherService.refresh()
             }
-
         }
-
     }
-
 }

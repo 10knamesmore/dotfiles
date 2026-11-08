@@ -1,5 +1,9 @@
+pragma ComponentBehavior: Bound
+
 import "../theme"
 import "../state"
+import "../components"
+import "../services"
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
@@ -47,11 +51,34 @@ PanelWindow {
                 "summary": notification.summary || "",
                 "body": notification.body || "",
                 "timeout": timeout,
+                "storageTarget": "",
+                "storageNotice": false,
                 "dismissed": false
             });
         }
 
         target: root.notifServer
+    }
+
+    Connections {
+        target: StorageService
+        function onNoticeReceived(notice) {
+            toastModel.append({
+                "notifId": 0,
+                "appName": "可移动存储",
+                "summary": ({
+                        inserted: "已插入存储设备",
+                        removed: "存储设备已拔出",
+                        safe: "可以安全拔出",
+                        error: "存储操作失败"
+                    })[notice.kind],
+                "body": notice.body,
+                "timeout": 8000,
+                "storageTarget": notice.kind === "inserted" ? notice.target : "",
+                "storageNotice": true,
+                "dismissed": false
+            });
+        }
     }
 
     Column {
@@ -78,9 +105,12 @@ PanelWindow {
             delegate: Rectangle {
                 id: toast
 
+                required property var model
+                required property int index
                 property bool exiting: false
                 property real _startTime: 0
                 property real _remainingTime: 0
+                readonly property var mountCandidate: model.storageNotice ? StorageService.mountCandidate(model.storageTarget) : null
 
                 function dismissToast() {
                     if (exiting)
@@ -128,7 +158,7 @@ PanelWindow {
                     onTriggered: {
                         // 水平滑出后才腾出位置，避免卡片在离场时向上收缩。
                         toast.height = 0;
-                        toastModel.setProperty(index, "dismissed", true);
+                        toastModel.setProperty(toast.index, "dismissed", true);
                         // 等全部 toast 都消失后一次性清空，避免索引漂移
                         for (let i = 0; i < toastModel.count; i++) {
                             if (!toastModel.get(i).dismissed)
@@ -140,6 +170,7 @@ PanelWindow {
 
                 ColumnLayout {
                     id: toastContent
+                    z: 1
 
                     spacing: 2
 
@@ -149,15 +180,15 @@ PanelWindow {
                     }
 
                     Text {
-                        text: model.appName
+                        text: toast.model.appName
                         color: Colors.subtext0
                         font.family: Fonts.family
                         font.pixelSize: Fonts.caption
-                        visible: model.appName !== ""
+                        visible: toast.model.appName !== ""
                     }
 
                     Text {
-                        text: model.summary
+                        text: toast.model.summary
                         color: Colors.text
                         font.family: Fonts.family
                         font.pixelSize: Fonts.body
@@ -167,8 +198,8 @@ PanelWindow {
                     }
 
                     Text {
-                        visible: model.body !== ""
-                        text: model.body
+                        visible: toast.model.body !== ""
+                        text: toast.model.body
                         color: Colors.subtext1
                         font.family: Fonts.family
                         font.pixelSize: Fonts.small
@@ -176,6 +207,37 @@ PanelWindow {
                         maximumLineCount: 2
                         elide: Text.ElideRight
                         Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        visible: toast.model.storageNotice
+                        Layout.fillWidth: true
+                        Layout.topMargin: Tokens.spaceS
+                        ActionButton {
+                            visible: !!toast.mountCandidate
+                            text: "挂载"
+                            emphasized: true
+                            enabled: StorageService.ready && !StorageService.busyForTarget(toast.model.storageTarget)
+                            onClicked: {
+                                StorageService.request("mount", toast.mountCandidate.path);
+                                PanelState.openControlCenter("storage");
+                                toast.dismissToast();
+                            }
+                        }
+                        ActionButton {
+                            text: "查看设备"
+                            onClicked: {
+                                PanelState.openControlCenter("storage");
+                                toast.dismissToast();
+                            }
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        ActionButton {
+                            text: "关闭"
+                            onClicked: toast.dismissToast()
+                        }
                     }
                 }
 
@@ -265,10 +327,22 @@ PanelWindow {
                             centerX: arrivalBorder.width / 2
                             centerY: arrivalBorder.height / 2
                             angle: arrivalBorder.progress * 360
-                            GradientStop { position: 0; color: "transparent" }
-                            GradientStop { position: 0.68; color: "transparent" }
-                            GradientStop { position: 0.88; color: Colors.withAlpha(Colors.blue, 0.9) }
-                            GradientStop { position: 1; color: "transparent" }
+                            GradientStop {
+                                position: 0
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 0.68
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 0.88
+                                color: Colors.withAlpha(Colors.blue, 0.9)
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                         PathRectangle {
                             width: arrivalBorder.width

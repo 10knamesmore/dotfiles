@@ -81,7 +81,7 @@ hl.config({
     -- no_hardware_cursors = 1,
     min_refresh_rate = 24,
     hide_on_key_press = true,
-    inactive_timeout = 30,
+    inactive_timeout = 20,
     persistent_warps = true,
     enable_hyprcursor = false,
   },
@@ -529,8 +529,9 @@ hl.on("hyprland.start", function()
   exec_once("hypridle")
   exec_once("xremap --watch=config,device ~/.config/xremap/config.yml")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
+  hl.exec_cmd("playerctld daemon")
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
-  hl.exec_cmd('"' .. HOME .. '/.cargo/bin/rime-wayland" serve') -- 数据目录锁保证单实例
+  hl.exec_cmd('systemd-cat --identifier=rime-wayland "' .. HOME .. '/.cargo/bin/rime-wayland" serve') -- 数据目录锁保证单实例
   exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
   hl.exec_cmd("clash-verge") -- tauri 单实例
   exec_once("google-chrome-stable", "chrome") -- Chrome 进程名是 chrome

@@ -7,10 +7,11 @@
 //   - wmoIcon(code, day) / wmoDesc(code) / aqiDesc(usAqi): 供 UI 渲染的映射函数
 // 副作用：两个 curl 子进程，各自独立失败重试（2 分钟）并每 30 分钟刷新一次。
 
+pragma Singleton
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
-pragma Singleton
 
 // curl 必须 --noproxy：本地代理对 api.open-meteo.com TLS 握手超时导致刷新静默失败，
 // 数据会一直停留在最后一次成功抓取；直连反而稳定。
@@ -62,12 +63,11 @@ Singleton {
 
         if (airQualityStatus !== "ready" || now - airQualityUpdatedAt > staleAfterMs)
             _startAirQualityFetch();
-
     }
 
     function _startWeatherFetch() {
         if (weatherProc.running)
-            return ;
+            return;
 
         weatherStatus = "loading";
         console.info("[weather] refresh started");
@@ -76,7 +76,7 @@ Singleton {
 
     function _startAirQualityFetch() {
         if (airQualityProc.running)
-            return ;
+            return;
 
         airQualityStatus = "loading";
         console.info("[air-quality] refresh started");
@@ -98,7 +98,6 @@ Singleton {
         for (const field of fields) {
             if (!(field in section))
                 return false;
-
         }
         return true;
     }
@@ -112,7 +111,6 @@ Singleton {
             const series = section[field];
             if (!Array.isArray(series) || series.length !== section.time.length)
                 return false;
-
         }
         return true;
     }
@@ -199,7 +197,7 @@ Singleton {
             root.weatherStatus = "error";
             console.warn("[weather] refresh failed; exit=" + exitCode + " status=" + exitStatus, weatherStderr.text.trim());
             weatherRetryTimer.restart();
-            return ;
+            return;
         }
         try {
             const parsed = _parseWeather(weatherStdout.text);
@@ -220,7 +218,7 @@ Singleton {
             root.airQualityStatus = "error";
             console.warn("[air-quality] refresh failed; exit=" + exitCode + " status=" + exitStatus, airQualityStderr.text.trim());
             airQualityRetryTimer.restart();
-            return ;
+            return;
         }
         try {
             const parsed = _parseAirQuality(airQualityStdout.text);
@@ -244,31 +242,31 @@ Singleton {
         const isDay = day !== false;
         if (code === 0)
             return isDay ? "󰖙" : "󰖔";
- // 晴
+        // 晴
         if (code >= 1 && code <= 3)
             return isDay ? "󰖕" : "󰼱";
- // 多云
+        // 多云
         if (code === 45 || code === 48)
             return "󰖑";
- // 雾
+        // 雾
         if (code >= 51 && code <= 57)
             return "󰖗";
- // 毛毛雨 / 冻毛毛雨
+        // 毛毛雨 / 冻毛毛雨
         if (code >= 61 && code <= 67)
             return "󰖗";
- // 雨 / 冻雨
+        // 雨 / 冻雨
         if (code >= 71 && code <= 77)
             return "󰖘";
- // 雪 / 雪粒
+        // 雪 / 雪粒
         if (code >= 80 && code <= 82)
             return "󰖗";
- // 阵雨
+        // 阵雨
         if (code === 85 || code === 86)
             return "󰖘";
- // 阵雪
+        // 阵雪
         if (code >= 95 && code <= 99)
             return "󰖖";
- // 雷暴 / 雷暴伴冰雹
+        // 雷暴 / 雷暴伴冰雹
         return "󰖐"; // 未知
     }
 
@@ -404,7 +402,6 @@ Singleton {
         stderr: StdioCollector {
             id: weatherStderr
         }
-
     }
 
     Process {
@@ -422,7 +419,6 @@ Singleton {
         stderr: StdioCollector {
             id: airQualityStderr
         }
-
     }
 
     // 启动即抓取，之后每 30 分钟一次；失败由各自的 2 分钟重试补上。
@@ -449,5 +445,4 @@ Singleton {
         interval: 2 * 60 * 1000
         onTriggered: root._startAirQualityFetch()
     }
-
 }

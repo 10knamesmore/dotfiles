@@ -23,12 +23,13 @@ Button {
 
     background: Rectangle {
         radius: Tokens.radiusS
-        color: root.down ? Colors.withAlpha(root.accent, 0.25)
-            : root.hovered || root.emphasized ? Colors.withAlpha(root.accent, 0.14) : Colors.surface1
+        color: root.down ? Colors.withAlpha(root.accent, 0.25) : root.hovered || root.emphasized ? Colors.withAlpha(root.accent, 0.14) : Colors.surface1
         border.width: root.activeFocus ? 1 : 0
         border.color: root.accent
         Behavior on color {
-            ColorAnimation { duration: Tokens.animFast }
+            ColorAnimation {
+                duration: Tokens.animFast
+            }
         }
     }
 
@@ -40,7 +41,9 @@ Button {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         Behavior on color {
-            ColorAnimation { duration: Tokens.animFast }
+            ColorAnimation {
+                duration: Tokens.animFast
+            }
         }
     }
 }

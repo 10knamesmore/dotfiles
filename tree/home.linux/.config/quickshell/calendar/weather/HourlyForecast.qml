@@ -17,9 +17,9 @@ WeatherSection {
     property int nextOffset: 0
     readonly property var shownHours: hours.slice(offset, offset + 8)
     readonly property var selectedHour: shownHours[selectedIndex] || null
-    readonly property var temperatures: hours.map((hour) => {
+    readonly property var temperatures: hours.map(hour => {
         return hour.temp;
-    }).filter((value) => {
+    }).filter(value => {
         return value !== null;
     })
     readonly property real minTemperature: temperatures.length ? Math.min.apply(Math, temperatures) - 2 : 0
@@ -90,7 +90,6 @@ WeatherSection {
             duration: 170
             easing.type: Easing.OutCubic
         }
-
     }
 
     Item {
@@ -120,16 +119,15 @@ WeatherSection {
             onVisibleChanged: {
                 if (visible)
                     requestPaint();
-
             }
             onPaint: {
                 const ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
                 const points = root.shownHours;
                 if (!points.length)
-                    return ;
+                    return;
 
-                const x = (index) => {
+                const x = index => {
                     return (index + 0.5) * width / points.length;
                 };
                 ctx.save();
@@ -210,12 +208,10 @@ WeatherSection {
                     onHoveredChanged: {
                         if (hovered)
                             root.selectedIndex = index;
-
                     }
                     onActiveFocusChanged: {
                         if (activeFocus)
                             root.selectedIndex = index;
-
                     }
 
                     HoverHandler {
@@ -233,9 +229,7 @@ WeatherSection {
                             ColorAnimation {
                                 duration: Tokens.animFast
                             }
-
                         }
-
                     }
 
                     contentItem: Item {
@@ -267,15 +261,10 @@ WeatherSection {
                             font.family: Fonts.family
                             font.pixelSize: Fonts.xs
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
     RowLayout {
@@ -309,7 +298,6 @@ WeatherSection {
             font.family: Fonts.family
             font.pixelSize: Fonts.xs
         }
-
     }
 
     Text {
@@ -322,5 +310,4 @@ WeatherSection {
         Accessible.role: Accessible.StaticText
         Accessible.name: text
     }
-
 }

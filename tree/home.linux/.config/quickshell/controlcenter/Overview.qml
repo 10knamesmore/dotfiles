@@ -46,12 +46,18 @@ Flickable {
             ConnectionCard {
                 icon: BluetoothService.powered ? "󰂯" : "󰂲"
                 label: "蓝牙"
-                status: !BluetoothService.ready ? "服务未就绪" : BluetoothService.connectedDevices.length
-                    ? BluetoothService.connectedDevices.map(device => device.name).join("、")
-                    : BluetoothService.powered ? "未连接设备" : "已关闭"
+                status: !BluetoothService.ready ? "服务未就绪" : BluetoothService.connectedDevices.length ? BluetoothService.connectedDevices.map(device => device.name).join("、") : BluetoothService.powered ? "未连接设备" : "已关闭"
                 connected: BluetoothService.connectedDevices.length > 0
                 onClicked: PanelState.openControlCenter("bluetooth")
             }
+        }
+
+        ActionButton {
+            Layout.fillWidth: true
+            implicitHeight: 40
+            text: "󰋊  可移动存储" + (StorageService.drives.length ? " · " + StorageService.drives.length + " 台 · " + StorageService.mountedCount + " 已挂载" : "")
+            emphasized: StorageService.drives.length > 0
+            onClicked: PanelState.openControlCenter("storage")
         }
 
         Rectangle {

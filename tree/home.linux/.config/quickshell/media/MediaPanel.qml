@@ -15,7 +15,7 @@ PanelOverlay {
 
     function seekTo(seconds) {
         if (!canSeek)
-            return ;
+            return;
 
         const target = Math.max(0, Math.min(player.length, seconds));
         console.debug("[media-panel] seek:", player.dbusName, target);
@@ -30,7 +30,6 @@ PanelOverlay {
     onShowingChanged: {
         if (showing)
             console.info("[media-panel] opened:", MediaService.activeTrackKey);
-
     }
 
     FocusScope {
@@ -79,9 +78,7 @@ PanelOverlay {
                                 NumberAnimation {
                                     duration: 240
                                 }
-
                             }
-
                         }
 
                         Text {
@@ -93,7 +90,6 @@ PanelOverlay {
                             font.pixelSize: Fonts.display2
                             Accessible.ignored: true
                         }
-
                     }
 
                     ColumnLayout {
@@ -122,7 +118,6 @@ PanelOverlay {
                                 onTextChanged: Qt.callLater(() => {
                                     if (titleScroll.running)
                                         titleScroll.restart();
-
                                 })
                             }
 
@@ -132,7 +127,6 @@ PanelOverlay {
                                 distance: Math.max(0, titleText.implicitWidth - titleViewport.width)
                                 running: root.showing && distance > 0
                             }
-
                         }
 
                         Text {
@@ -160,13 +154,11 @@ PanelOverlay {
                         transform: Translate {
                             id: trackShift
                         }
-
                     }
 
                     Item {
                         Layout.fillHeight: true
                     }
-
                 }
 
                 MediaLyrics {
@@ -176,11 +168,10 @@ PanelOverlay {
                     Layout.fillHeight: true
                     active: root.showing
                     canSeek: root.canSeek
-                    onSeekRequested: (seconds) => {
+                    onSeekRequested: seconds => {
                         return root.seekTo(seconds);
                     }
                 }
-
             }
 
             MediaControls {
@@ -188,20 +179,17 @@ PanelOverlay {
 
                 Layout.fillWidth: true
                 player: root.player
-                onSeekRequested: (seconds) => {
+                onSeekRequested: seconds => {
                     return root.seekTo(seconds);
                 }
             }
-
         }
-
     }
 
     Connections {
         function onActiveTrackKeyChanged() {
             if (root.showing)
                 trackTransition.restart();
-
         }
 
         target: MediaService
@@ -226,7 +214,5 @@ PanelOverlay {
             duration: 240
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

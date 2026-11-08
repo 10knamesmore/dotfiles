@@ -1,5 +1,5 @@
-import QtQuick
 pragma Singleton
+import QtQuick
 
 // OSD 显示状态（音量）
 QtObject {

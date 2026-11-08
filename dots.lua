@@ -99,6 +99,7 @@ dots.install.pacman({
   "git-delta",
   "uv",
   "trash-cli",
+  "udisks2",
 })
 
 local macos_cargo_packages = {

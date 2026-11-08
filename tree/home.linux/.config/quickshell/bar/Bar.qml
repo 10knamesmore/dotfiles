@@ -23,7 +23,7 @@ PanelWindow {
 
     function queueAutoHide() {
         if (!root.transientReveal || PanelState.anyPanelOpen || MorphState.heldItems.length > 0 || barHover.hovered || trackingHover.hovered)
-            return ;
+            return;
 
         hideTimer.stop();
         hideTimer.start();
@@ -91,13 +91,11 @@ PanelWindow {
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: implicitHeight
                 }
-
             }
 
             Item {
                 Layout.fillWidth: true
             }
-
         }
 
         // ── 中区 ──
@@ -120,9 +118,7 @@ PanelWindow {
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: implicitHeight
                 }
-
             }
-
         }
 
         // ── 右区 ──
@@ -145,11 +141,8 @@ PanelWindow {
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: implicitHeight
                 }
-
             }
-
         }
-
     }
 
     Item {
@@ -164,7 +157,6 @@ PanelWindow {
         HoverHandler {
             id: trackingHover
         }
-
     }
 
     Timer {
@@ -174,7 +166,6 @@ PanelWindow {
         onTriggered: {
             if (root.transientReveal && !PanelState.anyPanelOpen && MorphState.heldItems.length === 0 && !barHover.hovered && !trackingHover.hovered)
                 BarState.hideHoverBar();
-
         }
     }
 
@@ -227,7 +218,5 @@ PanelWindow {
             duration: 200
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

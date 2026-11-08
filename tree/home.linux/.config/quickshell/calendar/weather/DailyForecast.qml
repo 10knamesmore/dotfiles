@@ -12,14 +12,14 @@ WeatherSection {
     required property var days
     required property double now
     property string expandedDate: ""
-    readonly property var minimums: days.map((day) => {
+    readonly property var minimums: days.map(day => {
         return day.minTemp;
-    }).filter((value) => {
+    }).filter(value => {
         return value !== null;
     })
-    readonly property var maximums: days.map((day) => {
+    readonly property var maximums: days.map(day => {
         return day.maxTemp;
-    }).filter((value) => {
+    }).filter(value => {
         return value !== null;
     })
     readonly property real minTemperature: minimums.length ? Math.min.apply(Math, minimums) : 0
@@ -68,7 +68,6 @@ WeatherSection {
             font.family: Fonts.family
             font.pixelSize: Fonts.xs
         }
-
     }
 
     ColumnLayout {
@@ -115,9 +114,7 @@ WeatherSection {
                             ColorAnimation {
                                 duration: Tokens.animFast
                             }
-
                         }
-
                     }
 
                     contentItem: RowLayout {
@@ -184,11 +181,8 @@ WeatherSection {
                                         position: 1
                                         color: Colors.peach
                                     }
-
                                 }
-
                             }
-
                         }
 
                         Text {
@@ -199,9 +193,7 @@ WeatherSection {
                             font.pixelSize: Fonts.caption
                             horizontalAlignment: Text.AlignRight
                         }
-
                     }
-
                 }
 
                 Rectangle {
@@ -246,7 +238,6 @@ WeatherSection {
                             font.family: Fonts.family
                             font.pixelSize: Fonts.caption
                         }
-
                     }
 
                     Behavior on implicitHeight {
@@ -254,22 +245,15 @@ WeatherSection {
                             duration: Tokens.animNormal
                             easing.type: Easing.OutCubic
                         }
-
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
                             duration: Tokens.animFast
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
-
 }

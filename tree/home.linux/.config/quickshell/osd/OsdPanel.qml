@@ -51,7 +51,6 @@ PanelWindow {
         function onOsdIconChanged() {
             root.refreshDismissTimer();
         }
-
     }
 
     // 自动关闭定时器
@@ -161,7 +160,11 @@ PanelWindow {
                     radius: 4
                     color: Colors.surface1
 
-                    Behavior on displayedValue { NumberAnimation { duration: 100 } }
+                    Behavior on displayedValue {
+                        NumberAnimation {
+                            duration: 100
+                        }
+                    }
 
                     Shape {
                         anchors.fill: parent
@@ -174,14 +177,20 @@ PanelWindow {
                             fillColor: Colors.blue
                             startX: track.capRadius
                             startY: 0
-                            PathLine { x: track.edgeX; y: 0 }
+                            PathLine {
+                                x: track.edgeX
+                                y: 0
+                            }
                             PathQuad {
                                 x: track.edgeX
                                 y: track.height
                                 controlX: track.fillWidth - 2 * track.bend * (1 - track.fullCap) + track.capRadius * track.fullCap
                                 controlY: track.height / 2
                             }
-                            PathLine { x: track.capRadius; y: track.height }
+                            PathLine {
+                                x: track.capRadius
+                                y: track.height
+                            }
                             PathQuad {
                                 x: track.capRadius
                                 y: 0

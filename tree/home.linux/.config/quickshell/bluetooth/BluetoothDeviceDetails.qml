@@ -32,7 +32,9 @@ ColumnLayout {
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.small
-            HoverHandler { id: addressHover }
+            HoverHandler {
+                id: addressHover
+            }
             ToolTip.visible: addressHover.hovered
             ToolTip.text: root.device.bonded ? "已保存配对" : "未保存绑定"
             ToolTip.delay: 600

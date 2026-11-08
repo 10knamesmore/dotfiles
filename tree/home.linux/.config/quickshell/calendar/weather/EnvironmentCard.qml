@@ -64,7 +64,6 @@ WeatherSection {
             unit: "km"
             detail: root.currentHour ? Format.timeOfDay(root.currentHour.time) + " 预报" : "暂无数据"
         }
-
     }
 
     Rectangle {
@@ -105,12 +104,12 @@ WeatherSection {
             const ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
             if (!root.today)
-                return ;
+                return;
 
-            const x = (t) => {
+            const x = t => {
                 return 12 + (width - 24) * t;
             };
-            const y = (t) => {
+            const y = t => {
                 return height - 6 - Math.sin(t * Math.PI) * (height - 12);
             };
             ctx.lineWidth = 1.5;
@@ -118,14 +117,16 @@ WeatherSection {
             ctx.strokeStyle = Colors.withAlpha(root.sunColor, 0.25);
             ctx.beginPath();
             ctx.moveTo(x(0), y(0));
-            for (let t = 0.025; t <= 1.001; t += 0.025) ctx.lineTo(x(t), y(t))
+            for (let t = 0.025; t <= 1.001; t += 0.025)
+                ctx.lineTo(x(t), y(t));
             ctx.stroke();
             ctx.setLineDash([]);
             if (root.now >= root.today.sunrise && root.now <= root.today.sunset) {
                 ctx.strokeStyle = root.sunColor;
                 ctx.beginPath();
                 ctx.moveTo(x(0), y(0));
-                for (let t = 0.025; t < root.sunProgress; t += 0.025) ctx.lineTo(x(t), y(t))
+                for (let t = 0.025; t < root.sunProgress; t += 0.025)
+                    ctx.lineTo(x(t), y(t));
                 ctx.lineTo(x(root.sunProgress), y(root.sunProgress));
                 ctx.stroke();
             }
@@ -156,7 +157,6 @@ WeatherSection {
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
         }
-
     }
 
     component Metric: Rectangle {
@@ -212,7 +212,6 @@ WeatherSection {
                     font.family: Fonts.family
                     font.pixelSize: Fonts.xs
                 }
-
             }
 
             Text {
@@ -223,9 +222,6 @@ WeatherSection {
                 font.pixelSize: Fonts.xs
                 wrapMode: Text.Wrap
             }
-
         }
-
     }
-
 }

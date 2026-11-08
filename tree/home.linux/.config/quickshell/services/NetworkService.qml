@@ -9,12 +9,12 @@ Singleton {
     id: root
 
     property var snapshot: ({
-        connectionType: "disconnected",
-        interfaceName: "",
-        address: "",
-        ssid: "",
-        signalStrength: 0
-    })
+            connectionType: "disconnected",
+            interfaceName: "",
+            address: "",
+            ssid: "",
+            signalStrength: 0
+        })
     readonly property string connectionType: snapshot.connectionType
     readonly property string interfaceName: snapshot.interfaceName
     readonly property string address: snapshot.address

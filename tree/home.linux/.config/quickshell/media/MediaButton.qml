@@ -36,9 +36,7 @@ Button {
             ColorAnimation {
                 duration: Tokens.animFast
             }
-
         }
-
     }
 
     contentItem: Text {
@@ -57,7 +55,5 @@ Button {
             duration: Tokens.animFast
             easing.type: Easing.OutCubic
         }
-
     }
-
 }

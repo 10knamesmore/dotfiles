@@ -14,9 +14,7 @@ FocusScope {
     required property bool showing
     property string expandedDevice: ""
     readonly property var adapter: BluetoothService.adapter
-    readonly property var filteredDevices: BluetoothService.devices.filter(device =>
-        device.adapter === root.adapter?.path &&
-        (device.name + " " + device.address).toLowerCase().includes(search.text.toLowerCase()))
+    readonly property var filteredDevices: BluetoothService.devices.filter(device => device.adapter === root.adapter?.path && (device.name + " " + device.address).toLowerCase().includes(search.text.toLowerCase()))
 
     function updateRows() {
         const sorted = filteredDevices.slice().sort((a, b) => groupOrder(a) - groupOrder(b) || a.name.localeCompare(b.name));
@@ -26,11 +24,19 @@ FocusScope {
             while (previous < rows.count && rows.get(previous).path !== device.path)
                 previous++;
             if (previous === rows.count)
-                rows.insert(index, { path: device.path, device, group: groupName(device) });
+                rows.insert(index, {
+                    path: device.path,
+                    device,
+                    group: groupName(device)
+                });
             else {
                 if (previous !== index)
                     rows.move(previous, index, 1);
-                rows.set(index, { path: device.path, device, group: groupName(device) });
+                rows.set(index, {
+                    path: device.path,
+                    device,
+                    group: groupName(device)
+                });
             }
         }
         if (rows.count > sorted.length)
@@ -165,11 +171,7 @@ FocusScope {
         Text {
             visible: !BluetoothService.powered || rows.count === 0
             Layout.fillWidth: true
-            text: !BluetoothService.ready ? "蓝牙服务未就绪"
-                : !root.adapter ? "未发现蓝牙适配器"
-                : !BluetoothService.powered ? "蓝牙已关闭"
-                : search.text ? "没有匹配的设备"
-                : root.adapter.discovering ? "正在扫描，请让设备进入配对模式" : "点击扫描以查找附近设备"
+            text: !BluetoothService.ready ? "蓝牙服务未就绪" : !root.adapter ? "未发现蓝牙适配器" : !BluetoothService.powered ? "蓝牙已关闭" : search.text ? "没有匹配的设备" : root.adapter.discovering ? "正在扫描，请让设备进入配对模式" : "点击扫描以查找附近设备"
             color: Colors.overlay1
             font.family: Fonts.family
             font.pixelSize: Fonts.body

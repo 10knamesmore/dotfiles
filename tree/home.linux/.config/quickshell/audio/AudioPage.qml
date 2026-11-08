@@ -35,7 +35,9 @@ ColumnLayout {
             accent: Colors.peach
             onClicked: root.inputsSelected = true
         }
-        Item { Layout.fillWidth: true }
+        Item {
+            Layout.fillWidth: true
+        }
         ActionButton {
             text: "󰂯"
             Accessible.name: "蓝牙设备"
@@ -74,8 +76,7 @@ ColumnLayout {
                 visible: !AudioService.ready || root.devices.length === 0
                 Layout.fillWidth: true
                 Layout.topMargin: Tokens.spaceL
-                text: !AudioService.ready ? "PipeWire 未连接"
-                    : root.inputsSelected ? "没有可用的音频输入" : "没有可用的音频输出"
+                text: !AudioService.ready ? "PipeWire 未连接" : root.inputsSelected ? "没有可用的音频输入" : "没有可用的音频输出"
                 color: AudioService.ready ? Colors.overlay1 : Colors.red
                 font.family: Fonts.family
                 font.pixelSize: Fonts.body

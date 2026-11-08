@@ -11,15 +11,14 @@ Rectangle {
 
     required property var device
     required property bool expanded
-    signal toggleDetails()
+    signal toggleDetails
     property real detailsProgress: expanded ? 1 : 0
     readonly property var operation: BluetoothService.progressForDevice(device.path)
     readonly property string error: BluetoothService.errors[device.path] ?? ""
 
     implicitHeight: contents.implicitHeight + Tokens.spaceM * 2
     radius: Tokens.radiusM
-    color: device.connected ? Colors.withAlpha(Colors.blue, headerHover.hovered ? 0.12 : 0.07)
-        : Colors.withAlpha(Colors.surface1, headerHover.hovered ? 0.7 : Tokens.cardAlpha)
+    color: device.connected ? Colors.withAlpha(Colors.blue, headerHover.hovered ? 0.12 : 0.07) : Colors.withAlpha(Colors.surface1, headerHover.hovered ? 0.7 : Tokens.cardAlpha)
     border.width: 1
     border.color: headerInteraction.activeFocus ? Colors.blue : device.connected ? Colors.withAlpha(Colors.blue, 0.25) : Colors.overlay(0.05)
 
@@ -56,10 +55,14 @@ Rectangle {
         }
     }
     Behavior on color {
-        ColorAnimation { duration: Tokens.animFast }
+        ColorAnimation {
+            duration: Tokens.animFast
+        }
     }
     Behavior on border.color {
-        ColorAnimation { duration: Tokens.animFast }
+        ColorAnimation {
+            duration: Tokens.animFast
+        }
     }
 
     ColumnLayout {
@@ -79,12 +82,16 @@ Rectangle {
                 color: root.device.connected ? Colors.blue : Colors.subtext0
                 font.family: Fonts.family
                 font.pixelSize: Fonts.heading
-                HoverHandler { id: deviceIconHover }
+                HoverHandler {
+                    id: deviceIconHover
+                }
                 ToolTip.visible: deviceIconHover.hovered && DeviceInfo.serviceNames(root.device).length > 0
                 ToolTip.text: DeviceInfo.serviceNames(root.device).join("\n")
                 ToolTip.delay: 600
                 Behavior on color {
-                    ColorAnimation { duration: Tokens.animFast }
+                    ColorAnimation {
+                        duration: Tokens.animFast
+                    }
                 }
             }
 
@@ -97,7 +104,9 @@ Rectangle {
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
                 elide: Text.ElideRight
-                HoverHandler { id: nameHover }
+                HoverHandler {
+                    id: nameHover
+                }
                 ToolTip.visible: nameHover.hovered && truncated
                 ToolTip.text: text
                 ToolTip.delay: 600

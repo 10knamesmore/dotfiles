@@ -32,14 +32,12 @@ Button {
             duration: Tokens.animFast
             easing.type: Easing.OutCubic
         }
-
     }
 
     Behavior on opacity {
         NumberAnimation {
             duration: Tokens.animFast
         }
-
     }
 
     background: Rectangle {
@@ -52,9 +50,7 @@ Button {
             ColorAnimation {
                 duration: Tokens.animFast
             }
-
         }
-
     }
 
     contentItem: Item {
@@ -82,7 +78,6 @@ Button {
                     loops: Animation.Infinite
                     running: root.busy
                 }
-
             }
 
             Text {
@@ -91,9 +86,6 @@ Button {
                 font.family: Fonts.family
                 font.pixelSize: root.iconOnly ? Fonts.icon : Fonts.caption
             }
-
         }
-
     }
-
 }

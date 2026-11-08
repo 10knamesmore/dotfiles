@@ -44,9 +44,7 @@ WeatherSection {
                 font.family: Fonts.family
                 font.pixelSize: Fonts.caption
             }
-
         }
-
     }
 
     RowLayout {
@@ -71,7 +69,6 @@ WeatherSection {
             font.family: Fonts.family
             font.pixelSize: Fonts.caption
         }
-
     }
 
     RowLayout {
@@ -93,9 +90,7 @@ WeatherSection {
                 color: modelData
                 opacity: index === root.level ? 1 : 0.25
             }
-
         }
-
     }
 
     Text {
@@ -123,5 +118,4 @@ WeatherSection {
         enabled: !WeatherService.refreshing
         onClicked: WeatherService.refreshIfStale()
     }
-
 }

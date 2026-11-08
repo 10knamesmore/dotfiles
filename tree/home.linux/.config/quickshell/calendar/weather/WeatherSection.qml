@@ -53,7 +53,6 @@ Rectangle {
 
                 spacing: 2
             }
-
         }
 
         ColumnLayout {
@@ -62,7 +61,5 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 8
         }
-
     }
-
 }

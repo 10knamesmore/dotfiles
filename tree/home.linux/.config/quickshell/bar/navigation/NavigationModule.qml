@@ -95,11 +95,7 @@ Rectangle {
 
             Accessible.role: root.windowPid > 0 ? Accessible.Button : Accessible.StaticText
             Accessible.name: titleText.text
-            Accessible.description: root.windowPid <= 0 ? ""
-                : copyProcess.running ? "正在复制窗口 PID"
-                : root.copied ? "窗口 PID 已复制"
-                : root.copyFailed ? "复制窗口 PID 失败"
-                : "复制窗口 PID"
+            Accessible.description: root.windowPid <= 0 ? "" : copyProcess.running ? "正在复制窗口 PID" : root.copied ? "窗口 PID 已复制" : root.copyFailed ? "复制窗口 PID 失败" : "复制窗口 PID"
             Accessible.onPressAction: root.copyWindowPid()
 
             Item {

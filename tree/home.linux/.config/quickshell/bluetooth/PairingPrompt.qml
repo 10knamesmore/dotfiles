@@ -43,10 +43,7 @@ Rectangle {
         }
         Text {
             Layout.fillWidth: true
-            text: root.kind === "confirmation" ? "两端显示的配对码是否一致？"
-                : root.needsInput ? (root.kind === "pin" ? "输入设备的 PIN 码" : "输入设备显示的数字配对码")
-                : root.displayOnly ? "在设备上输入此配对码"
-                : root.kind === "service" ? "允许设备使用此服务？" : "允许此设备配对？"
+            text: root.kind === "confirmation" ? "两端显示的配对码是否一致？" : root.needsInput ? (root.kind === "pin" ? "输入设备的 PIN 码" : "输入设备显示的数字配对码") : root.displayOnly ? "在设备上输入此配对码" : root.kind === "service" ? "允许设备使用此服务？" : "允许此设备配对？"
             color: Colors.subtext0
             font.family: Fonts.family
             font.pixelSize: Fonts.small
@@ -99,7 +96,9 @@ Rectangle {
         }
         RowLayout {
             Layout.fillWidth: true
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
             ActionButton {
                 text: root.displayOnly ? "取消配对" : "拒绝"
                 onClicked: {

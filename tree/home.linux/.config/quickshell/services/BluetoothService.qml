@@ -26,14 +26,35 @@ Singleton {
 
     function request(action, device = "", value = false) {
         const id = String(++nextRequest);
-        const command = { id, action, device: device || null, adapter: adapter?.path ?? null, value };
-        operations = Object.assign({}, operations, { [id]: { device, action, value, adapter: command.adapter, stage: action } });
-        errors = Object.assign({}, errors, { [device]: "" });
+        const command = {
+            id,
+            action,
+            device: device || null,
+            adapter: adapter?.path ?? null,
+            value
+        };
+        operations = Object.assign({}, operations, {
+            [id]: {
+                device,
+                action,
+                value,
+                adapter: command.adapter,
+                stage: action
+            }
+        });
+        errors = Object.assign({}, errors, {
+            [device]: ""
+        });
         backend.write(JSON.stringify(command) + "\n");
     }
 
     function respond(accept, value = "") {
-        backend.write(JSON.stringify({ action: "respond", requestId: prompt.requestId, accept, value }) + "\n");
+        backend.write(JSON.stringify({
+            action: "respond",
+            requestId: prompt.requestId,
+            accept,
+            value
+        }) + "\n");
     }
 
     function progressForDevice(path) {
@@ -66,7 +87,9 @@ Singleton {
                     scanningAdapter = operation.value ? operation.adapter : "";
                 delete updated[event.id];
                 if (event.stage === "error")
-                    errors = Object.assign({}, errors, { [event.device]: event.error });
+                    errors = Object.assign({}, errors, {
+                        [event.device]: event.error
+                    });
             } else {
                 updated[event.id] = event;
             }

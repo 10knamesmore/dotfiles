@@ -9,6 +9,7 @@ import "../network"
 import "../notifications"
 import "../screen-effects"
 import "../state"
+import "../storage"
 import "../theme"
 import QtQuick
 import QtQuick.Controls
@@ -30,6 +31,7 @@ PanelOverlay {
             home: homePage,
             network: networkPage,
             bluetooth: bluetoothPage,
+            storage: storagePage,
             audio: audioPage,
             notifications: notificationPage,
             clipboard: clipboardPage,
@@ -246,6 +248,15 @@ PanelOverlay {
             BluetoothPage {
                 anchors.fill: parent
                 showing: bluetoothPage.showing
+            }
+        }
+
+        CenterPage {
+            id: storagePage
+            name: "storage"
+            StoragePage {
+                anchors.fill: parent
+                showing: storagePage.showing
             }
         }
 

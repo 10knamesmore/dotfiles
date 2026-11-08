@@ -3,6 +3,7 @@ mod capture;
 mod network_routes;
 mod network_status;
 mod resource_monitor;
+mod storage;
 mod system_info;
 
 use std::{
@@ -24,6 +25,8 @@ struct Arguments {
 enum Command {
     /// Manage Bluetooth devices through an interactive JSON-lines BlueZ session.
     Bluetooth,
+    /// Manage removable storage through an interactive JSON-lines UDisks2 session.
+    Storage,
     /// Supervise the capture server across Quickshell reloads.
     Capture,
     #[command(hide = true)]
@@ -70,6 +73,7 @@ fn output_disconnected(error: &anyhow::Error) -> bool {
 async fn run() -> Result<bool> {
     match Arguments::parse().command {
         Command::Bluetooth => bluetooth::run().await?,
+        Command::Storage => storage::run().await?,
         Command::Capture => capture::launch().await?,
         Command::CaptureServer => capture::serve().await?,
         Command::CapturePicker { allow_token } => return capture::pick(allow_token).await,
