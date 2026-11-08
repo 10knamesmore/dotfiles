@@ -44,7 +44,6 @@ return {
     ---@module "rustaceanvim"
     ---@return rustaceanvim.Opts
     opts = function()
-      local use_ra_diagnostics = vim.g.rust_diagnostics == "rust-analyzer"
       return {
         dap = {
           adapter = false,
@@ -86,7 +85,7 @@ return {
                   enable = true,
                 },
               },
-              checkOnSave = use_ra_diagnostics,
+              checkOnSave = true,
               check = {
                 command = "clippy",
               },
@@ -97,7 +96,7 @@ return {
                 },
               },
               diagnostics = {
-                enable = use_ra_diagnostics,
+                enable = true,
                 warningsAsHint = { "inactive-code" },
               },
               lens = {
@@ -157,24 +156,6 @@ return {
   {
     "neovim/nvim-lspconfig",
     opts = function(_, opts)
-      opts.servers.bacon_ls = {
-        enabled = vim.g.rust_diagnostics == "bacon-ls",
-        cmd = { vim.fn.stdpath("data") .. "/mason/bin/bacon-ls" },
-        cmd_env = { PATH = vim.fn.expand("~/.cargo/bin") .. ":" .. vim.env.PATH },
-        root_dir = function(bufnr, on_dir)
-          vim.lsp.config.rust_analyzer.root_dir(bufnr, on_dir)
-        end,
-        settings = {
-          bacon_ls = {
-            backend = "cargo",
-            cargo = {
-              command = "clippy",
-              allTargets = true,
-              extraArgs = { "--workspace", "--no-deps" },
-            },
-          },
-        },
-      }
       opts.servers.rust_analyzer = { enabled = false }
     end,
   },
