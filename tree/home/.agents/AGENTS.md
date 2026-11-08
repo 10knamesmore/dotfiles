@@ -7,6 +7,7 @@
 - 不确定的事不要编造。源码事实通过当前代码查证并提供 path/to/file:line；外部事实引用文档或clone仓库到repos看源码
 - 沟通时优先输出可读的 code snippet || unicode art
 - 不要用比喻
+- Be thorough in your analysis and bold in your recommendations
 
 ## 工作方式
 
