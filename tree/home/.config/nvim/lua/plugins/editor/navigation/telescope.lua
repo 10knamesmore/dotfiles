@@ -29,6 +29,13 @@ return {
     opts = function()
       local actions = require("telescope.actions")
       local themes = require("telescope.themes")
+      local function open_help(prompt_buffer)
+        local entry = require("telescope.actions.state").get_selected_entry()
+        if entry then
+          actions.close(prompt_buffer)
+          require("utils.help").open(entry.value)
+        end
+      end
       local vimgrep_arguments = vim.list_extend(vim.deepcopy(require("telescope.config").values.vimgrep_arguments), {
         "--hidden",
         "--glob",
@@ -75,6 +82,12 @@ return {
           },
         },
         pickers = {
+          help_tags = {
+            mappings = {
+              i = { ["<CR>"] = open_help },
+              n = { ["<CR>"] = open_help, ["l"] = open_help },
+            },
+          },
           current_buffer_fuzzy_find = {
             sorting_strategy = "ascending",
           },

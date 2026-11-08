@@ -64,7 +64,6 @@ vim.api.nvim_create_autocmd("FileType", {
     "dbout",
     "gitsigns-blame",
     "grug-far",
-    "help",
     "lspinfo",
     "neotest-output",
     "neotest-output-panel",
@@ -87,6 +86,33 @@ vim.api.nvim_create_autocmd("FileType", {
         desc = "Quit buffer",
       })
     end)
+  end,
+})
+
+-- 帮助使用当前窗口；退出时只删除 help buffer，保留窗口布局。
+vim.api.nvim_create_user_command("Help", function(args)
+  require("utils.help").open(args.args)
+end, { nargs = "?", complete = "help", desc = "Help in current window" })
+
+for _, command in ipairs({ "h", "he", "hel", "help" }) do
+  vim.cmd(
+    ("cnoreabbrev <expr> %s getcmdtype() == ':' && getcmdline() ==# '%s' ? 'Help' : '%s'"):format(
+      command,
+      command,
+      command
+    )
+  )
+end
+
+vim.keymap.set({ "n", "i" }, "<F1>", "<Cmd>Help<CR>", { desc = "Help in current window" })
+vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("help"),
+  pattern = "help",
+  callback = function(event)
+    vim.bo[event.buf].buflisted = false
+    vim.keymap.set("n", "q", function()
+      require("snacks").bufdelete({ buf = event.buf })
+    end, { buffer = event.buf, silent = true, desc = "Close help buffer" })
   end,
 })
 

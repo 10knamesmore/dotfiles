@@ -155,6 +155,17 @@ return {
         scope = {
           enabled = true, -- 启用作用域缩进高亮
           underline = false, -- 不使用下划线
+          config = function(scope)
+            if not scope.buf then
+              return
+            end
+            local filetype = vim.bo[scope.buf].filetype
+            if
+              vim.tbl_contains({ "rust", "javascript", "javascriptreact", "typescript", "typescriptreact" }, filetype)
+            then
+              scope.treesitter.field_blocks = { "local_declaration", "consequence", "alternative", "body" }
+            end
+          end,
           hl = { -- 定义每层缩进的高亮组
             "SnacksIndent1",
             "SnacksIndent2",
