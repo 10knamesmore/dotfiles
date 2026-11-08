@@ -1,6 +1,7 @@
 pragma Singleton
 
 import QtQuick
+import "../capture"
 
 // 顶栏布局：左侧导航信息带，中部独立模块，右侧按功能分组。
 QtObject {
@@ -15,7 +16,7 @@ QtObject {
         {
             "group": ["cpu", "memory", "netspeed"]
         },
-        "aiUsage", "capture", "controlCenter", "battery", "clock"]
+        "aiUsage"].concat(CaptureService.recordingActive ? ["capture"] : []).concat(["controlCenter", "battery", "clock"])
 
     // 归一化 widget 项 → {id, props}
     function normalize(item) {

@@ -3,6 +3,7 @@ import "../state"
 import "../theme"
 import "UsageFormat.js" as UsageFormat
 import QtQuick
+import QtQuick.Layouts
 
 // 常驻 Codex 周剩余额度、DS 与 OpenAI 余额，点击展开详情。
 BarModule {
@@ -39,72 +40,67 @@ BarModule {
         id: summary
 
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 8
+        spacing: 14
 
-        Image {
+        Row {
             anchors.verticalCenter: parent.verticalCenter
-            source: "icons/codex.svg"
-            width: Fonts.iconLarge
-            height: Fonts.iconLarge
-            sourceSize.width: width
-            sourceSize.height: height
-            Accessible.ignored: true
+            spacing: 7
+
+            Image {
+                anchors.verticalCenter: parent.verticalCenter
+                source: "icons/codex.svg"
+                width: Fonts.iconLarge
+                height: Fonts.iconLarge
+                sourceSize.width: width
+                sourceSize.height: height
+                Accessible.ignored: true
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.weeklyRemainingText
+                color: Colors.text
+                font.family: Fonts.family
+                font.pixelSize: Fonts.body
+                font.weight: Font.DemiBold
+            }
         }
-        Text {
+
+        GridLayout {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.weeklyRemainingText
-            color: Colors.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.body
-            font.weight: Font.DemiBold
-        }
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: 1
-            height: 12
-            color: Colors.surface2
-        }
-        Image {
-            anchors.verticalCenter: parent.verticalCenter
-            source: "icons/deepseek.svg"
-            width: Fonts.iconLarge
-            height: Fonts.iconLarge
-            sourceSize.width: width
-            sourceSize.height: height
-            Accessible.ignored: true
-        }
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.balanceText
-            color: Colors.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.body
-            font.weight: Font.DemiBold
-            Accessible.name: "DeepSeek 余额 " + root.balanceText
-        }
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: 1
-            height: 12
-            color: Colors.surface2
-        }
-        Image {
-            anchors.verticalCenter: parent.verticalCenter
-            source: "icons/openai.svg"
-            width: Fonts.iconLarge
-            height: Fonts.iconLarge
-            sourceSize.width: width
-            sourceSize.height: height
-            Accessible.ignored: true
-        }
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.openaiBalanceText
-            color: Colors.text
-            font.family: Fonts.family
-            font.pixelSize: Fonts.body
-            font.weight: Font.DemiBold
-            Accessible.name: "OpenAI 余额 " + root.openaiBalanceText
+            columns: 2
+            columnSpacing: 5
+            rowSpacing: 2
+
+            Image {
+                Layout.alignment: Qt.AlignVCenter
+                source: "icons/deepseek.svg"
+                sourceSize.width: 12
+                sourceSize.height: 12
+                Accessible.ignored: true
+            }
+            Text {
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                text: root.balanceText
+                color: Colors.text
+                font.family: Fonts.family
+                font.pixelSize: Fonts.caption
+                Accessible.name: "DeepSeek 余额 " + root.balanceText
+            }
+            Image {
+                Layout.alignment: Qt.AlignVCenter
+                source: "icons/openai.svg"
+                sourceSize.width: 12
+                sourceSize.height: 12
+                Accessible.ignored: true
+            }
+            Text {
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                text: root.openaiBalanceText
+                color: Colors.text
+                font.family: Fonts.family
+                font.pixelSize: Fonts.caption
+                Accessible.name: "OpenAI 余额 " + root.openaiBalanceText
+            }
         }
     }
 }

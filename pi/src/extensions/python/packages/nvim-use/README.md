@@ -4,7 +4,7 @@
 
 ## 使用
 
-Neovim 加载 dotfiles 的 `pi_bridge` 模块后登记实例。在 Pi 执行 `/nvim`，选择实例并连接；结果追加到会话消息，不触发回复。命令与 `python_repl` 共享同一个 Python worker：
+Neovim 加载 dotfiles 的 `pi_bridge` 模块后登记实例。在 Pi 执行 `/nvim`，选择实例并连接。命令与 `python_repl` 共享同一个 Python worker，发现和连接请求与 Python cells 按提交顺序执行，无需等待 agent idle。发送结果时，agent idle 则只记录消息；否则通过 steer 交给模型继续处理。通过 `python_repl` 取回连接：
 
 ```python
 import nvim_use as nvim

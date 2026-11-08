@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import "../../theme"
 import "../../state"
-import "../../services"
 import "../components"
 import QtQuick
 
@@ -19,27 +18,6 @@ BarModule {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         spacing: 0
-
-        EntryButton {
-            page: "network"
-            label: "网络"
-            icon: NetworkService.statusIcon
-            iconColor: NetworkService.disconnected ? Colors.overlay1 : Colors.blue
-        }
-
-        EntryButton {
-            page: "bluetooth"
-            label: "蓝牙"
-            icon: BluetoothService.powered ? "󰂯" : "󰂲"
-            iconColor: BluetoothService.connectedDevices.length > 0 ? Colors.blue : Colors.overlay1
-        }
-
-        EntryButton {
-            page: "audio"
-            label: "声音"
-            icon: AudioService.muted ? "󰝟" : "󰕾"
-            iconColor: AudioService.sink && !AudioService.muted ? Colors.peach : Colors.overlay1
-        }
 
         EntryButton {
             page: "notifications"

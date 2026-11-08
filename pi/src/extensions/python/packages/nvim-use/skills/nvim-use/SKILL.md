@@ -5,7 +5,7 @@ description: 连接已有 Neovim，读取编辑现场、调用 LSP、操作编�
 
 # Neovim Use
 
-用户可在 Pi 执行 `/nvim` 选择实例并连接，结果追加到会话消息，不触发模型回复。通过 `python_repl` 取回该连接：
+用户可在 Pi 执行 `/nvim` 选择实例并连接。命令与 Python cells 串行执行，无需等待 agent idle；发送结果时，idle 则只记录消息，否则通过 steer 交给模型继续处理。通过 `python_repl` 取回该连接：
 
 ```python
 import nvim_use as nvim

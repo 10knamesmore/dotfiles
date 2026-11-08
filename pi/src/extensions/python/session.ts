@@ -119,11 +119,11 @@ export function validateTimeout(seconds: number): void {
 /** Model identity shared with Python SDKs for connected-application status displays. */
 export type PythonModelIdentity = Pick<Model<Api>, "provider" | "id" | "name">;
 
-/** Owns one live Python namespace. Calls are serialized by Pi; close permanently disposes this instance. */
+/** Owns one live Python namespace and serializes tool and command calls; close permanently disposes it. */
 export class PythonSession {
   private worker?: WorkerProcess;
   private disposed = false;
-  private running = false;
+  private executionQueue: Promise<void> = Promise.resolve();
   private model: PythonModelIdentity | null = null;
 
   public constructor(
@@ -153,7 +153,7 @@ export class PythonSession {
     }
   }
 
-  /** Execute a complete block in the supplied absolute cwd for this call, preserving partial output on failure. */
+  /** Queue a block in the supplied absolute cwd; execution timeout excludes time waiting in the queue. */
   public async execute(
     code: string,
     timeoutSeconds: number,
@@ -163,9 +163,22 @@ export class PythonSession {
     onStarted?: () => void,
   ): Promise<PythonExecutionResult> {
     validateTimeout(timeoutSeconds);
+    const result = this.executionQueue.then(() =>
+      this.executeCell(code, timeoutSeconds, callId, cwd, signal, onStarted),
+    );
+    this.executionQueue = result.then(() => {}, () => {});
+    return result;
+  }
+
+  private async executeCell(
+    code: string,
+    timeoutSeconds: number,
+    callId: string,
+    cwd: string,
+    signal?: AbortSignal,
+    onStarted?: () => void,
+  ): Promise<PythonExecutionResult> {
     if (this.disposed) throw new Error("This Python session has been closed.");
-    if (this.running) throw new Error("Python calls must execute sequentially.");
-    this.running = true;
     const started = Date.now();
     let directory: string | undefined;
     let worker: WorkerProcess | undefined;
@@ -229,7 +242,6 @@ export class PythonSession {
           });
         }
       }
-      this.running = false;
     }
     const details: PythonToolDetails = {
       outcome,

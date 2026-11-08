@@ -22,7 +22,6 @@ export function registerNeovimCommand(
       if (!ctx.hasUI) throw new Error("/nvim requires an interactive instance selector.");
 
       const execute = async (expression: string): Promise<string> => {
-        await ctx.waitForIdle();
         const runtime = getSession(ctx);
         const result = await runtime.execute(
           `print(__import__("json").dumps(${expression}))`,
@@ -37,7 +36,7 @@ export function registerNeovimCommand(
       const appendResult = (content: string): void => {
         pi.sendMessage(
           { customType: "nvim-connection", content, display: true },
-          { triggerTurn: false, deliverAs: "steer" },
+          { triggerTurn: !ctx.isIdle(), deliverAs: "steer" },
         );
       };
 
