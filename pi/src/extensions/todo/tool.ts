@@ -78,7 +78,8 @@ export function registerTodoTool(pi: ExtensionAPI, store: TodoSessionStore, pres
 
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("Todo operation was cancelled.");
-      const readOnly = params.op === "view";
+      const operation = params.op as TodoOperation;
+      const readOnly = operation === "view";
       try {
         if (!readOnly) store.install(applyTodoMutation(store.snapshot(), params));
       } catch (error) {
@@ -91,7 +92,7 @@ export function registerTodoTool(pi: ExtensionAPI, store: TodoSessionStore, pres
       const uiWarning = presentation.refresh(ctx, phases);
       const details: TodoToolDetails = {
         version: TODO_STATE_VERSION,
-        op: params.op,
+        op: operation,
         phases,
       };
       if (uiWarning !== undefined) details.uiWarning = uiWarning;

@@ -76,7 +76,7 @@ type WorkflowAgentOptions = Omit<TierSubagentSpec, "prompt">;
 export function validateWorkflowAgentOptions(value: unknown): WorkflowAgentOptions {
   const options = value === undefined ? {} : value;
   assertSchemaValue(WorkflowAgentOptionsSchema, options, "agent() options");
-  return options as Static<typeof WorkflowAgentOptionsSchema>;
+  return options as Static<typeof WorkflowAgentOptionsSchema> as WorkflowAgentOptions;
 }
 
 /** Throw a stable, field-addressed error for a TypeBox runtime contract. */
