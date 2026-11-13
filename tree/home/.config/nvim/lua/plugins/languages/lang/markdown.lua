@@ -7,7 +7,7 @@ vim.api.nvim_create_autocmd("User", {
   end,
 })
 
--- 绝对路径 markdown link 不是 marksman 的 definition 输入；链接上直接打开文件，其他位置保留 LSP fallback。
+-- Markdown 链接直接打开目标文件，其他位置保留 LSP definition。
 local function normalize_markdown_anchor(value)
   value = vim.uri_decode(vim.trim(value)):lower()
   value = value:gsub("`([^`]*)`", "%1")
@@ -46,6 +46,20 @@ local function find_markdown_anchor(anchor)
   return false
 end
 
+local function normalize_reference_label(label)
+  return vim.trim(label):gsub("%s+", " "):lower()
+end
+
+local function find_reference_target(label)
+  local wanted = normalize_reference_label(label)
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+    local reference, target = line:match("^%s*%[([^%]]+)%]:%s*(.+)$")
+    if reference and normalize_reference_label(reference) == wanted then
+      return target
+    end
+  end
+end
+
 local function markdown_link_at_cursor()
   local row, column = unpack(vim.api.nvim_win_get_cursor(0))
   local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
@@ -71,6 +85,30 @@ local function markdown_link_at_cursor()
     end
     if cursor >= start_pos and cursor <= end_pos then
       return target
+    end
+    from = end_pos + 1
+  end
+
+  from = 1
+  while true do
+    local start_pos, end_pos, text, reference = line:find("%[([^%]]-)%]%[([^%]]-)%]", from)
+    if not start_pos then
+      break
+    end
+    if cursor >= start_pos and cursor <= end_pos then
+      return find_reference_target(reference == "" and text or reference)
+    end
+    from = end_pos + 1
+  end
+
+  from = 1
+  while true do
+    local start_pos, end_pos, reference = line:find("%[([^%]]-)%]", from)
+    if not start_pos then
+      break
+    end
+    if cursor >= start_pos and cursor <= end_pos then
+      return find_reference_target(reference)
     end
     from = end_pos + 1
   end
@@ -140,7 +178,13 @@ local function goto_markdown_link()
   end
 
   if anchor and anchor ~= "" then
-    find_markdown_anchor(anchor)
+    local line_number = anchor:match("^L(%d+)$")
+    if line_number then
+      vim.fn.cursor(tonumber(line_number), 1)
+      vim.cmd("normal! zz")
+    else
+      find_markdown_anchor(anchor)
+    end
   end
 end
 

@@ -77,6 +77,10 @@ class BrowserLoop:
             try:
                 async with asyncio.timeout(timeout):
                     value = await action()
+            except TimeoutError:
+                result.set_exception(
+                    TimeoutError(f"{operation} exceeded {timeout:g}s")
+                )
             except BaseException as error:
                 # Deliver SystemExit/KeyboardInterrupt to the cell interpreter rather
                 # than letting asyncio terminate this persistent event thread.

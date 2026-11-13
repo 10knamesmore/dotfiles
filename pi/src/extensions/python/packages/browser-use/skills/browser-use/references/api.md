@@ -44,7 +44,7 @@ async callback 不自动让阻塞代码变成异步。callback 中的 `time.slee
 - browser-use 的 `timeout` 是有限正数，单位秒；`run` 限制整个 callback。
 - 原生 Playwright 方法使用毫秒，也可按其文档使用 `timedelta`。默认普通操作 10,000 ms，导航 30,000 ms。
 - 外层 `python_repl` 仍有自己的 deadline。Chrome 授权等待、截图、结果处理和退出清理都需要留时间。
-- 适配层 deadline 抛出 Python `TimeoutError`；Playwright 操作错误原样返回，例如 `playwright.async_api.TimeoutError`。进程发现还可能抛出 `psutil` 的进程/权限错误。
+- 适配层 deadline 抛出带操作名和时长的 Python `TimeoutError`。连接时如果已有标签的 renderer 不响应 CDP，会抛出说明性 `RuntimeError`；关闭或重载卡住的标签，或者重启 Chrome 后重试。其他 Playwright 操作错误原样返回，例如 `playwright.async_api.TimeoutError`。进程发现还可能抛出 `psutil` 的进程/权限错误。
 - Python 中断取消当前 callback，并等待它处理取消。已发送的导航/点击/输入不能撤回；会话保留时先观察状态再决定重试。
 - callback 吞掉取消或阻塞后台线程时，Pi 的外层期限可能终止整个 worker。不要在 callback 中屏蔽 `asyncio.CancelledError`。
 

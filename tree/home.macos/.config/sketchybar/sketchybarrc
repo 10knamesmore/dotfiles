@@ -182,6 +182,13 @@ sketchybar --add item net_up right \
              update_freq=1 \
              script="$PLUGIN_DIR/netspeed.sh up"
 
+sketchybar --add item disk right \
+           --set disk \
+             icon="󰋊" icon.color="$MAUVE" \
+             icon.padding_right=2 label.padding_left=0 \
+             update_freq=30 \
+             script="$PLUGIN_DIR/disk.sh"
+
 sketchybar --add item memory right \
            --set memory \
              icon="" icon.color="$TEAL" \

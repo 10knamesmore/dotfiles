@@ -11,6 +11,7 @@ from playwright.async_api import (
     Browser,
     BrowserContext,
     Error,
+    TimeoutError as PlaywrightTimeoutError,
     Playwright,
     async_playwright,
 )
@@ -49,6 +50,7 @@ class Session:
         self.closed = False
         self._owned = owned
         self._source = source
+        self._timeout = timeout
         self._artifacts = tempfile.TemporaryDirectory(prefix="browser-use-artifacts-")
         self._loop = BrowserLoop()
         self._manager = async_playwright()
@@ -77,13 +79,24 @@ class Session:
             else self._source
         )
         self._playwright = await self._manager.start()
-        self._browser = await self._playwright.chromium.connect_over_cdp(
-            endpoint,
-            timeout=0,
-            no_defaults=not self._configure_browser,
-            is_local=self.pid is not None,
-            artifacts_dir=self._artifacts.name,
-        )
+        # Playwright initializes every existing page before returning from
+        # connect_over_cdp. A renderer that stopped answering CDP can therefore
+        # make the attach wait forever unless this timeout is finite.
+        connect_timeout = max(1, int(self._timeout * 1000) - 1000)
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(
+                endpoint,
+                timeout=connect_timeout,
+                no_defaults=not self._configure_browser,
+                is_local=self.pid is not None,
+                artifacts_dir=self._artifacts.name,
+            )
+        except PlaywrightTimeoutError as error:
+            raise RuntimeError(
+                "Chrome did not finish the CDP connection before the timeout. "
+                "An existing tab may have a renderer that is not responding to "
+                "CDP; close or reload the stuck tab, or restart Chrome, then retry."
+            ) from error
         self._context = self._browser.contexts[0]
         self._context.set_default_timeout(10_000)
         self._context.set_default_navigation_timeout(30_000)

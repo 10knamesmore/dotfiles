@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   truncateHead,
@@ -149,7 +149,6 @@ const Output = Type.Union([
     total: Type.Number(),
     phases: Type.Array(Type.String()),
     recentProgress: Type.Array(Type.String()),
-    resultPreview: Type.Optional(Type.String()),
     artifacts: Type.Array(Type.String()),
   }),
   Type.Object({
@@ -282,25 +281,6 @@ function runArtifacts(run: RunSummary): string[] {
   ];
 }
 
-function runResultPreview(run: RunSummary, detail: ReturnType<typeof readRunDetail>): string | undefined {
-  if (run.kind === "workflow") {
-    try {
-      return preview(readFileSync(join(run.runDir, "result.json"), "utf8"), 8_000);
-    } catch {
-      return undefined;
-    }
-  }
-  const results = detail.children.flatMap((child) => {
-    if (!child.result) return [];
-    return [
-      child.result.structured === undefined
-        ? child.result.text
-        : JSON.stringify(child.result.structured, null, 2),
-    ];
-  });
-  return results.length > 0 ? preview(results.join("\n"), 8_000) : undefined;
-}
-
 async function waitForRun(runId: string, signal?: AbortSignal): Promise<void> {
   const completion = subagentRunner.waitRun(runId);
   if (!signal) {
@@ -371,7 +351,6 @@ function resultSnapshot(input: Input, output: Output, target?: string): AgentsTo
       status: child.status,
       metadata: child.model,
     }));
-    snapshot.quote = output.resultPreview;
     snapshot.expandedLines = [
       ...output.recentProgress,
       ...output.children.flatMap((child) => [child.childId, ...(child.activity ? [child.activity] : [])]),
@@ -443,7 +422,6 @@ async function executeAction(
     }
     const finalRun = sessionRuns(ctx).find((candidate) => candidate.runId === run.runId);
     if (!finalRun) throw new Error(`Run ${run.runId} disappeared before wait completed`);
-    const resultPreview = runResultPreview(finalRun, detail);
     const artifacts = runArtifacts(finalRun).filter(existsSync);
     return finish({
       action: "wait",
@@ -452,7 +430,6 @@ async function executeAction(
       total: detail.children.length,
       phases: detail.phases.map((phase) => preview(phase.title)),
       recentProgress: detail.narrator.slice(-10).map((line) => preview(line.text)),
-      ...(resultPreview ? { resultPreview } : {}),
       artifacts,
     });
   }
