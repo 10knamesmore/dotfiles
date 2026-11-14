@@ -24,7 +24,7 @@ import {
   type WorkflowJournal,
 } from "./journal.js";
 import type { ParsedWorkflow } from "./parser.js";
-import { resolveRunDir } from "./run-dir.js";
+import { runDirectory } from "../store/run-paths.js";
 import { executeWorkflowBody, type WorkflowCallIdentity, type WorkflowVmApi } from "./vm.js";
 
 export const WORKFLOW_AGENT_CAP = 200;
@@ -92,25 +92,20 @@ export function startParsedWorkflow(
   if (input.resumeRunId && runner.isRunActive(runId)) {
     throw new Error(`Cannot resume workflow: run ${runId} is still active in this session; stop it from /agents first`);
   }
-  const existingRunDir = input.resumeRunId ? resolveResumeRunDir(root, parent.ctx.cwd, input.resumeRunId) : undefined;
+  const sessionId = parent.ctx.sessionManager.getSessionId();
+  const existingRunDir = input.resumeRunId ? resolveResumeRunDir(root, sessionId, input.resumeRunId) : undefined;
   const existingSnapshot = existingRunDir ? readRunSnapshot(existingRunDir) : undefined;
   // A run-owned controller lets navigator stop cancel live children and keep
   // the workflow loop from starting more work.
   const runController = new AbortController();
-  const store = new RunStore(
-    runId,
-    parent.ctx.cwd,
-    parent.ctx.sessionManager.getSessionId(),
-    parent.ctx.sessionManager.getSessionFile(),
-    {
-      rootDir: root,
-      kind: "workflow",
-      phases: workflow.meta.phases,
-      ...(!existingRunDir ? { maxAgentsPerWorkflow: WORKFLOW_AGENT_CAP } : {}),
-      existingRunDir,
-      existingSnapshot,
-    },
-  );
+  const store = new RunStore(runId, sessionId, parent.ctx.sessionManager.getSessionFile(), {
+    rootDir: root,
+    kind: "workflow",
+    phases: workflow.meta.phases,
+    ...(!existingRunDir ? { maxAgentsPerWorkflow: WORKFLOW_AGENT_CAP } : {}),
+    existingRunDir,
+    existingSnapshot,
+  });
   // Deliberately uncached: the comparison contract is "what would this call
   // resolve to NOW", and a per-call disk scan (milliseconds) is noise next to
   // a live model call while never serving a stale environment to a later
@@ -262,16 +257,18 @@ export function startParsedWorkflow(
     phase: (title: string) => {
       if (typeof title !== "string") throw new TypeError("phase(title) requires a string");
       currentPhase = title;
-      store.recordPhase(title);
-      runner.foldRunProjection?.(runId, { type: "phase", title });
+      const timestamp = Date.now();
+      store.recordPhase(title, timestamp);
+      runner.foldRunProjection?.(runId, { type: "phase", title, timestamp });
     },
     diagnostic: (message: string) => reportDiagnostic(`[subagent-workflow] ${message}`),
     log: (message: string) => {
       // Sanitize workflow-authored log text before it reaches a terminal (the
       // tool row via onLog, and the persisted event stream the navigator reads).
       const text = sanitizeTerminalText(String(message));
-      store.recordLog(text);
-      runner.foldRunProjection?.(runId, { type: "log", message: text });
+      const timestamp = Date.now();
+      store.recordLog(text, timestamp);
+      runner.foldRunProjection?.(runId, { type: "log", message: text, timestamp });
       try {
         options.onLog?.(text);
       } catch (error) {
@@ -389,7 +386,7 @@ export function startParsedWorkflow(
       return result;
     },
   };
-  runner.adoptRunProjection?.(runId, store, readRunSnapshot(store.runDir), workflow.meta.name);
+  runner.adoptRunProjection(runId, readRunSnapshot(store.runDir), workflow.meta.name);
   const execution = deferWorkflowExecution(async () => {
     let resultWritten = false;
     try {
@@ -471,8 +468,9 @@ export function startParsedWorkflow(
       }
       const message = errorMessage(error);
       if (refusedIntact) {
-        store.restoreTerminalStatus(priorTerminalStatus!, message);
-        runner.foldRunProjection?.(runId, { type: "workflow_resume_refused", error: message });
+        const timestamp = Date.now();
+        store.restoreTerminalStatus(priorTerminalStatus!, message, timestamp);
+        runner.foldRunProjection?.(runId, { type: "workflow_resume_refused", error: message, timestamp });
         runner.foldRunProjection?.(runId, { type: "workflow_status", status: priorTerminalStatus! });
         throw new WorkflowRunError(message, runId, store.runDir, persistenceWarningFor(store), [], generation);
       }
@@ -515,7 +513,6 @@ export function startParsedWorkflow(
       unbindAbort();
     } catch {}
     store.releaseOwnership();
-    runner.releaseRunActivity?.(runId);
     void execution.catch(() => undefined);
     throw error;
   }
@@ -585,9 +582,9 @@ function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-export function readWorkflowResumeArgs(cwd: string, runId: string): unknown {
+export function readWorkflowResumeArgs(sessionId: string, runId: string): unknown {
   const root = join(getAgentDir(), "subagent-workflow", "runs");
-  return readPersistedArgs(resolveResumeRunDir(root, cwd, runId));
+  return readPersistedArgs(resolveResumeRunDir(root, sessionId, runId));
 }
 
 function readPersistedArgs(runDir: string): unknown {
@@ -660,9 +657,9 @@ export function readAbsoluteScript(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-function resolveResumeRunDir(root: string, cwd: string, runId: string): string {
+function resolveResumeRunDir(root: string, sessionId: string, runId: string): string {
   try {
-    return resolveRunDir(cwd, runId, root);
+    return runDirectory(sessionId, runId, root);
   } catch (error) {
     const reason = errorMessage(error);
     throw new Error(`Cannot resume workflow: ${reason}`);

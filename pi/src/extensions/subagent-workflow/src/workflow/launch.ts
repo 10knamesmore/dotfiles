@@ -66,7 +66,9 @@ export async function launchWorkflow(
 ): Promise<LaunchedWorkflow> {
   const approvedPlan = await approveLaunch(input.plan, approval.ctx, approval.policy, () => {
     if (input.plan.args !== undefined) return input.plan.args;
-    return input.resumeRunId ? readWorkflowResumeArgs(parent.ctx.cwd, input.resumeRunId) : null;
+    return input.resumeRunId
+      ? readWorkflowResumeArgs(parent.ctx.sessionManager.getSessionId(), input.resumeRunId)
+      : null;
   });
   const { workflow, args } = approvedPlan;
   const modelTiers = readPersonalConfig()["model-tier"];
@@ -116,32 +118,24 @@ export function deliverWorkflowInBackground(
       (result) => {
         recordWorkflowCompleted(pi, result, { backgroundDelivery: true });
         const message = formatWorkflowDelivery(result);
-        try {
-          queueAcknowledgedDelivery(pi, {
-            sessionId,
-            message,
-            runs: [workflowDeliveryResult(result)],
-            targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
-          });
-        } finally {
-          subagentRunner.releaseRunActivity(result.runId);
-        }
+        queueAcknowledgedDelivery(pi, {
+          sessionId,
+          message,
+          runs: [workflowDeliveryResult(result)],
+          targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
+        });
       },
       (error) => {
         const message = formatWorkflowFailure(error);
-        try {
-          queueAcknowledgedDelivery(pi, {
-            sessionId,
-            message,
-            runs: [workflowFailureResult(error)],
-            targets:
-              error instanceof WorkflowRunError && error.generation !== undefined
-                ? [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }]
-                : [],
-          });
-        } finally {
-          if (error instanceof WorkflowRunError) subagentRunner.releaseRunActivity(error.runId);
-        }
+        queueAcknowledgedDelivery(pi, {
+          sessionId,
+          message,
+          runs: [workflowFailureResult(error)],
+          targets:
+            error instanceof WorkflowRunError && error.generation !== undefined
+              ? [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }]
+              : [],
+        });
       },
     )
     .catch((error) => {
@@ -264,35 +258,25 @@ export function formatWorkflowFailure(error: unknown): string {
  * there.
  */
 export function completeWorkflowInline(pi: ExtensionAPI, result: WorkflowRunResult, sessionId: string): string {
-  try {
-    recordWorkflowCompleted(pi, result);
-    const message = formatWorkflowDelivery(result);
-    if (!writeDeliveryMarker(result.runDir, sessionId, workflowDeliveryIdentity(result.generation))) {
-      throw new Error(`Workflow run ${result.runId} changed generation before inline delivery could be recorded`);
-    }
-    return message;
-  } finally {
-    subagentRunner.releaseRunActivity(result.runId);
+  recordWorkflowCompleted(pi, result);
+  const message = formatWorkflowDelivery(result);
+  if (!writeDeliveryMarker(result.runDir, sessionId, workflowDeliveryIdentity(result.generation))) {
+    throw new Error(`Workflow run ${result.runId} changed generation before inline delivery could be recorded`);
   }
+  return message;
 }
 
 /** Inline (headless) failure: format the failure envelope and fence redelivery. */
 export function completeWorkflowFailureInline(error: unknown, sessionId: string): Error {
-  try {
-    const message = formatWorkflowFailure(error);
-    if (
-      error instanceof WorkflowRunError &&
-      error.generation !== undefined &&
-      !writeDeliveryMarker(error.runDir, sessionId, workflowDeliveryIdentity(error.generation))
-    ) {
-      return new Error(
-        `Workflow run ${error.runId} changed generation before inline failure delivery could be recorded`,
-      );
-    }
-    return new Error(message);
-  } finally {
-    if (error instanceof WorkflowRunError) subagentRunner.releaseRunActivity(error.runId);
+  const message = formatWorkflowFailure(error);
+  if (
+    error instanceof WorkflowRunError &&
+    error.generation !== undefined &&
+    !writeDeliveryMarker(error.runDir, sessionId, workflowDeliveryIdentity(error.generation))
+  ) {
+    return new Error(`Workflow run ${error.runId} changed generation before inline failure delivery could be recorded`);
   }
+  return new Error(message);
 }
 
 function recordWorkflowCompleted(

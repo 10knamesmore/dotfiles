@@ -48,6 +48,7 @@ export interface ChildRow {
   model: string;
   /** Reasoning effort the child resolved to, shown beside the model. */
   thinking?: string;
+  resolved?: ResolvedSpec;
   phase?: string;
   status: SubagentStatus;
   /** Cumulative provider usage for this child. */
@@ -118,12 +119,6 @@ export interface RunProjection {
 export interface SnapshotProjectionOptions {
   describeWorkflow?: (script: string) => string;
   workflowLabel?: string;
-  ownerWasDead?: boolean;
-}
-
-export interface RunSnapshotSummaryProjection {
-  liveSummary: RunSummary;
-  reconciledSummary: RunSummary;
 }
 
 export type RunProjectionEvent =
@@ -180,20 +175,6 @@ export function snapshotSaysLive(snapshot: RunSnapshot): boolean {
   return isLiveStatus(runStatusFor(snapshot.status as RunStatusFile | undefined, ids));
 }
 
-/** Build only the level-1 data needed by the run list. */
-export function projectRunSnapshotSummary(
-  snapshot: RunSnapshot,
-  runId: string,
-  options: SnapshotProjectionOptions = {},
-): RunSnapshotSummaryProjection {
-  const eventState = scanSummaryEvents(snapshot.events);
-  const built = buildSnapshotSummary(snapshot, runId, options, eventState);
-  return {
-    liveSummary: built.summary,
-    reconciledSummary: reconcileDeadOwnerSummary(built.summary, built.children),
-  };
-}
-
 /** Tolerantly fold one immutable persisted snapshot into the navigator's full projection. */
 export function projectRunSnapshot(
   snapshot: RunSnapshot,
@@ -210,11 +191,13 @@ export function projectRunSnapshot(
   const children: ChildRow[] = run.children.map((child, index) => {
     const state = built.children[index]!;
     const events = eventState.byChild.get(state.id) ?? {};
+    const resolved = events.resolved ?? child.resolved;
     return {
       id: state.id,
       label: persistedChildLabel(child, state.id || "agent"),
-      model: shortModel(optionalString(child.resolved?.modelId)),
-      thinking: optionalString(child.resolved?.thinkingLevel),
+      model: shortModel(optionalString(resolved?.modelId)),
+      thinking: optionalString(resolved?.thinkingLevel),
+      resolved,
       phase: optionalString(child.spec?.phase),
       status: state.status,
       usage: state.usage,
@@ -224,7 +207,7 @@ export function projectRunSnapshot(
       resultLine: events.resultLine,
       result: events.result,
       error: events.error,
-      sessionFile: optionalString(child.sessionFile),
+      sessionFile: events.sessionFile ?? optionalString(child.sessionFile),
       followUpOf: child.followUpOf,
       spec: child.spec ?? { prompt: "" },
     };
@@ -260,7 +243,7 @@ export function projectRunSnapshot(
         .map((child) => [child.id, child.terminalStatus]),
     ),
   };
-  return options.ownerWasDead ? reconcileDeadOwnerProjection(projection) : projection;
+  return projection;
 }
 
 interface SummaryChildState {
@@ -327,19 +310,6 @@ function buildSnapshotSummary(
   };
 }
 
-function reconcileDeadOwnerSummary(source: RunSummary, sourceChildren: readonly SummaryChildState[]): RunSummary {
-  const summary = structuredClone(source);
-  if (summary.corrupt || !isLiveStatus(summary.status)) return summary;
-  const children = sourceChildren.map((child) => ({
-    ...child,
-    status: isLiveStatus(child.status) ? (child.terminalStatus ?? "aborted") : child.status,
-  }));
-  refreshSummary(summary, children);
-  if (summary.kind === "workflow" || children.length === 0) summary.status = "aborted";
-  summary.reconciled = true;
-  return summary;
-}
-
 function usageForChild(usage: UsageSummary | undefined, events: SummaryChildEventState | undefined): UsageSummary {
   if (events?.terminalUsage !== undefined) return copyUsage(events.terminalUsage);
   if (usage) return copyUsage(usage);
@@ -391,6 +361,7 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
     if (!child) return;
     child.model = shortModel(event.resolved.modelId);
     child.thinking = event.resolved.thinkingLevel;
+    child.resolved = event.resolved;
     child.sessionFile = event.sessionFile;
     foldActivity(projection.activity, { type: "child", id: event.id, label: event.resolved.label });
     return;
@@ -455,6 +426,7 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
     child.sessionFile = event.result.sessionFile ?? child.sessionFile;
     child.model = shortModel(event.result.resolved.modelId);
     child.thinking = event.result.resolved.thinkingLevel;
+    child.resolved = event.result.resolved;
   }
   refreshProjection(projection);
 }
@@ -545,6 +517,8 @@ interface SummaryChildEventState {
 }
 
 interface ChildEventState extends SummaryChildEventState {
+  resolved?: ResolvedSpec;
+  sessionFile?: string;
   startedAt?: number;
   endedAt?: number;
   activity?: string;
@@ -557,19 +531,6 @@ interface EventProjection {
   byChild: Map<string, ChildEventState>;
   narrator: NarratorLine[];
   priorGenerationNarration: NarratorLine[];
-}
-
-function scanSummaryEvents(events: readonly FrozenJson[]): Map<string, SummaryChildEventState> {
-  const byChild = new Map<string, SummaryChildEventState>();
-  for (const value of events) {
-    const event = value as Record<string, unknown>;
-    const id = typeof event.id === "string" ? event.id : undefined;
-    if (!id) continue;
-    const state = byChild.get(id) ?? {};
-    foldSummaryChildEvent(state, event);
-    byChild.set(id, state);
-  }
-  return byChild;
 }
 
 function scanEvents(events: readonly FrozenJson[]): EventProjection {
@@ -612,6 +573,8 @@ function scanEvents(events: readonly FrozenJson[]): EventProjection {
     if (type === "result") {
       state.endedAt = timestamp;
       const result = event.result as Record<string, unknown> | undefined;
+      state.resolved = result?.resolved as ResolvedSpec | undefined;
+      state.sessionFile = optionalString(result?.sessionFile);
       const text = optionalString(result?.text);
       const error = optionalString(result?.error);
       if (text) state.resultLine = firstLine(text);

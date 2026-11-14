@@ -15,13 +15,20 @@ import type {
 } from "../types.js";
 import { cloneActivityFold, type RunActivityFold } from "../store/activity-fold.js";
 import {
-  cloneRunProjection,
   foldRunProjection as foldProjection,
   projectRunSnapshot,
+  reconcileDeadOwnerProjection,
+  snapshotSaysLive,
+  corruptRunDetail,
+  corruptRunSummary,
+  type RunDetail,
+  type RunSummary,
   type RunProjection,
   type RunProjectionEvent,
 } from "../store/run-projection.js";
 import { readRunSnapshot, type RunSnapshot } from "../store/run-snapshot.js";
+import { runDirectory, sessionRunIds } from "../store/run-paths.js";
+import { runOwnerIsLive } from "../store/lease.js";
 import { EMPTY_USAGE, RunStore } from "../store/run-store.js";
 import { writeSessionClosedMarker } from "../store/session-closed-marker.js";
 import { reportDiagnostic } from "../diagnostics.js";
@@ -75,6 +82,7 @@ export interface ChildRunEvent {
   runDir: string;
   parentSessionId: string;
   resolved?: ResolvedSpec;
+  timestamp: number;
   event: SubagentEvent;
 }
 
@@ -125,13 +133,15 @@ class Handle implements SubagentHandle {
     });
   }
   emit(event: SubagentEvent): void {
+    const timestamp = Date.now();
     // Context belongs to the live session and is cleared when that session closes.
-    if (event.type !== "context") this.store.recordEvent(event);
+    if (event.type !== "context") this.store.recordEvent(event, timestamp);
     this.runner.publishChildEvent({
       runId: this.runId,
       runDir: this.runDir,
       parentSessionId: this.parent.ctx.sessionManager.getSessionId(),
       resolved: this.resolved,
+      timestamp,
       event,
     });
     for (const listener of this.listeners) {
@@ -323,14 +333,8 @@ class Handle implements SubagentHandle {
 export class SubagentRunner {
   private handles = new Map<string, Handle>();
   private stores = new Map<string, RunStore>();
-  private projections = new Map<
-    string,
-    {
-      projection: RunProjection;
-      retainAfterDelivery: boolean;
-      ownsRun: () => boolean;
-    }
-  >();
+  /** Display state survives result delivery and is released with its parent session. */
+  private projections = new Map<string, RunProjection>();
   private runControllers = new Map<
     string,
     {
@@ -354,6 +358,47 @@ export class SubagentRunner {
   // uniqueness is all they need.
   private readonly nonce = randomUUID().replaceAll("-", "").slice(0, 8);
   private readonly semaphore = globalSemaphore;
+
+  /** Restore this session once at startup; UI reads use the retained projections. */
+  restoreSession(sessionId: string, describeWorkflow: (script: string) => string): void {
+    for (const runId of sessionRunIds(sessionId)) {
+      if (this.projections.has(runId)) continue;
+      const runDir = runDirectory(sessionId, runId);
+      let projection: RunProjection;
+      try {
+        const snapshot = readRunSnapshot(runDir);
+        projection = projectRunSnapshot(snapshot, runId, { describeWorkflow });
+        if (snapshotSaysLive(snapshot) && !runOwnerIsLive(runDir)) {
+          projection = reconcileDeadOwnerProjection(projection);
+        }
+      } catch {
+        projection = {
+          summary: corruptRunSummary(runDir, runId),
+          detail: corruptRunDetail(runId, runDir),
+          activity: { children: new Map(), complete: false },
+          priorGenerationNarration: [],
+          terminalStatuses: new Map(),
+        };
+      }
+      projection.summary.parentSessionId = sessionId;
+      this.projections.set(runId, projection);
+    }
+  }
+
+  sessionRuns(sessionId: string): RunSummary[] {
+    return [...this.projections.values()]
+      .filter((projection) => projection.summary.parentSessionId === sessionId)
+      .map((projection) => structuredClone(projection.summary))
+      .sort((left, right) => right.createdAt - left.createdAt || right.runId.localeCompare(left.runId));
+  }
+
+  runDetail(sessionId: string, runId: string): RunDetail {
+    const projection = this.projections.get(runId);
+    if (!projection || projection.summary.parentSessionId !== sessionId) {
+      throw new Error(`No run ${runId} belongs to this session`);
+    }
+    return structuredClone(projection.detail);
+  }
 
   /** Apply a process-wide admission limit. Existing agents are never cancelled. */
   setMaxConcurrentAgents(capacity: number): void {
@@ -384,8 +429,8 @@ export class SubagentRunner {
 
   /** @internal Handle-to-runner telemetry handoff. */
   publishChildEvent(event: ChildRunEvent): void {
-    const projection = this.projections.get(event.runId)?.projection;
-    if (projection) foldProjection(projection, { ...event.event, timestamp: Date.now() } as RunProjectionEvent);
+    const projection = this.projections.get(event.runId);
+    if (projection) foldProjection(projection, { ...event.event, timestamp: event.timestamp } as RunProjectionEvent);
     for (const listener of this.childEventListeners) {
       try {
         listener(event);
@@ -438,13 +483,9 @@ export class SubagentRunner {
     const store =
       options.store ??
       existingStore ??
-      new RunStore(
-        runId,
-        parent.ctx.cwd,
-        parent.ctx.sessionManager.getSessionId(),
-        parent.ctx.sessionManager.getSessionFile(),
-        { directDelivery: options.directDelivery },
-      );
+      new RunStore(runId, parent.ctx.sessionManager.getSessionId(), parent.ctx.sessionManager.getSessionFile(), {
+        directDelivery: options.directDelivery,
+      });
     const ownsUnregisteredStore = options.store === undefined && existingStore === undefined;
     const identity = store.deliveryIdentity;
     if (identity.generation < 1) {
@@ -466,20 +507,14 @@ export class SubagentRunner {
     }
     const tracked = this.projections.get(runId);
     if (tracked) {
-      tracked.retainAfterDelivery ||= options.store !== undefined;
-      tracked.ownsRun = () => store.ownsRun;
-      foldProjection(tracked.projection, {
+      foldProjection(tracked, {
         type: "child",
         id: handle.id,
         spec: handle.spec,
         followUpOf: handle.followUpOf,
       });
     } else {
-      this.projections.set(runId, {
-        projection: projectRunSnapshot(readRunSnapshot(store.runDir), runId),
-        retainAfterDelivery: options.store !== undefined,
-        ownsRun: () => store.ownsRun,
-      });
+      this.projections.set(runId, projectRunSnapshot(readRunSnapshot(store.runDir), runId));
     }
     this.stores.set(runId, store);
     this.handles.set(handle.id, handle);
@@ -503,31 +538,18 @@ export class SubagentRunner {
     return [...this.handles.values()].filter((handle) => handle.runId === runId);
   }
   /** Seed a workflow projection from durable history before live execution resumes. */
-  adoptRunProjection(runId: string, store: RunStore, snapshot: RunSnapshot, workflowLabel: string): void {
-    this.projections.set(runId, {
-      projection: projectRunSnapshot(snapshot, runId, { workflowLabel }),
-      retainAfterDelivery: true,
-      ownsRun: () => store.ownsRun,
-    });
+  adoptRunProjection(runId: string, snapshot: RunSnapshot, workflowLabel: string): void {
+    this.projections.set(runId, projectRunSnapshot(snapshot, runId, { workflowLabel }));
   }
   /** Fold workflow narration and lifecycle events that do not originate from a child handle. */
   foldRunProjection(runId: string, event: RunProjectionEvent): void {
-    const projection = this.projections.get(runId)?.projection;
+    const projection = this.projections.get(runId);
     if (projection) foldProjection(projection, event);
-  }
-  /** Full in-memory view for a run currently owned by this process. */
-  runProjection(runId: string): RunProjection | undefined {
-    const tracked = this.projections.get(runId);
-    return tracked?.ownsRun() ? cloneRunProjection(tracked.projection) : undefined;
   }
   /** Incremental activity retained through workflow result delivery. */
   runActivityFold(runId: string): RunActivityFold | undefined {
-    const projection = this.projections.get(runId)?.projection;
+    const projection = this.projections.get(runId);
     return projection ? cloneActivityFold(projection.activity) : undefined;
-  }
-  /** Release a retained workflow projection after its result has been delivered. */
-  releaseRunActivity(runId: string): void {
-    this.projections.delete(runId);
   }
   /** Run ids with a live child or an active workflow controller in this process. */
   liveRunIds(): string[] {
@@ -565,7 +587,6 @@ export class SubagentRunner {
     if (!store && ![...this.handles.values()].some((handle) => handle.runId === runId)) return undefined;
     this.deliveredRuns.add(runId);
     this.dropDeliveredStore(runId);
-    if (!this.projections.get(runId)?.retainAfterDelivery) this.projections.delete(runId);
     return store?.persistenceDegraded;
   }
   abortedResult(handle: Handle): SubagentResult {
@@ -644,6 +665,9 @@ export class SubagentRunner {
         }),
     ];
     const results = await Promise.allSettled(tasks);
+    for (const [runId, projection] of this.projections) {
+      if (projection.summary.parentSessionId === parentSessionId) this.projections.delete(runId);
+    }
     const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failure) throw failure.reason;
   }
@@ -707,7 +731,7 @@ export class SubagentRunner {
       handle.resolved = child.resolved;
       handle.schemaCapture = child.schemaCapture;
       store.resolveChild(handle.id, child.resolved, child.session.sessionFile);
-      const projection = this.projections.get(handle.runId)?.projection;
+      const projection = this.projections.get(handle.runId);
       if (projection)
         foldProjection(projection, {
           type: "resolved",

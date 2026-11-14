@@ -41,7 +41,7 @@ const WorkflowToolParameters = Type.Object(
     resumeRunId: Type.Optional(
       Type.String({
         description:
-          "Existing workflow run id to resume with the supplied script or scriptPath; matching successful agent calls replay.",
+          "Workflow run id from this parent session to resume with the supplied script or scriptPath; matching successful agent calls replay.",
       }),
     ),
     rerunChildIds: Type.Optional(

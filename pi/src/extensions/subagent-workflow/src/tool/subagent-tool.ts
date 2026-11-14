@@ -1,11 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import {
-  getAgentDir,
-  type ExtensionAPI,
-  type AgentToolResult,
-  type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type AgentToolResult, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import {
   PublicSubagentOptionFields,
@@ -24,10 +19,8 @@ import {
   type ParentContext,
   type ResolvedFollowUpSpec,
 } from "../runner/child.js";
-import { runOwnerIsLive } from "../store/lease.js";
 import { queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
-import { encodeCwd, sumUsage } from "../store/run-store.js";
-import { jsonObject, readRunSnapshot } from "../store/run-snapshot.js";
+import { sumUsage } from "../store/run-store.js";
 import { hasSessionClosedMarker } from "../store/session-closed-marker.js";
 import { subagentRunner, type SubagentRunner } from "../runner/runner.js";
 import { initialDetails, renderCallHeader, renderSubagentResult, type SubagentDetails } from "../ui/tool-render.js";
@@ -47,7 +40,7 @@ export const SubagentToolParameters = Type.Object(
     followUp: Type.Optional(
       Type.Object(
         {
-          id: Type.String({ minLength: 1, description: "Child id from a completed spawn result." }),
+          id: Type.String({ minLength: 1, description: "Child id from a completed spawn in this parent session." }),
           prompt: Type.String({ minLength: 1, description: "Self-contained task for the follow-up turn." }),
         },
         {
@@ -111,138 +104,38 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
   };
 }
 
-interface FollowUpCandidate {
-  runId: string;
-  runDir: string;
-  childId: string;
-  createdAt: number;
-  child: Record<string, unknown>;
-  status: unknown;
-  generationPending: boolean;
-}
-
-function readFollowUpRecord(runDir: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
-  } catch {
-    return undefined;
-  }
-}
-
-export function resolveFollowUpSpec(
-  id: string,
-  prompt: string,
-  cwd: string,
-  runsRoot: string = join(getAgentDir(), "subagent-workflow", "runs"),
-): ResolvedFollowUpSpec {
+export function resolveFollowUpSpec(id: string, prompt: string, sessionId: string): ResolvedFollowUpSpec {
   const qualified = parseQualifiedFollowUpId(id);
-  const runRoot = join(runsRoot, encodeCwd(cwd));
-  const candidates: FollowUpCandidate[] = [];
-  let entries: string[];
-  if (qualified) {
-    entries = [qualified.runId];
-  } else {
-    try {
-      entries = readdirSync(runRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") entries = [];
-      else throw error;
+  for (const run of subagentRunner.sessionRuns(sessionId)) {
+    if (qualified && run.runId !== qualified.runId) continue;
+    const detail = subagentRunner.runDetail(sessionId, run.runId);
+    const child = detail.children.find((child) => child.id === (qualified?.childId ?? id));
+    if (!child) continue;
+    if (detail.corrupt) throw new Error(`Cannot follow up ${id}: source run is unreadable`);
+    if (!isTerminalStatus(child.status)) {
+      throw new Error(`Cannot follow up ${id}: child is ${child.status}`);
     }
-    entries = entries.filter((runId) => recordHasChild(readFollowUpRecord(join(runRoot, runId)), id));
-  }
-  for (const runId of entries) {
-    const runDir = join(runRoot, runId);
-    const snapshot = readRunSnapshot(runDir);
-    const record = jsonObject(snapshot.record);
-    if (!record || !Array.isArray(record.children)) continue;
-    const createdAt = typeof record.createdAt === "string" ? Date.parse(record.createdAt) : NaN;
-    const statusChildren = jsonObject(jsonObject(snapshot.status)?.children);
-    for (const value of record.children) {
-      const child = jsonObject(value);
-      const childId = typeof child?.id === "string" ? child.id : undefined;
-      if (!childId || childId !== (qualified?.childId ?? id)) continue;
-      let status = jsonObject(statusChildren?.[childId])?.status;
-      if (isLiveStatus(status) && !runOwnerIsLive(runDir)) {
-        status = terminalStatusFromEvents(snapshot.events, childId) ?? "aborted";
-      }
-      candidates.push({
-        runId,
-        runDir,
-        childId,
-        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
-        child: child as Record<string, unknown>,
-        status,
-        generationPending: snapshot.generationPending,
-      });
+    const resolved = child.resolved;
+    if (!resolved) throw new Error(`Cannot follow up ${id}: resolved configuration is missing`);
+    const sessionFile = child.sessionFile;
+    if (!sessionFile || !isAbsolute(sessionFile) || !existsSync(sessionFile)) {
+      throw new Error(`Cannot follow up ${id}: persisted session file is missing`);
     }
+    if (!hasSessionClosedMarker(run.runDir, child.id)) {
+      throw new Error(`Cannot follow up ${id}: wait for the source child's session to finish closing`);
+    }
+    return {
+      spec: {
+        ...child.spec,
+        prompt,
+        model: `${resolved.provider}/${resolved.modelId}`,
+        thinkingLevel: resolved.thinkingLevel,
+      },
+      forkSessionFile: sessionFile,
+      followUpOf: { runId: run.runId, childId: child.id },
+    };
   }
-  candidates.sort((left, right) => right.createdAt - left.createdAt || right.runId.localeCompare(left.runId));
-  if (candidates.length === 0) {
-    throw new Error(`No child ${JSON.stringify(id)} was found in persisted runs for ${cwd}`);
-  }
-  if (!qualified && candidates.length > 1) {
-    throw new Error(
-      `Child id ${JSON.stringify(id)} is ambiguous; use one of: ${candidates.map(candidateName).join(", ")}`,
-    );
-  }
-  const candidate = candidates[0]!;
-  if (candidate.generationPending) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: source run is quarantined by generation.pending`);
-  }
-  if (!isTerminalStatus(candidate.status)) {
-    throw new Error(
-      `Cannot follow up ${candidateName(candidate)}: child is not terminal (status: ${String(candidate.status ?? "missing")})`,
-    );
-  }
-  const submitted = jsonObject(candidate.child.spec);
-  const resolved = jsonObject(candidate.child.resolved);
-  if (!submitted || !resolved) {
-    throw new Error(
-      `Cannot follow up ${candidateName(candidate)}: persisted child spec or resolved configuration is missing`,
-    );
-  }
-  const sessionFile = candidate.child.sessionFile;
-  if (typeof sessionFile !== "string" || !sessionFile) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted sessionFile is missing`);
-  }
-  if (!isAbsolute(sessionFile)) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted sessionFile must be an absolute path`);
-  }
-  if (!existsSync(sessionFile)) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted sessionFile is missing`);
-  }
-  if (!hasSessionClosedMarker(candidate.runDir, candidate.childId)) {
-    throw new Error(
-      `Cannot follow up ${candidateName(candidate)}: source session closure is not confirmed; wait for child shutdown to finish and retry`,
-    );
-  }
-  const provider = requiredString(resolved.provider, candidate, "resolved provider");
-  const modelId = requiredString(resolved.modelId, candidate, "resolved modelId");
-  const thinkingLevel = resolved.thinkingLevel;
-  if (!isThinkingLevel(thinkingLevel)) {
-    throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted thinkingLevel is invalid`);
-  }
-  const inheritedTools = optionalStringArray(submitted.tools, candidate, "tools");
-  const tools =
-    submitted.schema === undefined ? inheritedTools : inheritedTools?.filter((tool) => tool !== "report_result");
-  const excludeTools = optionalStringArray(submitted.excludeTools, candidate, "excludeTools");
-  const submittedCwd = optionalString(submitted.cwd, candidate, "cwd");
-  const label = optionalString(submitted.label, candidate, "label");
-  return {
-    spec: {
-      prompt,
-      model: `${provider}/${modelId}`,
-      thinkingLevel,
-      ...(tools === undefined ? {} : { tools }),
-      ...(excludeTools === undefined ? {} : { excludeTools }),
-      ...(submittedCwd === undefined ? {} : { cwd: submittedCwd }),
-      ...(label === undefined ? {} : { label }),
-    },
-    forkSessionFile: sessionFile,
-    followUpOf: { runId: candidate.runId, childId: candidate.childId },
-  };
+  throw new Error(`No child ${JSON.stringify(id)} belongs to this parent session`);
 }
 
 function parseQualifiedFollowUpId(id: string): { runId: string; childId: string } | undefined {
@@ -250,69 +143,12 @@ function parseQualifiedFollowUpId(id: string): { runId: string; childId: string 
   return parts.length === 2 && parts[0] && parts[1] ? { runId: parts[0], childId: parts[1] } : undefined;
 }
 
-function recordHasChild(value: unknown, childId: string): boolean {
-  const children = jsonObject(value)?.children;
-  return Array.isArray(children) && children.some((child) => jsonObject(child)?.id === childId);
-}
-
-function candidateName(candidate: Pick<FollowUpCandidate, "runId" | "childId">): string {
-  return `${candidate.runId}/${candidate.childId}`;
-}
-
-function isLiveStatus(value: unknown): value is Extract<SubagentStatus, "pending" | "running"> {
-  return value === "pending" || value === "running";
-}
-
 function isTerminalStatus(value: unknown): value is Extract<SubagentStatus, "completed" | "failed" | "aborted"> {
   return value === "completed" || value === "failed" || value === "aborted";
 }
 
-function terminalStatusFromEvents(
-  events: readonly unknown[],
-  childId: string,
-): Extract<SubagentStatus, "completed" | "failed" | "aborted"> | undefined {
-  let terminal: Extract<SubagentStatus, "completed" | "failed" | "aborted"> | undefined;
-  for (const value of events) {
-    const event = jsonObject(value);
-    if (event?.id !== childId) continue;
-    const result = event.type === "result" ? jsonObject(event.result) : undefined;
-    const status = event.type === "status" ? event.status : result?.status;
-    if (isTerminalStatus(status)) terminal = status;
-  }
-  return terminal;
-}
-
-function isThinkingLevel(value: unknown): value is ThinkingLevel {
-  return (
-    value === "off" ||
-    value === "minimal" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "xhigh" ||
-    value === "max"
-  );
-}
-
-function requiredString(value: unknown, candidate: FollowUpCandidate, field: string): string {
-  if (typeof value === "string" && value.length > 0) return value;
-  throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted ${field} is invalid`);
-}
-
-function optionalString(value: unknown, candidate: FollowUpCandidate, field: string): string | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value === "string") return value;
-  throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted ${field} is invalid`);
-}
-
-function optionalStringArray(value: unknown, candidate: FollowUpCandidate, field: string): string[] | undefined {
-  if (value === undefined) return undefined;
-  if (Array.isArray(value) && value.every((item) => typeof item === "string")) return [...value];
-  throw new Error(`Cannot follow up ${candidateName(candidate)}: persisted ${field} is invalid`);
-}
-
 type Detailed = AgentToolResult<SubagentDetails | undefined>;
-type FollowUpResolver = (id: string, prompt: string, cwd: string) => ResolvedFollowUpSpec;
+type FollowUpResolver = (id: string, prompt: string, sessionId: string) => ResolvedFollowUpSpec;
 
 /**
  * Retitle a forked child when the caller named the new turn.
@@ -348,7 +184,7 @@ export function registerSubagentTool(
       }
       const spawnSpec: ChildSpawnSpec =
         input.type === "followUp"
-          ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.cwd), input.label)
+          ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.sessionManager.getSessionId()), input.label)
           : resolveTierSpec(input.spec, readPersonalConfig()["model-tier"], ctx.modelRegistry);
       const spec = submittedSpec(spawnSpec);
       // A child doomed by an unknown model fails fast with a suggestion instead

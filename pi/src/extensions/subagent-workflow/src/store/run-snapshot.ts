@@ -13,7 +13,7 @@ interface RunSnapshotDiagnostic {
   readonly problem: string;
 }
 
-/** Run and child status used to filter history or restore already-complete usage totals. */
+/** Run and child status used to select pending result deliveries at session startup. */
 export interface RunMetadata {
   readonly record: FrozenJson | undefined;
   readonly status: FrozenJson | undefined;

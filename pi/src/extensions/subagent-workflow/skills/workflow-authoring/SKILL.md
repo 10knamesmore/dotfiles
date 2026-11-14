@@ -159,8 +159,12 @@ agents({ action: "stop", runId, childId });
 agents({ action: "stop", runId });
 ```
 
-Views include orchestrated runs for the current parent session and cwd.
-Resuming a workflow assigns its new generation to the resuming parent session.
+Runs belong to the parent session that created them. Views include that
+session's running and completed work, including after reopening the same
+session. Closing Pi releases execution resources but keeps run files on disk.
+Interrupted work requires an explicit resume; reopening a session does not restart it.
+Resume and subagent follow-up must use that original parent session;
+another session cannot inspect, resume, or follow up its runs through these tools.
 `list` and run-level `peek` accept `offset` and `limit` for pagination.
 Child-level `peek` includes bounded transcript and result previews plus full
 artifact paths. Completion is pushed to the parent; use these views for

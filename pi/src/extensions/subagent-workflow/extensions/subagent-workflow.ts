@@ -1,7 +1,6 @@
-import { readdirSync, type Dirent } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ParentContext } from "../src/runner/child.js";
 import { createDeliveryBody, DELIVERY_MESSAGE_TYPE, type DeliveryMessageDetails } from "../src/delivery-message.js";
 import { subagentRunner } from "../src/runner/runner.js";
@@ -26,7 +25,8 @@ import {
   snapshotSaysLive,
   type RunProjection,
 } from "../src/store/run-projection.js";
-import { encodeCwd, persistReconciledProjection } from "../src/store/run-store.js";
+import { persistReconciledProjection } from "../src/store/run-store.js";
+import { runDirectory, sessionRunIds } from "../src/store/run-paths.js";
 import { jsonObject, readRunMetadata, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
 import { readPersonalConfig } from "@dotfiles/pi-config";
 import { applyWorkflowSettings } from "../src/settings/runtime.js";
@@ -67,7 +67,11 @@ function createNavigatorFollowUp(
       const message = prompt.trim();
       if (!message) throw new Error("Follow-up message must not be empty");
       if (message.startsWith("/")) throw new Error("Slash commands are not supported in agent follow-up messages");
-      const resolved = resolveFollowUpSpec(`${runId}/${childId}`, `${FOLLOW_UP_PROMPT_PREFIX}${message}`, ctx.cwd);
+      const resolved = resolveFollowUpSpec(
+        `${runId}/${childId}`,
+        `${FOLLOW_UP_PROMPT_PREFIX}${message}`,
+        ctx.sessionManager.getSessionId(),
+      );
       const parent: ParentContext = {
         ctx,
         thinkingLevel: pi.getThinkingLevel() as ThinkingLevel,
@@ -120,24 +124,10 @@ export interface CatchUpRun {
 }
 
 /** Claim terminal runs using the same ownership lock as workflow resume. */
-function claimCatchUpRuns(
-  cwd: string,
-  sessionId: string,
-  runsRoot: string = join(getAgentDir(), "subagent-workflow", "runs"),
-): CatchUpRun[] {
-  const runRoot = join(runsRoot, encodeCwd(cwd));
-  let entries: Dirent<string>[];
-  try {
-    entries = readdirSync(runRoot, { withFileTypes: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-
+function claimCatchUpRuns(sessionId: string, runsRoot?: string): CatchUpRun[] {
   const candidates: Pick<CatchUpRun, "runId" | "runDir" | "createdAt" | "generation">[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const runDir = join(runRoot, entry.name);
+  for (const runId of sessionRunIds(sessionId, runsRoot)) {
+    const runDir = runDirectory(sessionId, runId, runsRoot);
     try {
       const metadata = readRunMetadata(runDir);
       if (metadata.generationPending) continue;
@@ -151,7 +141,7 @@ function claimCatchUpRuns(
       if (parent?.sessionId !== sessionId || runOwnerIsLive(runDir)) continue;
       const createdAt = typeof record?.createdAt === "string" ? Date.parse(record.createdAt) : NaN;
       candidates.push({
-        runId: entry.name,
+        runId,
         runDir,
         createdAt: Number.isFinite(createdAt) ? createdAt : 0,
         generation: identity.generation,
@@ -235,7 +225,7 @@ export function catchUpUndeliveredRuns(pi: ExtensionAPI, ctx: ExtensionContext, 
   // was consumed in a previous session cannot be re-queued as undelivered.
   retryDeferredPublications();
   const sessionId = ctx.sessionManager.getSessionId();
-  const runs = claimCatchUpRuns(ctx.cwd, sessionId, runsRoot);
+  const runs = claimCatchUpRuns(sessionId, runsRoot);
   if (runs.length === 0) return runs;
   const message = formatCatchUpMessage(runs);
   queueAcknowledgedDelivery(pi, {
@@ -350,7 +340,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   registerSubagentTool(pi, selfPath, widget);
   registerAgentsTool(pi);
   const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => {
-    usageFooter.trackRun(run.runDir, ctx);
+    usageFooter.trackRun(run.runId, ctx);
     widget.observeWorkflowStarted(run, ctx);
   };
   registerWorkflowTool(pi, selfPath, { approvalPolicy: settings.workflowApproval, observeRun });
@@ -358,7 +348,6 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   // /agents is the canonical name; /workflows stays registered as a public alias.
   const openNavigator = registerNavigator(pi, {
     followUp: createNavigatorFollowUp(pi, selfPath, widget),
-    describeWorkflow: (script) => parseWorkflowScript(script).meta.name,
   });
   pi.registerShortcut("shift+down", {
     description: "Open the agent navigator (/agents)",
@@ -400,12 +389,13 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     markSessionOpen(sessionId);
     editorContext = ctx;
     if (ctx.hasUI) setTuiSession();
-    usageFooter.attach(ctx);
     try {
       catchUpUndeliveredRuns(pi, ctx);
     } catch (error) {
       reportDiagnostic(`[subagent-workflow] startup catch-up failed: ${errorMessage(error)}`);
     }
+    subagentRunner.restoreSession(sessionId, (script) => parseWorkflowScript(script).meta.name);
+    usageFooter.attach(ctx);
   });
   pi.on("session_shutdown", async (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();

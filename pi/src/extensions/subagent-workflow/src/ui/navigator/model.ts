@@ -1,47 +1,31 @@
 /**
  * Navigator data model and navigation state machine.
  *
- * Runs owned by this process render from the runner's synchronous in-memory
- * projection. Non-owned runs render from durable snapshots. `isLive` is used
- * only to pin active runs to the top of the list; live handles (steer/stop and
- * transcript following) remain in the navigator.
+ * Current-session runs render from the runner's retained state, including completed work.
  */
 
-import { join } from "node:path";
 import type { FilterMode, Level } from "./controls.js";
 import { orderedChildren } from "./controls.js";
-import {
-  listRunSummaries,
-  readRunDetail,
-  runsDirFor,
-  type ChildRow,
-  type ReadOptions,
-  type RunDetail,
-  type RunSummary,
-} from "../../store/run-reader.js";
+import { subagentRunner } from "../../runner/runner.js";
+import type { ChildRow, RunDetail, RunSummary } from "../../store/run-projection.js";
 
 export class NavigatorModel {
-  constructor(
-    private readonly cwd: string,
-    private readonly opts: ReadOptions,
-    private readonly isLive: (runId: string) => boolean = () => false,
-  ) {}
+  constructor(private readonly sessionId: string) {}
 
   /** Runs newest-first, with active/live runs pinned to the top. */
   runs(): RunSummary[] {
-    const rows = listRunSummaries(this.cwd, this.opts);
+    const rows = subagentRunner.sessionRuns(this.sessionId);
     const active: RunSummary[] = [];
     const history: RunSummary[] = [];
     for (const row of rows) {
-      const live = !row.corrupt && (row.status === "running" || row.status === "pending" || this.isLive(row.runId));
+      const live = !row.corrupt && (row.status === "running" || row.status === "pending");
       (live ? active : history).push(row);
     }
     return [...active, ...history];
   }
 
   detail(runId: string): RunDetail {
-    const runDir = join(runsDirFor(this.cwd), runId);
-    return readRunDetail(runDir, runId, this.opts);
+    return subagentRunner.runDetail(this.sessionId, runId);
   }
 }
 

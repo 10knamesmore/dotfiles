@@ -33,7 +33,7 @@ import {
 } from "./controls.js";
 import { NavigatorModel, NavigatorState } from "./model.js";
 import { pageRunDetail, renderRunDetail, renderRunList, scrollRunDetail, scrollRunList } from "./render.js";
-import type { ChildRow, RunDetail, RunSummary } from "../../store/run-reader.js";
+import type { ChildRow, RunDetail, RunSummary } from "../../store/run-projection.js";
 import { readSessionMessages, type TranscriptMessage } from "../../store/session-transcript.js";
 
 export type NavigatorOpenContext = Pick<
@@ -54,8 +54,6 @@ export interface NavigatorFollowUp {
 
 interface NavigatorServices {
   followUp?: NavigatorFollowUp;
-  /** Extract a workflow's display name from its script for run rows. */
-  describeWorkflow?: (script: string) => string;
 }
 
 /** Register `/agents` and its `/workflows` alias, returning their shared open path. */
@@ -91,9 +89,7 @@ async function runNavigator(
   ctx: NavigatorOpenContext,
   target?: NavigatorOpenTarget,
 ): Promise<void> {
-  const model = new NavigatorModel(ctx.cwd, { describeWorkflow: services.describeWorkflow }, (id) =>
-    subagentRunner.liveRunIds().includes(id),
-  );
+  const model = new NavigatorModel(ctx.sessionManager.getSessionId());
   if (!ctx.hasUI) {
     console.log(formatPlainSummary(model.runs()));
     return;
@@ -555,7 +551,7 @@ export function buildAgentView(
   followUp?: AgentFollowUpControls,
 ): AgentView {
   // Share one child row across a render's header, transcript and controls.
-  // The microtask reset lets the next frame observe file changes or live runner updates.
+  // The microtask reset lets the next frame observe runner updates.
   let burstChild: ChildRow | undefined;
   let burstValid = false;
   const child = (): ChildRow | undefined => {

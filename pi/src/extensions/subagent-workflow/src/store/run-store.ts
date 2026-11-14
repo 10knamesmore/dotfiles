@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   appendFileSync,
   closeSync,
@@ -12,8 +11,8 @@ import {
   statSync,
   writeSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { dirname, join } from "node:path";
+import { runDirectory } from "./run-paths.js";
 import type {
   FollowUpReference,
   ResolvedSpec,
@@ -127,7 +126,7 @@ interface RunRecord {
   runId: string;
   kind: "subagent" | "workflow";
   createdAt: string;
-  /** Parent responsible for the current generation's controls and result delivery. */
+  /** Parent session that created the run; resume keeps the same parent. */
   parent: { sessionId: string; sessionFile?: string };
   children: ChildRecord[];
   phases?: Array<{ title: string; detail?: string }>;
@@ -177,19 +176,6 @@ export class GenerationPendingError extends Error {
   }
 }
 
-export function encodeCwd(cwd: string): string {
-  const resolved = resolve(cwd);
-  // A readable slug for humans browsing the runs directory, plus a short hash
-  // of the full path so distinct projects never collide: without it "/a/b",
-  // "/a-b", and "/a:b" all slug to the same "a-b".
-  const slug = resolved.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-");
-  // 64-bit hash: wide enough that distinct paths sharing a slug do not collide
-  // in practice (8 hex digits left a birthday collision reachable with crafted
-  // paths).
-  const hash = createHash("sha256").update(resolved).digest("hex").slice(0, 16);
-  return `--${slug}--${hash}`;
-}
-
 /** Owns all writes in a run directory. Initial layout is mandatory; later writes are best-effort. */
 export class RunStore {
   readonly runDir: string;
@@ -197,7 +183,6 @@ export class RunStore {
   private record: RunRecord;
   private status: RunStatus = { status: "pending", children: {} };
   private readonly runId: string;
-  private readonly launchingParent: RunRecord["parent"];
   private openedSnapshot?: RunSnapshot;
   private runOwnership?: RunOwnership;
   /** Ownership acquisition is attempted exactly once during construction. */
@@ -208,15 +193,12 @@ export class RunStore {
 
   constructor(
     runId: string,
-    parentCwd: string,
-    parentSessionId: string,
+    private readonly parentSessionId: string,
     parentSessionFile?: string,
     options: RunStoreOptions = {},
   ) {
     this.runId = runId;
-    this.launchingParent = { sessionId: parentSessionId, sessionFile: parentSessionFile };
-    const root = options.rootDir ?? join(getAgentDir(), "subagent-workflow", "runs");
-    this.runDir = options.existingRunDir ?? join(root, encodeCwd(parentCwd), runId);
+    this.runDir = options.existingRunDir ?? runDirectory(parentSessionId, runId, options.rootDir);
     this.sessionsDir = join(this.runDir, "sessions");
     if (options.existingRunDir) {
       // An atomically-created directory is the new-run reservation. Validate
@@ -254,7 +236,7 @@ export class RunStore {
       runId,
       kind,
       createdAt: new Date().toISOString(),
-      parent: this.launchingParent,
+      parent: { sessionId: parentSessionId, sessionFile: parentSessionFile },
       children: [],
       phases: options.phases?.map((phase) => ({ ...phase })),
       delivery: {
@@ -291,11 +273,6 @@ export class RunStore {
       // that validated the metadata and acquired ownership in between.
       throw error;
     }
-  }
-
-  /** Whether this store still holds the process's ownership transaction. */
-  get ownsRun(): boolean {
-    return this.runOwnership !== undefined && !this.writesClosed;
   }
 
   /** First persistence failure after initialization, if any. The run is then not reliably resumable. */
@@ -348,8 +325,7 @@ export class RunStore {
   /**
    * Publish one prepared execution generation behind a durable pending marker.
    * Callers must finish journal, usage, and persisted-input reads before
-   * entering this commit. The committed generation belongs to the parent
-   * that opened this store, including resumes from another session.
+   * entering this commit. Every generation belongs to the session that created the run.
    */
   startWorkflowGeneration(
     script: string,
@@ -385,7 +361,6 @@ export class RunStore {
         const nextGeneration = this.record.delivery.generation + 1;
         const nextRecord: RunRecord = {
           ...this.record,
-          parent: this.launchingParent,
           delivery: {
             generation: nextGeneration,
           },
@@ -552,11 +527,11 @@ export class RunStore {
     );
   }
 
-  recordLog(message: string): void {
-    this.writeOwned(() => this.appendLifecycle("log", { message }));
+  recordLog(message: string, timestamp: number): void {
+    this.writeOwned(() => this.appendLifecycle("log", { message }, timestamp));
   }
 
-  recordPhase(title: string): void {
+  recordPhase(title: string, timestamp: number): void {
     this.writeOwned(() => {
       if (!this.record.phases?.some((phase) => phase.title === title)) {
         this.record.phases ??= [];
@@ -565,7 +540,7 @@ export class RunStore {
       }
       // The phase list is static metadata; this event is the transition. Keep
       // it even for declared phases so narrator logs can be assigned correctly.
-      this.appendLifecycle("phase", { title });
+      this.appendLifecycle("phase", { title }, timestamp);
     });
   }
 
@@ -600,11 +575,11 @@ export class RunStore {
    * run exactly as terminal as it was. The refusal itself stays auditable in
    * the event log.
    */
-  restoreTerminalStatus(status: "completed" | "failed" | "aborted", reason: string): void {
+  restoreTerminalStatus(status: "completed" | "failed" | "aborted", reason: string, timestamp: number): void {
     this.writeOwned(() => {
       this.status.status = status;
       this.writeJson("status.json", this.status, { durable: true });
-      this.appendLifecycle("workflow_resume_refused", { error: reason });
+      this.appendLifecycle("workflow_resume_refused", { error: reason }, timestamp);
     });
     this.releaseOwnershipHandle();
   }
@@ -624,7 +599,7 @@ export class RunStore {
     });
   }
 
-  recordEvent(event: SubagentEvent): void {
+  recordEvent(event: SubagentEvent, timestamp: number): void {
     if (this.writesClosed) return;
     const runWasTerminal =
       this.record.kind === "subagent" && this.status.status !== "running" && this.status.status !== "pending";
@@ -648,7 +623,7 @@ export class RunStore {
     }
     this.writeOwned(() => {
       this.applyEventState(event);
-      this.appendLine({ timestamp: new Date().toISOString(), ...event });
+      this.appendLine({ timestamp: new Date(timestamp).toISOString(), ...event });
       this.writeJson("status.json", this.status, { durable: releaseAfterWrite });
     });
     // A failed terminal status write is degraded but must not leave ownership
@@ -742,8 +717,12 @@ export class RunStore {
     reportDiagnostic(`[subagent-workflow] run persistence failed: ${message}`);
   }
 
-  private appendLifecycle(type: string, data: Record<string, unknown> = {}): { event: FrozenJson; line: string } {
-    const event = Object.freeze({ timestamp: new Date().toISOString(), type, ...data }) as FrozenJson;
+  private appendLifecycle(
+    type: string,
+    data: Record<string, unknown> = {},
+    timestamp = Date.now(),
+  ): { event: FrozenJson; line: string } {
+    const event = Object.freeze({ timestamp: new Date(timestamp).toISOString(), type, ...data }) as FrozenJson;
     return { event, line: this.appendLine(event) };
   }
 
@@ -893,6 +872,9 @@ export class RunStore {
     const record = this.requiredSnapshotValue<RunRecord>(snapshot, "run.json", snapshot.record);
     const status = this.requiredSnapshotValue<RunStatus>(snapshot, "status.json", snapshot.status);
     this.validateResumeRecord(record);
+    if (record.parent.sessionId !== this.parentSessionId) {
+      throw new Error(`Cannot resume run ${this.runId}: it belongs to another session`);
+    }
     this.validateResumeStatus(status);
     const recordIds = new Set(record.children.map((child) => child.id));
     const unrecordedStatusId = Object.keys(status.children).find((id) => !recordIds.has(id));

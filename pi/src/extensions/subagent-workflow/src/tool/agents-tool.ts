@@ -11,10 +11,9 @@ import {
 import { Type, type Static } from "typebox";
 import { subagentRunner } from "../runner/runner.js";
 import { isLiveStatus } from "../store/run-projection.js";
-import { listRunSummaries, readRunDetail, type ChildRow, type RunSummary } from "../store/run-reader.js";
+import type { ChildRow, RunSummary } from "../store/run-projection.js";
 import { readSessionMessages, type TranscriptMessage } from "../store/session-transcript.js";
 import { isRecord } from "../util.js";
-import { parseWorkflowScript } from "../workflow/parser.js";
 import {
   renderAgentsCall,
   renderAgentsResult,
@@ -172,16 +171,10 @@ const Output = Type.Union([
 ]);
 type Output = Static<typeof Output>;
 
-const readOptions = {
-  describeWorkflow: (script: string) => parseWorkflowScript(script).meta.name,
-};
-
 /** Only the current parent's orchestrated runs belong in its model context. */
 function sessionRuns(ctx: ExtensionContext): RunSummary[] {
   const sessionId = ctx.sessionManager.getSessionId();
-  return listRunSummaries(ctx.cwd, readOptions).filter(
-    (run) => run.parentSessionId === sessionId && !run.directDelivery,
-  );
+  return subagentRunner.sessionRuns(sessionId).filter((run) => !run.directDelivery);
 }
 
 function validateInput(input: Input): void {
@@ -399,8 +392,8 @@ async function executeAction(
   }
 
   const run = runs.find((candidate) => candidate.runId === input.runId);
-  if (!run) throw new Error(`No orchestrated run ${input.runId} belongs to this session and cwd; use agents list`);
-  const detail = readRunDetail(run.runDir, run.runId, { ...readOptions, bypassCache: true });
+  if (!run) throw new Error(`No orchestrated run ${input.runId} belongs to this session; use agents list`);
+  const detail = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
   if (detail.corrupt) throw new Error(`Cannot read run ${run.runId}; inspect ${run.runDir}`);
   const child = input.childId ? detail.children.find((candidate) => candidate.id === input.childId) : undefined;
   if (input.childId && !child) throw new Error(`Child ${input.childId} does not belong to run ${run.runId}`);
@@ -424,7 +417,7 @@ async function executeAction(
 
   if (input.action === "wait") {
     await waitForRun(run.runId, signal);
-    const detail = readRunDetail(run.runDir, run.runId, { ...readOptions, bypassCache: true });
+    const detail = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
     if (isLiveStatus(detail.status)) {
       throw new Error(`Run ${run.runId} is still active in another process; wait requires its owning Pi process`);
     }
@@ -487,7 +480,7 @@ async function executeAction(
     } else if (isLiveStatus(run.status)) {
       throw new Error(`Run ${run.runId} is owned by another process; stop it from that Pi instance`);
     }
-    const stopped = readRunDetail(run.runDir, run.runId, { ...readOptions, bypassCache: true });
+    const stopped = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
     return finish(
       {
         action: "stop",
@@ -517,7 +510,7 @@ export function registerAgentsTool(pi: ExtensionAPI): void {
   const tool: ToolDefinition<typeof Parameters, AgentsToolSnapshot | undefined, AgentsToolRenderState> = {
     name: "agents",
     label: "Agents",
-    description: "Observe and control subagent and workflow runs belonging to the current parent session and cwd.",
+    description: "Observe and control subagent and workflow runs belonging to the current parent session.",
     parameters: Parameters,
     outputSchema: Output,
     executionMode: "sequential",
