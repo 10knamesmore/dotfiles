@@ -1,16 +1,17 @@
 import { copyToClipboard, type CustomEditor, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SelectList, stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { marked } from "marked";
-import { highlightCopySource } from "./copy-highlight.js";
+import { highlightCopySource, type CopyTarget } from "./copy-highlight.js";
+import { replyCodeBlocks, type ReplyMarkdown } from "./reply-markdown.js";
 
 interface CopyChoice {
   label: string;
   hint: string;
   text: string;
+  target?: CopyTarget;
 }
 
 /** Install after Pi wires onSubmit: built-in /copy runs before extension commands. */
-export function installCopyCommand(editor: CustomEditor, ctx: ExtensionContext): void {
+export function installCopyCommand(editor: CustomEditor, ctx: ExtensionContext, renderer: ReplyMarkdown): void {
   const submit = editor.onSubmit;
   editor.onSubmit = async (text) => {
     if (text.trim() !== "/copy") {
@@ -18,17 +19,17 @@ export function installCopyCommand(editor: CustomEditor, ctx: ExtensionContext):
       return;
     }
     editor.setText("");
-    await copyLastResponse(ctx);
+    await copyLastResponse(ctx, renderer);
   };
 }
 
-async function copyLastResponse(ctx: ExtensionContext): Promise<void> {
+async function copyLastResponse(ctx: ExtensionContext, renderer: ReplyMarkdown): Promise<void> {
   const lastResponse = findLastResponse(ctx);
   if (lastResponse === undefined) {
     ctx.ui.notify("No assistant response to copy yet.", "info");
     return;
   }
-  const { text: response, timestamp } = lastResponse;
+  const { text: response, timestamp, chunks } = lastResponse;
 
   const responseLineCount = response.replace(/\n$/u, "").split("\n").length;
   const choices: CopyChoice[] = [
@@ -38,18 +39,20 @@ async function copyLastResponse(ctx: ExtensionContext): Promise<void> {
       text: response,
     },
   ];
-  marked.walkTokens(marked.lexer(response), (token) => {
-    if (token.type !== "code") return;
-    const lineCount = token.text.replace(/\n$/u, "").split("\n").length;
-    const language = stripTerminalSequences(token.lang || "text").replace(/\s+/gu, " ");
-    choices.push({
-      label: stripTerminalSequences(token.text).replace(/\s+/gu, " ").trim(),
-      hint: `${language} · ${lineCount} ${lineCount === 1 ? "line" : "lines"}`,
-      text: token.text,
-    });
+  chunks.forEach((text, chunk) => {
+    for (const block of replyCodeBlocks(text.trim())) {
+      const lineCount = block.text.replace(/\n$/u, "").split("\n").length;
+      const language = stripTerminalSequences(block.language || "text").replace(/\s+/gu, " ");
+      choices.push({
+        label: stripTerminalSequences(block.text).replace(/\s+/gu, " ").trim(),
+        hint: `${language} · ${lineCount} ${lineCount === 1 ? "line" : "lines"}`,
+        text: block.text,
+        target: { chunk, key: block.key, occurrence: block.occurrence },
+      });
+    }
   });
 
-  const choice = await selectCopyChoice(ctx, choices, timestamp);
+  const choice = await selectCopyChoice(ctx, choices, timestamp, renderer);
   if (choice === undefined) return;
   try {
     await copyToClipboard(choice.text);
@@ -63,6 +66,7 @@ function selectCopyChoice(
   ctx: ExtensionContext,
   choices: CopyChoice[],
   messageTimestamp: number,
+  renderer: ReplyMarkdown,
 ): Promise<CopyChoice | undefined> {
   return ctx.ui.custom<CopyChoice | undefined>((tui, theme, _keybindings, done) => {
     let selectedIndex = 0;
@@ -77,20 +81,15 @@ function selectCopyChoice(
         noMatch: (text) => theme.fg("muted", text),
       },
     );
-    list.onSelectionChange = (item) => {
-      selectedIndex = Number(item.value);
-    };
     list.onSelect = (item) => done(choices[Number(item.value)]!);
     list.onCancel = () => done(undefined);
-    const clearHighlight = highlightCopySource(
-      tui,
-      theme,
-      messageTimestamp,
-      choices.slice(1).map((choice) => choice.text),
-      () => selectedIndex,
-    );
+    const highlight = highlightCopySource(tui, theme, messageTimestamp, renderer, () => choices[selectedIndex]!.target);
+    list.onSelectionChange = (item) => {
+      selectedIndex = Number(item.value);
+      highlight.refresh();
+    };
     return {
-      dispose: clearHighlight,
+      dispose: highlight.dispose,
       render(width: number): string[] {
         const title = ` Copy · ${selectedIndex + 1}/${choices.length} `;
         const border = (text: string) => theme.fg("borderMuted", text);
@@ -116,14 +115,13 @@ function selectCopyChoice(
   });
 }
 
-function findLastResponse(ctx: ExtensionContext): { text: string; timestamp: number } | undefined {
+function findLastResponse(ctx: ExtensionContext): { text: string; timestamp: number; chunks: string[] } | undefined {
   for (const entry of ctx.sessionManager.getBranch().reverse()) {
     if (entry.type !== "message" || entry.message.role !== "assistant") continue;
-    const text = entry.message.content
-      .filter((content) => content.type === "text")
-      .map((content) => content.text)
-      .join("");
-    if (text.trim()) return { text, timestamp: entry.message.timestamp };
+    const chunks = entry.message.content.filter((content) => content.type === "text").map((content) => content.text);
+    const text = chunks.join("");
+    if (text.trim())
+      return { text, timestamp: entry.message.timestamp, chunks: chunks.filter((chunk) => chunk.trim()) };
   }
   return undefined;
 }
