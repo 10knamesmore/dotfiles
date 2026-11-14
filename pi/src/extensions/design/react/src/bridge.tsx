@@ -26,7 +26,10 @@ export function RuntimeBridge() {
     const environment = current.current.environment;
     if (!environment) return;
     const send = (message: Omit<RuntimeMessage, "source" | "artboard"> | Record<string, unknown>) => {
-      window.parent.postMessage({ ...message, source: "pi-design", artboard: environment.artboard }, environment.origin);
+      window.parent.postMessage(
+        { ...message, source: "pi-design", artboard: environment.artboard },
+        environment.origin,
+      );
     };
     let frame = 0;
     let previous = "";
@@ -35,12 +38,22 @@ export function RuntimeBridge() {
     function measure() {
       frame = 0;
       const elements = allElements();
-      for (const node of observed) if (!node.isConnected) { observer.unobserve(node); observed.delete(node); }
-      const values = elements.map(node => {
-        if (!observed.has(node)) { observed.add(node); observer.observe(node); }
+      for (const node of observed)
+        if (!node.isConnected) {
+          observer.unobserve(node);
+          observed.delete(node);
+        }
+      const values = elements.map((node) => {
+        if (!observed.has(node)) {
+          observed.add(node);
+          observer.observe(node);
+        }
         return {
-          id: node.dataset.designId!, tag: node.tagName.toLowerCase(), text: node.innerText ?? "", rect: rectOf(node),
-          kind: node.hasAttribute("data-design-text") ? "text" as const : "box" as const,
+          id: node.dataset.designId!,
+          tag: node.tagName.toLowerCase(),
+          text: node.innerText ?? "",
+          rect: rectOf(node),
+          kind: node.hasAttribute("data-design-text") ? ("text" as const) : ("box" as const),
         };
       });
       const serialized = JSON.stringify(values);
@@ -50,10 +63,15 @@ export function RuntimeBridge() {
         send({ type: "bounds", elements: values });
       }
     }
-    function schedule() { if (!frame) frame = requestAnimationFrame(measure); }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(measure);
+    }
     scheduleRef.current = schedule;
-    const mutation = new MutationObserver(records => {
-      if (records.some(record => !(record.target instanceof Element && record.target.closest("[data-design-overlay]")))) schedule();
+    const mutation = new MutationObserver((records) => {
+      if (
+        records.some((record) => !(record.target instanceof Element && record.target.closest("[data-design-overlay]")))
+      )
+        schedule();
     });
     mutation.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
     observer.observe(document.documentElement);
@@ -61,7 +79,13 @@ export function RuntimeBridge() {
     function select(node: HTMLElement | null) {
       const id = node?.dataset.designId ?? null;
       current.current.setSelected(id);
-      send({ type: "selection", element: id, rect: node ? rectOf(node) : null, text: node?.innerText ?? "", tag: node?.tagName.toLowerCase() ?? "" });
+      send({
+        type: "selection",
+        element: id,
+        rect: node ? rectOf(node) : null,
+        text: node?.innerText ?? "",
+        tag: node?.tagName.toLowerCase() ?? "",
+      });
     }
     function click(event: MouseEvent) {
       const value = current.current;
@@ -71,7 +95,12 @@ export function RuntimeBridge() {
       event.stopPropagation();
       const node = editableFrom(event.target);
       if (value.mode === "comment") {
-        send({ type: "comment", ...(node ? { element: node.dataset.designId } : {}), x: event.clientX, y: event.clientY });
+        send({
+          type: "comment",
+          ...(node ? { element: node.dataset.designId } : {}),
+          x: event.clientX,
+          y: event.clientY,
+        });
       } else select(node);
     }
     function pointerdown(event: PointerEvent) {
@@ -95,7 +124,8 @@ export function RuntimeBridge() {
     }
     function keyboard(event: KeyboardEvent) {
       const target = event.target;
-      if (target instanceof HTMLElement && (target.isContentEditable || target.matches("input,textarea,select"))) return;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.matches("input,textarea,select")))
+        return;
       if (!(event.ctrlKey || event.metaKey)) return;
       if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
         event.preventDefault();
@@ -106,12 +136,18 @@ export function RuntimeBridge() {
     function message(event: MessageEvent) {
       if (event.source !== window.parent || event.origin !== environment!.origin) return;
       const data: unknown = event.data;
-      if (!data || typeof data !== "object" || !("source" in data) || data.source !== "pi-design" || !("type" in data)) return;
-      if (data.type === "mode" && "mode" in data && (data.mode === "select" || data.mode === "comment" || data.mode === "play")) {
+      if (!data || typeof data !== "object" || !("source" in data) || data.source !== "pi-design" || !("type" in data))
+        return;
+      if (
+        data.type === "mode" &&
+        "mode" in data &&
+        (data.mode === "select" || data.mode === "comment" || data.mode === "play")
+      ) {
         current.current.setMode(data.mode);
         if (data.mode === "play") current.current.setEditing(null);
       }
-      if (data.type === "select" && "element" in data && (typeof data.element === "string" || data.element === null)) current.current.setSelected(data.element);
+      if (data.type === "select" && "element" in data && (typeof data.element === "string" || data.element === null))
+        current.current.setSelected(data.element);
     }
     document.addEventListener("click", click, true);
     document.addEventListener("pointerdown", pointerdown, true);
@@ -140,15 +176,17 @@ export function RuntimeBridge() {
     };
   }, []);
 
-  useEffect(() => { scheduleRef.current(); }, [runtime.data, runtime.selected, runtime.editing]);
-  const selected = bounds.find(item => item.id === runtime.selected);
-  const hover = bounds.find(item => item.id === hovered && item.id !== runtime.selected);
+  useEffect(() => {
+    scheduleRef.current();
+  }, [runtime.data, runtime.selected, runtime.editing]);
+  const selected = bounds.find((item) => item.id === runtime.selected);
+  const hover = bounds.find((item) => item.id === hovered && item.id !== runtime.selected);
   if (!runtime.environment || runtime.mode === "play") return null;
 
   function resize(event: React.PointerEvent) {
     event.preventDefault();
     event.stopPropagation();
-    const node = allElements().find(item => item.dataset.designId === runtime.selected);
+    const node = allElements().find((item) => item.dataset.designId === runtime.selected);
     if (!node) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const x = event.clientX;
@@ -172,7 +210,9 @@ export function RuntimeBridge() {
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", cancel);
       move(pointer);
-      current.current.connection?.edit([{ type: "style", element: node!.dataset.designId!, style: { width: nextWidth, height: nextHeight } }]);
+      current.current.connection?.edit([
+        { type: "style", element: node!.dataset.designId!, style: { width: nextWidth, height: nextHeight } },
+      ]);
     }
     function cancel() {
       window.removeEventListener("pointermove", move);
@@ -187,18 +227,44 @@ export function RuntimeBridge() {
     window.addEventListener("pointercancel", cancel);
   }
   function outline(item: ElementBounds, active: boolean) {
-    return <div key={active ? "selected" : "hover"} style={{
-      position: "fixed", left: item.rect.x, top: item.rect.y, width: item.rect.width, height: item.rect.height,
-      boxSizing: "border-box", border: `1.5px solid ${active ? "#6856e8" : "#9a8ff0"}`, pointerEvents: "none",
-    }}>
-      {active && !runtime.editing && <div onPointerDown={resize} style={{
-        position: "absolute", right: -4, bottom: -4, width: 8, height: 8, background: "white",
-        border: "1px solid #6856e8", pointerEvents: "auto", cursor: "nwse-resize",
-      }} />}
-    </div>;
+    return (
+      <div
+        key={active ? "selected" : "hover"}
+        style={{
+          position: "fixed",
+          left: item.rect.x,
+          top: item.rect.y,
+          width: item.rect.width,
+          height: item.rect.height,
+          boxSizing: "border-box",
+          border: `1.5px solid ${active ? "#6856e8" : "#9a8ff0"}`,
+          pointerEvents: "none",
+        }}
+      >
+        {active && !runtime.editing && (
+          <div
+            onPointerDown={resize}
+            style={{
+              position: "absolute",
+              right: -4,
+              bottom: -4,
+              width: 8,
+              height: 8,
+              background: "white",
+              border: "1px solid #6856e8",
+              pointerEvents: "auto",
+              cursor: "nwse-resize",
+            }}
+          />
+        )}
+      </div>
+    );
   }
-  return createPortal(<div data-design-overlay style={{ position: "fixed", inset: 0, zIndex: 2147483646, pointerEvents: "none" }}>
-    {hover && outline(hover, false)}
-    {selected && outline(selected, true)}
-  </div>, document.body);
+  return createPortal(
+    <div data-design-overlay style={{ position: "fixed", inset: 0, zIndex: 2147483646, pointerEvents: "none" }}>
+      {hover && outline(hover, false)}
+      {selected && outline(selected, true)}
+    </div>,
+    document.body,
+  );
 }

@@ -13,7 +13,8 @@ export interface RunActivityFold {
 }
 
 export type ActivityFoldEvent =
-  { type: "child"; id: string; label: string } | { type: "activity"; id: string; description: string };
+  | { type: "child"; id: string; label: string }
+  | { type: "activity"; id: string; description: string };
 
 export function createActivityFold(complete = true): RunActivityFold {
   return { children: new Map(), complete };

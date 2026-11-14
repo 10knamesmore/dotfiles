@@ -9,10 +9,7 @@ export async function searchBlended(request: SearchRequest, signal?: AbortSignal
   const controller = new AbortController();
   const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   try {
-    const results = await Promise.all([
-      searchDeepseek(request, requestSignal),
-      searchExa(request, requestSignal),
-    ]);
+    const results = await Promise.all([searchDeepseek(request, requestSignal), searchExa(request, requestSignal)]);
     requestSignal.throwIfAborted();
     return blendSources(results, request.limit);
   } finally {

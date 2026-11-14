@@ -11,15 +11,17 @@ export default function piDesign(): Plugin {
       designFile = resolve(config.root, "design.json");
     },
     transformIndexHtml() {
-      return [{
-        tag: "script",
-        attrs: { type: "module" },
-        children:
-          'import { createHotContext } from "/@vite/client";' +
-          'createHotContext("/@pi-design/data").on("pi-design:data", data => ' +
-          'window.dispatchEvent(new CustomEvent("pi-design:data", { detail: data })));',
-        injectTo: "head-prepend",
-      }];
+      return [
+        {
+          tag: "script",
+          attrs: { type: "module" },
+          children:
+            'import { createHotContext } from "/@vite/client";' +
+            'createHotContext("/@pi-design/data").on("pi-design:data", data => ' +
+            'window.dispatchEvent(new CustomEvent("pi-design:data", { detail: data })));',
+          injectTo: "head-prepend",
+        },
+      ];
     },
     async handleHotUpdate(context) {
       if (resolve(context.file) !== designFile) return;

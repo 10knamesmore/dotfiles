@@ -6,12 +6,27 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./vite": { "types": "./dist/vite.d.ts", "default": "./dist/vite.js" },
-    "./client": { "types": "./src/client.ts", "default": "./dist/client.js" },
-    "./protocol": { "types": "./src/types.ts", "default": "./dist/types.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./dist/client.js"
+    },
+    "./protocol": {
+      "types": "./src/types.ts",
+      "default": "./dist/types.js"
+    }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -22,7 +37,9 @@
     "vite": "^7.0.0"
   },
   "peerDependenciesMeta": {
-    "vite": { "optional": true }
+    "vite": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

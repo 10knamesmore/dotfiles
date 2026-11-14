@@ -3,8 +3,19 @@ import { LoaderCircle, RotateCw } from "lucide-react";
 import type { Artboard, Mode, RuntimeMessage } from "@pi-design/react/protocol";
 import { IconButton } from "./ui";
 
-export function ArtboardFrame({ board, previewUrl, endpoint, mode, selected, onMessage }: {
-  board: Artboard; previewUrl: string; endpoint: string; mode: Mode; selected: string | null;
+export function ArtboardFrame({
+  board,
+  previewUrl,
+  endpoint,
+  mode,
+  selected,
+  onMessage,
+}: {
+  board: Artboard;
+  previewUrl: string;
+  endpoint: string;
+  mode: Mode;
+  selected: string | null;
   onMessage: (message: RuntimeMessage) => void;
 }) {
   const iframe = useRef<HTMLIFrameElement>(null);
@@ -28,13 +39,27 @@ export function ArtboardFrame({ board, previewUrl, endpoint, mode, selected, onM
       const message = event.data;
       if (!message || message.source !== "pi-design" || message.artboard !== board.id) return;
       if (!["ready", "selection", "comment", "bounds"].includes(message.type)) return;
-      if (message.type === "bounds" && (!Array.isArray(message.elements) || message.elements.some(item =>
-        typeof item.id !== "string" || !item.rect || !Object.values(item.rect).every(value => typeof value === "number" && Number.isFinite(value)),
-      ))) return;
+      if (
+        message.type === "bounds" &&
+        (!Array.isArray(message.elements) ||
+          message.elements.some(
+            (item) =>
+              typeof item.id !== "string" ||
+              !item.rect ||
+              !Object.values(item.rect).every((value) => typeof value === "number" && Number.isFinite(value)),
+          ))
+      )
+        return;
       if (message.type === "ready") {
         setReady(true);
-        iframe.current?.contentWindow?.postMessage({ source: "pi-design", type: "mode", mode: current.current.mode }, origin);
-        iframe.current?.contentWindow?.postMessage({ source: "pi-design", type: "select", element: current.current.selected }, origin);
+        iframe.current?.contentWindow?.postMessage(
+          { source: "pi-design", type: "mode", mode: current.current.mode },
+          origin,
+        );
+        iframe.current?.contentWindow?.postMessage(
+          { source: "pi-design", type: "select", element: current.current.selected },
+          origin,
+        );
       }
       current.current.onMessage(message);
     }
@@ -62,7 +87,7 @@ export function ArtboardFrame({ board, previewUrl, endpoint, mode, selected, onM
         setReachable(true);
         if (!previouslyReachable) {
           previouslyReachable = true;
-          setRetry(value => value + 1);
+          setRetry((value) => value + 1);
         }
       } catch {
         if (disposed) return;
@@ -72,16 +97,40 @@ export function ArtboardFrame({ board, previewUrl, endpoint, mode, selected, onM
       if (!disposed) timer = setTimeout(() => void probe(), 1600);
     }
     timer = setTimeout(() => void probe(), 1200);
-    return () => { disposed = true; controller.abort(); clearTimeout(timer); clearTimeout(waitTimer); };
+    return () => {
+      disposed = true;
+      controller.abort();
+      clearTimeout(timer);
+      clearTimeout(waitTimer);
+    };
   }, [src, ready]);
 
-  return <>
-    <iframe key={`${src}:${retry}`} ref={iframe} title={board.name} src={src} className="preview-frame"
-      style={{ width: board.width, height: board.height }} />
-    {!ready && <div className={`preview-status ${waiting ? "waiting" : ""}`}>
-      <LoaderCircle size={18} className="spin" />
-      <span>{!reachable ? "Starting preview" : waiting ? "Waiting for DesignProvider" : "Connecting preview"}</span>
-      {waiting && <IconButton icon={RotateCw} title="Reload preview" onClick={() => { setWaiting(false); setRetry(value => value + 1); }} />}
-    </div>}
-  </>;
+  return (
+    <>
+      <iframe
+        key={`${src}:${retry}`}
+        ref={iframe}
+        title={board.name}
+        src={src}
+        className="preview-frame"
+        style={{ width: board.width, height: board.height }}
+      />
+      {!ready && (
+        <div className={`preview-status ${waiting ? "waiting" : ""}`}>
+          <LoaderCircle size={18} className="spin" />
+          <span>{!reachable ? "Starting preview" : waiting ? "Waiting for DesignProvider" : "Connecting preview"}</span>
+          {waiting && (
+            <IconButton
+              icon={RotateCw}
+              title="Reload preview"
+              onClick={() => {
+                setWaiting(false);
+                setRetry((value) => value + 1);
+              }}
+            />
+          )}
+        </div>
+      )}
+    </>
+  );
 }

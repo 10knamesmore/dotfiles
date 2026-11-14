@@ -14,7 +14,13 @@ const INTERRUPT_GRACE_MS = 1_000;
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 
 export type PythonOutcome =
-  "completed" | "python_error" | "interrupted" | "timed_out" | "process_exited" | "startup_error" | "output_error";
+  | "completed"
+  | "python_error"
+  | "interrupted"
+  | "timed_out"
+  | "process_exited"
+  | "startup_error"
+  | "output_error";
 
 /** Execution metadata used for UI status and the model's state-loss notice. */
 export interface PythonToolDetails {
@@ -166,7 +172,10 @@ export class PythonSession {
     const result = this.executionQueue.then(() =>
       this.executeCell(code, timeoutSeconds, callId, cwd, signal, onStarted),
     );
-    this.executionQueue = result.then(() => {}, () => {});
+    this.executionQueue = result.then(
+      () => {},
+      () => {},
+    );
     return result;
   }
 
@@ -592,11 +601,7 @@ function parseMessage(line: string): WorkerMessage {
   const value: unknown = JSON.parse(line);
   if (!value || typeof value !== "object") throw new Error("Invalid Python control message.");
   const message = value as Record<string, unknown>;
-  if (
-    message.type === "ready" &&
-    Number.isSafeInteger(message.pid) &&
-    (message.pid as number) > 0
-  )
+  if (message.type === "ready" && Number.isSafeInteger(message.pid) && (message.pid as number) > 0)
     return message as unknown as WorkerMessage;
   if (
     typeof message.callId === "string" &&

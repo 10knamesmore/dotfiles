@@ -50,8 +50,9 @@ export async function runPatch(
     const after = new Map(await Promise.all(paths.map(async (path) => [path, await fileContents(path)] as const)));
     // A later operation may fail after a move has already completed.
     const completedMoves = new Map(
-      [...moves].filter(([path, destination]) =>
-        before.get(path) !== null && after.get(path) === null && after.get(destination) !== null,
+      [...moves].filter(
+        ([path, destination]) =>
+          before.get(path) !== null && after.get(path) === null && after.get(destination) !== null,
       ),
     );
     const movedDestinations = new Set(completedMoves.values());

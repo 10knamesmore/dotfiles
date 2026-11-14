@@ -23,18 +23,22 @@ import {
   type AgentsToolSnapshot,
 } from "../ui/agents-tool-render.js";
 
-const Action = Type.Union([
-  Type.Literal("list", { description: "List runs newest first." }),
-  Type.Literal("peek", {
+const Action = Type.Union(
+  [
+    Type.Literal("list", { description: "List runs newest first." }),
+    Type.Literal("peek", {
+      description:
+        "Read run progress and child IDs, or a child's recent transcript and result. Previews are bounded; full records are under artifacts.",
+    }),
+    Type.Literal("stop", { description: "Cancel the selected run or child." }),
+    Type.Literal("wait", { description: "Wait until the selected run reaches a terminal status." }),
+    Type.Literal("send_message", { description: "Send instructions to a pending or running child." }),
+  ],
+  {
     description:
-      "Read run progress and child IDs, or a child's recent transcript and result. Previews are bounded; full records are under artifacts.",
-  }),
-  Type.Literal("stop", { description: "Cancel the selected run or child." }),
-  Type.Literal("wait", { description: "Wait until the selected run reaches a terminal status." }),
-  Type.Literal("send_message", { description: "Send instructions to a pending or running child." }),
-], {
-  description: "Inspect and control existing work. Completion is pushed automatically; wait is the explicit run-level synchronization point.",
-});
+      "Inspect and control existing work. Completion is pushed automatically; wait is the explicit run-level synchronization point.",
+  },
+);
 const Status = Type.Union([
   Type.Literal("pending"),
   Type.Literal("running"),
@@ -46,11 +50,13 @@ const Status = Type.Union([
 const Parameters = Type.Object(
   {
     action: Action,
-    runId: Type.Optional(Type.String({
-      minLength: 1,
-      description:
-        "Required except for list. stop, wait, and send_message require the Pi process that owns this run.",
-    })),
+    runId: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "Required except for list. stop, wait, and send_message require the Pi process that owns this run.",
+      }),
+    ),
     childId: Type.Optional(
       Type.String({
         minLength: 1,
@@ -336,8 +342,10 @@ function resultSnapshot(input: Input, output: Output, target?: string): AgentsTo
   } else if (output.action === "peek" && "child" in output) {
     snapshot.rows = [{ name: output.child.model, status: output.child.status }];
     snapshot.activity = output.child.activity;
-    snapshot.quote = output.resultPreview || output.streaming?.text
-      || [...output.messages].reverse().find((message) => message.role === "assistant" && message.text)?.text;
+    snapshot.quote =
+      output.resultPreview ||
+      output.streaming?.text ||
+      [...output.messages].reverse().find((message) => message.role === "assistant" && message.text)?.text;
     snapshot.expandedLines = [
       output.prompt,
       ...output.messages.flatMap((message) => [message.toolName ?? message.role, message.text]),
@@ -480,11 +488,14 @@ async function executeAction(
       throw new Error(`Run ${run.runId} is owned by another process; stop it from that Pi instance`);
     }
     const stopped = readRunDetail(run.runDir, run.runId, { ...readOptions, bypassCache: true });
-    return finish({
-      action: "stop",
-      runId: run.runId,
-      status: stopped.status,
-    }, stopped.children.map((row) => ({ name: row.label, status: row.status })));
+    return finish(
+      {
+        action: "stop",
+        runId: run.runId,
+        status: stopped.status,
+      },
+      stopped.children.map((row) => ({ name: row.label, status: row.status })),
+    );
   }
 
   const handle = subagentRunner.get(child!.id);
@@ -506,8 +517,7 @@ export function registerAgentsTool(pi: ExtensionAPI): void {
   const tool: ToolDefinition<typeof Parameters, AgentsToolSnapshot | undefined, AgentsToolRenderState> = {
     name: "agents",
     label: "Agents",
-    description:
-      "Observe and control subagent and workflow runs belonging to the current parent session and cwd.",
+    description: "Observe and control subagent and workflow runs belonging to the current parent session and cwd.",
     parameters: Parameters,
     outputSchema: Output,
     executionMode: "sequential",

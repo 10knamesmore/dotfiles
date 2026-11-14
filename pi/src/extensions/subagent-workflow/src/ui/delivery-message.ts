@@ -41,9 +41,7 @@ export function registerDeliveryMessageRenderer(pi: ExtensionAPI): void {
 
 function runHeading(run: DeliveryRunResult, theme: Theme): string {
   const marker =
-    run.status === "completed-with-failures"
-      ? theme.fg("warning", "!")
-      : statusGlyph(run.status, theme, 0, false);
+    run.status === "completed-with-failures" ? theme.fg("warning", "!") : statusGlyph(run.status, theme, 0, false);
   return (
     `${marker} ${theme.bold(sanitizeTerminalText(run.label))}` +
     theme.fg("dim", ` · ${run.kind} · ${run.status.replaceAll("-", " ")}`)
@@ -106,7 +104,11 @@ function appendRunResult(container: Box, run: DeliveryRunResult, theme: Theme): 
       container.addChild(new Spacer(1));
       for (const artifact of artifacts) {
         container.addChild(
-          new Text(theme.fg("muted", `${sanitizeTerminalText(artifact.label)}: ${sanitizeTerminalText(artifact.path)}`), 0, 0),
+          new Text(
+            theme.fg("muted", `${sanitizeTerminalText(artifact.label)}: ${sanitizeTerminalText(artifact.path)}`),
+            0,
+            0,
+          ),
         );
       }
     }

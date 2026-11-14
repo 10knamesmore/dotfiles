@@ -3,7 +3,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use image::{DynamicImage, ImageFormat, Rgb, RgbImage, RgbaImage, imageops};
+use image::{imageops, DynamicImage, ImageFormat, Rgb, RgbImage, RgbaImage};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use wayland_client::protocol::wl_shm::Format;

@@ -2,10 +2,10 @@
 
 import json
 import os
-from pathlib import Path
 import tempfile
 import threading
 import time
+from pathlib import Path
 
 _lock = threading.Lock()
 

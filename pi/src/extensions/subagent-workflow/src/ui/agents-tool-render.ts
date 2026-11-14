@@ -34,11 +34,16 @@ const COLLAPSED_QUOTE_LINES = 3;
 
 function glyph(status: SubagentStatus, theme: ThemeLike): string {
   switch (status) {
-    case "pending": return theme.fg("dim", "◌");
-    case "running": return theme.fg("accent", "●");
-    case "completed": return theme.fg("success", "✓");
-    case "failed": return theme.fg("error", "✕");
-    case "aborted": return theme.fg("error", "■");
+    case "pending":
+      return theme.fg("dim", "◌");
+    case "running":
+      return theme.fg("accent", "●");
+    case "completed":
+      return theme.fg("success", "✓");
+    case "failed":
+      return theme.fg("error", "✕");
+    case "aborted":
+      return theme.fg("error", "■");
   }
 }
 
@@ -51,9 +56,13 @@ export function renderAgentsCall(
   // Read the shared snapshot at paint time so the header uses this result's names.
   return linesComponent((width) => {
     const snapshot = state.snapshot;
-    const status = state.isError ? "failed"
-      : !state.settled ? "pending"
-      : snapshot?.action === "stop" || snapshot?.action === "wait" ? snapshot.status! : "completed";
+    const status = state.isError
+      ? "failed"
+      : !state.settled
+        ? "pending"
+        : snapshot?.action === "stop" || snapshot?.action === "wait"
+          ? snapshot.status!
+          : "completed";
     const operation = action ? ` · ${sanitizeTerminalText(action)}` : "";
     const target = snapshot?.target ? ` · ${sanitizeTerminalText(snapshot.target)}` : "";
     return wrapTextWithAnsi(
@@ -75,22 +84,21 @@ export function renderAgentsResult(
   context.state.isError = context.isError;
   return linesComponent((width) => {
     if (context.isError || !snapshot) {
-      return result.content.flatMap((part) => part.type === "text"
-        ? wrapTextWithAnsi(
-            theme.fg(context.isError ? "error" : "toolOutput", sanitizeTerminalText(part.text, undefined, true)),
-            width,
-          ).map((line) => truncateToWidth(line, width))
-        : []);
+      return result.content.flatMap((part) =>
+        part.type === "text"
+          ? wrapTextWithAnsi(
+              theme.fg(context.isError ? "error" : "toolOutput", sanitizeTerminalText(part.text, undefined, true)),
+              width,
+            ).map((line) => truncateToWidth(line, width))
+          : [],
+      );
     }
 
     const lines: string[] = [];
     const rows = options.expanded ? snapshot.rows : snapshot.rows.slice(0, COLLAPSED_ROWS);
     for (const row of rows) {
       const metadata = row.metadata ? `  ${theme.fg("dim", sanitizeTerminalText(row.metadata))}` : "";
-      lines.push(truncateToWidth(
-        `${glyph(row.status, theme)} ${sanitizeTerminalText(row.name)}${metadata}`,
-        width,
-      ));
+      lines.push(truncateToWidth(`${glyph(row.status, theme)} ${sanitizeTerminalText(row.name)}${metadata}`, width));
     }
     if (rows.length < snapshot.rows.length) {
       lines.push(truncateToWidth(theme.fg("dim", `+${snapshot.rows.length - rows.length}`), width));

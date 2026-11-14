@@ -66,11 +66,30 @@ export type Edit =
   | { type: "comment"; comment: DesignComment }
   | { type: "remove_comment"; id: string };
 export type Mode = "select" | "comment" | "play";
-export interface Rect { x: number; y: number; width: number; height: number }
-export interface ElementBounds { id: string; tag: string; text: string; rect: Rect; kind?: "text" | "box" }
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface ElementBounds {
+  id: string;
+  tag: string;
+  text: string;
+  rect: Rect;
+  kind?: "text" | "box";
+}
 export type RuntimeMessage =
   | { source: "pi-design"; type: "ready"; artboard: string }
-  | { source: "pi-design"; type: "selection"; artboard: string; element: string | null; rect: Rect | null; text: string; tag: string }
+  | {
+      source: "pi-design";
+      type: "selection";
+      artboard: string;
+      element: string | null;
+      rect: Rect | null;
+      text: string;
+      tag: string;
+    }
   | { source: "pi-design"; type: "comment"; artboard: string; element?: string; x: number; y: number }
   | { source: "pi-design"; type: "bounds"; artboard: string; elements: ElementBounds[] };
 export type EditorMessage =

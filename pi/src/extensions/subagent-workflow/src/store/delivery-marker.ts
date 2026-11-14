@@ -2,11 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  DELIVERY_MESSAGE_TYPE,
-  type DeliveryMessageDetails,
-  type DeliveryRunResult,
-} from "../delivery-message.js";
+import { DELIVERY_MESSAGE_TYPE, type DeliveryMessageDetails, type DeliveryRunResult } from "../delivery-message.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
 import { replaceAtomicFile } from "./atomic-file.js";

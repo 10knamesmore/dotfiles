@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { errorMessage, isRecord } from "../util.js";
 
 export type FrozenJson =
-  null | boolean | number | string | readonly FrozenJson[] | { readonly [key: string]: FrozenJson };
+  | null
+  | boolean
+  | number
+  | string
+  | readonly FrozenJson[]
+  | { readonly [key: string]: FrozenJson };
 
 interface RunSnapshotDiagnostic {
   readonly file: string;

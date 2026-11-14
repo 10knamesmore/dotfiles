@@ -13,7 +13,8 @@ type EditableComponent = <T extends ElementType = "div">(
 
 function createEditable(kind: "text" | "box", defaultTag: string) {
   const Component = forwardRef<HTMLElement, EditableProps<ElementType>>(function EditableElement(
-    { id, as, children, style, onBlur, onKeyDown, ...props }, forwardedRef,
+    { id, as, children, style, onBlur, onKeyDown, ...props },
+    forwardedRef,
   ) {
     const runtime = useDesign();
     const node = useRef<HTMLElement | null>(null);
@@ -38,45 +39,49 @@ function createEditable(kind: "text" | "box", defaultTag: string) {
       selection?.addRange(range);
     }, [editing]);
 
-    return createElement(as ?? defaultTag, {
-      ...props,
-      id,
-      ref: (element: HTMLElement | null) => {
-        node.current = element;
-        if (typeof forwardedRef === "function") forwardedRef(element);
-        else if (forwardedRef) forwardedRef.current = element;
-      },
-      style: { ...style, ...saved?.style },
-      "data-design-id": id,
-      "data-design-text": kind === "text" ? "true" : undefined,
-      contentEditable: editing ? "plaintext-only" : props.contentEditable,
-      suppressContentEditableWarning: editing || props.suppressContentEditableWarning,
-      onInput: (event: React.FormEvent<HTMLElement>) => {
-        if (editing) runtime.connection?.edit([{ type: "text", element: id, text: event.currentTarget.innerText }]);
-        props.onInput?.(event);
-      },
-      onBlur: (event: React.FocusEvent<HTMLElement>) => {
-        if (editing) {
-          const text = event.currentTarget.innerText;
-          runtime.setEditing(null);
-          runtime.connection?.edit([{ type: "text", element: id, text }]);
-        }
-        onBlur?.(event);
-      },
-      onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
-        if (editing && (event.key === "Escape" || event.key === "Enter" && !event.shiftKey)) {
-          event.preventDefault();
-          event.stopPropagation();
-          if (event.key === "Escape") {
-            event.currentTarget.textContent = originalText.current;
-            runtime.connection?.edit([{ type: "text", element: id, text: originalText.current }]);
+    return createElement(
+      as ?? defaultTag,
+      {
+        ...props,
+        id,
+        ref: (element: HTMLElement | null) => {
+          node.current = element;
+          if (typeof forwardedRef === "function") forwardedRef(element);
+          else if (forwardedRef) forwardedRef.current = element;
+        },
+        style: { ...style, ...saved?.style },
+        "data-design-id": id,
+        "data-design-text": kind === "text" ? "true" : undefined,
+        contentEditable: editing ? "plaintext-only" : props.contentEditable,
+        suppressContentEditableWarning: editing || props.suppressContentEditableWarning,
+        onInput: (event: React.FormEvent<HTMLElement>) => {
+          if (editing) runtime.connection?.edit([{ type: "text", element: id, text: event.currentTarget.innerText }]);
+          props.onInput?.(event);
+        },
+        onBlur: (event: React.FocusEvent<HTMLElement>) => {
+          if (editing) {
+            const text = event.currentTarget.innerText;
             runtime.setEditing(null);
-            event.currentTarget.blur();
-          } else event.currentTarget.blur();
-        }
-        onKeyDown?.(event);
+            runtime.connection?.edit([{ type: "text", element: id, text }]);
+          }
+          onBlur?.(event);
+        },
+        onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
+          if (editing && (event.key === "Escape" || (event.key === "Enter" && !event.shiftKey))) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.key === "Escape") {
+              event.currentTarget.textContent = originalText.current;
+              runtime.connection?.edit([{ type: "text", element: id, text: originalText.current }]);
+              runtime.setEditing(null);
+              event.currentTarget.blur();
+            } else event.currentTarget.blur();
+          }
+          onKeyDown?.(event);
+        },
       },
-    }, kind === "box" ? children : editing ? frozenChildren.current : saved?.text ?? children);
+      kind === "box" ? children : editing ? frozenChildren.current : (saved?.text ?? children),
+    );
   });
   Component.displayName = kind === "text" ? "Editable.Text" : "Editable.Box";
   return Component as EditableComponent;

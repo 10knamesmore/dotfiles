@@ -1,9 +1,6 @@
 """Run persistent Python cells over dedicated control and event file descriptors."""
 
 import code
-from collections.abc import Callable
-from contextlib import chdir
-from dataclasses import dataclass
 import io
 import json
 import linecache
@@ -12,8 +9,10 @@ import signal
 import sys
 import threading
 import types
+from collections.abc import Callable
+from contextlib import chdir
+from dataclasses import dataclass
 from typing import Literal, cast, override
-
 
 WORKER_REQUEST_FD = 3
 WORKER_EVENT_FD = 4
@@ -30,11 +29,15 @@ class SessionInterpreter(code.InteractiveInterpreter):
         self.outcome: Literal["completed", "python_error", "interrupted"] = "completed"
 
     @override
-    def runsource(self, source: str, filename: str = "<input>", symbol: str = "exec") -> bool:
+    def runsource(
+        self, source: str, filename: str = "<input>", symbol: str = "exec"
+    ) -> bool:
         """Reject incomplete cells without retaining them for the next call."""
         if super().runsource(source, filename, symbol):
             try:
-                raise SyntaxError("incomplete input", (filename, len(source.splitlines()) or 1, 1, ""))
+                raise SyntaxError(
+                    "incomplete input", (filename, len(source.splitlines()) or 1, 1, "")
+                )
             except SyntaxError:
                 self.showsyntaxerror(filename)
         return False
@@ -67,7 +70,7 @@ def send_event(event: dict[str, object]) -> None:
     """Write a complete JSON event to the dedicated event descriptor."""
     frame = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
     while frame:
-        frame = frame[os.write(WORKER_EVENT_FD, frame):]
+        frame = frame[os.write(WORKER_EVENT_FD, frame) :]
 
 
 def handle_browser_ownership(event: dict[str, object]) -> None:
@@ -75,11 +78,25 @@ def handle_browser_ownership(event: dict[str, object]) -> None:
     action = event.get("action")
     session_id = event.get("id")
     pid = event.get("pid")
-    if action not in ("opened", "closed") or not isinstance(session_id, str) or not session_id:
+    if (
+        action not in ("opened", "closed")
+        or not isinstance(session_id, str)
+        or not session_id
+    ):
         raise ValueError(f"malformed browser ownership event: {event!r}")
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-        raise ValueError(f"browser ownership event for {session_id!r} has no positive pid")
-    send_event({"type": "process_ownership", "kind": "browser", "action": action, "id": session_id, "pid": pid})
+        raise ValueError(
+            f"browser ownership event for {session_id!r} has no positive pid"
+        )
+    send_event(
+        {
+            "type": "process_ownership",
+            "kind": "browser",
+            "action": action,
+            "id": session_id,
+            "pid": pid,
+        }
+    )
 
 
 def install_browser_ownership_hook() -> None:
@@ -114,12 +131,16 @@ class CellRuntime:
         """Load required SDKs before user imports and expose native REPL helpers."""
         self.close_desktops: Callable[[], None] | None = None
         try:
-            from pi_repl_tools import _make_summarize, _set_image_sink, display_image
             from nvim_use import _configure_worker, _set_model
-            _configure_worker(os.environ["PI_PYTHON_SESSION_ID"], os.environ["PI_PYTHON_SESSION_CWD"])
+            from pi_repl_tools import _make_summarize, _set_image_sink, display_image
+
+            _configure_worker(
+                os.environ["PI_PYTHON_SESSION_ID"], os.environ["PI_PYTHON_SESSION_CWD"]
+            )
             self.set_model = _set_model
             if sys.platform == "linux":
                 from computer_use import _close_all
+
                 self.close_desktops = _close_all
         except ImportError as error:
             reason = f"a required Python worker SDK is not importable: {error}"
@@ -133,14 +154,27 @@ class CellRuntime:
 
     def begin_cell(self, call_id: str, output_path: str) -> None:
         """Start an image sequence in the controller's output directory for this cell."""
-        self.active_cell = CellImageOutput(call_id, os.path.dirname(output_path), threading.get_ident())
+        self.active_cell = CellImageOutput(
+            call_id, os.path.dirname(output_path), threading.get_ident()
+        )
 
     def write_image(self, data: bytes, mime_type: str) -> None:
         """Store encoded bytes before announcing their path; reject background output."""
         cell = self.active_cell
-        if cell is None or cell.thread_id != threading.get_ident() or self.pid != os.getpid():
-            raise RuntimeError("display_image() must run on the active Python cell's thread")
-        extensions = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
+        if (
+            cell is None
+            or cell.thread_id != threading.get_ident()
+            or self.pid != os.getpid()
+        ):
+            raise RuntimeError(
+                "display_image() must run on the active Python cell's thread"
+            )
+        extensions = {
+            "image/png": "png",
+            "image/jpeg": "jpg",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        }
         extension = extensions.get(mime_type)
         if extension is None:
             raise ValueError("display_image() returned an unsupported image format")
@@ -148,7 +182,14 @@ class CellRuntime:
         path = os.path.join(cell.directory, f"image-{cell.sequence}.{extension}")
         with open(path, "xb") as image:
             _ = image.write(data)
-        send_event({"type": "image", "callId": cell.call_id, "path": path, "mimeType": mime_type})
+        send_event(
+            {
+                "type": "image",
+                "callId": cell.call_id,
+                "path": path,
+                "mimeType": mime_type,
+            }
+        )
 
     def finish_cell(self, failed: bool) -> str | None:
         """Forget image ownership and report cleanup failure without replacing the cell outcome."""
@@ -171,7 +212,10 @@ def handle_sigint(_signum: int, _frame: types.FrameType | None) -> None:
 
 
 def execute_cell(
-    interpreter: SessionInterpreter, request: dict[str, object], number: int, runtime: CellRuntime
+    interpreter: SessionInterpreter,
+    request: dict[str, object],
+    number: int,
+    runtime: CellRuntime,
 ) -> None:
     """Capture one cell's output, restore its working directory, and report completion."""
     global executing
@@ -179,10 +223,20 @@ def execute_cell(
     source = request["code"]
     output_path = request["outputPath"]
     cwd = request["cwd"]
-    assert isinstance(call_id, str) and isinstance(source, str) and isinstance(output_path, str) and isinstance(cwd, str)
+    assert (
+        isinstance(call_id, str)
+        and isinstance(source, str)
+        and isinstance(output_path, str)
+        and isinstance(cwd, str)
+    )
 
     filename = f"<python-{number}>"
-    linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
+    linecache.cache[filename] = (
+        len(source),
+        None,
+        source.splitlines(keepends=True),
+        filename,
+    )
     original_stdout, original_stderr = sys.stdout, sys.stderr
     _ = original_stdout.flush()
     _ = original_stderr.flush()
@@ -191,8 +245,18 @@ def execute_cell(
     try:
         _ = os.dup2(output_fd, 1)
         _ = os.dup2(output_fd, 2)
-        stdout = io.TextIOWrapper(os.fdopen(os.dup(1), "wb", buffering=0), encoding="utf-8", errors="backslashreplace", write_through=True)
-        stderr = io.TextIOWrapper(os.fdopen(os.dup(2), "wb", buffering=0), encoding="utf-8", errors="backslashreplace", write_through=True)
+        stdout = io.TextIOWrapper(
+            os.fdopen(os.dup(1), "wb", buffering=0),
+            encoding="utf-8",
+            errors="backslashreplace",
+            write_through=True,
+        )
+        stderr = io.TextIOWrapper(
+            os.fdopen(os.dup(2), "wb", buffering=0),
+            encoding="utf-8",
+            errors="backslashreplace",
+            write_through=True,
+        )
         sys.stdout, sys.stderr = stdout, stderr
         interpreter.outcome = "completed"
         runtime.begin_cell(call_id, output_path)
@@ -210,7 +274,9 @@ def execute_cell(
             interpreter.outcome = "interrupted"
         finally:
             try:
-                input_cleanup_error = runtime.finish_cell(interpreter.outcome != "completed")
+                input_cleanup_error = runtime.finish_cell(
+                    interpreter.outcome != "completed"
+                )
             finally:
                 executing = False
             for stream in (stdout, stderr):
@@ -228,7 +294,13 @@ def execute_cell(
         os.close(saved_stderr)
         os.close(output_fd)
     if input_cleanup_error is not None:
-        send_event({"type": "input_cleanup_failed", "callId": call_id, "errorType": input_cleanup_error})
+        send_event(
+            {
+                "type": "input_cleanup_failed",
+                "callId": call_id,
+                "errorType": input_cleanup_error,
+            }
+        )
     send_event({"type": "completed", "callId": call_id, "outcome": interpreter.outcome})
 
 

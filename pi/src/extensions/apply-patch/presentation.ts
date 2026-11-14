@@ -60,9 +60,7 @@ class FileList extends MouseRegion {
 
   constructor() {
     const content = new Container();
-    super(content, (event) =>
-      event.type === "click" && event.button === "left" ? { handled: true } : undefined,
-    );
+    super(content, (event) => (event.type === "click" && event.button === "left" ? { handled: true } : undefined));
     this.content = content;
   }
 }

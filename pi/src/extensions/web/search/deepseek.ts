@@ -23,11 +23,7 @@ export async function searchDeepseek(request: SearchRequest, signal?: AbortSigna
   if ([...query].length > MAX_QUERY_CHARS) {
     throw new WebError("invalid_input", `DeepSeek search queries are limited to ${MAX_QUERY_CHARS} characters.`);
   }
-  const body = await requestSearch(
-    apiKey,
-    { query, count: request.limit, ori_question: request.oriQuestion },
-    signal,
-  );
+  const body = await requestSearch(apiKey, { query, count: request.limit, ori_question: request.oriQuestion }, signal);
   return parseResults(body, request.limit);
 }
 
@@ -94,8 +90,7 @@ function parseResults(text: string, limit: number): SearchSource[] {
       providers: ["deepseek"],
       title: boundedText(item.title, MAX_TITLE_CHARS) || url,
       url,
-      summary:
-        boundedText(item.summary, MAX_SUMMARY_CHARS) || boundedText(item.snippet, MAX_SUMMARY_CHARS),
+      summary: boundedText(item.summary, MAX_SUMMARY_CHARS) || boundedText(item.snippet, MAX_SUMMARY_CHARS),
     };
     const date = displayDate(item.date);
     if (date) source.date = date;

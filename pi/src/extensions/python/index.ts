@@ -63,11 +63,7 @@ export async function registerPython(pi: ExtensionAPI): Promise<void> {
   let session: PythonSession | undefined;
 
   const createSession = (ctx: ExtensionContext): PythonSession => {
-    const runtime = new PythonSession(
-      ctx.sessionManager.getSessionId(),
-      ctx.cwd,
-      notifyEnvironmentCleared,
-    );
+    const runtime = new PythonSession(ctx.sessionManager.getSessionId(), ctx.cwd, notifyEnvironmentCleared);
     runtime.setModel(ctx.model);
     return runtime;
   };

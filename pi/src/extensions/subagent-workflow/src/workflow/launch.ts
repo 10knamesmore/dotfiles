@@ -194,7 +194,12 @@ function workflowDeliveryResult(result: WorkflowRunResult): DeliveryRunResult {
 
 function workflowFailureResult(error: unknown): DeliveryRunResult {
   if (!(error instanceof WorkflowRunError)) {
-    return { kind: "workflow", label: "workflow", status: "failed", failures: [formatFailureText(errorMessage(error))] };
+    return {
+      kind: "workflow",
+      label: "workflow",
+      status: "failed",
+      failures: [formatFailureText(errorMessage(error))],
+    };
   }
   const aborted = error.status === "aborted";
   return {

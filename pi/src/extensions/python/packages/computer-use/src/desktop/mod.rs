@@ -11,7 +11,7 @@ use pyo3::types::PyTuple;
 
 use crate::capture::{self, Capture, Rect};
 use crate::{hyprland, input::Input, wait};
-use session::{Handle, Open, active_handles};
+use session::{active_handles, Handle, Open};
 
 pub(crate) use control::{Control, Target};
 

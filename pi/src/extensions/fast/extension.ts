@@ -6,10 +6,15 @@ function isOfficialSubscription(ctx: ExtensionContext): boolean {
   const model = ctx.model;
   if (!model || model.provider !== "openai" || model.api !== "openai-responses") return false;
   const url = new URL(model.baseUrl);
-  return url.origin === "https://api.openai.com" &&
+  return (
+    url.origin === "https://api.openai.com" &&
     url.pathname.replace(/\/+$/u, "") === "/v1" &&
-    !url.username && !url.password && !url.search && !url.hash &&
-    ctx.modelRegistry.isUsingOAuth(model);
+    !url.username &&
+    !url.password &&
+    !url.search &&
+    !url.hash &&
+    ctx.modelRegistry.isUsingOAuth(model)
+  );
 }
 
 function isFastEnabled(ctx: ExtensionContext): boolean {
@@ -61,7 +66,9 @@ export default function fastMode(pi: ExtensionAPI): void {
       refreshStatus(ctx);
       const enabled = isFastEnabled(ctx);
       const scope = isOfficialSubscription(ctx)
-        ? enabled ? " Higher subscription usage; applies from the next request." : ""
+        ? enabled
+          ? " Higher subscription usage; applies from the next request."
+          : ""
         : " Applies only to official OpenAI OAuth subscription models, not the current model.";
       ctx.ui.notify(`Fast mode: ${enabled ? "on" : "off"} (${modelReference}).${scope}`, "info");
     },

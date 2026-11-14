@@ -17,7 +17,7 @@ var KELVIN_NEUTRAL = 6500;
 var KELVIN_WARMEST = 2500;
 
 function clamp01(x) {
-    return x < 0 ? 0 : (x > 1 ? 1 : x);
+  return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
 // warmth(0-100) → 黑体辐射白点的 RGB 缩放系数 [r, g, b]。
@@ -31,21 +31,21 @@ function clamp01(x) {
 // 因映射上限 6500K < 6600K，恒落在 Tanner Helland 的 temp<=66 分支（该分支 R 恒为满值），
 // 故这里不实现高色温分支。若将来把 KELVIN_NEUTRAL 提到 6600 以上，必须补上。
 function kelvinScale(warmth) {
-    var w = Math.max(0, Math.min(100, warmth));
-    var kelvin = KELVIN_NEUTRAL - (KELVIN_NEUTRAL - KELVIN_WARMEST) * (w / 100);
-    var t = kelvin / 100;
+  var w = Math.max(0, Math.min(100, warmth));
+  var kelvin = KELVIN_NEUTRAL - (KELVIN_NEUTRAL - KELVIN_WARMEST) * (w / 100);
+  var t = kelvin / 100;
 
-    var g = 99.4708025861 * Math.log(t) - 161.1195681661;
-    var b = t <= 19 ? 0 : Math.log(t - 10) * 138.5177312231 - 305.0447927307;
+  var g = 99.4708025861 * Math.log(t) - 161.1195681661;
+  var b = t <= 19 ? 0 : Math.log(t - 10) * 138.5177312231 - 305.0447927307;
 
-    return [1.0, clamp01(g / 255), clamp01(b / 255)];
+  return [1.0, clamp01(g / 255), clamp01(b / 255)];
 }
 
 // ── 颗粒 ──────────────────────────────────────────────────
 // grainSize(0-100) → 噪声采样频率。0 = 极细银盐(6000x)，100 = 粗颗粒(800x)。
 function grainFreq(grainSize) {
-    var gs = Math.max(0, Math.min(100, grainSize)) / 100;
-    return 6000 - (6000 - 800) * gs;
+  var gs = Math.max(0, Math.min(100, grainSize)) / 100;
+  return 6000 - (6000 - 800) * gs;
 }
 
 // ── 源码拼装 ──────────────────────────────────────────────
@@ -59,37 +59,51 @@ function grainFreq(grainSize) {
 // 先于任何用到该类型的声明，而下面的 const 块就用了 float/vec3。放 body 里会报
 // "type requires declaration of default precision qualifier"。
 function buildShader(params, body) {
-    var temp = kelvinScale(params.warmth || 0);
-    var f = function (x) {
-        return x.toFixed(4);
-    };
+  var temp = kelvinScale(params.warmth || 0);
+  var f = function (x) {
+    return x.toFixed(4);
+  };
 
-    return "#version 300 es\n"
-        + "// 由 QuickShell ScreenEffectsService 生成，改这里没用 —— 主体见\n"
-        + "// ~/.config/quickshell/screen-effects/screen-effects.frag，参数见面板。\n"
-        + "precision highp float;\n"
-        + "\n"
-        + "const vec3  TEMP_SCALE   = vec3(" + f(temp[0]) + ", " + f(temp[1]) + ", " + f(temp[2]) + ");\n"
-        + "const float GRAIN        = " + f((params.grain || 0) / 100) + ";\n"
-        + "const float GRAIN_FREQ   = " + f(grainFreq(params.grainSize || 0)) + ";\n"
-        + "const float SHADOW_BOOST = " + f((params.shadowBoost || 0) / 100) + ";\n"
-        + "\n"
-        + body;
+  return (
+    "#version 300 es\n" +
+    "// 由 QuickShell ScreenEffectsService 生成，改这里没用 —— 主体见\n" +
+    "// ~/.config/quickshell/screen-effects/screen-effects.frag，参数见面板。\n" +
+    "precision highp float;\n" +
+    "\n" +
+    "const vec3  TEMP_SCALE   = vec3(" +
+    f(temp[0]) +
+    ", " +
+    f(temp[1]) +
+    ", " +
+    f(temp[2]) +
+    ");\n" +
+    "const float GRAIN        = " +
+    f((params.grain || 0) / 100) +
+    ";\n" +
+    "const float GRAIN_FREQ   = " +
+    f(grainFreq(params.grainSize || 0)) +
+    ";\n" +
+    "const float SHADOW_BOOST = " +
+    f((params.shadowBoost || 0) / 100) +
+    ";\n" +
+    "\n" +
+    body
+  );
 }
 
 // 效果是否需要 shader。两项都为 0 时应当直接清空 decoration:screen_shader，
 // 而不是加载一个恒等变换的 shader —— 后者仍会走完整的 final shader 渲染路径。
 function needsShader(params) {
-    return (params.warmth || 0) > 0 || (params.grain || 0) > 0;
+  return (params.warmth || 0) > 0 || (params.grain || 0) > 0;
 }
 
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = {
-        KELVIN_NEUTRAL: KELVIN_NEUTRAL,
-        KELVIN_WARMEST: KELVIN_WARMEST,
-        kelvinScale: kelvinScale,
-        grainFreq: grainFreq,
-        buildShader: buildShader,
-        needsShader: needsShader
-    };
+  module.exports = {
+    KELVIN_NEUTRAL: KELVIN_NEUTRAL,
+    KELVIN_WARMEST: KELVIN_WARMEST,
+    kelvinScale: kelvinScale,
+    grainFreq: grainFreq,
+    buildShader: buildShader,
+    needsShader: needsShader,
+  };
 }

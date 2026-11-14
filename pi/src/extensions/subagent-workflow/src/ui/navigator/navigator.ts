@@ -145,260 +145,248 @@ function openNavigator(
     if (visibleLiveRunIds.length === 1) state.seedRun(visibleLiveRunIds[0]!);
   }
 
-  return ctx.ui.custom<void>(
-    (tui: TUI, theme: Theme, _keybindings, done: (result: void) => void) => {
-      let agentView: AgentView | undefined;
-      let timer: ReturnType<typeof setInterval> | undefined;
-      let stopArmedRunId: string | undefined;
-      let stoppingRunId: string | undefined;
-      const subscriptions: Array<() => void> = [];
+  return ctx.ui.custom<void>((tui: TUI, theme: Theme, _keybindings, done: (result: void) => void) => {
+    let agentView: AgentView | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let stopArmedRunId: string | undefined;
+    let stoppingRunId: string | undefined;
+    const subscriptions: Array<() => void> = [];
 
-      const rerender = () => tui.requestRender();
-      const clearSubscriptions = () => {
-        for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
-      };
-      // Re-render (which re-reads the store) whenever any live child emits.
-      const resubscribe = () => {
-        clearSubscriptions();
-        for (const runId of runner.liveRunIds()) {
-          for (const handle of runner.runHandles(runId)) subscriptions.push(handle.subscribe(() => rerender()));
-        }
-      };
+    const rerender = () => tui.requestRender();
+    const clearSubscriptions = () => {
+      for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
+    };
+    // Re-render (which re-reads the store) whenever any live child emits.
+    const resubscribe = () => {
+      clearSubscriptions();
+      for (const runId of runner.liveRunIds()) {
+        for (const handle of runner.runHandles(runId)) subscriptions.push(handle.subscribe(() => rerender()));
+      }
+    };
+    resubscribe();
+    const unsubscribeSpawns = runner.subscribeSpawns((run) => {
+      if (run.parentSessionId !== ctx.sessionManager.getSessionId()) return;
       resubscribe();
-      const unsubscribeSpawns = runner.subscribeSpawns((run) => {
-        if (run.parentSessionId !== ctx.sessionManager.getSessionId()) return;
-        resubscribe();
-        rerender();
-      });
+      rerender();
+    });
 
-      const disposeAgentView = () => {
-        agentView?.dispose();
-        agentView = undefined;
-      };
-      const reportError = (message: string) => {
-        ctx.ui.notify(message, "error");
-        reportDiagnostic(`[subagent-workflow] ${message}`);
-      };
-      const openAgentView = () => {
-        disposeAgentView();
-        if (state.runId && state.childId) {
-          const sourceRunId = state.runId;
-          const sourceChildId = state.childId;
-          agentView = buildAgentView(
-            runner,
-            tui,
-            model,
-            sourceRunId,
-            sourceChildId,
-            reportError,
-            services.followUp
-              ? {
-                  onMessage: (text) => {
-                    let target: { runId: string; childId: string };
-                    try {
-                      target = services.followUp!.send(sourceRunId, sourceChildId, text, ctx);
-                    } catch (error) {
-                      reportError(
-                        `Could not message agent ${sanitizeTerminalText(sourceChildId)}: ${sanitizeTerminalText(errorMessage(error))}`,
-                      );
-                      return false;
-                    }
+    const disposeAgentView = () => {
+      agentView?.dispose();
+      agentView = undefined;
+    };
+    const reportError = (message: string) => {
+      ctx.ui.notify(message, "error");
+      reportDiagnostic(`[subagent-workflow] ${message}`);
+    };
+    const openAgentView = () => {
+      disposeAgentView();
+      if (state.runId && state.childId) {
+        const sourceRunId = state.runId;
+        const sourceChildId = state.childId;
+        agentView = buildAgentView(
+          runner,
+          tui,
+          model,
+          sourceRunId,
+          sourceChildId,
+          reportError,
+          services.followUp
+            ? {
+                onMessage: (text) => {
+                  let target: { runId: string; childId: string };
+                  try {
+                    target = services.followUp!.send(sourceRunId, sourceChildId, text, ctx);
+                  } catch (error) {
+                    reportError(
+                      `Could not message agent ${sanitizeTerminalText(sourceChildId)}: ${sanitizeTerminalText(errorMessage(error))}`,
+                    );
+                    return false;
+                  }
 
-                    try {
-                      state.filter = "all";
-                      const children = orderedChildren(model.detail(target.runId), state.filter);
-                      const childIndex = children.findIndex((child) => child.id === target.childId);
-                      if (childIndex < 0)
-                        throw new Error(`spawned child ${target.childId} is missing from run ${target.runId}`);
-                      state.switchRun(target.runId);
-                      state.setChildCursor(childIndex, children);
-                      if (state.drill(model) !== "agent")
-                        throw new Error(`spawned child ${target.childId} could not be opened`);
-                      openAgentView();
-                    } catch (error) {
-                      reportError(
-                        `Follow-up run ${sanitizeTerminalText(target.runId)} was started, but could not be opened: ${sanitizeTerminalText(errorMessage(error))}`,
-                      );
-                    }
-                    return true;
-                  },
-                }
-              : undefined,
-          );
-        }
-      };
-      if (state.level === "agent") openAgentView();
-
-      const cleanup = () => {
-        unsubscribeSpawns();
-        clearSubscriptions();
-        disposeAgentView();
-        if (timer) clearInterval(timer);
-        timer = undefined;
-      };
-      const finish = () => {
-        cleanup();
-        done();
-      };
-
-      const currentCount = (): number => {
-        if (state.level === "runs") return model.runs().length;
-        if (state.level === "run" && state.runId)
-          return orderedChildren(model.detail(state.runId), state.filter).length;
-        return 0;
-      };
-
-      const actionsFor = (detail: RunDetail): RunActionAvailability =>
-        runActionAvailability(
-          runner.liveRunIds().includes(detail.runId),
-          runner.runHandles(detail.runId).map((handle) => handle.status),
+                  try {
+                    state.filter = "all";
+                    const children = orderedChildren(model.detail(target.runId), state.filter);
+                    const childIndex = children.findIndex((child) => child.id === target.childId);
+                    if (childIndex < 0)
+                      throw new Error(`spawned child ${target.childId} is missing from run ${target.runId}`);
+                    state.switchRun(target.runId);
+                    state.setChildCursor(childIndex, children);
+                    if (state.drill(model) !== "agent")
+                      throw new Error(`spawned child ${target.childId} could not be opened`);
+                    openAgentView();
+                  } catch (error) {
+                    reportError(
+                      `Follow-up run ${sanitizeTerminalText(target.runId)} was started, but could not be opened: ${sanitizeTerminalText(errorMessage(error))}`,
+                    );
+                  }
+                  return true;
+                },
+              }
+            : undefined,
         );
+      }
+    };
+    if (state.level === "agent") openAgentView();
 
-      const stopRun = async () => {
-        const runId = state.currentRunId(model.runs());
-        if (!runId) return;
-        if (stoppingRunId === runId) return;
-        if (!actionsFor(model.detail(runId)).canStop) {
-          stopArmedRunId = undefined;
-          ctx.ui.notify("Run has no live agents to stop", "info");
-          return;
-        }
-        if (stopArmedRunId !== runId) {
-          stopArmedRunId = runId;
-          rerender();
-          return;
-        }
+    const cleanup = () => {
+      unsubscribeSpawns();
+      clearSubscriptions();
+      disposeAgentView();
+      if (timer) clearInterval(timer);
+      timer = undefined;
+    };
+    const finish = () => {
+      cleanup();
+      done();
+    };
+
+    const currentCount = (): number => {
+      if (state.level === "runs") return model.runs().length;
+      if (state.level === "run" && state.runId) return orderedChildren(model.detail(state.runId), state.filter).length;
+      return 0;
+    };
+
+    const actionsFor = (detail: RunDetail): RunActionAvailability =>
+      runActionAvailability(
+        runner.liveRunIds().includes(detail.runId),
+        runner.runHandles(detail.runId).map((handle) => handle.status),
+      );
+
+    const stopRun = async () => {
+      const runId = state.currentRunId(model.runs());
+      if (!runId) return;
+      if (stoppingRunId === runId) return;
+      if (!actionsFor(model.detail(runId)).canStop) {
         stopArmedRunId = undefined;
-        stoppingRunId = runId;
+        ctx.ui.notify("Run has no live agents to stop", "info");
+        return;
+      }
+      if (stopArmedRunId !== runId) {
+        stopArmedRunId = runId;
         rerender();
-        // stopRun cancels the run's workflow loop (so no further agents spawn),
-        // then aborts every live child - not just the currently-running ones.
-        try {
-          await runner.stopRun(runId);
-          ctx.ui.notify(`Stopped ${runId}`, "info");
-          resubscribe();
-        } catch (error) {
-          ctx.ui.notify(`Could not stop ${runId}: ${sanitizeTerminalText(errorMessage(error))}`, "error");
-        } finally {
-          stoppingRunId = undefined;
-          rerender();
-        }
-      };
-
-      const act = (data: string) => {
-        const keyId = navigatorKeyId(data);
-        // AgentView owns block navigation and composer input before navigator shortcuts.
-        if (state.level === "agent" && agentView?.handleInput(data, keyId)) return;
-        const action = keyToAction(keyId, state.level);
-        if (action.type !== "stop") stopArmedRunId = undefined;
-        switch (action.type) {
-          case "move":
-            if (state.level === "runs") state.moveRun(action.delta, model.runs());
-            else if (state.level === "run" && state.runId)
-              state.moveChild(action.delta, orderedChildren(model.detail(state.runId), state.filter));
-            else state.move(action.delta, currentCount());
-            state.scroll = undefined;
-            break;
-          case "scroll":
-            if (state.level === "runs") {
-              const runs = model.runs();
-              state.reconcileRuns(runs);
-              state.scroll = scrollRunList(
-                runs.length,
-                state.cursor,
-                action.amount,
-                navigatorRowBudget(tui) - 3,
-                state.scroll,
-              );
-            } else if (state.level === "run" && state.runId) {
-              const detail = model.detail(state.runId);
-              state.reconcileChildren(orderedChildren(detail, state.filter));
-              state.scroll = scrollRunDetail(
-                detail,
-                state.cursor,
-                state.filter,
-                action.amount,
-                navigatorRowBudget(tui) - 3,
-                state.scroll,
-              );
-            }
-            break;
-          case "pageMove":
-            if (state.level === "runs") {
-              state.pageMoveRun(action.delta, model.runs(), navigationPageSize(tui));
-              state.scroll = undefined;
-            } else if (state.level === "run" && state.runId) {
-              const detail = model.detail(state.runId);
-              const children = orderedChildren(detail, state.filter);
-              state.reconcileChildren(children);
-              const page = pageRunDetail(
-                detail,
-                state.cursor,
-                state.filter,
-                action.delta,
-                navigationPageSize(tui),
-                state.scroll,
-              );
-              state.setChildCursor(page.cursor, children);
-              state.scroll = page.row;
-            } else state.pageMove(action.delta, currentCount(), navigationPageSize(tui));
-            break;
-          case "drill":
-            if (state.drill(model) === "agent") openAgentView();
-            break;
-          case "back":
-            disposeAgentView();
-            if (!state.back()) return finish();
-            break;
-          case "close":
-            return finish();
-          case "filter":
-            state.filter = cycleFilter(state.filter);
-            if (state.level === "run" && state.runId)
-              state.reconcileChildren(orderedChildren(model.detail(state.runId), state.filter));
-            else state.clampCursor(currentCount());
-            state.scroll = undefined;
-            break;
-          case "stop":
-            void stopRun();
-            return;
-          default:
-            return;
-        }
+        return;
+      }
+      stopArmedRunId = undefined;
+      stoppingRunId = runId;
+      rerender();
+      // stopRun cancels the run's workflow loop (so no further agents spawn),
+      // then aborts every live child - not just the currently-running ones.
+      try {
+        await runner.stopRun(runId);
+        ctx.ui.notify(`Stopped ${runId}`, "info");
+        resubscribe();
+      } catch (error) {
+        ctx.ui.notify(`Could not stop ${runId}: ${sanitizeTerminalText(errorMessage(error))}`, "error");
+      } finally {
+        stoppingRunId = undefined;
         rerender();
-      };
+      }
+    };
 
-      const component: Component & { dispose?(): void } = {
-        render: (width: number) => {
-          const maxTotal = navigatorRowBudget(tui);
-          const inner = Math.max(20, width - 4);
-          const content = renderContent(
-            state,
-            model,
-            agentView,
-            theme,
-            inner,
-            maxTotal - 3,
-            actionsFor,
-            stopArmedRunId,
-          );
-          if (content.hasSpinner && !timer) timer = setInterval(rerender, 100);
-          if (!content.hasSpinner && timer) {
-            clearInterval(timer);
-            timer = undefined;
+    const act = (data: string) => {
+      const keyId = navigatorKeyId(data);
+      // AgentView owns block navigation and composer input before navigator shortcuts.
+      if (state.level === "agent" && agentView?.handleInput(data, keyId)) return;
+      const action = keyToAction(keyId, state.level);
+      if (action.type !== "stop") stopArmedRunId = undefined;
+      switch (action.type) {
+        case "move":
+          if (state.level === "runs") state.moveRun(action.delta, model.runs());
+          else if (state.level === "run" && state.runId)
+            state.moveChild(action.delta, orderedChildren(model.detail(state.runId), state.filter));
+          else state.move(action.delta, currentCount());
+          state.scroll = undefined;
+          break;
+        case "scroll":
+          if (state.level === "runs") {
+            const runs = model.runs();
+            state.reconcileRuns(runs);
+            state.scroll = scrollRunList(
+              runs.length,
+              state.cursor,
+              action.amount,
+              navigatorRowBudget(tui) - 3,
+              state.scroll,
+            );
+          } else if (state.level === "run" && state.runId) {
+            const detail = model.detail(state.runId);
+            state.reconcileChildren(orderedChildren(detail, state.filter));
+            state.scroll = scrollRunDetail(
+              detail,
+              state.cursor,
+              state.filter,
+              action.amount,
+              navigatorRowBudget(tui) - 3,
+              state.scroll,
+            );
           }
-          return boxLines(content.lines, content.footer, inner, maxTotal, theme);
-        },
-        handleInput: act,
-        invalidate: () => {
-          agentView?.invalidate();
-        },
-        dispose: () => cleanup(),
-      };
+          break;
+        case "pageMove":
+          if (state.level === "runs") {
+            state.pageMoveRun(action.delta, model.runs(), navigationPageSize(tui));
+            state.scroll = undefined;
+          } else if (state.level === "run" && state.runId) {
+            const detail = model.detail(state.runId);
+            const children = orderedChildren(detail, state.filter);
+            state.reconcileChildren(children);
+            const page = pageRunDetail(
+              detail,
+              state.cursor,
+              state.filter,
+              action.delta,
+              navigationPageSize(tui),
+              state.scroll,
+            );
+            state.setChildCursor(page.cursor, children);
+            state.scroll = page.row;
+          } else state.pageMove(action.delta, currentCount(), navigationPageSize(tui));
+          break;
+        case "drill":
+          if (state.drill(model) === "agent") openAgentView();
+          break;
+        case "back":
+          disposeAgentView();
+          if (!state.back()) return finish();
+          break;
+        case "close":
+          return finish();
+        case "filter":
+          state.filter = cycleFilter(state.filter);
+          if (state.level === "run" && state.runId)
+            state.reconcileChildren(orderedChildren(model.detail(state.runId), state.filter));
+          else state.clampCursor(currentCount());
+          state.scroll = undefined;
+          break;
+        case "stop":
+          void stopRun();
+          return;
+        default:
+          return;
+      }
+      rerender();
+    };
 
-      return component;
-    },
-  );
+    const component: Component & { dispose?(): void } = {
+      render: (width: number) => {
+        const maxTotal = navigatorRowBudget(tui);
+        const inner = Math.max(20, width - 4);
+        const content = renderContent(state, model, agentView, theme, inner, maxTotal - 3, actionsFor, stopArmedRunId);
+        if (content.hasSpinner && !timer) timer = setInterval(rerender, 100);
+        if (!content.hasSpinner && timer) {
+          clearInterval(timer);
+          timer = undefined;
+        }
+        return boxLines(content.lines, content.footer, inner, maxTotal, theme);
+      },
+      handleInput: act,
+      invalidate: () => {
+        agentView?.invalidate();
+      },
+      dispose: () => cleanup(),
+    };
+
+    return component;
+  });
 }
 
 interface RenderedContent {

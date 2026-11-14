@@ -3,7 +3,6 @@
 import ctypes
 import json
 import os
-from pathlib import Path
 import select
 import shutil
 import signal
@@ -11,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 
 
 def run():
@@ -31,12 +31,17 @@ def run():
     pending = bytearray()
 
     def log(operation, outcome):
-        path = Path(environment.get("COMPUTER_USE_LOG") or tempfile.gettempdir() + "/computer-use-sdk.log")
+        path = Path(
+            environment.get("COMPUTER_USE_LOG")
+            or tempfile.gettempdir() + "/computer-use-sdk.log"
+        )
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             mode = "w" if path.exists() and path.stat().st_size >= 1048576 else "a"
             with path.open(mode) as stream:
-                stream.write(f"{int(time.time())} pid={os.getpid()} {operation} {outcome}\n")
+                stream.write(
+                    f"{int(time.time())} pid={os.getpid()} {operation} {outcome}\n"
+                )
         except OSError:
             pass
 
@@ -79,7 +84,11 @@ def run():
             except FileNotFoundError:
                 continue
             if len(lines) >= 2 and lines[0] == str(inner_pid):
-                return {"runtime": str(runtime), "display": lines[1], "signature": lock.parent.name}
+                return {
+                    "runtime": str(runtime),
+                    "display": lines[1],
+                    "signature": lock.parent.name,
+                }
         return None
 
     def reply(value):
@@ -109,7 +118,9 @@ def run():
         hyprland = shutil.which("Hyprland")
         kwin = shutil.which("kwin_wayland")
         if not hyprland or not kwin:
-            raise RuntimeError("create_background requires Hyprland and kwin_wayland on PATH")
+            raise RuntimeError(
+                "create_background requires Hyprland and kwin_wayland on PATH"
+            )
         config = root / "hyprland.lua"
         config.write_text(
             "hl.config({xwayland={enabled=false},cursor={no_hardware_cursors=true,"
@@ -120,7 +131,12 @@ def run():
         )
         # Restore the worker's development environment for Hyprland; only KWin gets temporary XDG homes.
         inner_env = environment.copy()
-        for name in ("HYPRLAND_INSTANCE_SIGNATURE", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "WAYLAND_SOCKET"):
+        for name in (
+            "HYPRLAND_INSTANCE_SIGNATURE",
+            "DISPLAY",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "WAYLAND_SOCKET",
+        ):
             inner_env.pop(name, None)
         inner_env.update(
             LIBSEAT_BACKEND="seatd",
@@ -141,24 +157,48 @@ def run():
             f"os.execve({hyprland!r}, [{hyprland!r}, '--config', {str(config)!r}, '--socket', {desktop_socket!r}, '--wayland-fd', str(server.fileno())], environment)\n"
         )
         inner.chmod(0o700)
-        kwin_env = {name: environment[name] for name in ("HOME", "USER", "LOGNAME", "PATH", "LANG", "XDG_RUNTIME_DIR") if name in environment}
+        kwin_env = {
+            name: environment[name]
+            for name in ("HOME", "USER", "LOGNAME", "PATH", "LANG", "XDG_RUNTIME_DIR")
+            if name in environment
+        }
         for category in ("CONFIG", "STATE", "CACHE", "DATA"):
             directory = root / f"kwin-{category.lower()}"
             directory.mkdir()
             kwin_env[f"XDG_{category}_HOME"] = str(directory)
         with (root / "compositor.log").open("wb") as compositor_log:
             compositor = subprocess.Popen(
-                [kwin, "--virtual", "--socket", kwin_socket, "--width", str(width), "--height", str(height),
-                 "--scale", "2", "--no-lockscreen", "--no-global-shortcuts", "--no-kactivities",
-                 "--exit-with-session", str(inner)],
-                env=kwin_env, stdin=subprocess.DEVNULL, stdout=compositor_log, stderr=compositor_log, start_new_session=True,
+                [
+                    kwin,
+                    "--virtual",
+                    "--socket",
+                    kwin_socket,
+                    "--width",
+                    str(width),
+                    "--height",
+                    str(height),
+                    "--scale",
+                    "2",
+                    "--no-lockscreen",
+                    "--no-global-shortcuts",
+                    "--no-kactivities",
+                    "--exit-with-session",
+                    str(inner),
+                ],
+                env=kwin_env,
+                stdin=subprocess.DEVNULL,
+                stdout=compositor_log,
+                stderr=compositor_log,
+                start_new_session=True,
             )
         children.append(compositor)
         deadline = time.monotonic() + 20
         while target is None:
             command(0.02)  # EOF during startup must clean half-created resources too.
             if compositor.poll() is not None:
-                raise RuntimeError(f"background compositor exited during startup ({compositor.returncode})")
+                raise RuntimeError(
+                    f"background compositor exited during startup ({compositor.returncode})"
+                )
             if time.monotonic() >= deadline:
                 raise RuntimeError("background Hyprland startup timed out")
             pid_file = root / "inner.pid"
@@ -167,7 +207,12 @@ def run():
             if inner_pid is not None:
                 remember_instance()
                 candidate = find_target()
-                if candidate and (runtime / "hypr" / candidate["signature"] / ".socket.sock").exists():
+                if (
+                    candidate
+                    and (
+                        runtime / "hypr" / candidate["signature"] / ".socket.sock"
+                    ).exists()
+                ):
                     target = candidate
         log("background.supervisor", "ready")
         reply(target)
@@ -187,13 +232,23 @@ def run():
                 break
             if request["type"] == "launch":
                 app_env = environment.copy()
-                app_env.update(WAYLAND_DISPLAY=target["display"], HYPRLAND_INSTANCE_SIGNATURE=target["signature"], XDG_RUNTIME_DIR=target["runtime"])
+                app_env.update(
+                    WAYLAND_DISPLAY=target["display"],
+                    HYPRLAND_INSTANCE_SIGNATURE=target["signature"],
+                    XDG_RUNTIME_DIR=target["runtime"],
+                )
                 for name in ("DISPLAY", "WAYLAND_SOCKET"):
                     app_env.pop(name, None)
                 try:
-                    child = subprocess.Popen(request["argv"], cwd=request["cwd"], env=app_env,
-                                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                             stderr=subprocess.DEVNULL, start_new_session=True)
+                    child = subprocess.Popen(
+                        request["argv"],
+                        cwd=request["cwd"],
+                        env=app_env,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                    )
                 except (OSError, ValueError) as error:
                     reply({"error": str(error)})
                 else:
@@ -216,7 +271,11 @@ def run():
             inner_pid = int((root / "inner.pid").read_text())
         # The log FD identifies this instance before Hyprland writes hyprland.lock.
         deadline = time.monotonic() + 1
-        while inner_pid is not None and instance_directory is None and time.monotonic() < deadline:
+        while (
+            inner_pid is not None
+            and instance_directory is None
+            and time.monotonic() < deadline
+        ):
             remember_instance()
             if not Path(f"/proc/{inner_pid}").exists():
                 break
@@ -236,7 +295,9 @@ def run():
             child.wait()
         while True:
             # Reparented descendants can have their own process groups (for example an app helper).
-            adopted = Path(f"/proc/self/task/{os.getpid()}/children").read_text().split()
+            adopted = (
+                Path(f"/proc/self/task/{os.getpid()}/children").read_text().split()
+            )
             for pid in adopted:
                 try:
                     os.kill(int(pid), signal.SIGKILL)

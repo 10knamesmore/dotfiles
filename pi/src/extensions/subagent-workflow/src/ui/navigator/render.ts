@@ -198,7 +198,10 @@ export function scrollRunDetail(
   const order = orderedChildren(detail, filter);
   const layout = detail.kind === "workflow" ? buildWorkflowLayout(detail, order) : undefined;
   const selectedRow = layout
-    ? Math.max(0, layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor))
+    ? Math.max(
+        0,
+        layout.findIndex((row) => row.kind === "child" && row.childIndex === cursor),
+      )
     : cursor;
   return scrollRows(layout?.length ?? order.length, currentRow ?? selectedRow, Math.max(1, maxLines - 4), amount);
 }

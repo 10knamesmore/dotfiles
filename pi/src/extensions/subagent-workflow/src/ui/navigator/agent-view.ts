@@ -66,7 +66,8 @@ export class AgentView {
   private selectedId: string | undefined;
   private outputOnly = false;
   private fullContentPosition:
-    { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string } | undefined;
+    | { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string }
+    | undefined;
 
   constructor(private readonly deps: AgentViewDeps) {
     this.unsubscribe = deps.subscribe?.(() => {
@@ -332,7 +333,9 @@ export class AgentView {
       lines.push(selected?.start === row ? selected.selectedHeading : (layout.lines[row] ?? ""));
     }
     const position = this.autoScroll ? (this.isActive() ? "Following latest" : "End of transcript") : "Reading history";
-    lines.push(theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · l/Space fold`));
+    lines.push(
+      theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · l/Space fold`),
+    );
     if (this.composer) {
       const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;
       const prefix = `✎ ${kind}: `;

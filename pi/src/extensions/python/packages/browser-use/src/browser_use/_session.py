@@ -1,19 +1,21 @@
 """Connect Pi-managed browser lifetimes to unwrapped Playwright async objects."""
 
-import atexit
 import asyncio
+import atexit
+import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-import tempfile
 from typing import Literal, TypeVar
 
 from playwright.async_api import (
     Browser,
     BrowserContext,
     Error,
-    TimeoutError as PlaywrightTimeoutError,
     Playwright,
     async_playwright,
+)
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
 )
 
 from ._diagnostics import event

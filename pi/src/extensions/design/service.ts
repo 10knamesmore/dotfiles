@@ -29,9 +29,12 @@ export class DesignService {
     const child = spawn(
       environment.executable,
       [
-        "-u", "-c",
+        "-u",
+        "-c",
         "import sys, pi_design; pi_design.serve(sys.argv[1], sys.argv[2], sys.argv[3])",
-        agentDirectory, WEB_DIRECTORY, sessionId,
+        agentDirectory,
+        WEB_DIRECTORY,
+        sessionId,
       ],
       { stdio: ["pipe", "pipe", "pipe"], env: process.env },
     );
@@ -80,7 +83,7 @@ export class DesignService {
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`Design: ${await response.text()}`);
-    return await response.json() as T;
+    return (await response.json()) as T;
   }
 
   async projects(): Promise<DesignProject[]> {

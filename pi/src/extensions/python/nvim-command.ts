@@ -12,10 +12,7 @@ interface NeovimInstance {
 }
 
 /** Use the tool's worker so the selected connection survives into subsequent Python calls. */
-export function registerNeovimCommand(
-  pi: ExtensionAPI,
-  getSession: (ctx: ExtensionContext) => PythonSession,
-): void {
+export function registerNeovimCommand(pi: ExtensionAPI, getSession: (ctx: ExtensionContext) => PythonSession): void {
   pi.registerCommand("nvim", {
     description: "Choose and connect a Neovim instance",
     handler: async (_args, ctx) => {
@@ -59,12 +56,14 @@ export function registerNeovimCommand(
         if (choice === undefined) return;
         const instance = instances[labels.indexOf(choice)]!;
         const instanceId = JSON.parse(
-          await execute(`__import__("nvim_use").select(instance_id=${JSON.stringify(instance.instance_id)}).instance_id`),
+          await execute(
+            `__import__("nvim_use").select(instance_id=${JSON.stringify(instance.instance_id)}).instance_id`,
+          ),
         ) as string;
         appendResult(
           `Neovim connected: ${instance.cwd} (PID ${instance.pid}).\n` +
             `Instance: ${instanceId}\n` +
-            'Selected connection is available in python_repl as: import nvim_use as nvim; editor = nvim.current()\n' +
+            "Selected connection is available in python_repl as: import nvim_use as nvim; editor = nvim.current()\n" +
             "Read the nvim-use skill before editor operations or showcast. This selection lasts until disconnect or Python environment reset.",
         );
       } catch (error) {

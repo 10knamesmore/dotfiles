@@ -1,11 +1,11 @@
 """Keep Playwright's event loop running while synchronous Python cells wait or finish."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import concurrent.futures
 import math
 import threading
 import time
+from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from ._diagnostics import event
@@ -78,9 +78,7 @@ class BrowserLoop:
                 async with asyncio.timeout(timeout):
                     value = await action()
             except TimeoutError:
-                result.set_exception(
-                    TimeoutError(f"{operation} exceeded {timeout:g}s")
-                )
+                result.set_exception(TimeoutError(f"{operation} exceeded {timeout:g}s"))
             except BaseException as error:
                 # Deliver SystemExit/KeyboardInterrupt to the cell interpreter rather
                 # than letting asyncio terminate this persistent event thread.

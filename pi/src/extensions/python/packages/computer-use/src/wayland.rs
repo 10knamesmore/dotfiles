@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use wayland_client::protocol::{
     wl_buffer, wl_callback, wl_output, wl_registry, wl_seat, wl_shm, wl_shm_pool,
 };
-use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle, WEnum, delegate_noop};
+use wayland_client::{delegate_noop, Connection, Dispatch, EventQueue, QueueHandle, WEnum};
 use wayland_protocols_hyprland::toplevel_export::v1::client::{
     hyprland_toplevel_export_frame_v1, hyprland_toplevel_export_manager_v1,
 };

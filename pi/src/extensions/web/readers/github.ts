@@ -143,10 +143,7 @@ async function readRepository(api: GitHubApi, repository: string): Promise<WebDo
   };
 }
 
-async function readDiscussion(
-  api: GitHubApi,
-  target: GitHubTarget & { kind: "issue" | "pull" },
-): Promise<WebDocument> {
+async function readDiscussion(api: GitHubApi, target: GitHubTarget & { kind: "issue" | "pull" }): Promise<WebDocument> {
   const root = `repos/${target.repository}`;
   let isPull = target.kind === "pull";
   let discussion = await api.json<Discussion>(`${root}/${isPull ? "pulls" : "issues"}/${target.number}`);

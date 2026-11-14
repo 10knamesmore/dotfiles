@@ -1,8 +1,4 @@
-import {
-  copyToClipboard,
-  type CustomEditor,
-  type ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import { copyToClipboard, type CustomEditor, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SelectList, stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { marked } from "marked";
 import { highlightCopySource } from "./copy-highlight.js";

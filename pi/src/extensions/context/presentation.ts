@@ -11,8 +11,7 @@ import {
 import type { ReportRow, ReportTone } from "./report.js";
 import type { SourceDocument } from "./source-layout.js";
 
-export type PageContent =
-  { kind: "report"; rows: ReportRow[] } | ({ kind: "source" } & SourceDocument);
+export type PageContent = { kind: "report"; rows: ReportRow[] } | ({ kind: "source" } & SourceDocument);
 
 const valueColors: Record<ReportTone, ThemeColor> = {
   value: "text",

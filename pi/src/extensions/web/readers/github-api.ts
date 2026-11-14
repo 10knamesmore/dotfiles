@@ -10,15 +10,11 @@ export class GitHubApi {
   constructor(private readonly signal: AbortSignal) {}
 
   async json<T>(endpoint: string, mediaType = "application/vnd.github+json"): Promise<T> {
-    return JSON.parse(
-      (await this.request(endpoint, ["--header", `Accept: ${mediaType}`])).toString("utf8"),
-    ) as T;
+    return JSON.parse((await this.request(endpoint, ["--header", `Accept: ${mediaType}`])).toString("utf8")) as T;
   }
 
   async list<T>(endpoint: string): Promise<T[]> {
-    const pages = JSON.parse(
-      (await this.request(endpoint, ["--paginate", "--slurp"])).toString("utf8"),
-    ) as T[][];
+    const pages = JSON.parse((await this.request(endpoint, ["--paginate", "--slurp"])).toString("utf8")) as T[][];
     return pages.flat();
   }
 

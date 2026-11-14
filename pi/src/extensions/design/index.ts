@@ -94,7 +94,8 @@ export default function designExtension(pi: ExtensionAPI): void {
       newDesignPrompt = false;
       return {
         action: "transform",
-        text: `${event.text}\n\n<pi_design_new>\n` +
+        text:
+          `${event.text}\n\n<pi_design_new>\n` +
           `Create a new design from the user's free-form request. Read ${SKILL} first. ` +
           "Choose an appropriate project name and directory from the request; absent a path, use ~/Documents. " +
           "Use normal file tools to create the React/Vite project and install dependencies. " +

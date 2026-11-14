@@ -8,7 +8,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use pyo3::prelude::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::{Control, Target};
 use crate::{hyprland, logging, wait};

@@ -26,11 +26,7 @@ export function designContext(state: DesignState, changes: DesignChanges, first:
 }
 
 export function displayDesignContext(markdown: string): string {
-  return markdown.replace(
-    /\n\n<pi_design_context>\n[\s\S]*?\n<\/pi_design_context>$/,
-    "\n\n*Design context attached*",
-  ).replace(
-    /\n\n<pi_design_new>\n[\s\S]*?\n<\/pi_design_new>$/,
-    "\n\n*New design*",
-  );
+  return markdown
+    .replace(/\n\n<pi_design_context>\n[\s\S]*?\n<\/pi_design_context>$/, "\n\n*Design context attached*")
+    .replace(/\n\n<pi_design_new>\n[\s\S]*?\n<\/pi_design_new>$/, "\n\n*New design*");
 }

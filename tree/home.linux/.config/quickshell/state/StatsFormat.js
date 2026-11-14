@@ -5,7 +5,7 @@
  * @returns {string} 一位小数的 GiB 数值，不含单位。
  */
 function gib(value) {
-    return (value / 1073741824).toFixed(1);
+  return (value / 1073741824).toFixed(1);
 }
 
 /**
@@ -13,13 +13,10 @@ function gib(value) {
  * @returns {string} 含二进制容量单位的数值。
  */
 function bytes(value) {
-    if (value < 1024)
-        return value.toFixed(0) + " B";
-    if (value < 1048576)
-        return (value / 1024).toFixed(1) + " KiB";
-    if (value < 1073741824)
-        return (value / 1048576).toFixed(1) + " MiB";
-    return (value / 1073741824).toFixed(2) + " GiB";
+  if (value < 1024) return value.toFixed(0) + " B";
+  if (value < 1048576) return (value / 1024).toFixed(1) + " KiB";
+  if (value < 1073741824) return (value / 1048576).toFixed(1) + " MiB";
+  return (value / 1073741824).toFixed(2) + " GiB";
 }
 
 /**
@@ -27,5 +24,5 @@ function bytes(value) {
  * @returns {string} 含速率单位的数值。
  */
 function speed(value) {
-    return bytes(value) + "/s";
+  return bytes(value) + "/s";
 }
