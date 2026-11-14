@@ -20,6 +20,7 @@ sha2        = "0.10"
 rustc-hash  = "2"
 owo-colors  = "4"
 walkdir     = "2"
+shell-words = "1"
 dots-core   = { path = "crates/dots-core" }
 
 # dev

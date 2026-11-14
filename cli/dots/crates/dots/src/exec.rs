@@ -14,6 +14,7 @@ use crate::managed_block;
 use crate::realfs::RealFs;
 use crate::reconciliation::{ContainerConversion, observe_surface};
 use crate::state::State;
+use crate::subprocess;
 
 /// Executor 对 planning 后重观察与 systemd 写入的可替换边界。
 trait Runtime {
@@ -34,15 +35,9 @@ impl Runtime for RealRuntime {
 
     fn set_systemd_enabled(&self, unit: &str, enabled: bool) -> Result<()> {
         let action = if enabled { "enable" } else { "disable" };
-        let status = Command::new("systemctl")
-            .args(["--user", action, unit])
-            .status()?;
-        if !status.success() {
-            return Err(color_eyre::eyre::eyre!(
-                "systemctl --user {action} {unit} 失败：{status}"
-            ));
-        }
-        Ok(())
+        let mut command = Command::new("systemctl");
+        command.args(["--user", action, unit]);
+        subprocess::run(command, &format!("systemctl --user {action} {unit}"))
     }
 }
 
@@ -105,7 +100,8 @@ fn execute_with_runtime(
     runtime: &dyn Runtime,
 ) -> ExecReport {
     let mut report = ExecReport::default();
-    let blocked_prefixes = execute_conversions(conversions, filesystem, state, dry_run, &mut report);
+    let blocked_prefixes =
+        execute_conversions(conversions, filesystem, state, dry_run, &mut report);
     let mut blocked_directories: Vec<PathBuf> = plan
         .items
         .iter()
@@ -159,7 +155,7 @@ fn execute_conversions(
     let mut blocked = Vec::new();
     for conversion in conversions {
         println!(
-            "  {} container:{} {}",
+            "      {} container:{} {}",
             "update".cyan(),
             conversion.target.display(),
             format!("was symlink → {}", conversion.source.display()).dimmed()
@@ -208,22 +204,22 @@ fn execute_item(
     match &item.action {
         PlanAction::Noop => {}
         PlanAction::Adopt => {
-            println!("  {} {selector}", "adopt".cyan());
+            println!("      {} {selector}", "adopt".cyan());
             if !dry_run {
                 update_inventory_from_desired(item, state);
             }
             report.adopted += 1;
         }
         PlanAction::Create => {
-            println!("  {} {selector}", "create".green());
+            println!("      {} {selector}", "create".green());
             execute_desired(item, filesystem, dry_run, state, runtime, report);
         }
         PlanAction::Update => {
-            println!("  {} {selector}", "update".yellow());
+            println!("      {} {selector}", "update".yellow());
             execute_desired(item, filesystem, dry_run, state, runtime, report);
         }
         PlanAction::Delete => {
-            println!("  {} {selector}", "delete".red());
+            println!("      {} {selector}", "delete".red());
             if dry_run {
                 report.deleted += 1;
             } else {
@@ -237,22 +233,22 @@ fn execute_item(
             }
         }
         PlanAction::Forget => {
-            println!("  {} {selector}", "forget".cyan());
+            println!("      {} {selector}", "forget".cyan());
             if !dry_run {
                 state.remove_resource(&item.surface);
             }
             report.forgotten += 1;
         }
         PlanAction::Retain { reason } => {
-            println!("  {} {selector} — {reason}", "retain".yellow());
+            println!("      {} {selector} — {reason}", "retain".yellow());
             report.retained += 1;
         }
         PlanAction::Collision { reason } => {
-            println!("  {} {selector} — {reason}", "collision".red());
+            println!("      {} {selector} — {reason}", "collision".red());
             report.collisions += 1;
         }
         PlanAction::Drift { reason } => {
-            println!("  {} {selector} — {reason}", "drift".red());
+            println!("      {} {selector} — {reason}", "drift".red());
             report.drift += 1;
         }
     }

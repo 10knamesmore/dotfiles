@@ -9,6 +9,7 @@ pub mod realfs;
 pub mod reconciliation;
 pub mod render;
 pub mod state;
+pub mod subprocess;
 
 pub mod lua;
 
