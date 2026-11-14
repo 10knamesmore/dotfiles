@@ -66,8 +66,7 @@ export class AgentView {
   private selectedId: string | undefined;
   private outputOnly = false;
   private fullContentPosition:
-    | { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string }
-    | undefined;
+    { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string } | undefined;
 
   constructor(private readonly deps: AgentViewDeps) {
     this.unsubscribe = deps.subscribe?.(() => {

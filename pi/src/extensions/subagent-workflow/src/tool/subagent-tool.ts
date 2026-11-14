@@ -65,8 +65,7 @@ export type SubagentToolInput = Static<typeof SubagentToolParameters>;
 const OPTION_FIELDS = Object.keys(PublicSubagentOptionFields) as Array<keyof typeof PublicSubagentOptionFields>;
 
 export type ValidatedSubagentInput =
-  | { type: "spawn"; spec: TierSubagentSpec }
-  | { type: "followUp"; id: string; prompt: string; label?: string };
+  { type: "spawn"; spec: TierSubagentSpec } | { type: "followUp"; id: string; prompt: string; label?: string };
 
 /**
  * Top-level fields a follow-up may not set.

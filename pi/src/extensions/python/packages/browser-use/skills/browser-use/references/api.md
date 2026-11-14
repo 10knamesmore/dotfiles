@@ -4,12 +4,12 @@
 
 ## 模块
 
-| 调用 | 行为 |
-| --- | --- |
-| `browser.discover() -> list[BrowserInstance]` | 列出当前用户的 Chrome/Chromium/Edge/Brave 主进程，不打开连接或授权对话框。 |
-| `browser.connect(*, pid=None, endpoint=None, configure_browser=False, timeout=30) -> Session` | pid 和 endpoint 必须且只能提供一个。PID 可以是窗口、renderer 或主进程，沿父进程解析浏览器。endpoint 接受 CDP HTTP/WebSocket 地址。 |
-| `browser.launch(*, executable_path=None, user_data_dir=None, headless=False, timeout=30) -> Session` | 启动本机浏览器，创建独立进程组；默认有界面，省略 profile 时使用临时目录。不下载浏览器。 |
-| `browser.close_all()` | 关闭当前 worker 的所有会话；附加的用户 Chrome 保留，自己启动的 Chrome 退出。 |
+| 调用                                                                                                 | 行为                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `browser.discover() -> list[BrowserInstance]`                                                        | 列出当前用户的 Chrome/Chromium/Edge/Brave 主进程，不打开连接或授权对话框。                                                         |
+| `browser.connect(*, pid=None, endpoint=None, configure_browser=False, timeout=30) -> Session`        | pid 和 endpoint 必须且只能提供一个。PID 可以是窗口、renderer 或主进程，沿父进程解析浏览器。endpoint 接受 CDP HTTP/WebSocket 地址。 |
+| `browser.launch(*, executable_path=None, user_data_dir=None, headless=False, timeout=30) -> Session` | 启动本机浏览器，创建独立进程组；默认有界面，省略 profile 时使用临时目录。不下载浏览器。                                            |
+| `browser.close_all()`                                                                                | 关闭当前 worker 的所有会话；附加的用户 Chrome 保留，自己启动的 Chrome 退出。                                                       |
 
 `BrowserInstance` 是冻结的进程快照，字段为 `pid: int`、`name: str`、`executable: str`、`user_data_dir: str`。发现结果不保证调试已启用或进程仍存活。profile 指数据根目录，不是 `Default`/`Profile N` 子目录。
 
@@ -19,13 +19,13 @@ PID 连接读取 profile 的 `DevToolsActivePort`，也支持进程参数中的�
 
 ## Session
 
-| 成员 | 行为 |
-| --- | --- |
-| `session.pid` | PID 连接或 launch 的浏览器主 PID；显式 endpoint 连接为 `None`。 |
-| `session.mode` | `"attached"` 或 `"launched"`。 |
-| `session.closed` | 适配层是否已关闭，不是浏览器的实时健康探测。 |
-| `session.run(action, *, timeout=30)` | 同步调用 async callback，传入原生默认 `BrowserContext`，返回 callback 的结果或抛出其异常。 |
-| `session.close()` | 幂等。解除本连接的页面/context 请求路由，恢复已接管的下载设置，断开 CDP；启动模式还退出自有 Chrome。 |
+| 成员                                 | 行为                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `session.pid`                        | PID 连接或 launch 的浏览器主 PID；显式 endpoint 连接为 `None`。                                      |
+| `session.mode`                       | `"attached"` 或 `"launched"`。                                                                       |
+| `session.closed`                     | 适配层是否已关闭，不是浏览器的实时健康探测。                                                         |
+| `session.run(action, *, timeout=30)` | 同步调用 async callback，传入原生默认 `BrowserContext`，返回 callback 的结果或抛出其异常。           |
+| `session.close()`                    | 幂等。解除本连接的页面/context 请求路由，恢复已接管的下载设置，断开 CDP；启动模式还退出自有 Chrome。 |
 
 `Session` 支持普通 `with browser.launch(...) as session:`。跨 cell 工作保留变量并显式关闭。关闭后原有 Playwright 对象失效。
 
@@ -50,18 +50,18 @@ async callback 不自动让阻塞代码变成异步。callback 中的 `time.slee
 
 ## 原生 Playwright 能力
 
-| 任务 | callback 内使用 |
-| --- | --- |
-| 现有页面、新页面 | `context.pages`、`await context.new_page()` |
-| 标题、URL、结构 | `await page.title()`、`page.url`、`await page.locator("body").aria_snapshot()` |
-| 定位与等待 | `page.get_by_role(...)`、`page.get_by_text(...)`、`page.locator(...)`、`page.frame_locator(...)` |
-| 输入 | `await locator.fill(text)`、`await locator.press("Control+A")`、`await page.keyboard.insert_text(text)` |
-| 页面 JavaScript | `await page.evaluate(function, arg)`；参数由 Playwright 传递，不拼接未转义字符串。 |
-| 截图 | `await page.screenshot(full_page=True)` 返回 bytes。 |
-| 上传下载 | `await locator.set_input_files(...)`、`async with page.expect_download()`、`await download.save_as(path)` |
-| 请求规则 | `await page.route(pattern, async_handler)`；handler 使用 `await route.abort()/fulfill()/continue_()`。 |
-| Cookie | `await context.cookies()`、`await context.add_cookies(records)`、`await context.clear_cookies()`；字段沿用 Playwright，例如 `httpOnly`、`sameSite`。 |
-| 原始 CDP | `await context.new_cdp_session(page)`，使用后 `await cdp.detach()`。 |
+| 任务             | callback 内使用                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 现有页面、新页面 | `context.pages`、`await context.new_page()`                                                                                                          |
+| 标题、URL、结构  | `await page.title()`、`page.url`、`await page.locator("body").aria_snapshot()`                                                                       |
+| 定位与等待       | `page.get_by_role(...)`、`page.get_by_text(...)`、`page.locator(...)`、`page.frame_locator(...)`                                                     |
+| 输入             | `await locator.fill(text)`、`await locator.press("Control+A")`、`await page.keyboard.insert_text(text)`                                              |
+| 页面 JavaScript  | `await page.evaluate(function, arg)`；参数由 Playwright 传递，不拼接未转义字符串。                                                                   |
+| 截图             | `await page.screenshot(full_page=True)` 返回 bytes。                                                                                                 |
+| 上传下载         | `await locator.set_input_files(...)`、`async with page.expect_download()`、`await download.save_as(path)`                                            |
+| 请求规则         | `await page.route(pattern, async_handler)`；handler 使用 `await route.abort()/fulfill()/continue_()`。                                               |
+| Cookie           | `await context.cookies()`、`await context.add_cookies(records)`、`await context.clear_cookies()`；字段沿用 Playwright，例如 `httpOnly`、`sameSite`。 |
+| 原始 CDP         | `await context.new_cdp_session(page)`，使用后 `await cdp.detach()`。                                                                                 |
 
 完整签名和语义以 [Playwright Python API](https://playwright.dev/python/docs/api/class-browsercontext) 为准。连接使用 CDP；[Playwright 明确说明](https://playwright.dev/python/docs/api/class-browsertype#browser-type-connect-over-cdp)它与 Playwright 自己的协议连接并非完全等价。iframe、shadow DOM、定位与自动等待交给 Playwright，不自行模拟。
 

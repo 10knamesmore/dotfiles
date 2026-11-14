@@ -12,13 +12,13 @@ import design from "../design.json";
 
 <DesignProvider data={design as DesignData}>
   <App />
-</DesignProvider>
+</DesignProvider>;
 ```
 
-| Prop | 类型 | 含义 |
-| --- | --- | --- |
-| `data` | `DesignData` | 从 `design.json` 导入的初始数据 |
-| `children` | `ReactNode` | 整个作品应用 |
+| Prop       | 类型         | 含义                            |
+| ---------- | ------------ | ------------------------------- |
+| `data`     | `DesignData` | 从 `design.json` 导入的初始数据 |
+| `children` | `ReactNode`  | 整个作品应用                    |
 
 放在作品根部。独立运行时使用传入的数据；在设计工作区里，使用当前设计状态。
 用户直接修改或模型 patch 数据后，组件按最新值重新渲染。
@@ -42,13 +42,13 @@ import design from "../design.json";
 }
 ```
 
-| Prop | 含义 |
-| --- | --- |
-| `id` | 必填，对应 `design.json.elements` 中的键；同一页面内唯一 |
-| `as` | 渲染的元素或组件，默认 `span` |
-| `children` | 未设置 `elements[id].text` 时显示的内容 |
-| `className`、`style`、事件等 | 传给实际渲染的元素 |
-| `ref` | 指向渲染的 DOM 元素 |
+| Prop                         | 含义                                                     |
+| ---------------------------- | -------------------------------------------------------- |
+| `id`                         | 必填，对应 `design.json.elements` 中的键；同一页面内唯一 |
+| `as`                         | 渲染的元素或组件，默认 `span`                            |
+| `children`                   | 未设置 `elements[id].text` 时显示的内容                  |
+| `className`、`style`、事件等 | 传给实际渲染的元素                                       |
+| `ref`                        | 指向渲染的 DOM 元素                                      |
 
 `elements[id].text` 优先于 `children`。
 `elements[id].style` 优先于 JSX `style` 中的同名属性。
@@ -98,7 +98,7 @@ Props 与 `Editable.Text` 相同，默认渲染 `div`。
 const parameters = useParameters();
 const coverSize = Number(parameters.coverSize);
 
-<img src="/cover.jpg" style={{ width: coverSize }} />
+<img src="/cover.jpg" style={{ width: coverSize }} />;
 ```
 
 已知参数类型时可以指定返回类型：
@@ -114,14 +114,14 @@ const { coverSize, accent, showLyrics } = useParameters<{
 参数控件定义在 `design.json.parameters`。控件由工作区渲染，模型只定义
 参数并将值连接到作品的 props、样式或行为。
 
-| `control` | `value` 类型 | 其他字段 |
-| --- | --- | --- |
-| `range` | number | `min`、`max`、`step` |
-| `number` | number | 可选 `min`、`max`、`step` |
-| `color` | string | 颜色值 |
-| `text` | string | — |
-| `boolean` | boolean | — |
-| `select` | string | `options: string[]` |
+| `control` | `value` 类型 | 其他字段                  |
+| --------- | ------------ | ------------------------- |
+| `range`   | number       | `min`、`max`、`step`      |
+| `number`  | number       | 可选 `min`、`max`、`step` |
+| `color`   | string       | 颜色值                    |
+| `text`    | string       | —                         |
+| `boolean` | boolean      | —                         |
+| `select`  | string       | `options: string[]`       |
 
 每个参数可用 `label` 提供显示名称。
 
@@ -129,14 +129,20 @@ const { coverSize, accent, showLyrics } = useParameters<{
 {
   "parameters": {
     "coverSize": {
-      "label": "封面尺寸", "control": "range",
-      "value": 240, "min": 120, "max": 400, "step": 4
+      "label": "封面尺寸",
+      "control": "range",
+      "value": 240,
+      "min": 120,
+      "max": 400,
+      "step": 4
     },
     "accent": { "label": "强调色", "control": "color", "value": "#b8d89c" },
     "showLyrics": { "label": "显示歌词", "control": "boolean", "value": true },
     "density": {
-      "label": "列表密度", "control": "select",
-      "value": "comfortable", "options": ["compact", "comfortable"]
+      "label": "列表密度",
+      "control": "select",
+      "value": "comfortable",
+      "options": ["compact", "comfortable"]
     }
   }
 }

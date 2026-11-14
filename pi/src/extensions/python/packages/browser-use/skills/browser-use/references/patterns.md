@@ -10,7 +10,12 @@ import browser_use as browser
 
 with computer.connect_host() as desktop:
     windows = desktop.hyprland.query("clients")
-print([{key: window.get(key) for key in ("address", "pid", "class", "title")} for window in windows])
+print(
+    [
+        {key: window.get(key) for key in ("address", "pid", "class", "title")}
+        for window in windows
+    ]
+)
 ```
 
 根据实际输出把目标保存为 `window`，然后连接并观察页面：
@@ -18,8 +23,10 @@ print([{key: window.get(key) for key in ("address", "pid", "class", "title")} fo
 ```python
 session = browser.connect(pid=window["pid"])
 
+
 async def inspect_tabs(context):
     return [(page, await page.title(), page.url) for page in context.pages]
+
 
 tabs = session.run(inspect_tabs)
 print([(index, title, url) for index, (_, title, url) in enumerate(tabs)])
@@ -38,6 +45,7 @@ async def inspect_chrome(context):
     finally:
         await cdp.detach()
 
+
 print(session.run(inspect_chrome))
 ```
 
@@ -54,10 +62,12 @@ session = browser.launch(
     headless=False,
 )
 
+
 async def open_page(context):
     page = await context.new_page()
     await page.goto("https://example.com")
     return page, await page.screenshot()
+
 
 page, image = session.run(open_page)
 display_image(image)
@@ -83,6 +93,7 @@ async def search(context):
     await page.get_by_role("button", name="搜索", exact=True).click()
     return await page.locator("body").aria_snapshot()
 
+
 print(session.run(search, timeout=40))
 ```
 
@@ -94,9 +105,11 @@ Playwright 按键使用单字符串，例如 `await field.press("Control+A")`；
 
 ```python
 from pathlib import Path
+
 upload = Path("report.csv").absolute()
 destination = Path("artifacts/report.csv").absolute()
 destination.parent.mkdir(parents=True, exist_ok=True)
+
 
 async def transfer(context):
     await page.locator('input[type="file"]').set_input_files(upload)
@@ -105,6 +118,7 @@ async def transfer(context):
     download = await pending.value
     await download.save_as(destination)
     return download.suggested_filename
+
 
 print(session.run(transfer, timeout=30))
 ```
@@ -119,7 +133,9 @@ print(session.run(transfer, timeout=30))
 async def install_route(context):
     async def profile(route):
         await route.fulfill(json={"name": "演示用户"})
+
     await page.route("**/api/profile", profile)
+
 
 session.run(install_route)
 ```
@@ -127,7 +143,11 @@ session.run(install_route)
 后续 cell 中可以继续使用这个路由；Python 等待下一次工具调用时，事件循环仍运行：
 
 ```python
-print(session.run(lambda context: page.evaluate("fetch('/api/profile').then(r => r.json())")))
+print(
+    session.run(
+        lambda context: page.evaluate("fetch('/api/profile').then(r => r.json())")
+    )
+)
 session.run(lambda context: page.unroute("**/api/profile"))
 ```
 
@@ -135,10 +155,15 @@ session.run(lambda context: page.unroute("**/api/profile"))
 
 ```python
 from queue import SimpleQueue
+
 browser_events = SimpleQueue()
 
+
 async def watch(context):
-    page.on("download", lambda download: browser_events.put(download.suggested_filename))
+    page.on(
+        "download", lambda download: browser_events.put(download.suggested_filename)
+    )
+
 
 session.run(watch)
 # 后续在主线程检查 browser_events.empty() 并 get() 读取已发生的事件。
@@ -150,11 +175,18 @@ session.run(watch)
 
 ```python
 async def set_preference(context):
-    await context.add_cookies([{
-        "name": "preferred_language", "value": "zh-CN",
-        "url": "https://example.com", "sameSite": "Lax",
-    }])
+    await context.add_cookies(
+        [
+            {
+                "name": "preferred_language",
+                "value": "zh-CN",
+                "url": "https://example.com",
+                "sameSite": "Lax",
+            }
+        ]
+    )
     return await context.cookies("https://example.com")
+
 
 cookies = session.run(set_preference)
 ```
@@ -165,7 +197,9 @@ cookies = session.run(set_preference)
 
 ```python
 try:
-    session.run(lambda context: page.get_by_role("button", name="等待出现").click(), timeout=2)
+    session.run(
+        lambda context: page.get_by_role("button", name="等待出现").click(), timeout=2
+    )
 except TimeoutError:
     print("callback deadline reached")
 

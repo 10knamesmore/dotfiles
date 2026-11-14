@@ -32,15 +32,15 @@ state = project.read_state()
 
 ## 结构
 
-| 目录或文件 | 职责 |
-| --- | --- |
-| `index.ts`、`selector.ts` | `/design`、会话关联、TUI 输入上下文 |
-| `service.ts` | 本地服务进程的启动和关闭 |
-| `native/` | Rust 状态服务与 PyO3 Python SDK |
-| `web/` | React 画布、属性面板、参数与评论 |
-| `react/` | 作品中的可编辑 React 组件和浏览器通信 |
-| `skills/design/` | 模型的创建、修改和验证流程 |
-| [protocol.md](protocol.md) | 项目文件、HTTP 与浏览器消息格式 |
+| 目录或文件                 | 职责                                  |
+| -------------------------- | ------------------------------------- |
+| `index.ts`、`selector.ts`  | `/design`、会话关联、TUI 输入上下文   |
+| `service.ts`               | 本地服务进程的启动和关闭              |
+| `native/`                  | Rust 状态服务与 PyO3 Python SDK       |
+| `web/`                     | React 画布、属性面板、参数与评论      |
+| `react/`                   | 作品中的可编辑 React 组件和浏览器通信 |
+| `skills/design/`           | 模型的创建、修改和验证流程            |
+| [protocol.md](protocol.md) | 项目文件、HTTP 与浏览器消息格式       |
 
 普通第三方依赖安装在作品自己的 `package.json` 中。编辑器全局安装，
 作品只依赖小型 `@pi-design/react` 运行时。

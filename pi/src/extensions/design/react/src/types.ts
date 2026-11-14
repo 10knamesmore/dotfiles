@@ -93,5 +93,4 @@ export type RuntimeMessage =
   | { source: "pi-design"; type: "comment"; artboard: string; element?: string; x: number; y: number }
   | { source: "pi-design"; type: "bounds"; artboard: string; elements: ElementBounds[] };
 export type EditorMessage =
-  | { source: "pi-design"; type: "mode"; mode: Mode }
-  | { source: "pi-design"; type: "select"; element: string | null };
+  { source: "pi-design"; type: "mode"; mode: Mode } | { source: "pi-design"; type: "select"; element: string | null };

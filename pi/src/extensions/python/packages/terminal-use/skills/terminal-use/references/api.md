@@ -107,10 +107,16 @@ session.read(
 
 ```python
 {
-    "text": str, "wide": bool, "wide_continuation": bool,
-    "foreground": CellColor, "background": CellColor,
-    "bold": bool, "dim": bool, "italic": bool,
-    "underline": bool, "inverse": bool,
+    "text": str,
+    "wide": bool,
+    "wide_continuation": bool,
+    "foreground": CellColor,
+    "background": CellColor,
+    "bold": bool,
+    "dim": bool,
+    "italic": bool,
+    "underline": bool,
+    "inverse": bool,
 }
 ```
 
@@ -210,7 +216,7 @@ session.detach() -> None
 
 ```python
 {"kind": "running"}  # 窗口仍存在
-{"kind": "closed"}   # 窗口关闭，但 Kitty 未报告退出码
+{"kind": "closed"}  # 窗口关闭，但 Kitty 未报告退出码
 {"kind": "exited", "exit_code": int | None, "signal": int | None}
 ```
 

@@ -12,7 +12,7 @@ description: 用 python_repl 的 terminal_use 操作真实 Kitty 终端：发现
 ```python
 import terminal_use as terminal
 
-instances = terminal.list_instances()       # socket、实例 ID、Kitty PID、窗口概况
+instances = terminal.list_instances()  # socket、实例 ID、Kitty PID、窗口概况
 kitty = terminal.connect(socket=instances[0]["socket"])
 windows = kitty.list_windows()
 session = kitty.attach(window_id=windows[0]["id"])
@@ -21,9 +21,7 @@ session = kitty.attach(window_id=windows[0]["id"])
 `terminal.connect()` 不带参数时读取 `KITTY_LISTEN_ON`。未从 Kitty 中启动 Pi 或需要独立工作区时：
 
 ```python
-session = terminal.launch(
-    ["some-tui"], cwd="/path/to/project", cols=120, rows=40
-)
+session = terminal.launch(["some-tui"], cwd="/path/to/project", cols=120, rows=40)
 ```
 
 `launch()` 创建新的 Kitty 实例，在唯一的初始桌面窗口运行指定程序，并返回该终端的 `Session`；省略程序参数时运行默认 shell。通过 `kitty = session.instance` 获取实例。只有需要额外桌面窗口时才调用 `kitty.open_window()`；`open_tab()` / `open_split()` 使用实例的当前活动位置。窗口 ID 仅在一个实例内有意义，不跨实例复用。
@@ -55,10 +53,10 @@ display_image(session.screenshot())
 终端属于 Kitty，不属于 Python worker。worker 重启、cell 取消、变量丢弃均不关闭终端。之后可重新发现并 attach。
 
 ```python
-session.focus()              # 展示给用户接管
-session.detach()             # 停用句柄，终端继续运行
+session.focus()  # 展示给用户接管
+session.detach()  # 停用句柄，终端继续运行
 session = session.instance.attach(window_id=session.window_id)
-session.close()              # 明确关闭终端
+session.close()  # 明确关闭终端
 ```
 
 不要关闭用户原有终端来清理 Python 状态。`wait()` 等待窗口关闭，不是等待 shell 当前命令；后者使用 `wait_command(after=...)`，详见 API。Kitty 未报告退出码时 status 为 `closed`，不要当作成功退出。关闭后仍可读取最终文字与 cells，但不能再截图；异常终止 Kitty 可能无法保存关闭记录。

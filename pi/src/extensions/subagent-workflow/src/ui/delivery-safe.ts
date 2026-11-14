@@ -67,7 +67,7 @@ export function formatFailureText(value: string, maxLength = 1_500): string {
 export function chunkDeliveryText(value: string, maxLineLength = 500): string {
   if (maxLineLength < 1) return "";
   const chunks: string[] = [];
-  for (let offset = 0; offset < value.length; ) {
+  for (let offset = 0; offset < value.length;) {
     let end = Math.min(value.length, offset + maxLineLength);
     const last = value.charCodeAt(end - 1);
     if (last >= 0xd800 && last <= 0xdbff) end -= 1;

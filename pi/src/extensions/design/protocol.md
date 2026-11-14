@@ -77,20 +77,20 @@ allows standalone inspection. Python JSON results are native dict/list objects.
 
 HTTP routes:
 
-| Method | Route | Body / result |
-| --- | --- | --- |
-| GET | `/api/projects` | Global `{ projects: [...] }` |
-| GET | `/api/preferences` | Global editor `{ theme: "dark" | "light" }`; defaults to dark |
-| POST | `/api/preferences` | `{ theme: "dark" | "light" }` → saved preferences |
-| POST | `/api/open` | `{ path, name?, start_preview?: true }` → full state; register and select |
-| GET | `/api/state` | Full state |
-| GET | `/api/changes?since=N` | `{ revision, changes: [...] }` |
-| POST | `/api/edit` | `{ edits: [...], snapshot?: boolean }` → full state |
-| POST | `/api/undo` | Full state |
-| POST | `/api/redo` | Full state |
-| POST | `/api/history` | `{ id: number }` → restore a design-data snapshot, return full state |
-| POST | `/api/selection` | `{ artboard: string|null, element: string|null }` → selection |
-| GET | `/api/events` | SSE `state` with full state; SSE `error` with `{error}` |
+| Method | Route                  | Body / result                                                             |
+| ------ | ---------------------- | ------------------------------------------------------------------------- |
+| GET    | `/api/projects`        | Global `{ projects: [...] }`                                              |
+| GET    | `/api/preferences`     | Global editor `{ theme: "dark"                                            | "light" }`; defaults to dark   |
+| POST   | `/api/preferences`     | `{ theme: "dark"                                                          | "light" }` → saved preferences |
+| POST   | `/api/open`            | `{ path, name?, start_preview?: true }` → full state; register and select |
+| GET    | `/api/state`           | Full state                                                                |
+| GET    | `/api/changes?since=N` | `{ revision, changes: [...] }`                                            |
+| POST   | `/api/edit`            | `{ edits: [...], snapshot?: boolean }` → full state                       |
+| POST   | `/api/undo`            | Full state                                                                |
+| POST   | `/api/redo`            | Full state                                                                |
+| POST   | `/api/history`         | `{ id: number }` → restore a design-data snapshot, return full state      |
+| POST   | `/api/selection`       | `{ artboard: string                                                       | null, element: string          | null }` → selection |
+| GET    | `/api/events`          | SSE `state` with full state; SSE `error` with `{error}`                   |
 
 Full state:
 
@@ -101,23 +101,33 @@ type State = {
   design: {
     name: string;
     elements: Record<string, { text?: string; style?: Record<string, string | number> }>;
-    parameters: Record<string, {
-      label?: string;
-      control: "range" | "number" | "color" | "text" | "boolean" | "select";
-      value: string | number | boolean;
-      min?: number;
-      max?: number;
-      step?: number;
-      options?: string[];
-    }>;
+    parameters: Record<
+      string,
+      {
+        label?: string;
+        control: "range" | "number" | "color" | "text" | "boolean" | "select";
+        value: string | number | boolean;
+        min?: number;
+        max?: number;
+        step?: number;
+        options?: string[];
+      }
+    >;
   };
   workspace: {
     artboards: Array<{
-      id: string; name: string; route: string;
-      x: number; y: number; width: number; height: number;
+      id: string;
+      name: string;
+      route: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
     }>;
     comments: Array<{
-      id: string; text: string; resolved: boolean;
+      id: string;
+      text: string;
+      resolved: boolean;
       anchor: { artboard: string; element?: string; x?: number; y?: number };
     }>;
   };
@@ -149,15 +159,28 @@ type Edit =
   | { type: "text"; element: string; text: string }
   | { type: "style"; element: string; style: Record<string, string | number | null> }
   | { type: "parameter"; name: string; value: string | number | boolean }
-  | { type: "artboard"; artboard: {
-      id: string; name: string; route: string;
-      x: number; y: number; width: number; height: number;
-    } }
+  | {
+      type: "artboard";
+      artboard: {
+        id: string;
+        name: string;
+        route: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+    }
   | { type: "remove_artboard"; id: string }
-  | { type: "comment"; comment: {
-      id: string; text: string; resolved: boolean;
-      anchor: { artboard: string; element?: string; x?: number; y?: number };
-    } }
+  | {
+      type: "comment";
+      comment: {
+        id: string;
+        text: string;
+        resolved: boolean;
+        anchor: { artboard: string; element?: string; x?: number; y?: number };
+      };
+    }
   | { type: "remove_comment"; id: string };
 ```
 

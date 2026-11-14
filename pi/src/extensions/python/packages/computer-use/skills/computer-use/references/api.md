@@ -4,14 +4,14 @@
 
 ## 桌面与生命周期
 
-| 调用 | 约定 |
-| --- | --- |
-| `computer.connect_host()` | 连接启动环境中的当前 Hyprland；独占加锁并等 Quickshell 接管提示就绪后返回。已占用或提示服务不可用时失败。 |
-| `computer.create_background(*, size=(1920, 1080))` | 创建独立后台桌面，宽高为正整数像素，scale=1。本机须有 `Hyprland` 和 `kwin_wayland`；输出就绪后返回。 |
-| `desktop.status` | 只读：`active`、`closed`、`revoked`、`disconnected`。 |
-| `desktop.launch(argv, *, cwd=None)` | argv 是可执行文件及参数的字符串列表，不经过 shell；返回 PID。指定 cwd 时用该目录，否则 host 继承当前工作目录、background 继承创建桌面时的工作目录。应用使用该桌面的连接环境。 |
-| `desktop.close()` | 幂等关闭并等待清理；先释放虚拟输入，再撤掉提示并释放锁。host 保留用户桌面和应用；background 退出自有桌面及应用。 |
-| `with desktop:` | 进入时检查对象有效，退出时关闭。也可以直接 `with computer.create_background() as desktop:`。 |
+| 调用                                               | 约定                                                                                                                                                                          |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `computer.connect_host()`                          | 连接启动环境中的当前 Hyprland；独占加锁并等 Quickshell 接管提示就绪后返回。已占用或提示服务不可用时失败。                                                                     |
+| `computer.create_background(*, size=(1920, 1080))` | 创建独立后台桌面，宽高为正整数像素，scale=1。本机须有 `Hyprland` 和 `kwin_wayland`；输出就绪后返回。                                                                          |
+| `desktop.status`                                   | 只读：`active`、`closed`、`revoked`、`disconnected`。                                                                                                                         |
+| `desktop.launch(argv, *, cwd=None)`                | argv 是可执行文件及参数的字符串列表，不经过 shell；返回 PID。指定 cwd 时用该目录，否则 host 继承当前工作目录、background 继承创建桌面时的工作目录。应用使用该桌面的连接环境。 |
+| `desktop.close()`                                  | 幂等关闭并等待清理；先释放虚拟输入，再撤掉提示并释放锁。host 保留用户桌面和应用；background 退出自有桌面及应用。                                                              |
+| `with desktop:`                                    | 进入时检查对象有效，退出时关闭。也可以直接 `with computer.create_background() as desktop:`。                                                                                  |
 
 当前桌面独占锁位于 `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/computer-use.lock`，使用非阻塞 `flock`；PID 仅作诊断。锁文件不删除，进程退出后内核释放锁。第二个连接即使来自同一 Python 进程也立即报 busy，不排队、不抢占。
 
@@ -23,16 +23,16 @@ worker 在 cell 失败/取消和正常退出时调用内部 `_close_all()`。该
 
 ## 捕获与指针
 
-| 调用 | 约定 |
-| --- | --- |
-| `capture(*, monitor=None, window=None, rect=None, max_size=None)` | 默认捕获焦点显示器；`window` 传 `"active"` 或 `clients` 里的 `address`，捕获单个窗口内容。`max_size` 只影响图像。 |
-| `move_pointer(x, y, *, relative_to=None, relative=False)` | 默认桌面逻辑坐标；指定截图后使用其返回 PNG 的像素坐标；`relative=True` 时 x/y 是相对位移，不能与 `relative_to` 同用。 |
-| `click(x, y, *, button="left", count=1, relative_to=None)` | 移动后点击；`count` 为正整数，每次重复完整按下/松开。 |
-| `drag(start, end, *, button="left", duration=0.3, relative_to=None)` | `start/end` 为 `(x,y)`，`duration` 为非负秒数；直线移动，失败也释放按钮。路径须经过有效显示器区域。 |
-| `button_down(*buttons)` | 按住按钮，可跨 cell 保留；已持有的按钮不重复按下。 |
-| `button_up(*buttons)` | 释放当前对象持有的对应按钮；未持有的按钮无效果。 |
-| `release_buttons()` | 释放当前对象的全部按钮，不关闭桌面。 |
-| `scroll(amount, *, horizontal=False, continuous=False)` | 在当前指针处滚动；默认 amount 为整数格数，`continuous=True` 时 amount 可为小数，一个整数单位等于一格的行程。正数向下或向右，0 不操作。 |
+| 调用                                                                 | 约定                                                                                                                                   |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `capture(*, monitor=None, window=None, rect=None, max_size=None)`    | 默认捕获焦点显示器；`window` 传 `"active"` 或 `clients` 里的 `address`，捕获单个窗口内容。`max_size` 只影响图像。                      |
+| `move_pointer(x, y, *, relative_to=None, relative=False)`            | 默认桌面逻辑坐标；指定截图后使用其返回 PNG 的像素坐标；`relative=True` 时 x/y 是相对位移，不能与 `relative_to` 同用。                  |
+| `click(x, y, *, button="left", count=1, relative_to=None)`           | 移动后点击；`count` 为正整数，每次重复完整按下/松开。                                                                                  |
+| `drag(start, end, *, button="left", duration=0.3, relative_to=None)` | `start/end` 为 `(x,y)`，`duration` 为非负秒数；直线移动，失败也释放按钮。路径须经过有效显示器区域。                                    |
+| `button_down(*buttons)`                                              | 按住按钮，可跨 cell 保留；已持有的按钮不重复按下。                                                                                     |
+| `button_up(*buttons)`                                                | 释放当前对象持有的对应按钮；未持有的按钮无效果。                                                                                       |
+| `release_buttons()`                                                  | 释放当前对象的全部按钮，不关闭桌面。                                                                                                   |
+| `scroll(amount, *, horizontal=False, continuous=False)`              | 在当前指针处滚动；默认 amount 为整数格数，`continuous=True` 时 amount 可为小数，一个整数单位等于一格的行程。正数向下或向右，0 不操作。 |
 
 `click`/`drag` 的 `button` 及 `button_down`/`button_up` 的按钮名为 `left`、`right`、`middle`、`back` 或 `forward`。
 
@@ -42,24 +42,24 @@ worker 在 cell 失败/取消和正常退出时调用内部 `_close_all()`。该
 
 `Capture` 由 `desktop.capture()` 返回，不能直接构造。桌面关闭后，已有图像和像素缓冲区仍可读取：
 
-| 只读成员 | 含义 |
-| --- | --- |
-| `monitor: str` | 捕获的 Hyprland 显示器名称；窗口捕获时为窗口所在显示器。 |
-| `size: tuple[int,int]` | 图像的像素宽高，受 `max_size` 影响。 |
-| `bounds: tuple[float,float,float,float]` | 捕获区域的桌面逻辑 `(x,y,width,height)`，含裁剪偏移，可有负原点。 |
-| `buffer: PixelBuffer` | 同一区域的未缩放像素缓冲区，保留 compositor 的像素格式和位深。 |
-| `_repr_png_() -> bytes` | 按需生成 8-bit RGB PNG，用于 `display_image(shot)` 或写文件；不重新捕获、不修改 buffer。10-bit 通道映射到 0–255，缩小时使用 Lanczos3。 |
+| 只读成员                                 | 含义                                                                                                                                   |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `monitor: str`                           | 捕获的 Hyprland 显示器名称；窗口捕获时为窗口所在显示器。                                                                               |
+| `size: tuple[int,int]`                   | 图像的像素宽高，受 `max_size` 影响。                                                                                                   |
+| `bounds: tuple[float,float,float,float]` | 捕获区域的桌面逻辑 `(x,y,width,height)`，含裁剪偏移，可有负原点。                                                                      |
+| `buffer: PixelBuffer`                    | 同一区域的未缩放像素缓冲区，保留 compositor 的像素格式和位深。                                                                         |
+| `_repr_png_() -> bytes`                  | 按需生成 8-bit RGB PNG，用于 `display_image(shot)` 或写文件；不重新捕获、不修改 buffer。10-bit 通道映射到 0–255，缩小时使用 Lanczos3。 |
 
 `PixelBuffer` 不能直接构造，成员只读：
 
-| 成员 | 含义 |
-| --- | --- |
-| `data: bytes` | 未编码像素字节；每个像素占 4 字节，保留原始通道、alpha 与未使用位。每次访问复制成 Python bytes。 |
-| `size: tuple[int,int]` | 裁剪区域的原始像素宽高，不受 `max_size` 影响。 |
-| `stride: int` | 相邻行的字节距离，等于 `size[0] * 4`；无行填充。 |
-| `format: str` | compositor 提供的 `wl_shm` 格式：`argb8888`、`xrgb8888`、`abgr8888`、`xbgr8888`、`argb2101010`、`xrgb2101010`、`abgr2101010` 或 `xbgr2101010`。 |
-| `channel_bits: int` | RGB 每个通道的位数，8 或 10。 |
-| `rgb() -> list[list[tuple[int,int,int]]]` | `rows[y][x] = (R,G,B)`，保留原生整数值：8-bit 为 0–255，10-bit 为 0–1023；忽略 alpha，不缩放、不经过 PNG。 |
+| 成员                                      | 含义                                                                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data: bytes`                             | 未编码像素字节；每个像素占 4 字节，保留原始通道、alpha 与未使用位。每次访问复制成 Python bytes。                                                |
+| `size: tuple[int,int]`                    | 裁剪区域的原始像素宽高，不受 `max_size` 影响。                                                                                                  |
+| `stride: int`                             | 相邻行的字节距离，等于 `size[0] * 4`；无行填充。                                                                                                |
+| `format: str`                             | compositor 提供的 `wl_shm` 格式：`argb8888`、`xrgb8888`、`abgr8888`、`xbgr8888`、`argb2101010`、`xrgb2101010`、`abgr2101010` 或 `xbgr2101010`。 |
+| `channel_bits: int`                       | RGB 每个通道的位数，8 或 10。                                                                                                                   |
+| `rgb() -> list[list[tuple[int,int,int]]]` | `rows[y][x] = (R,G,B)`，保留原生整数值：8-bit 为 0–255，10-bit 为 0–1023；忽略 alpha，不缩放、不经过 PNG。                                      |
 
 buffer 来自 Wayland 共享内存捕获。SDK 只重排方向、裁剪和去除行填充，不改写保留像素的 4 字节；它不是包含原始行填充和方向的整块共享内存副本。格式名称描述本机字节序的 32-bit 整数位布局，不是内存字节顺序。这里的原始值指 compositor 导出的值，不保证等同于应用源颜色或显示器最终颜色。当前捕获包含鼠标指针。
 
@@ -67,15 +67,15 @@ buffer 来自 Wayland 共享内存捕获。SDK 只重排方向、裁剪和去除
 
 ## 键盘
 
-| 调用 | 约定 |
-| --- | --- |
-| `press(*keys, count=1, interval=0.05)` | keys 是一个组合键，重复整个组合；`count` 为正整数，`interval` 为组合之间的非负秒数。 |
-| `key_down(*keys)` | 整组名称验证后才发送事件，已持有的键不会重复获取。成功调用后跨 cell 保留。 |
-| `key_up(*keys)` | 整组验证后释放当前桌面对象持有的对应键；未持有的键无效果。 |
-| `hold(*keys)` | 返回 context manager；进入时获取，退出时只倒序释放本 scope 新获取的键。 |
-| `type_text(text, /, *, interval=0.0)` | 通过 Unicode/XKB 键图输入，`interval` 为字符间额外等待的非负秒数；支持换行、制表符，不使用剪贴板。 |
-| `held_keys()` | 按获取顺序返回当前桌面对象持有键的规范 XKB 名称元组；不查询物理键盘。 |
-| `release_keys()` | 释放当前对象的全部键和虚拟修饰状态，不关闭桌面。 |
+| 调用                                   | 约定                                                                                               |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `press(*keys, count=1, interval=0.05)` | keys 是一个组合键，重复整个组合；`count` 为正整数，`interval` 为组合之间的非负秒数。               |
+| `key_down(*keys)`                      | 整组名称验证后才发送事件，已持有的键不会重复获取。成功调用后跨 cell 保留。                         |
+| `key_up(*keys)`                        | 整组验证后释放当前桌面对象持有的对应键；未持有的键无效果。                                         |
+| `hold(*keys)`                          | 返回 context manager；进入时获取，退出时只倒序释放本 scope 新获取的键。                            |
+| `type_text(text, /, *, interval=0.0)`  | 通过 Unicode/XKB 键图输入，`interval` 为字符间额外等待的非负秒数；支持换行、制表符，不使用剪贴板。 |
+| `held_keys()`                          | 按获取顺序返回当前桌面对象持有键的规范 XKB 名称元组；不查询物理键盘。                              |
+| `release_keys()`                       | 释放当前对象的全部键和虚拟修饰状态，不关闭桌面。                                                   |
 
 文本输入每字符发送后保留 4 ms 投递时间，避免 XWayland 应用尚未处理旧按键时就收到下一块文字的键图；`interval` 在此基础上增加间隔。切换到文字键图前还会等待先前的键盘输入，例如 Ctrl+A。协议返回不代表目标应用已完成处理，慢应用可增加 `interval`，操作后仍须观察结果。
 
@@ -83,13 +83,13 @@ buffer 来自 Wayland 共享内存捕获。SDK 只重排方向、裁剪和去除
 
 常用别名与 XKB 名称（忽略大小写，`esc` 与 `escape` 等价）：
 
-| 别名 | 规范名称 |
-| --- | --- |
-| `ctrl`, `shift`, `alt`, `super` | `Control_L`, `Shift_L`, `Alt_L`, `Super_L` |
-| `enter`, `escape`, `tab`, `backspace` | `Return`, `Escape`, `Tab`, `BackSpace` |
-| `delete`, `insert`, `home`, `end` | `Delete`, `Insert`, `Home`, `End` |
-| `left`, `right`, `up`, `down` | `Left`, `Right`, `Up`, `Down` |
-| `pageup`, `pagedown`, `space` | `Prior`, `Next`, `space` |
+| 别名                                  | 规范名称                                   |
+| ------------------------------------- | ------------------------------------------ |
+| `ctrl`, `shift`, `alt`, `super`       | `Control_L`, `Shift_L`, `Alt_L`, `Super_L` |
+| `enter`, `escape`, `tab`, `backspace` | `Return`, `Escape`, `Tab`, `BackSpace`     |
+| `delete`, `insert`, `home`, `end`     | `Delete`, `Insert`, `Home`, `End`          |
+| `left`, `right`, `up`, `down`         | `Left`, `Right`, `Up`, `Down`              |
+| `pageup`, `pagedown`, `space`         | `Prior`, `Next`, `space`                   |
 
 也接受 `Control_R`、`Shift_R`、`Alt_R`、`Super_R`、`F1` 等 US 键图基础层中存在的 XKB 名称。空格和 US 未加 Shift 的标点可直接作为键名：`` ` ``、`-`、`=`、`[`、`]`、`\`、`;`、`'`、`,`、`.`、`/`；也可使用对应 XKB 名称 `grave`、`minus`、`equal`、`bracketleft`、`bracketright`、`backslash`、`semicolon`、`apostrophe`、`comma`、`period`、`slash`。
 

@@ -1,11 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use pyo3::{
     exceptions::{PyKeyError, PyRuntimeError, PyValueError},
     prelude::*,
     types::{PyDict, PyList},
 };
-use reqwest::{blocking::Client, Method};
-use serde_json::{json, Value};
+use reqwest::{Method, blocking::Client};
+use serde_json::{Value, json};
 use std::{env, fs, path::PathBuf, time::Duration};
 
 pub fn python_error(error: anyhow::Error) -> PyErr {

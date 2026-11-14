@@ -86,13 +86,15 @@ buffer_id, before = editor.run(
 )
 editor.showcast.start(
     title="重命名讲解",
-    stops=[{
-        "buffer": buffer_id,
-        "position": (1, 0),
-        "title": "拟重命名 old_name",
-        "comment": "查看名称变化；按 <leader>up 对照原文。",
-        "proposed_text": before.replace("old_name", "new_name"),
-    }],
+    stops=[
+        {
+            "buffer": buffer_id,
+            "position": (1, 0),
+            "title": "拟重命名 old_name",
+            "comment": "查看名称变化；按 <leader>up 对照原文。",
+            "proposed_text": before.replace("old_name", "new_name"),
+        }
+    ],
 )
 ```
 
@@ -121,6 +123,7 @@ def inspect(nv):
             "buffer": nv.current.buffer.handle,
         },
     }
+
 
 print(editor.run(inspect))
 ```

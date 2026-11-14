@@ -8,7 +8,9 @@
 import computer_use as computer
 
 desktop = computer.create_background(size=(1920, 1080))
-pid = desktop.launch(["kitty", "--class", "pi-work", "bash"], cwd="/home/wanger/dotfiles")
+pid = desktop.launch(
+    ["kitty", "--class", "pi-work", "bash"], cwd="/home/wanger/dotfiles"
+)
 clients = desktop.hyprland.query("clients")
 print(clients)
 display_image(desktop.capture(max_size=1600))
@@ -49,7 +51,7 @@ clients = desktop.hyprland.query("clients")
 target = next(c for c in clients if c["title"] == "nvim")
 desktop.hyprland.dispatch(f'hl.dsp.focus({{ window = "address:{target["address"]}" }})')
 desktop.hyprland.dispatch('hl.dsp.window.close({ window = "class:mpv" })')
-desktop.hyprland.dispatch('hl.dsp.window.float({ window = hl.get_active_window() })')
+desktop.hyprland.dispatch("hl.dsp.window.float({ window = hl.get_active_window() })")
 ```
 
 ## 裁剪后点击

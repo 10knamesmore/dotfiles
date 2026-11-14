@@ -6,12 +6,15 @@
 
 ```python
 import browser_use as browser
+
 session = browser.launch(headless=True)
+
 
 async def inspect(context):
     page = await context.new_page()
     await page.goto("https://example.com")
     return await page.title(), await page.screenshot()
+
 
 title, image = session.run(inspect)
 print(title)

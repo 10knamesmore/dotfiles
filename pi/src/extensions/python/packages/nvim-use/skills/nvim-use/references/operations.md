@@ -13,35 +13,50 @@ def read_buffer(nv):
         "modified": buf.options["modified"],
     }
 
+
 before = editor.run(read_buffer)
 ```
 
 原生修改进入 Neovim undo 历史；保存是单独操作。把版本检查和修改放在同一次 Neovim 执行中，避免中间穿插用户输入：
 
 ```python
-editor.lua('''
+editor.lua(
+    """
 local buffer, expected, first, last, lines = ...
 assert(vim.api.nvim_buf_get_changedtick(buffer) == expected, 'Buffer changed')
 vim.api.nvim_buf_set_lines(buffer, first, last, true, lines)
-''', buffer_id, before["changedtick"], start_line, end_line, replacement_lines)
+""",
+    buffer_id,
+    before["changedtick"],
+    start_line,
+    end_line,
+    replacement_lines,
+)
 ```
 
 保存指定 buffer 可使用 `vim.api.nvim_buf_call`，不要为保存切换用户窗口：
 
 ```python
-editor.lua('''
+editor.lua(
+    """
 local buffer = ...
 vim.api.nvim_buf_call(buffer, function() vim.cmd.write() end)
-''', buffer_id)
+""",
+    buffer_id,
+)
 ```
 
 ## Tabs、windows 与导航
 
 ```python
-print(editor.run(lambda nv: [
-    {"tab": tab.handle, "windows": [win.handle for win in tab.windows]}
-    for tab in nv.tabpages
-]))
+print(
+    editor.run(
+        lambda nv: [
+            {"tab": tab.handle, "windows": [win.handle for win in tab.windows]}
+            for tab in nv.tabpages
+        ]
+    )
+)
 
 # 明确要求导航时才改变焦点。
 editor.run(lambda nv: nv.api.set_current_win(window_id))
@@ -56,15 +71,23 @@ editor.command("vsplit")
 workspace_edit = editor.lsp.request(
     client_id=client_id,
     method="textDocument/rename",
-    params={"textDocument": {"uri": uri}, "position": position, "newName": "load_config"},
+    params={
+        "textDocument": {"uri": uri},
+        "position": position,
+        "newName": "load_config",
+    },
 )
 print(workspace_edit)
 
-editor.lua('''
+editor.lua(
+    """
 local client_id, edit = ...
 local client = assert(vim.lsp.get_client_by_id(client_id))
 vim.lsp.util.apply_workspace_edit(edit, client.offset_encoding)
-''', client_id, workspace_edit)
+""",
+    client_id,
+    workspace_edit,
+)
 ```
 
 应用使用 Neovim 的原生编辑规则和文档版本检查。请求到应用期间用户可能继续输入；对未携带文档版本的编辑，应用前核对相关 buffer 的 `changedtick`。多文件操作按 Neovim 的顺序应用，失败时检查已经修改的文件。

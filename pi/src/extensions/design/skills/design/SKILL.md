@@ -17,6 +17,7 @@ description: 创建和迭代产品 UI、可交互原型与多方案设计；读�
 
    ```python
    import pi_design
+
    project = pi_design.open("/absolute/project/path", name="项目名称")
    ```
 
@@ -28,6 +29,7 @@ description: 创建和迭代产品 UI、可交互原型与多方案设计；读�
 
 ```python
 import pi_design
+
 project = pi_design.current()
 state = project.read_state()
 print(state)

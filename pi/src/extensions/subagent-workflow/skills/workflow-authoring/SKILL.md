@@ -14,11 +14,23 @@ replays on resume. The script starts with a literal `meta` header and uses the
 injected globals; imports are unavailable.
 
 ```js
-export const meta = { name: 'audit-routes', description: 'Audit routes', phases: [{ title: 'Discover' }, { title: 'Audit' }] }
-const result = await agent('List route files', { model: 'mid', schema: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } } }, required: ['files'], additionalProperties: false } })
-const files = result?.files.filter(Boolean) ?? []
-phase('Audit')
-return parallel(files.map(file => () => agent('Audit ' + file, { model: 'high' })))
+export const meta = {
+  name: "audit-routes",
+  description: "Audit routes",
+  phases: [{ title: "Discover" }, { title: "Audit" }],
+};
+const result = await agent("List route files", {
+  model: "mid",
+  schema: {
+    type: "object",
+    properties: { files: { type: "array", items: { type: "string" } } },
+    required: ["files"],
+    additionalProperties: false,
+  },
+});
+const files = result?.files.filter(Boolean) ?? [];
+phase("Audit");
+return parallel(files.map((file) => () => agent("Audit " + file, { model: "high" })));
 ```
 
 `meta.name` must be kebab-case; `description` is required; `phases` is
@@ -138,13 +150,13 @@ quarantined directory rather than removing the marker.
 The parent calls `agents` outside the workflow script:
 
 ```js
-agents({ action: "list", status: "live" })
-agents({ action: "peek", runId })
-agents({ action: "peek", runId, childId, messages: 6 })
-agents({ action: "wait", runId })
-agents({ action: "send_message", runId, childId, message: "Focus on the storage module." })
-agents({ action: "stop", runId, childId })
-agents({ action: "stop", runId })
+agents({ action: "list", status: "live" });
+agents({ action: "peek", runId });
+agents({ action: "peek", runId, childId, messages: 6 });
+agents({ action: "wait", runId });
+agents({ action: "send_message", runId, childId, message: "Focus on the storage module." });
+agents({ action: "stop", runId, childId });
+agents({ action: "stop", runId });
 ```
 
 Views include orchestrated runs for the current parent session and cwd.

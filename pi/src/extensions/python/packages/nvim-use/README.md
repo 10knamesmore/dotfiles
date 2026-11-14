@@ -19,28 +19,28 @@ editor.disconnect()
 
 ## 接口
 
-| 入口 | 行为 |
-| --- | --- |
-| `discover()` | 读取活实例的登记摘要，不占用连接 |
-| `connect(instance_id=..., timeout=10)` | 按完整 ID 显式连接 |
-| `select(instance_id=..., timeout=10)` | 连接并设为当前选择，成功后释放上一个选择 |
-| `current()` | 取回 `/nvim` 或 `select()` 选定的活连接 |
-| `editor.run(callback, timeout=30)` | 同步 callback 接收原生 `pynvim.Nvim` |
-| `editor.lua(code, *args, timeout=30)` | 原生 `nvim_exec_lua` |
-| `editor.command(command, timeout=30)` | 原生 Ex command |
-| `editor.on_notification(handler)` | 注册原生通知回调；`None` 清除 |
-| `editor.lsp.clients()` | client ID、workspace、编码、能力、buffers |
-| `editor.lsp.request(method=..., client_id=..., params=..., timeout=30)` | 任意标准／扩展 LSP 请求，返回原生结果 |
-| `editor.lsp.request(method=..., buffer=..., editor_position=..., params=...)` | 从编辑器位置构造请求，`params` 补充方法字段 |
-| `editor.lsp.position_params(method=..., buffer=..., editor_position=..., client_id=...)` | 单独返回 `{client_id, params}` |
-| `editor.lsp.notify(client_id=..., method=..., params=...)` | 原生 LSP notification |
-| `editor.lsp.open_document(client_id=..., uri=...)` | 后台加载并附着指定 client，返回 buffer ID |
-| `editor.lsp.execute_command(client_id=..., command=..., buffer=..., timeout=30)` | 执行客户端或服务端 LSP Command |
-| `editor.showcast.start(title=..., stops=[...])` | 当前代码窗口中发布带高亮与 Markdown 浮窗说明的 tour，不创建 tab 或分屏 |
-| `editor.showcast.toggle_comment()` | 显示／隐藏当前站的说明 |
-| `editor.showcast.toggle_diff()` | 显示／隐藏当前站的 diff，开关跨站保留 |
-| `editor.showcast.stop()` | 结束 tour，清除高亮、diff 并恢复按键、原 buffer、视图和 winbar |
-| `editor.disconnect()` | 断开连接，保留 Neovim、buffers 和 LSP |
+| 入口                                                                                     | 行为                                                                   |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `discover()`                                                                             | 读取活实例的登记摘要，不占用连接                                       |
+| `connect(instance_id=..., timeout=10)`                                                   | 按完整 ID 显式连接                                                     |
+| `select(instance_id=..., timeout=10)`                                                    | 连接并设为当前选择，成功后释放上一个选择                               |
+| `current()`                                                                              | 取回 `/nvim` 或 `select()` 选定的活连接                                |
+| `editor.run(callback, timeout=30)`                                                       | 同步 callback 接收原生 `pynvim.Nvim`                                   |
+| `editor.lua(code, *args, timeout=30)`                                                    | 原生 `nvim_exec_lua`                                                   |
+| `editor.command(command, timeout=30)`                                                    | 原生 Ex command                                                        |
+| `editor.on_notification(handler)`                                                        | 注册原生通知回调；`None` 清除                                          |
+| `editor.lsp.clients()`                                                                   | client ID、workspace、编码、能力、buffers                              |
+| `editor.lsp.request(method=..., client_id=..., params=..., timeout=30)`                  | 任意标准／扩展 LSP 请求，返回原生结果                                  |
+| `editor.lsp.request(method=..., buffer=..., editor_position=..., params=...)`            | 从编辑器位置构造请求，`params` 补充方法字段                            |
+| `editor.lsp.position_params(method=..., buffer=..., editor_position=..., client_id=...)` | 单独返回 `{client_id, params}`                                         |
+| `editor.lsp.notify(client_id=..., method=..., params=...)`                               | 原生 LSP notification                                                  |
+| `editor.lsp.open_document(client_id=..., uri=...)`                                       | 后台加载并附着指定 client，返回 buffer ID                              |
+| `editor.lsp.execute_command(client_id=..., command=..., buffer=..., timeout=30)`         | 执行客户端或服务端 LSP Command                                         |
+| `editor.showcast.start(title=..., stops=[...])`                                          | 当前代码窗口中发布带高亮与 Markdown 浮窗说明的 tour，不创建 tab 或分屏 |
+| `editor.showcast.toggle_comment()`                                                       | 显示／隐藏当前站的说明                                                 |
+| `editor.showcast.toggle_diff()`                                                          | 显示／隐藏当前站的 diff，开关跨站保留                                  |
+| `editor.showcast.stop()`                                                                 | 结束 tour，清除高亮、diff 并恢复按键、原 buffer、视图和 winbar         |
+| `editor.disconnect()`                                                                    | 断开连接，保留 Neovim、buffers 和 LSP                                  |
 
 超时单位是秒。LSP 参数的 `line` / `character` 使用原生 0-based 坐标和 client 编码。`editor_position` 使用 pynvim 光标的 `(1-based row, 0-based UTF-8 byte column)`。
 
@@ -55,13 +55,15 @@ Showcast 由 Neovim 管理站点切换，不需要 Python 持续运行。`n/N` �
 ```python
 editor.showcast.start(
     title="配置修改",
-    stops=[{
-        "buffer": "/absolute/project/config.py",
-        "position": (1, 0),
-        "title": "启用配置",
-        "comment": "绿色虚拟行是拟修改内容，原文未变。",
-        "proposed_text": "enabled = True\n",
-    }],
+    stops=[
+        {
+            "buffer": "/absolute/project/config.py",
+            "position": (1, 0),
+            "title": "启用配置",
+            "comment": "绿色虚拟行是拟修改内容，原文未变。",
+            "proposed_text": "enabled = True\n",
+        }
+    ],
 )
 editor.showcast.toggle_diff()
 editor.showcast.stop()

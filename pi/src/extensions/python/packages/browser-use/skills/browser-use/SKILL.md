@@ -13,12 +13,15 @@ description: 在同步 python_repl 中，通过 browser_use 管理 Chrome/Chromi
 
 ```python
 import browser_use as browser
+
 session = browser.launch(headless=True)
+
 
 async def open_page(context):
     page = await context.new_page()
     await page.goto("https://example.com")
     return page, await page.title(), await page.screenshot()
+
 
 page, title, image = session.run(open_page)
 print(title)
@@ -50,6 +53,7 @@ Linux Hyprland 中，可将 computer-use 已确认窗口的 PID 传给 `browser.
 async def inspect_tabs(context):
     return [(page, await page.title(), page.url) for page in context.pages]
 
+
 tabs = session.run(inspect_tabs)
 print([(index, title, url) for index, (_, title, url) in enumerate(tabs)])
 # 根据实际输出选定索引，再把 tabs[选定索引][0] 保存为 page。
@@ -71,6 +75,7 @@ async def fill_form(context):
     await page.get_by_role("button", name="搜索").click()
     return await page.locator("body").aria_snapshot()
 
+
 print(session.run(fill_form))
 ```
 
@@ -86,8 +91,8 @@ print(session.run(fill_form))
 
 超时或 Python 中断会取消当前回调，不回滚已送达 Chrome 的动作。普通异常/取消不主动关闭仍存活的会话；重新观察页面后再决定下一步。若回调阻塞或拒绝取消，Pi 的外层超时可能强杀 worker，并回收已登记的独立浏览器。worker 正常退出自动 `browser.close_all()`。
 
-| 内容 | 参考 |
-| --- | --- |
-| Pi 适配接口、线程、超时与日志 | [API](references/api.md) |
-| 桌面接入、下载、事件与回调示例 | [操作流程](references/patterns.md) |
+| 内容                           | 参考                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| Pi 适配接口、线程、超时与日志  | [API](references/api.md)                                               |
+| 桌面接入、下载、事件与回调示例 | [操作流程](references/patterns.md)                                     |
 | 回调内 Page/Locator 等原生 API | [Playwright Python](https://playwright.dev/python/docs/api/class-page) |

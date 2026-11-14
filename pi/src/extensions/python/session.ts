@@ -14,13 +14,7 @@ const INTERRUPT_GRACE_MS = 1_000;
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 
 export type PythonOutcome =
-  | "completed"
-  | "python_error"
-  | "interrupted"
-  | "timed_out"
-  | "process_exited"
-  | "startup_error"
-  | "output_error";
+  "completed" | "python_error" | "interrupted" | "timed_out" | "process_exited" | "startup_error" | "output_error";
 
 /** Execution metadata used for UI status and the model's state-loss notice. */
 export interface PythonToolDetails {
