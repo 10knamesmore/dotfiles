@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ParentContext } from "../src/runner/child.js";
 import { createDeliveryBody, DELIVERY_MESSAGE_TYPE, type DeliveryMessageDetails } from "../src/delivery-message.js";
-import { subagentRunner } from "../src/runner/runner.js";
+import { SubagentRunner } from "../src/runner/runner.js";
 import { preflightSubprocessChild } from "../src/runner/subprocess/spawn-child.js";
 import {
   acknowledgeDeliveryMessage,
@@ -57,21 +57,16 @@ type TerminalStatus = "completed" | "failed" | "aborted";
 
 function createNavigatorFollowUp(
   pi: ExtensionAPI,
+  runner: SubagentRunner,
   extensionPath: string,
   widget: SubagentStatusWidget,
 ): NavigatorFollowUp {
-  const runner = subagentRunner;
-
   return {
     send(runId, childId, prompt, ctx) {
       const message = prompt.trim();
       if (!message) throw new Error("Follow-up message must not be empty");
       if (message.startsWith("/")) throw new Error("Slash commands are not supported in agent follow-up messages");
-      const resolved = resolveFollowUpSpec(
-        `${runId}/${childId}`,
-        `${FOLLOW_UP_PROMPT_PREFIX}${message}`,
-        ctx.sessionManager.getSessionId(),
-      );
+      const resolved = resolveFollowUpSpec(runner, `${runId}/${childId}`, `${FOLLOW_UP_PROMPT_PREFIX}${message}`);
       const parent: ParentContext = {
         ctx,
         thinkingLevel: pi.getThinkingLevel() as ThinkingLevel,
@@ -329,25 +324,28 @@ function persistedRunLabel(record: Record<string, unknown> | undefined): string 
 export default function subagentWorkflow(pi: ExtensionAPI): void {
   pi.on("resources_discover", () => ({ skillPaths: [WORKFLOW_AUTHORING_SKILL] }));
 
-  const widget = new SubagentStatusWidget(subagentRunner);
-  const usageFooter = new SubagentUsageFooter(subagentRunner);
+  // Pi creates a new extension runtime for each session start, switch and reload.
+  const runner = new SubagentRunner();
+  const widget = new SubagentStatusWidget(runner);
+  const usageFooter = new SubagentUsageFooter(runner);
   const settings = readPersonalConfig()["subagent-workflow"];
-  applyWorkflowSettings(settings, widget);
+  applyWorkflowSettings(settings, runner, widget);
   registerEntryMarkers(pi);
   registerDeliveryMessageRenderer(pi);
   registerModelTiersCommand(pi);
   registerModelTierGuidance(pi);
-  registerSubagentTool(pi, selfPath, widget);
-  registerAgentsTool(pi);
+  registerSubagentTool(pi, runner, selfPath, widget);
+  registerAgentsTool(pi, runner);
   const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => {
     usageFooter.trackRun(run.runId, ctx);
     widget.observeWorkflowStarted(run, ctx);
   };
-  registerWorkflowTool(pi, selfPath, { approvalPolicy: settings.workflowApproval, observeRun });
+  registerWorkflowTool(pi, selfPath, { runner, approvalPolicy: settings.workflowApproval, observeRun });
 
   // /agents is the canonical name; /workflows stays registered as a public alias.
   const openNavigator = registerNavigator(pi, {
-    followUp: createNavigatorFollowUp(pi, selfPath, widget),
+    runner,
+    followUp: createNavigatorFollowUp(pi, runner, selfPath, widget),
   });
   pi.registerShortcut("shift+down", {
     description: "Open the agent navigator (/agents)",
@@ -394,7 +392,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     } catch (error) {
       reportDiagnostic(`[subagent-workflow] startup catch-up failed: ${errorMessage(error)}`);
     }
-    subagentRunner.restoreSession(sessionId, (script) => parseWorkflowScript(script).meta.name);
+    runner.restoreSession(sessionId, (script) => parseWorkflowScript(script).meta.name);
     usageFooter.attach(ctx);
   });
   pi.on("session_shutdown", async (_event, ctx) => {
@@ -412,7 +410,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
       reportDiagnostic(`[subagent-workflow] usage footer disposal failed: ${errorMessage(error)}`);
     }
     try {
-      await subagentRunner.disposeForSession(sessionId);
+      await runner.dispose();
     } catch (error) {
       reportDiagnostic(`[subagent-workflow] child disposal failed: ${errorMessage(error)}`);
     }

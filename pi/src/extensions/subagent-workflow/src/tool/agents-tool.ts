@@ -5,11 +5,10 @@ import {
   type AgentToolResult,
   type AgentToolUpdateCallback,
   type ExtensionAPI,
-  type ExtensionContext,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import { subagentRunner } from "../runner/runner.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import { isLiveStatus } from "../store/run-projection.js";
 import type { ChildRow, RunSummary } from "../store/run-projection.js";
 import { readSessionMessages, type TranscriptMessage } from "../store/session-transcript.js";
@@ -172,9 +171,8 @@ const Output = Type.Union([
 type Output = Static<typeof Output>;
 
 /** Only the current parent's orchestrated runs belong in its model context. */
-function sessionRuns(ctx: ExtensionContext): RunSummary[] {
-  const sessionId = ctx.sessionManager.getSessionId();
-  return subagentRunner.sessionRuns(sessionId).filter((run) => !run.directDelivery);
+function sessionRuns(runner: SubagentRunner): RunSummary[] {
+  return runner.sessionRuns().filter((run) => !run.directDelivery);
 }
 
 function validateInput(input: Input): void {
@@ -216,7 +214,7 @@ function preview(text: string, maxBytes = 512): string {
   return clipped.truncated || prefix.length < text.length ? `${clipped.content}\n[truncated; see artifacts]` : text;
 }
 
-function runOverview(run: RunSummary): Static<typeof RunOverview> {
+function runOverview(runner: SubagentRunner, run: RunSummary): Static<typeof RunOverview> {
   return {
     runId: run.runId,
     runDir: run.runDir,
@@ -225,12 +223,12 @@ function runOverview(run: RunSummary): Static<typeof RunOverview> {
     status: run.status,
     done: run.done,
     total: run.total,
-    canStop: subagentRunner.isRunActive(run.runId),
+    canStop: runner.isRunActive(run.runId),
   };
 }
 
-function childOverview(runId: string, child: ChildRow): Static<typeof ChildOverview> {
-  const handle = subagentRunner.get(child.id);
+function childOverview(runner: SubagentRunner, runId: string, child: ChildRow): Static<typeof ChildOverview> {
+  const handle = runner.get(child.id);
   return {
     childId: child.id,
     label: preview(child.label),
@@ -280,8 +278,8 @@ function runArtifacts(run: RunSummary): string[] {
   ];
 }
 
-async function waitForRun(runId: string, signal?: AbortSignal): Promise<void> {
-  const completion = subagentRunner.waitRun(runId);
+async function waitForRun(runner: SubagentRunner, runId: string, signal?: AbortSignal): Promise<void> {
+  const completion = runner.waitRun(runId);
   if (!signal) {
     await completion;
     return;
@@ -371,13 +369,13 @@ function resultSnapshot(input: Input, output: Output, target?: string): AgentsTo
 }
 
 async function executeAction(
+  runner: SubagentRunner,
   input: Input,
-  ctx: ExtensionContext,
   onUpdate: AgentToolUpdateCallback<AgentsToolSnapshot | undefined> | undefined,
   signal: AbortSignal | undefined,
 ): Promise<ActionResult> {
   validateInput(input);
-  const runs = sessionRuns(ctx);
+  const runs = sessionRuns(runner);
   if (input.action === "list") {
     const filtered = runs.filter((run) =>
       !input.status || input.status === "all"
@@ -387,13 +385,13 @@ async function executeAction(
           : run.status === input.status,
     );
     const { items, ...pagination } = page(filtered, input.offset, input.limit);
-    const output: Output = { action: "list", runs: items.map(runOverview), ...pagination };
+    const output: Output = { action: "list", runs: items.map((run) => runOverview(runner, run)), ...pagination };
     return { output, snapshot: resultSnapshot(input, output) };
   }
 
   const run = runs.find((candidate) => candidate.runId === input.runId);
   if (!run) throw new Error(`No orchestrated run ${input.runId} belongs to this session; use agents list`);
-  const detail = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
+  const detail = runner.runDetail(run.runId);
   if (detail.corrupt) throw new Error(`Cannot read run ${run.runId}; inspect ${run.runDir}`);
   const child = input.childId ? detail.children.find((candidate) => candidate.id === input.childId) : undefined;
   if (input.childId && !child) throw new Error(`Child ${input.childId} does not belong to run ${run.runId}`);
@@ -416,18 +414,18 @@ async function executeAction(
   };
 
   if (input.action === "wait") {
-    await waitForRun(run.runId, signal);
-    const detail = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
+    await waitForRun(runner, run.runId, signal);
+    const detail = runner.runDetail(run.runId);
     if (isLiveStatus(detail.status)) {
       throw new Error(`Run ${run.runId} is still active in another process; wait requires its owning Pi process`);
     }
-    const finalRun = sessionRuns(ctx).find((candidate) => candidate.runId === run.runId);
+    const finalRun = sessionRuns(runner).find((candidate) => candidate.runId === run.runId);
     if (!finalRun) throw new Error(`Run ${run.runId} disappeared before wait completed`);
     const artifacts = runArtifacts(finalRun).filter(existsSync);
     return finish({
       action: "wait",
-      run: runOverview(finalRun),
-      children: detail.children.map((row) => childOverview(finalRun.runId, row)),
+      run: runOverview(runner, finalRun),
+      children: detail.children.map((row) => childOverview(runner, finalRun.runId, row)),
       total: detail.children.length,
       phases: detail.phases.map((phase) => preview(phase.title)),
       recentProgress: detail.narrator.slice(-10).map((line) => preview(line.text)),
@@ -437,7 +435,7 @@ async function executeAction(
 
   if (input.action === "peek") {
     if (child) {
-      const live = subagentRunner.liveSession(child.id);
+      const live = runner.liveSession(child.id);
       const sessionFile = live?.sessionFile ?? child.sessionFile;
       const messages = sessionFile ? readSessionMessages(sessionFile) : [];
       const count = input.messages ?? 6;
@@ -445,7 +443,7 @@ async function executeAction(
       return finish({
         action: "peek",
         runId: run.runId,
-        child: childOverview(run.runId, child),
+        child: childOverview(runner, run.runId, child),
         prompt: preview(child.spec.prompt, 4_000),
         ...(child.result
           ? {
@@ -465,8 +463,8 @@ async function executeAction(
     const { items, ...pagination } = page(detail.children, input.offset, input.limit);
     return finish({
       action: "peek",
-      run: runOverview(run),
-      children: items.map((row) => childOverview(run.runId, row)),
+      run: runOverview(runner, run),
+      children: items.map((row) => childOverview(runner, run.runId, row)),
       ...pagination,
       phases: detail.phases.map((phase) => preview(phase.title)),
       recentProgress: detail.narrator.slice(-10).map((line) => preview(line.text)),
@@ -475,12 +473,12 @@ async function executeAction(
   }
 
   if (input.action === "stop" && !child) {
-    if (subagentRunner.isRunActive(run.runId)) {
-      await subagentRunner.stopRun(run.runId);
+    if (runner.isRunActive(run.runId)) {
+      await runner.stopRun(run.runId);
     } else if (isLiveStatus(run.status)) {
       throw new Error(`Run ${run.runId} is owned by another process; stop it from that Pi instance`);
     }
-    const stopped = subagentRunner.runDetail(ctx.sessionManager.getSessionId(), run.runId);
+    const stopped = runner.runDetail(run.runId);
     return finish(
       {
         action: "stop",
@@ -491,7 +489,7 @@ async function executeAction(
     );
   }
 
-  const handle = subagentRunner.get(child!.id);
+  const handle = runner.get(child!.id);
   if (input.action === "stop" && !isLiveStatus(child!.status)) {
     return finish({ action: "stop", runId: run.runId, childId: child!.id, status: child!.status });
   }
@@ -506,7 +504,7 @@ async function executeAction(
   return finish({ action: "send_message", runId: run.runId, childId: child!.id, accepted: true });
 }
 
-export function registerAgentsTool(pi: ExtensionAPI): void {
+export function registerAgentsTool(pi: ExtensionAPI, runner: SubagentRunner): void {
   const tool: ToolDefinition<typeof Parameters, AgentsToolSnapshot | undefined, AgentsToolRenderState> = {
     name: "agents",
     label: "Agents",
@@ -514,8 +512,8 @@ export function registerAgentsTool(pi: ExtensionAPI): void {
     parameters: Parameters,
     outputSchema: Output,
     executionMode: "sequential",
-    async execute(_toolCallId, input, signal, onUpdate, ctx): Promise<AgentToolResult<AgentsToolSnapshot | undefined>> {
-      const { output, snapshot } = await executeAction(input, ctx, onUpdate, signal);
+    async execute(_toolCallId, input, signal, onUpdate): Promise<AgentToolResult<AgentsToolSnapshot | undefined>> {
+      const { output, snapshot } = await executeAction(runner, input, onUpdate, signal);
       const text = JSON.stringify(output, null, 2);
       const clipped = truncateHead(text, { maxBytes: 48_000, maxLines: 1_500 });
       return {

@@ -22,7 +22,7 @@ import {
 import { queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
 import { sumUsage } from "../store/run-store.js";
 import { hasSessionClosedMarker } from "../store/session-closed-marker.js";
-import { subagentRunner, type SubagentRunner } from "../runner/runner.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import { initialDetails, renderCallHeader, renderSubagentResult, type SubagentDetails } from "../ui/tool-render.js";
 import { appendEntrySafely } from "../ui/entry-markers.js";
 import { buildDeliveryEnvelope } from "../ui/delivery-envelope.js";
@@ -104,11 +104,11 @@ export function validateSubagentInput(params: SubagentToolInput): ValidatedSubag
   };
 }
 
-export function resolveFollowUpSpec(id: string, prompt: string, sessionId: string): ResolvedFollowUpSpec {
+export function resolveFollowUpSpec(runner: SubagentRunner, id: string, prompt: string): ResolvedFollowUpSpec {
   const qualified = parseQualifiedFollowUpId(id);
-  for (const run of subagentRunner.sessionRuns(sessionId)) {
+  for (const run of runner.sessionRuns()) {
     if (qualified && run.runId !== qualified.runId) continue;
-    const detail = subagentRunner.runDetail(sessionId, run.runId);
+    const detail = runner.runDetail(run.runId);
     const child = detail.children.find((child) => child.id === (qualified?.childId ?? id));
     if (!child) continue;
     if (detail.corrupt) throw new Error(`Cannot follow up ${id}: source run is unreadable`);
@@ -148,7 +148,6 @@ function isTerminalStatus(value: unknown): value is Extract<SubagentStatus, "com
 }
 
 type Detailed = AgentToolResult<SubagentDetails | undefined>;
-type FollowUpResolver = (id: string, prompt: string, sessionId: string) => ResolvedFollowUpSpec;
 
 /**
  * Retitle a forked child when the caller named the new turn.
@@ -164,10 +163,9 @@ export function withFollowUpLabel(resolved: ResolvedFollowUpSpec, label: string 
 
 export function registerSubagentTool(
   pi: ExtensionAPI,
+  runner: SubagentRunner,
   selfPath: string,
   widget?: SubagentStatusWidget,
-  runner: SubagentRunner = subagentRunner,
-  resolveFollowUp: FollowUpResolver = resolveFollowUpSpec,
 ): void {
   const tool: ToolDefinition<typeof SubagentToolParameters, SubagentDetails | undefined> = {
     name: "subagent",
@@ -184,7 +182,7 @@ export function registerSubagentTool(
       }
       const spawnSpec: ChildSpawnSpec =
         input.type === "followUp"
-          ? withFollowUpLabel(resolveFollowUp(input.id, input.prompt, ctx.sessionManager.getSessionId()), input.label)
+          ? withFollowUpLabel(resolveFollowUpSpec(runner, input.id, input.prompt), input.label)
           : resolveTierSpec(input.spec, readPersonalConfig()["model-tier"], ctx.modelRegistry);
       const spec = submittedSpec(spawnSpec);
       // A child doomed by an unknown model fails fast with a suggestion instead

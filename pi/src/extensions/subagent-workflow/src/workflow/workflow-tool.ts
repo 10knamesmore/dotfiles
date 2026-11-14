@@ -2,6 +2,7 @@ import type { AgentToolResult, ExtensionAPI, ExtensionContext, ToolDefinition } 
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { Type, type Static } from "typebox";
 import type { ParentContext } from "../runner/child.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import type { ThinkingLevel, WorkflowPhase } from "../types.js";
 import { sanitizeTerminalText, sanitizeTerminalTextChunks, UNTRUSTED_FIELD_MAX } from "../ui/sanitize.js";
 import { reportDiagnostic } from "../diagnostics.js";
@@ -57,6 +58,7 @@ const WorkflowToolParameters = Type.Object(
 type WorkflowToolInput = Static<typeof WorkflowToolParameters>;
 
 interface WorkflowToolServices {
+  runner: SubagentRunner;
   approvalPolicy: WorkflowApprovalPolicy;
   observeRun?: (run: StartedWorkflow, ctx: ExtensionContext) => void;
 }
@@ -99,6 +101,7 @@ export function isWorkflowDetails(value: unknown): value is WorkflowToolDetails 
 }
 
 export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, services: WorkflowToolServices): void {
+  const { runner } = services;
   const tool: ToolDefinition<typeof WorkflowToolParameters, WorkflowToolDetails | undefined> = {
     name: "workflow",
     label: "Workflow",
@@ -130,6 +133,7 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
       const headless = !ctx.hasUI;
       const { started, execution } = await launchWorkflow(
         pi,
+        runner,
         parent,
         {
           plan,
@@ -156,13 +160,16 @@ export function registerWorkflowTool(pi: ExtensionAPI, selfPath: string, service
         try {
           result = await execution;
         } catch (error) {
-          throw completeWorkflowFailureInline(error, sessionId);
+          throw completeWorkflowFailureInline(runner, error, sessionId);
         }
-        return { content: [{ type: "text", text: completeWorkflowInline(pi, result, sessionId) }], details: undefined };
+        return {
+          content: [{ type: "text", text: completeWorkflowInline(pi, runner, result, sessionId) }],
+          details: undefined,
+        };
       }
       // A background workflow outlives the turn: a later Esc must not abort
       // it - stop it from /agents instead.
-      deliverWorkflowInBackground(pi, execution, sessionId);
+      deliverWorkflowInBackground(pi, runner, execution, sessionId);
       return {
         content: [
           {

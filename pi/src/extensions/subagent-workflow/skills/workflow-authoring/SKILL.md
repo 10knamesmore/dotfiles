@@ -59,7 +59,7 @@ the orchestration and its inputs for review. Supply the source through
   is an alias that stringifies and joins its arguments before forwarding.
 
 `options` on the helpers supports `{ concurrency: positiveInteger }`. Omit it:
-the process-wide semaphore already paces all spawns. Pass it only when a
+the session's agent limit already paces all spawns. Pass it only when a
 branch group should intentionally run below the global limit.
 
 ## agent() options

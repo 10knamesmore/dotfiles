@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createDeliveryBody, type DeliveryRunResult } from "../delivery-message.js";
 import type { ParentContext } from "../runner/child.js";
-import { subagentRunner } from "../runner/runner.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import { activityFoldFromSnapshot, type RunActivityFold } from "../store/activity-fold.js";
 import { queueAcknowledgedDelivery, writeDeliveryMarker, type RunDeliveryIdentity } from "../store/delivery-marker.js";
 import { readRunSnapshot } from "../store/run-snapshot.js";
@@ -60,6 +60,7 @@ interface LaunchedWorkflow {
  */
 export async function launchWorkflow(
   pi: ExtensionAPI,
+  runner: SubagentRunner,
   parent: ParentContext,
   input: WorkflowLaunchInput,
   approval: WorkflowApproval,
@@ -75,6 +76,7 @@ export async function launchWorkflow(
   const modelError = validateLiteralModels(workflow.literalModels, modelTiers, parent.ctx.modelRegistry);
   if (modelError) throw new Error(modelError);
   const launch = startParsedWorkflow(
+    runner,
     { workflow, args, resumeRunId: input.resumeRunId, rerunChildIds: input.rerunChildIds },
     parent,
     {
@@ -110,6 +112,7 @@ export function workflowStartedMarker(started: StartedWorkflow, autoApproved: bo
 /** Wire background delivery and wait for the host's consumed-message acknowledgement. */
 export function deliverWorkflowInBackground(
   pi: ExtensionAPI,
+  runner: SubagentRunner,
   execution: Promise<WorkflowRunResult>,
   sessionId: string,
 ): void {
@@ -117,20 +120,20 @@ export function deliverWorkflowInBackground(
     .then(
       (result) => {
         recordWorkflowCompleted(pi, result, { backgroundDelivery: true });
-        const message = formatWorkflowDelivery(result);
+        const message = formatWorkflowDelivery(runner, result);
         queueAcknowledgedDelivery(pi, {
           sessionId,
           message,
-          runs: [workflowDeliveryResult(result)],
+          runs: [workflowDeliveryResult(runner, result)],
           targets: [{ runDir: result.runDir, identity: workflowDeliveryIdentity(result.generation) }],
         });
       },
       (error) => {
-        const message = formatWorkflowFailure(error);
+        const message = formatWorkflowFailure(runner, error);
         queueAcknowledgedDelivery(pi, {
           sessionId,
           message,
-          runs: [workflowFailureResult(error)],
+          runs: [workflowFailureResult(runner, error)],
           targets:
             error instanceof WorkflowRunError && error.generation !== undefined
               ? [{ runDir: error.runDir, identity: workflowDeliveryIdentity(error.generation) }]
@@ -159,8 +162,8 @@ function workflowDeliveryArtifacts(runDir: string, hasResult: boolean): NonNulla
   ].filter((artifact) => existsSync(artifact.path));
 }
 
-function workflowDeliveryActivity(runId: string): DeliveryRunResult["activity"] {
-  const fold = subagentRunner.runActivityFold(runId);
+function workflowDeliveryActivity(runner: SubagentRunner, runId: string): DeliveryRunResult["activity"] {
+  const fold = runner.runActivityFold(runId);
   if (!fold) return undefined;
   const tools: Record<string, number> = {};
   for (const child of fold.children.values()) {
@@ -169,7 +172,7 @@ function workflowDeliveryActivity(runId: string): DeliveryRunResult["activity"] 
   return { tools, complete: fold.complete };
 }
 
-function workflowDeliveryResult(result: WorkflowRunResult): DeliveryRunResult {
+function workflowDeliveryResult(runner: SubagentRunner, result: WorkflowRunResult): DeliveryRunResult {
   return {
     kind: "workflow",
     runId: result.runId,
@@ -181,12 +184,12 @@ function workflowDeliveryResult(result: WorkflowRunResult): DeliveryRunResult {
     failures: formatGroupedFailures(result.failedChildren),
     recovery: result.failedChildren.length > 0 ? workflowRecovery(result.runId, result.runDir) : [],
     warnings: result.persistenceWarning ? [result.persistenceWarning] : [],
-    activity: workflowDeliveryActivity(result.runId),
+    activity: workflowDeliveryActivity(runner, result.runId),
     artifacts: workflowDeliveryArtifacts(result.runDir, result.result !== undefined),
   };
 }
 
-function workflowFailureResult(error: unknown): DeliveryRunResult {
+function workflowFailureResult(runner: SubagentRunner, error: unknown): DeliveryRunResult {
   if (!(error instanceof WorkflowRunError)) {
     return {
       kind: "workflow",
@@ -207,7 +210,7 @@ function workflowFailureResult(error: unknown): DeliveryRunResult {
       ...(aborted ? ["The workflow was intentionally stopped. Do not resume it unless the user explicitly asks."] : []),
       ...(error.persistenceWarning ? [error.persistenceWarning] : []),
     ],
-    activity: workflowDeliveryActivity(error.runId),
+    activity: workflowDeliveryActivity(runner, error.runId),
     artifacts: workflowDeliveryArtifacts(error.runDir, false),
   };
 }
@@ -220,7 +223,7 @@ function workflowFailureSections(error: WorkflowRunError): string[] {
   return error.status === "aborted" ? failures : [`Error: ${formatFailureText(error.message)}`, ...failures];
 }
 
-export function formatWorkflowFailure(error: unknown): string {
+export function formatWorkflowFailure(runner: SubagentRunner, error: unknown): string {
   const message = formatFailureText(errorMessage(error));
   if (!(error instanceof WorkflowRunError)) {
     return buildDeliveryEnvelope({
@@ -235,7 +238,7 @@ export function formatWorkflowFailure(error: unknown): string {
   // like "cannot read properties of null" is the SYMPTOM of an agent() call
   // failing and resolving to null.
   const failures = workflowFailureSections(error);
-  const activity = formatWorkflowActivity(error.runId, error.runDir);
+  const activity = formatWorkflowActivity(runner, error.runId, error.runDir);
   return buildDeliveryEnvelope({
     header: [
       `Workflow run ${runId}`,
@@ -257,9 +260,14 @@ export function formatWorkflowFailure(error: unknown): string {
  * session when the turn ends, so this is the only path a result can take
  * there.
  */
-export function completeWorkflowInline(pi: ExtensionAPI, result: WorkflowRunResult, sessionId: string): string {
+export function completeWorkflowInline(
+  pi: ExtensionAPI,
+  runner: SubagentRunner,
+  result: WorkflowRunResult,
+  sessionId: string,
+): string {
   recordWorkflowCompleted(pi, result);
-  const message = formatWorkflowDelivery(result);
+  const message = formatWorkflowDelivery(runner, result);
   if (!writeDeliveryMarker(result.runDir, sessionId, workflowDeliveryIdentity(result.generation))) {
     throw new Error(`Workflow run ${result.runId} changed generation before inline delivery could be recorded`);
   }
@@ -267,8 +275,8 @@ export function completeWorkflowInline(pi: ExtensionAPI, result: WorkflowRunResu
 }
 
 /** Inline (headless) failure: format the failure envelope and fence redelivery. */
-export function completeWorkflowFailureInline(error: unknown, sessionId: string): Error {
-  const message = formatWorkflowFailure(error);
+export function completeWorkflowFailureInline(runner: SubagentRunner, error: unknown, sessionId: string): Error {
+  const message = formatWorkflowFailure(runner, error);
   if (
     error instanceof WorkflowRunError &&
     error.generation !== undefined &&
@@ -479,18 +487,26 @@ export function formatToolActivity(
   return `\n${lines.join("\n")}`;
 }
 
-export function formatWorkflowDelivery(result: WorkflowRunResult): string {
-  return formatWorkflowEnvelope(result);
+export function formatWorkflowDelivery(runner: SubagentRunner, result: WorkflowRunResult): string {
+  return formatWorkflowEnvelope(runner, result);
 }
 
-function workflowActivitySummary(runId: string, runDir: string): ChildToolActivitySummary {
-  const incremental = subagentRunner.runActivityFold(runId);
+function workflowActivitySummary(runner: SubagentRunner, runId: string, runDir: string): ChildToolActivitySummary {
+  const incremental = runner.runActivityFold(runId);
   return incremental ? summarizeActivityFold(incremental) : summarizeChildToolActivity(runDir);
 }
 
-function formatWorkflowActivity(runId: string, runDir: string): { text: string; artifact?: string } {
+function formatWorkflowActivity(
+  runner: SubagentRunner,
+  runId: string,
+  runDir: string,
+): { text: string; artifact?: string } {
   const eventsPath = `${safeDeliveryValue(runDir)}/events.jsonl`;
-  const text = formatToolActivity(workflowActivitySummary(runId, runDir), TOOL_ACTIVITY_TEXT_BUDGET, eventsPath);
+  const text = formatToolActivity(
+    workflowActivitySummary(runner, runId, runDir),
+    TOOL_ACTIVITY_TEXT_BUDGET,
+    eventsPath,
+  );
   return {
     text,
     ...(text.includes(`full activity in ${eventsPath}`) ? { artifact: `Activity log: ${eventsPath}` } : {}),
@@ -571,7 +587,7 @@ function formatResumeSummary(result: WorkflowRunResult): string[] {
   }
 }
 
-function formatWorkflowEnvelope(result: WorkflowRunResult): string {
+function formatWorkflowEnvelope(runner: SubagentRunner, result: WorkflowRunResult): string {
   const runId = safeDeliveryValue(result.runId);
   const runDir = safeDeliveryValue(result.runDir);
   const resultJson = chunkDeliveryText(stringifyDeliveryJson({ type: "workflow_result", result: result.result }));
@@ -579,7 +595,7 @@ function formatWorkflowEnvelope(result: WorkflowRunResult): string {
   const failedCount = result.failedChildren.length;
   const status = workflowStatus(result);
   const resumeSummary = formatResumeSummary(result);
-  const activity = formatWorkflowActivity(result.runId, result.runDir);
+  const activity = formatWorkflowActivity(runner, result.runId, result.runDir);
   return buildDeliveryEnvelope({
     header: [
       ...resumeSummary,

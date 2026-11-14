@@ -195,8 +195,8 @@ export function projectRunSnapshot(
     return {
       id: state.id,
       label: persistedChildLabel(child, state.id || "agent"),
-      model: shortModel(optionalString(resolved?.modelId)),
-      thinking: optionalString(resolved?.thinkingLevel),
+      model: events.model ?? shortModel(optionalString(resolved?.modelId)),
+      thinking: events.thinking ?? optionalString(resolved?.thinkingLevel),
       resolved,
       phase: optionalString(child.spec?.phase),
       status: state.status,
@@ -262,7 +262,7 @@ function buildSnapshotSummary(
   snapshot: RunSnapshot,
   runId: string,
   options: SnapshotProjectionOptions,
-  eventState: ReadonlyMap<string, SummaryChildEventState>,
+  eventState: ReadonlyMap<string, ChildEventState>,
 ): SnapshotSummaryBuild {
   const { runDir } = snapshot;
   if (snapshot.generationPending) {
@@ -310,7 +310,7 @@ function buildSnapshotSummary(
   };
 }
 
-function usageForChild(usage: UsageSummary | undefined, events: SummaryChildEventState | undefined): UsageSummary {
+function usageForChild(usage: UsageSummary | undefined, events: ChildEventState | undefined): UsageSummary {
   if (events?.terminalUsage !== undefined) return copyUsage(events.terminalUsage);
   if (usage) return copyUsage(usage);
   return events?.usage !== undefined ? copyUsage(events.usage) : EMPTY_USAGE();
@@ -336,7 +336,7 @@ export function reconcileDeadOwnerProjection(source: RunProjection): RunProjecti
   return projection;
 }
 
-/** Fold one live runner or workflow event synchronously into an owned projection. */
+/** Apply runner and workflow events to the session's retained task view. */
 export function foldRunProjection(projection: RunProjection, event: RunProjectionEvent): void {
   if (projection.summary.corrupt) return;
   const timestamp = event.timestamp ?? Date.now();
@@ -359,36 +359,30 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
   if (event.type === "resolved") {
     const child = projection.detail.children.find((item) => item.id === event.id);
     if (!child) return;
-    child.model = shortModel(event.resolved.modelId);
-    child.thinking = event.resolved.thinkingLevel;
-    child.resolved = event.resolved;
-    child.sessionFile = event.sessionFile;
+    applyResolvedSpec(child, event.resolved, event.sessionFile);
     foldActivity(projection.activity, { type: "child", id: event.id, label: event.resolved.label });
     return;
   }
   if (event.type === "workflow_started") {
-    projection.priorGenerationNarration = projection.detail.narrator.splice(0);
+    projection.priorGenerationNarration = foldNarration(
+      projection.detail.narrator,
+      projection.priorGenerationNarration,
+      event,
+      timestamp,
+    );
     projection.summary.status = "running";
     projection.detail.status = "running";
     return;
   }
-  if (event.type === "log") {
-    projection.detail.narrator.push({ timestamp, kind: "log", text: event.message });
-    return;
-  }
-  if (event.type === "phase") {
-    if (!projection.detail.phases.some((phase) => phase.title === event.title))
+  if (event.type === "log" || event.type === "phase" || event.type === "workflow_resume_refused") {
+    if (event.type === "phase" && !projection.detail.phases.some((phase) => phase.title === event.title))
       projection.detail.phases.push({ title: event.title });
-    projection.detail.narrator.push({ timestamp, kind: "phase", text: event.title });
-    return;
-  }
-  if (event.type === "workflow_resume_refused") {
-    projection.detail.narrator.splice(0, projection.detail.narrator.length, ...projection.priorGenerationNarration);
-    projection.detail.narrator.push({
+    projection.priorGenerationNarration = foldNarration(
+      projection.detail.narrator,
+      projection.priorGenerationNarration,
+      event,
       timestamp,
-      kind: "log",
-      text: sanitizeTerminalText(`resume refused: ${firstLine(event.error)}`),
-    });
+    );
     return;
   }
   if (event.type === "workflow_status") {
@@ -399,36 +393,72 @@ export function foldRunProjection(projection: RunProjection, event: RunProjectio
 
   const child = projection.detail.children.find((item) => item.id === event.id);
   if (!child) return;
-  if (event.type === "status") {
-    child.status = event.status;
-    if (event.status === "running" && child.startedAt === undefined) child.startedAt = timestamp;
-    if (isTerminalStatus(event.status)) {
-      child.endedAt = timestamp;
-      projection.terminalStatuses.set(event.id, event.status);
-    }
-  } else if (event.type === "activity") {
-    child.activity = event.description;
-    foldActivity(projection.activity, event);
-  } else if (event.type === "usage") {
-    child.usage = copyUsage(event.usage);
-  } else if (event.type === "result") {
-    child.status = event.result.status;
-    projection.terminalStatuses.set(event.id, event.result.status);
-    child.usage = copyUsage(event.result.usage);
-    child.endedAt = timestamp;
-    if (event.result.text) child.resultLine = firstLine(event.result.text);
-    child.result = {
-      status: event.result.status,
-      text: event.result.text,
-      ...(Object.hasOwn(event.result, "structured") ? { structured: event.result.structured } : {}),
-    };
-    child.error = event.result.error;
-    child.sessionFile = event.result.sessionFile ?? child.sessionFile;
-    child.model = shortModel(event.result.resolved.modelId);
-    child.thinking = event.result.resolved.thinkingLevel;
-    child.resolved = event.result.resolved;
-  }
+  foldChildEvent(child, event, timestamp);
+  if (isTerminalStatus(child.status)) projection.terminalStatuses.set(event.id, child.status);
+  if (event.type === "activity") foldActivity(projection.activity, event);
   refreshProjection(projection);
+}
+
+/** Shared by live events and persisted JSONL replay. */
+function foldChildEvent(state: Partial<ChildRow>, event: Record<string, unknown>, timestamp: number): void {
+  if (event.type === "status") {
+    if (event.status === "pending" || event.status === "running" || isTerminalStatus(event.status))
+      state.status = event.status;
+    if (event.status === "running" && state.startedAt === undefined) state.startedAt = timestamp;
+    if (isTerminalStatus(event.status)) state.endedAt = timestamp;
+  } else if (event.type === "activity" && typeof event.description === "string") {
+    state.activity = event.description;
+  } else if (event.type === "usage" && event.usage) {
+    state.usage = copyUsage(event.usage as UsageSummary);
+  } else if (event.type === "result") {
+    const result = event.result as Partial<SubagentResult> | undefined;
+    state.endedAt = timestamp;
+    if (result?.usage) state.usage = copyUsage(result.usage);
+    const text = optionalString(result?.text);
+    if (text) state.resultLine = firstLine(text);
+    if (result && isTerminalStatus(result.status)) {
+      state.status = result.status;
+      state.result = {
+        status: result.status,
+        text: text ?? "",
+        ...(Object.hasOwn(result, "structured") ? { structured: result.structured } : {}),
+      };
+    }
+    state.error = optionalString(result?.error);
+    state.sessionFile = optionalString(result?.sessionFile) ?? state.sessionFile;
+    if (result?.resolved) applyResolvedSpec(state, result.resolved, state.sessionFile);
+  }
+}
+
+function applyResolvedSpec(state: Partial<ChildRow>, resolved: ResolvedSpec, sessionFile: string | undefined): void {
+  state.resolved = resolved;
+  state.model = shortModel(optionalString(resolved.modelId));
+  state.thinking = optionalString(resolved.thinkingLevel);
+  state.sessionFile = sessionFile;
+}
+
+function foldNarration(
+  narrator: NarratorLine[],
+  previousGeneration: NarratorLine[],
+  event: Record<string, unknown>,
+  timestamp: number,
+): NarratorLine[] {
+  if (event.type === "workflow_started") return narrator.splice(0);
+  if (event.type === "workflow_resume_refused") {
+    narrator.splice(0, narrator.length, ...previousGeneration);
+    narrator.push({
+      timestamp,
+      kind: "log",
+      text: sanitizeTerminalText(
+        `resume refused: ${typeof event.error === "string" ? firstLine(event.error) : "environment changed"}`,
+      ),
+    });
+  } else if (event.type === "log" && typeof event.message === "string") {
+    narrator.push({ timestamp, kind: "log", text: event.message });
+  } else if (event.type === "phase" && typeof event.title === "string") {
+    narrator.push({ timestamp, kind: "phase", text: event.title });
+  }
+  return previousGeneration;
 }
 
 export function cloneRunProjection(projection: RunProjection): RunProjection {
@@ -510,21 +540,9 @@ function workflowName(
   }
 }
 
-interface SummaryChildEventState {
-  usage?: UsageSummary;
+interface ChildEventState extends Partial<ChildRow> {
   terminalUsage?: UsageSummary;
   terminalStatus?: SubagentStatus;
-}
-
-interface ChildEventState extends SummaryChildEventState {
-  resolved?: ResolvedSpec;
-  sessionFile?: string;
-  startedAt?: number;
-  endedAt?: number;
-  activity?: string;
-  resultLine?: string;
-  result?: ChildRow["result"];
-  error?: string;
 }
 
 interface EventProjection {
@@ -543,69 +561,19 @@ function scanEvents(events: readonly FrozenJson[]): EventProjection {
     const event = value as Record<string, unknown>;
     const timestamp = parseTimestamp(typeof event.timestamp === "string" ? event.timestamp : undefined);
     const type = event.type;
-    if (type === "workflow_started") priorGenerationNarration = narrator.splice(0);
-    if (type === "workflow_resume_refused") {
-      narrator.splice(0, narrator.length, ...priorGenerationNarration);
-      narrator.push({
-        timestamp,
-        kind: "log",
-        text: sanitizeTerminalText(
-          `resume refused: ${typeof event.error === "string" ? firstLine(event.error) : "environment changed"}`,
-        ),
-      });
-      continue;
-    }
-    if (type === "log" && typeof event.message === "string") {
-      narrator.push({ timestamp, kind: "log", text: event.message });
-      continue;
-    }
-    if (type === "phase" && typeof event.title === "string") {
-      narrator.push({ timestamp, kind: "phase", text: event.title });
-      continue;
-    }
+    priorGenerationNarration = foldNarration(narrator, priorGenerationNarration, event, timestamp);
     const id = typeof event.id === "string" ? event.id : undefined;
     if (!id) continue;
     const state = byChild.get(id) ?? {};
-    foldSummaryChildEvent(state, event);
-    if (type === "status" && event.status === "running" && state.startedAt === undefined) state.startedAt = timestamp;
-    if (type === "status" && isTerminalStatus(event.status)) state.endedAt = timestamp;
-    if (type === "activity" && typeof event.description === "string") state.activity = event.description;
+    foldChildEvent(state, event, timestamp);
+    if (isTerminalStatus(state.status)) state.terminalStatus = state.status;
     if (type === "result") {
-      state.endedAt = timestamp;
-      const result = event.result as Record<string, unknown> | undefined;
-      state.resolved = result?.resolved as ResolvedSpec | undefined;
-      state.sessionFile = optionalString(result?.sessionFile);
-      const text = optionalString(result?.text);
-      const error = optionalString(result?.error);
-      if (text) state.resultLine = firstLine(text);
-      if (result && isTerminalStatus(result.status)) {
-        state.result = {
-          status: result.status,
-          text: text ?? "",
-          ...(Object.hasOwn(result, "structured") ? { structured: result.structured } : {}),
-        };
-      }
-      if (error) state.error = error;
+      const result = event.result as Partial<SubagentResult> | undefined;
+      if (result?.usage) state.terminalUsage = state.usage;
     }
     byChild.set(id, state);
   }
   return { byChild, narrator, priorGenerationNarration };
-}
-
-function foldSummaryChildEvent(state: SummaryChildEventState, event: Record<string, unknown>): void {
-  if (event.type === "status" && isTerminalStatus(event.status)) state.terminalStatus = event.status;
-  if (event.type === "usage") {
-    const usage = event.usage as UsageSummary | undefined;
-    if (usage) state.usage = copyUsage(usage);
-  }
-  if (event.type === "result") {
-    const result = event.result as { status?: string; usage?: UsageSummary } | undefined;
-    if (result?.usage) {
-      state.usage = copyUsage(result.usage);
-      state.terminalUsage = copyUsage(result.usage);
-    }
-    if (isTerminalStatus(result?.status)) state.terminalStatus = result.status;
-  }
 }
 
 function childStatuses(status: RunStatusFile | undefined, ids: string[]): SubagentStatus[] {

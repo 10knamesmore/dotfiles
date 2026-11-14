@@ -6,15 +6,15 @@
 
 import type { FilterMode, Level } from "./controls.js";
 import { orderedChildren } from "./controls.js";
-import { subagentRunner } from "../../runner/runner.js";
+import type { SubagentRunner } from "../../runner/runner.js";
 import type { ChildRow, RunDetail, RunSummary } from "../../store/run-projection.js";
 
 export class NavigatorModel {
-  constructor(private readonly sessionId: string) {}
+  constructor(private readonly runner: SubagentRunner) {}
 
   /** Runs newest-first, with active/live runs pinned to the top. */
   runs(): RunSummary[] {
-    const rows = subagentRunner.sessionRuns(this.sessionId);
+    const rows = this.runner.sessionRuns();
     const active: RunSummary[] = [];
     const history: RunSummary[] = [];
     for (const row of rows) {
@@ -25,7 +25,7 @@ export class NavigatorModel {
   }
 
   detail(runId: string): RunDetail {
-    return subagentRunner.runDetail(this.sessionId, runId);
+    return this.runner.runDetail(runId);
   }
 }
 

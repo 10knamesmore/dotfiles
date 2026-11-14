@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadChildExtensionEnvironment, resolveModel, type ParentContext } from "../runner/child.js";
-import { subagentRunner } from "../runner/runner.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import { readRunSnapshot } from "../store/run-snapshot.js";
 import { RunStore } from "../store/run-store.js";
 import { sanitizeTerminalText } from "../ui/sanitize.js";
@@ -73,6 +73,7 @@ interface WorkflowRunnerOptions {
 }
 
 export function startParsedWorkflow(
+  runner: SubagentRunner,
   input: ParsedWorkflowRunInput,
   parent: ParentContext,
   options: WorkflowRunnerOptions = {},
@@ -83,7 +84,6 @@ export function startParsedWorkflow(
   const rerunAuthorized = new Set(input.rerunChildIds ?? []);
   const inputArgs = input.args ?? null;
   if (!input.resumeRunId || input.args !== undefined) validateWorkflowArgs(inputArgs);
-  const runner = subagentRunner;
   const root = join(getAgentDir(), "subagent-workflow", "runs");
   const runId =
     input.resumeRunId ?? `workflow-${Date.now().toString(36)}-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
@@ -259,7 +259,7 @@ export function startParsedWorkflow(
       currentPhase = title;
       const timestamp = Date.now();
       store.recordPhase(title, timestamp);
-      runner.foldRunProjection?.(runId, { type: "phase", title, timestamp });
+      runner.foldRunProjection(runId, { type: "phase", title, timestamp });
     },
     diagnostic: (message: string) => reportDiagnostic(`[subagent-workflow] ${message}`),
     log: (message: string) => {
@@ -268,7 +268,7 @@ export function startParsedWorkflow(
       const text = sanitizeTerminalText(String(message));
       const timestamp = Date.now();
       store.recordLog(text, timestamp);
-      runner.foldRunProjection?.(runId, { type: "log", message: text, timestamp });
+      runner.foldRunProjection(runId, { type: "log", message: text, timestamp });
       try {
         options.onLog?.(text);
       } catch (error) {
@@ -415,7 +415,7 @@ export function startParsedWorkflow(
       store.writeWorkflowResult(result);
       resultWritten = true;
       store.workflowFinished("completed");
-      runner.foldRunProjection?.(runId, { type: "workflow_status", status: "completed" });
+      runner.foldRunProjection(runId, { type: "workflow_status", status: "completed" });
       // A stop can race the final body-level check and completion commit.
       if (abortSignal.aborted) {
         throw new WorkflowRunError(
@@ -455,7 +455,7 @@ export function startParsedWorkflow(
       }
       if (error instanceof WorkflowAbortedError || abortSignal.aborted) {
         store.workflowFinished("aborted", "Workflow stopped");
-        runner.foldRunProjection?.(runId, { type: "workflow_status", status: "aborted" });
+        runner.foldRunProjection(runId, { type: "workflow_status", status: "aborted" });
         throw new WorkflowRunError(
           "Workflow stopped",
           runId,
@@ -470,12 +470,12 @@ export function startParsedWorkflow(
       if (refusedIntact) {
         const timestamp = Date.now();
         store.restoreTerminalStatus(priorTerminalStatus!, message, timestamp);
-        runner.foldRunProjection?.(runId, { type: "workflow_resume_refused", error: message, timestamp });
-        runner.foldRunProjection?.(runId, { type: "workflow_status", status: priorTerminalStatus! });
+        runner.foldRunProjection(runId, { type: "workflow_resume_refused", error: message, timestamp });
+        runner.foldRunProjection(runId, { type: "workflow_status", status: priorTerminalStatus! });
         throw new WorkflowRunError(message, runId, store.runDir, persistenceWarningFor(store), [], generation);
       }
       store.workflowFinished("failed", message);
-      runner.foldRunProjection?.(runId, { type: "workflow_status", status: "failed" });
+      runner.foldRunProjection(runId, { type: "workflow_status", status: "failed" });
       // Carry the failed children: a script error like "cannot read properties
       // of null" is usually CAUSED by a failed agent() resolving to null, and
       // the child's own error is the actionable part.
@@ -500,7 +500,6 @@ export function startParsedWorkflow(
     runner.registerRunController(
       runId,
       runController,
-      parent.ctx.sessionManager.getSessionId(),
       execution,
       (error) => error instanceof WorkflowRunError && error.status === "aborted",
     );

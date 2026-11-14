@@ -10,7 +10,7 @@ import { formatTokens } from "./format.js";
 
 export const USAGE_STATUS_KEY = "subagent-workflow:usage";
 
-type FooterContext = Pick<ExtensionContext, "modelRegistry" | "sessionManager" | "ui">;
+type FooterContext = Pick<ExtensionContext, "modelRegistry" | "ui">;
 type FooterRunner = Pick<SubagentRunner, "subscribeChildEvents" | "subscribeSpawns" | "sessionRuns" | "runDetail">;
 type UsageAuth = "metered" | "subscription" | "mixed";
 
@@ -64,15 +64,14 @@ export class SubagentUsageFooter {
     this.lastStatus = undefined;
     this.uiFailed = false;
 
-    for (const run of this.runner.sessionRuns(ctx.sessionManager.getSessionId())) this.hydrateRun(run.runId);
+    for (const run of this.runner.sessionRuns()) this.hydrateRun(run.runId);
     this.render();
   }
 
   /** Attach a just-launched workflow even when it replays without spawning a new child. */
   trackRun(runId: string, ctx: FooterContext): void {
     if (this.disposed) return;
-    if (this.ctx?.sessionManager.getSessionId() !== ctx.sessionManager.getSessionId()) this.attach(ctx);
-    else this.ctx = ctx;
+    this.ctx = ctx;
     this.hydrateRun(runId);
     this.render();
   }
@@ -92,13 +91,13 @@ export class SubagentUsageFooter {
   }
 
   private observeSpawn(run: SpawnedRun): void {
-    if (this.disposed || run.parentSessionId !== this.ctx?.sessionManager.getSessionId()) return;
+    if (this.disposed || !this.ctx) return;
     this.hydrateRun(run.runId);
     this.render();
   }
 
   private observeChildEvent(observed: ChildRunEvent): void {
-    if (this.disposed || observed.parentSessionId !== this.ctx?.sessionManager.getSessionId()) return;
+    if (this.disposed || !this.ctx) return;
     this.hydrateRun(observed.runId);
     const key = childKey(observed.runId, observed.event.id);
     if (observed.resolved)
@@ -117,7 +116,7 @@ export class SubagentUsageFooter {
   private hydrateRun(runId: string): void {
     if (!this.ctx || this.hydratedRuns.has(runId)) return;
     this.hydratedRuns.add(runId);
-    const detail = this.runner.runDetail(this.ctx.sessionManager.getSessionId(), runId);
+    const detail = this.runner.runDetail(runId);
     for (const child of detail.children) {
       const key = childKey(runId, child.id);
       this.mergeUsage(key, child.usage);

@@ -40,14 +40,6 @@ import { STRUCTURED_REPAIR_PROMPT } from "./schema-tool.js";
 import type { SchemaCapture } from "./schema-tool.js";
 import { Semaphore } from "./semaphore.js";
 
-// Pi reloads modules per cwd. Share one semaphore so all module instances
-// respect the process-wide concurrency limit.
-const SEMAPHORE_KEY = "__piSubagentWorkflowSemaphore__";
-const globalScope = globalThis as unknown as Record<string, Semaphore | undefined>;
-const globalSemaphore: Semaphore = (globalScope[SEMAPHORE_KEY] ??= new Semaphore(
-  Math.max(1, Math.min(16, cpus().length - 2)),
-));
-
 interface SpawnRunOptions {
   runId?: string;
   store?: RunStore;
@@ -68,7 +60,6 @@ function defaultDelay(ms: number): Promise<void> {
 export interface SpawnedRun {
   runId: string;
   runDir: string;
-  parentSessionId: string;
   /** Fully qualified provider/model used for the child, when it resolves before launch. */
   model?: string;
   /** Effective reasoning level used for the child, when it resolves before launch. */
@@ -80,7 +71,6 @@ export interface SpawnedRun {
 export interface ChildRunEvent {
   runId: string;
   runDir: string;
-  parentSessionId: string;
   resolved?: ResolvedSpec;
   timestamp: number;
   event: SubagentEvent;
@@ -139,7 +129,6 @@ class Handle implements SubagentHandle {
     this.runner.publishChildEvent({
       runId: this.runId,
       runDir: this.runDir,
-      parentSessionId: this.parent.ctx.sessionManager.getSessionId(),
       resolved: this.resolved,
       timestamp,
       event,
@@ -330,6 +319,7 @@ class Handle implements SubagentHandle {
   }
 }
 
+/** One parent session's executions and task views, released when its extension runtime shuts down. */
 export class SubagentRunner {
   private handles = new Map<string, Handle>();
   private stores = new Map<string, RunStore>();
@@ -339,7 +329,6 @@ export class SubagentRunner {
     string,
     {
       controller: AbortController;
-      parentSessionId: string;
       execution: Promise<unknown>;
       isExpectedStop: (error: unknown) => boolean;
     }
@@ -357,7 +346,7 @@ export class SubagentRunner {
   // contract (that is async-lineage identity + payload hash), so process
   // uniqueness is all they need.
   private readonly nonce = randomUUID().replaceAll("-", "").slice(0, 8);
-  private readonly semaphore = globalSemaphore;
+  private readonly semaphore = new Semaphore(Math.max(1, Math.min(16, cpus().length - 2)));
 
   /** Restore this session once at startup; UI reads use the retained projections. */
   restoreSession(sessionId: string, describeWorkflow: (script: string) => string): void {
@@ -385,22 +374,21 @@ export class SubagentRunner {
     }
   }
 
-  sessionRuns(sessionId: string): RunSummary[] {
+  sessionRuns(): RunSummary[] {
     return [...this.projections.values()]
-      .filter((projection) => projection.summary.parentSessionId === sessionId)
       .map((projection) => structuredClone(projection.summary))
       .sort((left, right) => right.createdAt - left.createdAt || right.runId.localeCompare(left.runId));
   }
 
-  runDetail(sessionId: string, runId: string): RunDetail {
+  runDetail(runId: string): RunDetail {
     const projection = this.projections.get(runId);
-    if (!projection || projection.summary.parentSessionId !== sessionId) {
+    if (!projection) {
       throw new Error(`No run ${runId} belongs to this session`);
     }
     return structuredClone(projection.detail);
   }
 
-  /** Apply a process-wide admission limit. Existing agents are never cancelled. */
+  /** Apply this session's admission limit. Existing agents are never cancelled. */
   setMaxConcurrentAgents(capacity: number): void {
     this.semaphore.resize(capacity);
   }
@@ -522,7 +510,6 @@ export class SubagentRunner {
     this.notifySpawn({
       runId,
       runDir: store.runDir,
-      parentSessionId: parent.ctx.sessionManager.getSessionId(),
       ...display,
       handle,
     });
@@ -604,11 +591,10 @@ export class SubagentRunner {
   registerRunController(
     runId: string,
     controller: AbortController,
-    parentSessionId: string,
     execution: Promise<unknown>,
     isExpectedStop: (error: unknown) => boolean = () => false,
   ): void {
-    this.runControllers.set(runId, { controller, parentSessionId, execution, isExpectedStop });
+    this.runControllers.set(runId, { controller, execution, isExpectedStop });
   }
   unregisterRunController(runId: string): void {
     this.runControllers.delete(runId);
@@ -640,13 +626,12 @@ export class SubagentRunner {
     for (const handle of this.handles.values()) if (handle.runId === runId && handle.isLive) return true;
     return false;
   }
-  async disposeForSession(parentSessionId: string): Promise<void> {
+  async dispose(): Promise<void> {
     // Abort workflow loops first. Otherwise a background workflow can spawn a
     // new child after the handle snapshot below and keep the run owned after
     // the parent session that owns it has shut down.
     const executions: Promise<unknown>[] = [];
-    for (const { controller, parentSessionId: owner, execution, isExpectedStop } of this.runControllers.values()) {
-      if (owner !== parentSessionId) continue;
+    for (const { controller, execution, isExpectedStop } of this.runControllers.values()) {
       controller.abort();
       executions.push(
         execution.catch((error: unknown) => {
@@ -657,17 +642,20 @@ export class SubagentRunner {
     }
     const tasks = [
       ...executions,
-      ...[...this.handles.values()]
-        .filter((handle) => handle.parent.ctx.sessionManager.getSessionId() === parentSessionId)
-        .map(async (handle) => {
-          await handle.dispose();
-          await this.retire(handle);
-        }),
+      ...[...this.handles.values()].map(async (handle) => {
+        await handle.dispose();
+        await this.retire(handle);
+      }),
     ];
     const results = await Promise.allSettled(tasks);
-    for (const [runId, projection] of this.projections) {
-      if (projection.summary.parentSessionId === parentSessionId) this.projections.delete(runId);
-    }
+    this.handles.clear();
+    this.stores.clear();
+    this.runControllers.clear();
+    this.finalizedRuns.clear();
+    this.deliveredRuns.clear();
+    this.projections.clear();
+    this.spawnListeners.clear();
+    this.childEventListeners.clear();
     const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failure) throw failure.reason;
   }
@@ -956,9 +944,3 @@ function summarizeCall(name: string, args: unknown): string {
   const summary = JSON.stringify(args) ?? "";
   return `${name} ${summary.replace(/\s+/g, " ").slice(0, 120)}`.trim();
 }
-
-// Share one handle/store registry across module instances. Restart Pi after
-// changing runner code so the process picks up the new implementation.
-const RUNNER_KEY = "__piSubagentWorkflowRunner__";
-const runnerScope = globalThis as unknown as Record<string, SubagentRunner | undefined>;
-export const subagentRunner: SubagentRunner = (runnerScope[RUNNER_KEY] ??= new SubagentRunner());

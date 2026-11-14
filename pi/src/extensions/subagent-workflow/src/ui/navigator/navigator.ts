@@ -15,7 +15,7 @@ import { statSync } from "node:fs";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { ChildSession } from "../../runner/child-session.js";
-import { subagentRunner, type SubagentRunner } from "../../runner/runner.js";
+import type { SubagentRunner } from "../../runner/runner.js";
 import { EMPTY_USAGE } from "../../store/run-store.js";
 import type { SubagentHandle } from "../../types.js";
 import { reportDiagnostic } from "../../diagnostics.js";
@@ -53,6 +53,7 @@ export interface NavigatorFollowUp {
 }
 
 interface NavigatorServices {
+  runner: SubagentRunner;
   followUp?: NavigatorFollowUp;
 }
 
@@ -89,7 +90,7 @@ async function runNavigator(
   ctx: NavigatorOpenContext,
   target?: NavigatorOpenTarget,
 ): Promise<void> {
-  const model = new NavigatorModel(ctx.sessionManager.getSessionId());
+  const model = new NavigatorModel(services.runner);
   if (!ctx.hasUI) {
     console.log(formatPlainSummary(model.runs()));
     return;
@@ -123,7 +124,7 @@ function openNavigator(
   target?: NavigatorOpenTarget,
 ): Promise<void> {
   const state = new NavigatorState();
-  const runner = subagentRunner;
+  const { runner } = services;
   if (target) {
     state.seedRun(target.runId);
     if (target.childId) {
@@ -135,8 +136,6 @@ function openNavigator(
       }
     }
   } else {
-    // Intersect with the model first: the runner is process-global across cwd
-    // generations, so a live run in another cwd must not defeat smart landing.
     const visibleLiveRunIds = orderedLiveRunIds(model.runs(), runner.liveRunIds());
     if (visibleLiveRunIds.length === 1) state.seedRun(visibleLiveRunIds[0]!);
   }
@@ -160,8 +159,7 @@ function openNavigator(
       }
     };
     resubscribe();
-    const unsubscribeSpawns = runner.subscribeSpawns((run) => {
-      if (run.parentSessionId !== ctx.sessionManager.getSessionId()) return;
+    const unsubscribeSpawns = runner.subscribeSpawns(() => {
       resubscribe();
       rerender();
     });
@@ -366,7 +364,17 @@ function openNavigator(
       render: (width: number) => {
         const maxTotal = navigatorRowBudget(tui);
         const inner = Math.max(20, width - 4);
-        const content = renderContent(state, model, agentView, theme, inner, maxTotal - 3, actionsFor, stopArmedRunId);
+        const content = renderContent(
+          runner,
+          state,
+          model,
+          agentView,
+          theme,
+          inner,
+          maxTotal - 3,
+          actionsFor,
+          stopArmedRunId,
+        );
         if (content.hasSpinner && !timer) timer = setInterval(rerender, 100);
         if (!content.hasSpinner && timer) {
           clearInterval(timer);
@@ -392,6 +400,7 @@ interface RenderedContent {
 }
 
 function renderContent(
+  runner: SubagentRunner,
   state: NavigatorState,
   model: NavigatorModel,
   agentView: AgentView | undefined,
@@ -425,7 +434,7 @@ function renderContent(
     const detail = model.detail(state.runId);
     const actions = actionsFor(detail);
     const liveContextUsage = new Map<string, { tokens: number | null; contextWindow: number }>();
-    for (const handle of subagentRunner.runHandles(detail.runId)) {
+    for (const handle of runner.runHandles(detail.runId)) {
       const usage = handle.contextUsage;
       if (usage) liveContextUsage.set(handle.id, { tokens: usage.tokens, contextWindow: usage.contextWindow });
     }

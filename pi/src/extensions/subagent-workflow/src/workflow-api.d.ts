@@ -24,7 +24,7 @@ export function agent(prompt: string, options: WorkflowAgentOptions & { schema?:
 export function agent(prompt: string, options: WorkflowAgentOptions): Promise<unknown>;
 
 export interface WorkflowConcurrency {
-  /** Positive integer limiting this group. Omit to use the process-wide limit. */
+  /** Positive integer limiting this group. Omit to use the session's agent limit. */
   concurrency?: number;
 }
 
