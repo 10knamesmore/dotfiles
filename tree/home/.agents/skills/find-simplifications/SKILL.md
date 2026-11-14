@@ -7,8 +7,6 @@ description: 调查并证明值得删除、合并或简化的代码与依赖，�
 
 把宽泛的 simplify 请求转成少量、证据充分、可以独立决定和验收的 proposal。目标是删除、合并、降级或重新归属真实 surface area，而不是制造 cleanup inventory。本 Skill 是 guidance，不是 dead-code 工具的包装或候选数量清单。
 
-本 Skill 负责发现和证明候选。用户只要求 audit、review 或 proposal 时，不修改实现；用户批准实施后直接实现和验证，需要澄清取舍或跨会话续做时使用 [wayfinder](../wayfinder/SKILL.md)，不把写文档设为实施前提。
-
 ## Start with repository context
 
 1. 读取 repo instructions 和候选附近的代码、调用方与验证入口；涉及领域约定、跨模块结构或持久化行为时，再查对应 glossary、架构文档、ADR 或当前任务说明。
@@ -92,10 +90,6 @@ dependency swap 是有效简化，但必须证明净删除而不是搬家：
 ## Present and retain the proposal
 
 默认在回复中简短说明：当前成本、建议删除或合并的内容、会保留或失去的行为、证据与验证方式。源码片段或小 diff 更清楚时直接展示；不为每个候选填完整设计模板。只有真实取舍需要比较时才展开替代方案，不编造陪衬。
-
-用户要求保存，或获批实施后需要跨会话推进时，用 [wayfinder](../wayfinder/SKILL.md) 保存简短 Brief。已有同目标的 Brief 就更新它；互不相关的候选不要合成一个大任务。只保留理解目标所需的结论、约束和关键证据入口，不复制整份审计。
-
-确实需要长期保留的理由，遵循 [wayfinder 的长期文档规则](../wayfinder/SKILL.md#长期文档)。
 
 ## Validation and report
 
