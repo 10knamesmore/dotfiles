@@ -15,7 +15,7 @@ import {
 } from "../footer/format.js";
 import { palette, separator } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
-import type { AgentInputNavigation } from "./navigation.js";
+import type { InputNavigation } from "./navigation.js";
 
 const FAST_BADGE = palette.yellow(" ⚡");
 
@@ -25,7 +25,7 @@ export class PromptEditor extends CustomEditor {
     tui: TUI,
     theme: EditorTheme,
     keybindings: KeybindingsManager,
-    private readonly navigation: () => AgentInputNavigation | undefined,
+    private readonly navigation: () => InputNavigation | undefined,
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
     private readonly fastRequested: () => boolean,

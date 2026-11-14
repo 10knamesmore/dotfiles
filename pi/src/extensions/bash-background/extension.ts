@@ -37,6 +37,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { createBackgroundSession, publishProcesses, type BackgroundProcess, type BackgroundSession } from "./model.js";
+import { registerBackgroundUi } from "./ui.js";
 
 const DEFAULT_FOREGROUND_TIMEOUT_SECONDS = 120;
 const BACKGROUND_EXIT_MESSAGE = "bash-background:exit";
@@ -57,21 +59,13 @@ const bashSchema = Type.Object({
   ),
 });
 
-/** A command that runs detached from the session. */
-interface BackgroundProcess {
-  pid: number;
-  logPath: string;
-}
-
-interface BackgroundExit extends BackgroundProcess {
+type BackgroundExitResult = Omit<BackgroundProcess, "exit"> & {
   code: number | null;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
-}
+};
 
-interface BackgroundExitMessage extends BackgroundExit {
-  command: string;
-}
+type BackgroundExitMessage = BackgroundExitResult;
 
 interface BashBackgroundDetails extends BashToolDetails {
   background?: BackgroundProcess;
@@ -89,9 +83,9 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Register the background-capable `bash` tool in place of Pi's built-in one. */
 export function registerBashBackground(pi: ExtensionAPI): void {
   // Each launch captures its session lifetime, including while its exit log is being written.
-  let lifetime = { active: true, processes: new Set<number>() };
+  let lifetime = createBackgroundSession();
   pi.on("session_start", () => {
-    lifetime = { active: true, processes: new Set<number>() };
+    lifetime = createBackgroundSession();
   });
   pi.registerMessageRenderer<BackgroundExitMessage>(BACKGROUND_EXIT_MESSAGE, (message, { outputPad }, theme) => {
     const result = message.details!;
@@ -160,13 +154,13 @@ export function registerBashBackground(pi: ExtensionAPI): void {
         ...settings,
         operations: createBackgroundOperations(
           settings.shellPath,
-          owner.processes,
+          owner,
+          params.command,
           (started) => {
             handoff.started = started;
           },
           (result) => {
             if (!owner.active) return;
-            const details = { ...result, command: params.command };
             pi.sendMessage<BackgroundExitMessage>(
               {
                 customType: BACKGROUND_EXIT_MESSAGE,
@@ -177,7 +171,7 @@ export function registerBashBackground(pi: ExtensionAPI): void {
                   exitSummary(result.code, result.signal),
                   `Log: ${result.logPath}`,
                 ].join("\n"),
-                details,
+                details: result,
                 display: true,
               },
               { deliverAs: "steer", triggerTurn: true },
@@ -196,9 +190,13 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     },
   });
 
+  registerBackgroundUi(pi, () => lifetime, killProcessGroup);
+
   pi.on("session_shutdown", () => {
     lifetime.active = false;
-    for (const pid of lifetime.processes) killProcessGroup(pid);
+    for (const task of lifetime.processes.values()) {
+      if (!task.exit) killProcessGroup(task.pid);
+    }
     lifetime.processes.clear();
   });
 }
@@ -222,9 +220,10 @@ function backgroundReport(started: BackgroundProcess): string {
  */
 function createBackgroundOperations(
   shellPath: string | undefined,
-  hostedProcesses: Set<number>,
+  session: BackgroundSession,
+  commandLabel: string,
   onStarted: (started: BackgroundProcess) => void,
-  onExited: (result: BackgroundExit) => void,
+  onExited: (result: BackgroundExitResult) => void,
 ): BashOperations {
   return {
     exec: async (command, cwd, { env, timeout }) => {
@@ -254,7 +253,9 @@ function createBackgroundOperations(
       const pid = child.pid;
       if (pid === undefined) throw new Error(`Failed to start background command: ${command}`);
 
-      hostedProcesses.add(pid);
+      const started: BackgroundProcess = { pid, logPath, command: commandLabel, startedAt: Date.now() };
+      session.processes.set(pid, started);
+      publishProcesses(session);
       // Errors after spawn, such as a failed kill, must not crash Pi.
       child.on("error", () => {});
       let timedOut = false;
@@ -267,19 +268,31 @@ function createBackgroundOperations(
             }, timeoutMs);
       child.on("exit", (code, exitSignal) => {
         clearTimeout(timeoutHandle);
-        hostedProcesses.delete(pid);
         void appendFile(logPath, `\n${exitSummary(code, exitSignal)}\n`)
           .catch(() => {})
-          .then(() => onExited({ pid, logPath, code, signal: exitSignal, timedOut }));
+          .then(() => {
+            if (!session.active) return;
+            started.exit = { code, signal: exitSignal, timedOut, endedAt: Date.now() };
+            publishProcesses(session);
+            onExited({
+              pid,
+              logPath,
+              command: commandLabel,
+              startedAt: started.startedAt,
+              code,
+              signal: exitSignal,
+              timedOut,
+            });
+          });
       });
 
-      onStarted({ pid, logPath });
+      onStarted({ ...started });
       return { exitCode: 0 };
     },
   };
 }
 
-function backgroundExitStatus(result: BackgroundExit): string {
+function backgroundExitStatus(result: BackgroundExitResult): string {
   if (result.timedOut) return "timed out";
   if (result.signal !== null) return `killed by ${result.signal}`;
   return result.code === 0 ? "completed" : `failed · exit ${result.code ?? "unknown"}`;

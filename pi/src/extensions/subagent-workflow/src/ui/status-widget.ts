@@ -144,17 +144,18 @@ export function renderWidgetLines(
   const lines: string[] = [truncateToWidth(header, cap)];
 
   for (const run of runs.slice(0, maxRows)) {
-    const cursor = run.selected ? theme.fg("accent", "❯") : " ";
+    const cursor = run.selected ? "❯" : " ";
     const glyph = statusGlyph("running", theme, 0, false);
     const rawLabel = truncateToWidth(run.label, LABEL_WIDTH, "…", true);
-    const label = run.selected ? theme.fg("accent", theme.bold(rawLabel)) : rawLabel;
+    const label = run.selected ? theme.bold(rawLabel) : rawLabel;
     const model = run.model ? theme.fg("dim", run.model) : "";
     const phase = run.phase ? theme.fg("dim", run.phase) : "";
     const progress = theme.fg("dim", run.counts.total > 0 ? `${run.counts.done}/${run.counts.total}` : "starting");
     const context = run.contexts.length > 0 ? theme.fg("dim", run.contexts.join(" · ")) : "";
     const metadata = [context, model, phase, progress].filter((part) => part.length > 0).join("  ");
     const usage = theme.fg("dim", formatTokenUsage(run.usage));
-    lines.push(truncateToWidth(`${cursor} ${glyph} ${label}  ${metadata}  ${usage}`, cap));
+    const row = `${cursor} ${glyph} ${label}  ${metadata}  ${usage}`;
+    lines.push(truncateToWidth(run.selected ? theme.bg("selectedBg", row) : row, cap));
   }
   if (runs.length > maxRows) lines.push(truncateToWidth(theme.fg("dim", `  +${runs.length - maxRows} more runs`), cap));
   return lines;
@@ -320,6 +321,11 @@ export class SubagentStatusWidget {
   /**
    * Move through visible active runs without wrapping at either end.
    *
+   * Moving down from the last row reports a boundary while retaining the row,
+   * so editor-level navigation can move into its trailing footer selection.
+   * Moving up with no selection enters at the last row when returning from that
+   * footer. Moving up from the first row returns to the editor.
+   *
    * Returns whether a run remains selected. Moving up from the first row clears
    * selection; the editor must consume that key without moving its cursor or history.
    */
@@ -332,11 +338,12 @@ export class SubagentStatusWidget {
     }
     const current = runs.findIndex(([runId]) => runId === this.selectedRunId);
     if (current < 0 && delta < 0) {
-      this.selectedRunId = undefined;
+      this.selectedRunId = runs.at(-1)![0];
       this.safeUpdate();
-      return false;
+      return true;
     }
     const next = current < 0 ? 0 : current + delta;
+    if (next >= runs.length) return false;
     if (next < 0) {
       this.selectedRunId = undefined;
       this.safeUpdate();

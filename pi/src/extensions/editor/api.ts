@@ -1,8 +1,10 @@
-import type { AgentInputNavigation } from "./navigation.js";
+import type { InputNavigation } from "./navigation.js";
 
 /** UI capabilities offered to other extensions for the current Pi session. */
 export interface PromptEditorApi {
-  useAgentNavigation(navigation: AgentInputNavigation): void;
+  useAgentNavigation(navigation: InputNavigation): void;
+  /** Navigation for a status entry visited after the last below-editor agent. */
+  useFooterNavigation(navigation: InputNavigation): void;
   useStatus(readStatus: () => EditorStatus): void;
   /** Whether the model name should carry the OpenAI Fast marker. */
   useFastRequested(readFastRequested: () => boolean): void;

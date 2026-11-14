@@ -71,7 +71,7 @@ class FooterRuntime {
     // The editor status badge replaces Pi's built-in working loader row.
     ctx.ui.setWorkingVisible(false);
 
-    ctx.ui.setFooter((tui, _theme, footerData) => {
+    ctx.ui.setFooter((tui, theme, footerData) => {
       const git = new GitStatusCache(this.cwd(ctx), () => tui.requestRender());
       const component = new ClaudeFooterComponent({
         getContext: () => this.currentContext ?? ctx,
@@ -80,6 +80,7 @@ class FooterRuntime {
         metrics: this.metrics,
         hitRate: this.hitRate,
         requestRender: () => tui.requestRender(),
+        selectedBg: (text) => theme.bg("selectedBg", text),
       });
       this.component = component;
       return component;

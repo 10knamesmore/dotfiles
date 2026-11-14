@@ -1,6 +1,6 @@
 import { homedir, hostname, userInfo } from "node:os";
 import type { ExtensionContext, ReadonlyFooterDataProvider } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { fitByDropping, formatDuration, formatFooterCwd, formatTokens, sanitizeFooterText } from "./format.js";
 import type { GitDiffStat, GitFileStatus, GitStatusSnapshot } from "./git-status.js";
 import { GitStatusCache } from "./git-status.js";
@@ -31,6 +31,9 @@ interface ClaudeFooterComponentOptions {
 
   /** Requests an event-driven TUI repaint. */
   requestRender: () => void;
+
+  /** Keep keyboard focus consistent with native Pi selection rows. */
+  selectedBg: (text: string) => string;
 }
 
 interface FirstLineRenderOptions {
@@ -60,6 +63,7 @@ interface ThirdLineRenderOptions {
   footerData: ReadonlyFooterDataProvider;
   promptRun: PromptRunSnapshot | undefined;
   hitRate: string;
+  selectedBg: (text: string) => string;
 }
 
 function currentUsername(): string {
@@ -251,7 +255,11 @@ function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string
   const statuses = [...footerData.getExtensionStatuses().entries()]
     .filter(
       ([key]) =>
-        key !== "todo" && key !== "subagent-workflow" && key !== "subagent-workflow:usage" && key !== "openai-fast",
+        key !== "todo" &&
+        key !== "subagent-workflow" &&
+        key !== "subagent-workflow:usage" &&
+        key !== "openai-fast" &&
+        key !== "bash-background",
     )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([, value]) => sanitizeFooterText(value))
@@ -277,9 +285,21 @@ function formatPromptRun(run: PromptRunSnapshot | undefined): string[] {
 }
 
 function renderThirdLine(options: ThirdLineRenderOptions): string {
-  const { width, footerData, promptRun, hitRate } = options;
+  const { width, footerData, promptRun, hitRate, selectedBg } = options;
   const statuses = formatExtensionStatuses(footerData);
-  return fitByDropping([...formatPromptRun(promptRun), hitRate, statuses], [4, 3], width, separator);
+  const leftParts = [...formatPromptRun(promptRun), hitRate, statuses];
+  const rawBackground = footerData.getExtensionStatuses().get("bash-background");
+  if (!rawBackground) return fitByDropping(leftParts, [4, 3], width, separator);
+
+  const backgroundText = sanitizeFooterText(rawBackground);
+  const fullBackground = backgroundText.startsWith("❯")
+    ? `${separator}${selectedBg(palette.lavender(` ${backgroundText} `))}`
+    : `${separator}${palette.lavender(backgroundText)}`;
+  const background = truncateToWidth(fullBackground, Math.max(1, width - 1), palette.overlay2("…"));
+  const backgroundWidth = visibleWidth(background);
+  const left = fitByDropping(leftParts, [4, 3], Math.max(0, width - backgroundWidth - 1), separator);
+  const space = Math.max(1, width - visibleWidth(left) - backgroundWidth);
+  return `${left}${" ".repeat(space)}${background}`;
 }
 
 /**
@@ -336,6 +356,7 @@ export class ClaudeFooterComponent implements Component {
         footerData: this.options.footerData,
         promptRun: metrics.promptRun,
         hitRate: formatRecentHitRate(this.options.hitRate.hitRatePercent()),
+        selectedBg: this.options.selectedBg,
       }),
     ];
   }

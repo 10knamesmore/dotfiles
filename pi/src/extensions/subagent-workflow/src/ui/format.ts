@@ -18,11 +18,12 @@ export { childLabel } from "../util.js";
  */
 export interface ThemeLike {
   fg(color: string, text: string): string;
+  bg(color: string, text: string): string;
   bold(text: string): string;
 }
 
 /** Identity theme: no ANSI, so rendered widths equal string lengths in tests. */
-export const PLAIN: ThemeLike = { fg: (_color, text) => text, bold: (text) => text };
+export const PLAIN: ThemeLike = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
 
 /** Native pi braille spinner frames (packages/tui loader DEFAULT_FRAMES). */
 export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;

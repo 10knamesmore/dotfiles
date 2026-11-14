@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { PROMPT_EDITOR_CONFIGURE, type EditorStatus, type PromptEditorApi } from "./api.js";
 import { PromptEditor } from "./component.js";
 import { installCopyCommand } from "./copy.js";
-import type { AgentInputNavigation } from "./navigation.js";
+import { chainInputNavigation, type InputNavigation } from "./navigation.js";
 
 type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
 
@@ -14,13 +14,21 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
     currentContext = ctx;
-    let navigation: AgentInputNavigation | undefined;
+    let navigation: InputNavigation | undefined;
+    let footerNavigation: InputNavigation | undefined;
     let readStatus: (() => EditorStatus) | undefined;
     let readFastRequested: (() => boolean) | undefined;
     let readWorkflowUsage: (() => string | undefined) | undefined;
+    const chainedNavigation = chainInputNavigation(
+      () => navigation,
+      () => footerNavigation,
+    );
     const api: PromptEditorApi = {
       useAgentNavigation: (contribution) => {
         navigation = contribution;
+      },
+      useFooterNavigation: (contribution) => {
+        footerNavigation = contribution;
       },
       useStatus: (contribution) => {
         readStatus = contribution;
@@ -39,7 +47,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         tui,
         theme,
         keybindings,
-        () => navigation,
+        () => chainedNavigation,
         () => readStatus?.(),
         () => currentContext,
         () => readFastRequested?.() ?? false,
