@@ -1,11 +1,15 @@
-import { copyToClipboard, highlightCode, type CustomEditor, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { SelectList, stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  copyToClipboard,
+  type CustomEditor,
+  type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import { SelectList, stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { marked } from "marked";
+import { highlightCopySource } from "./copy-highlight.js";
 
 interface CopyChoice {
   label: string;
   hint: string;
-  language: string;
   text: string;
 }
 
@@ -23,19 +27,21 @@ export function installCopyCommand(editor: CustomEditor, ctx: ExtensionContext):
 }
 
 async function copyLastResponse(ctx: ExtensionContext): Promise<void> {
-  const response = lastResponseText(ctx);
-  if (response === undefined) {
+  const lastResponse = findLastResponse(ctx);
+  if (lastResponse === undefined) {
     ctx.ui.notify("No assistant response to copy yet.", "info");
     return;
   }
+  const { text: response, timestamp } = lastResponse;
 
   const responseLineCount = response.replace(/\n$/u, "").split("\n").length;
-  const choices: CopyChoice[] = [{
-    label: "Entire response",
-    hint: `${responseLineCount} ${responseLineCount === 1 ? "line" : "lines"}`,
-    language: "markdown",
-    text: response,
-  }];
+  const choices: CopyChoice[] = [
+    {
+      label: "Entire response",
+      hint: `${responseLineCount} ${responseLineCount === 1 ? "line" : "lines"}`,
+      text: response,
+    },
+  ];
   marked.walkTokens(marked.lexer(response), (token) => {
     if (token.type !== "code") return;
     const lineCount = token.text.replace(/\n$/u, "").split("\n").length;
@@ -43,12 +49,11 @@ async function copyLastResponse(ctx: ExtensionContext): Promise<void> {
     choices.push({
       label: stripTerminalSequences(token.text).replace(/\s+/gu, " ").trim(),
       hint: `${language} · ${lineCount} ${lineCount === 1 ? "line" : "lines"}`,
-      language: language.trim().split(/\s+/u)[0]!,
       text: token.text,
     });
   });
 
-  const choice = await selectCopyChoice(ctx, choices);
+  const choice = await selectCopyChoice(ctx, choices, timestamp);
   if (choice === undefined) return;
   try {
     await copyToClipboard(choice.text);
@@ -58,10 +63,13 @@ async function copyLastResponse(ctx: ExtensionContext): Promise<void> {
   }
 }
 
-function selectCopyChoice(ctx: ExtensionContext, choices: CopyChoice[]): Promise<CopyChoice | undefined> {
+function selectCopyChoice(
+  ctx: ExtensionContext,
+  choices: CopyChoice[],
+  messageTimestamp: number,
+): Promise<CopyChoice | undefined> {
   return ctx.ui.custom<CopyChoice | undefined>((tui, theme, _keybindings, done) => {
     let selectedIndex = 0;
-    const highlightedPreviews = new Map<number, string[]>();
     const list = new SelectList(
       choices.map((choice, index) => ({ value: String(index), label: choice.label, description: choice.hint })),
       5,
@@ -78,32 +86,30 @@ function selectCopyChoice(ctx: ExtensionContext, choices: CopyChoice[]): Promise
     };
     list.onSelect = (item) => done(choices[Number(item.value)]!);
     list.onCancel = () => done(undefined);
+    const clearHighlight = highlightCopySource(
+      tui,
+      theme,
+      messageTimestamp,
+      choices.slice(1).map((choice) => choice.text),
+      () => selectedIndex,
+    );
     return {
+      dispose: clearHighlight,
       render(width: number): string[] {
-        const contentWidth = Math.max(1, width - 4);
-        const selected = choices[selectedIndex]!;
-        const hint = selectedIndex === 0 ? `Entire response · ${selected.hint}` : selected.hint;
-        let preview = highlightedPreviews.get(selectedIndex);
-        if (!preview) {
-          preview = highlightCode(stripTerminalSequences(selected.text), selected.language);
-          highlightedPreviews.set(selectedIndex, preview);
-        }
+        const title = ` Copy · ${selectedIndex + 1}/${choices.length} `;
+        const border = (text: string) => theme.fg("borderMuted", text);
         return [
-          truncateToWidth(theme.bold(theme.fg("accent", `Copy · ${selectedIndex + 1}/${choices.length}`)), width),
-          "",
+          truncateToWidth(
+            border("──") +
+              theme.bold(theme.fg("accent", title)) +
+              border("─".repeat(Math.max(0, width - 2 - visibleWidth(title)))),
+            width,
+          ),
           ...list.render(width),
-          "",
-          truncateToWidth(theme.fg("accent", `── ${hint} ${"─".repeat(width)}`), width),
-          ...preview
-            .slice(0, 8)
-            .map((line) => truncateToWidth(`  ${truncateToWidth(line, contentWidth)}`, width)),
-          ...(preview.length > 8 ? [theme.fg("dim", "  …")] : []),
-          "",
-          truncateToWidth(theme.fg("accent", "↑↓ select · Enter copy · Esc cancel"), width),
+          border("─".repeat(width)),
         ];
       },
       invalidate() {
-        highlightedPreviews.clear();
         list.invalidate();
       },
       handleInput(data: string) {
@@ -114,14 +120,14 @@ function selectCopyChoice(ctx: ExtensionContext, choices: CopyChoice[]): Promise
   });
 }
 
-function lastResponseText(ctx: ExtensionContext): string | undefined {
+function findLastResponse(ctx: ExtensionContext): { text: string; timestamp: number } | undefined {
   for (const entry of ctx.sessionManager.getBranch().reverse()) {
     if (entry.type !== "message" || entry.message.role !== "assistant") continue;
     const text = entry.message.content
       .filter((content) => content.type === "text")
       .map((content) => content.text)
       .join("");
-    if (text.trim()) return text;
+    if (text.trim()) return { text, timestamp: entry.message.timestamp };
   }
   return undefined;
 }
