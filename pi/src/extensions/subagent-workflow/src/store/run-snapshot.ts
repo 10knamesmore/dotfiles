@@ -13,12 +13,16 @@ interface RunSnapshotDiagnostic {
   readonly problem: string;
 }
 
-export interface RunSnapshot {
-  readonly runDir: string;
+/** Run and child status used to filter history or restore already-complete usage totals. */
+export interface RunMetadata {
   readonly record: FrozenJson | undefined;
   readonly status: FrozenJson | undefined;
-  readonly events: readonly FrozenJson[];
   readonly generationPending: boolean;
+}
+
+export interface RunSnapshot extends RunMetadata {
+  readonly runDir: string;
+  readonly events: readonly FrozenJson[];
   readonly ownerMetadata: FrozenJson | undefined;
   /** Exact source bytes for consumers that must preserve persisted formatting. */
   readonly rawRecord: string | undefined;
@@ -34,6 +38,20 @@ export interface RunSnapshot {
 interface ParsedFile {
   readonly value: FrozenJson | undefined;
   readonly text: string | undefined;
+}
+
+/** Read run.json and status.json without loading the event log or workflow inputs. */
+export function readRunMetadata(runDir: string): RunMetadata {
+  const diagnostics: RunSnapshotDiagnostic[] = [];
+  const pendingBefore = existsSync(join(runDir, "generation.pending"));
+  let record = readJsonFile(runDir, "run.json", diagnostics).value;
+  const status = readJsonFile(runDir, "status.json", diagnostics).value;
+  // Child registration writes run.json before status.json; a later status can reveal a newer record.
+  if (referencesUnrecordedChild(record, status, [])) {
+    record = readJsonFile(runDir, "run.json", diagnostics).value;
+  }
+  const pendingAfter = existsSync(join(runDir, "generation.pending"));
+  return Object.freeze({ record, status, generationPending: pendingBefore || pendingAfter });
 }
 
 /**

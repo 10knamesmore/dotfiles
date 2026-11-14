@@ -2,6 +2,7 @@ import { Worker } from "node:worker_threads";
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 
 export interface SourceDocument {
+  /** Raw text or compact JSON; the worker formats JSON on first opening this document. */
   body: string;
   format: "text" | "json";
 }

@@ -35,11 +35,16 @@ parentPort!.on("message", (message: SourceWorkerMessage) => {
         document.layout = undefined;
       }
       break;
-    case "document":
+    case "document": {
+      const { body, format } = message.document;
       documents.set(message.documentId, {
-        document: { ...message.document, body: stripTerminalSequences(message.document.body) },
+        document: {
+          format,
+          body: stripTerminalSequences(format === "json" ? JSON.stringify(JSON.parse(body), null, 2) : body),
+        },
       });
       break;
+    }
     case "viewport": {
       const request = message.request;
       const prepared = documents.get(request.documentId)!;

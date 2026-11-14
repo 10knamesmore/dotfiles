@@ -49,11 +49,14 @@ export default function contextInspector(pi: ExtensionAPI): void {
 
   pi.on("message_end", (event) => {
     if (!current || !awaitingResponse || event.message.role !== "assistant") return;
-    current.response = {
-      model: `${event.message.provider}/${event.message.model}`,
-      responseModel: event.message.responseModel,
-      stopReason: event.message.stopReason,
-      usage: structuredClone(event.message.usage),
+    current = {
+      ...current,
+      response: {
+        model: `${event.message.provider}/${event.message.model}`,
+        responseModel: event.message.responseModel,
+        stopReason: event.message.stopReason,
+        usage: structuredClone(event.message.usage),
+      },
     };
     awaitingResponse = false;
   });
@@ -72,8 +75,8 @@ export default function contextInspector(pi: ExtensionAPI): void {
         ctx.ui.notify("No request captured. Send a prompt after loading the extension or switching branches.", "info");
         return;
       }
-      // Freeze the view while a running agent continues collecting the next request.
-      await inspectContext(ctx, structuredClone(current), latestPayload && structuredClone(latestPayload));
+      // Observations are replaced, so this inspector keeps its opening snapshot.
+      await inspectContext(ctx, current, latestPayload);
     },
   });
 }

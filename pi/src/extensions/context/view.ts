@@ -9,10 +9,11 @@ import {
   formatBytes,
   overviewReport,
   payloadReport,
+  prepareContext,
+  preparePayload,
   type ContextEntry,
-  type ContextSnapshot,
-  type PayloadSnapshot,
-} from "./snapshot.js";
+} from "./inspection.js";
+import type { ContextSnapshot, PayloadSnapshot } from "./snapshot.js";
 
 interface InspectionPage {
   label: string;
@@ -70,9 +71,11 @@ const keyboardPage: InspectionPage = {
 
 export async function inspectContext(
   ctx: ExtensionCommandContext,
-  current: ContextSnapshot,
-  payload: PayloadSnapshot | undefined,
+  snapshot: ContextSnapshot,
+  payloadSnapshot: PayloadSnapshot | undefined,
 ): Promise<void> {
+  const current = prepareContext(snapshot);
+  const payload = payloadSnapshot && preparePayload(payloadSnapshot);
   const pages: InspectionPage[] = [
     {
       label: `Request #${current.number}`,

@@ -27,7 +27,7 @@ import {
   type RunProjection,
 } from "../src/store/run-projection.js";
 import { encodeCwd, persistReconciledProjection } from "../src/store/run-store.js";
-import { jsonObject, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
+import { jsonObject, readRunMetadata, readRunSnapshot, type RunSnapshot } from "../src/store/run-snapshot.js";
 import { readPersonalConfig } from "@dotfiles/pi-config";
 import { applyWorkflowSettings } from "../src/settings/runtime.js";
 import { registerModelTiersCommand } from "../src/settings/model-tiers-command.js";
@@ -134,14 +134,14 @@ function claimCatchUpRuns(
     throw error;
   }
 
-  const candidates: CatchUpRun[] = [];
+  const candidates: Pick<CatchUpRun, "runId" | "runDir" | "createdAt" | "generation">[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const runDir = join(runRoot, entry.name);
     try {
-      const snapshot = readRunSnapshot(runDir);
-      if (snapshot.generationPending) continue;
-      const record = jsonObject(snapshot.record);
+      const metadata = readRunMetadata(runDir);
+      if (metadata.generationPending) continue;
+      const record = jsonObject(metadata.record);
       // Direct-delivery results were shown to the human in the navigator;
       // queueing them to the model would leak a private follow-up thread.
       if (record?.directDelivery === true) continue;
@@ -149,16 +149,10 @@ function claimCatchUpRuns(
       if (!identity || deliveryMarkerMatches(runDir, identity)) continue;
       const parent = jsonObject(record?.parent);
       if (parent?.sessionId !== sessionId || runOwnerIsLive(runDir)) continue;
-      const evaluation = evaluateCatchUpRun(snapshot, entry.name);
-      if (!evaluation) continue;
-      const { liveProjection, status, interruptedChildIds } = evaluation;
       const createdAt = typeof record?.createdAt === "string" ? Date.parse(record.createdAt) : NaN;
       candidates.push({
         runId: entry.name,
         runDir,
-        label: persistedRunLabel(record),
-        status,
-        ...catchUpDetails(snapshot, liveProjection, status, interruptedChildIds),
         createdAt: Number.isFinite(createdAt) ? createdAt : 0,
         generation: identity.generation,
       });
@@ -180,16 +174,17 @@ function claimCatchUpRuns(
       const record = jsonObject(snapshot.record);
       const parent = jsonObject(record?.parent);
       const currentIdentity = parseRunDeliveryIdentity(record);
-      const evaluation = evaluateCatchUpRun(snapshot, candidate.runId);
       if (
         snapshot.generationPending ||
+        record?.directDelivery === true ||
         parent?.sessionId !== sessionId ||
         !currentIdentity ||
         currentIdentity.generation !== identity.generation ||
-        deliveryMarkerMatches(candidate.runDir, identity) ||
-        !evaluation
+        deliveryMarkerMatches(candidate.runDir, identity)
       )
         continue;
+      const evaluation = evaluateCatchUpRun(snapshot, candidate.runId);
+      if (!evaluation) continue;
       const { liveProjection, projection, ownerWasDead, status, interruptedChildIds } = evaluation;
       if (ownerWasDead) {
         try {
@@ -201,7 +196,12 @@ function claimCatchUpRuns(
           continue;
         }
       }
-      claimed.push({ ...candidate, status, ...catchUpDetails(snapshot, liveProjection, status, interruptedChildIds) });
+      claimed.push({
+        ...candidate,
+        label: persistedRunLabel(record),
+        status,
+        ...catchUpDetails(snapshot, liveProjection, status, interruptedChildIds),
+      });
     } catch (error) {
       reportDiagnostic(`[subagent-workflow] catch-up claim failed for ${candidate.runDir}: ${errorMessage(error)}`);
     } finally {
@@ -255,7 +255,7 @@ export function catchUpUndeliveredRuns(pi: ExtensionAPI, ctx: ExtensionContext, 
   return runs;
 }
 
-function catchUpIdentity(run: CatchUpRun): RunDeliveryIdentity {
+function catchUpIdentity(run: Pick<CatchUpRun, "generation">): RunDeliveryIdentity {
   return { generation: run.generation };
 }
 

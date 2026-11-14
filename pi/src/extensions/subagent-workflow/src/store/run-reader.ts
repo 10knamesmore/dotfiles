@@ -24,7 +24,7 @@ import type { RunDetail, RunSummary } from "./run-projection.js";
 export interface ReadOptions {
   /** Extract a workflow's display name from its script.js contents. */
   describeWorkflow?: (script: string) => string;
-  /** Selected non-owned runs bypass the mtime cache to preserve fresh detail. */
+  /** Force a disk read when a control operation needs an uncached view. */
   bypassCache?: boolean;
 }
 

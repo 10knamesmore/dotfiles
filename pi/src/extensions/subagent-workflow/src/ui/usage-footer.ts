@@ -4,7 +4,7 @@ import { resolve, sep } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ChildRunEvent, SpawnedRun, SubagentRunner } from "../runner/runner.js";
 import { sumUsage } from "../store/run-store.js";
-import { readRunSnapshot } from "../store/run-snapshot.js";
+import { readRunMetadata, readRunSnapshot, type RunMetadata } from "../store/run-snapshot.js";
 import type { ResolvedSpec, SubagentStatus, UsageSummary } from "../types.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage, isRecord } from "../util.js";
@@ -219,7 +219,9 @@ export class SubagentUsageFooter {
 export function readUsageSnapshot(runDir: string): UsageSnapshot {
   const usage = new Map<string, UsageSummary>();
   const models = new Map<string, Pick<ResolvedSpec, "modelId" | "provider">>();
-  const snapshot = readRunSnapshot(runDir);
+  const metadata = readRunMetadata(runDir);
+  const fullSnapshot = !metadata.generationPending && hasCompleteUsage(metadata) ? undefined : readRunSnapshot(runDir);
+  const snapshot = fullSnapshot ?? metadata;
   const status = snapshot.status as unknown as RunStatusFile | undefined;
   for (const [childId, child] of Object.entries(status?.children ?? {})) {
     if (validUsage(child.usage)) usage.set(childId, copyUsage(child.usage));
@@ -232,22 +234,9 @@ export function readUsageSnapshot(runDir: string): UsageSnapshot {
     }
   }
 
-  // status.json is atomically replaced after each event, but the event itself
-  // is appended first. Only a terminal run with terminal, valid snapshots and
-  // resolved model metadata for every registered child proves the event log
-  // cannot add usage or OAuth classification data left out by a degraded
-  // write. Keep the fold for every live/incomplete state and for corruption
-  // recovery; avoid it for fully persisted long-running workflows.
-  const statusIsComplete =
-    runChildren !== undefined &&
-    isTerminalStatus(status?.status) &&
-    runChildren.every((child) => {
-      const childStatus = status?.children?.[child.id];
-      return validResolved(child.resolved) && isTerminalStatus(childStatus?.status) && validUsage(childStatus.usage);
-    });
-  if (statusIsComplete) return { usage, models };
+  if (!fullSnapshot || hasCompleteUsage(fullSnapshot)) return { usage, models };
 
-  for (const event of snapshot.events) {
+  for (const event of fullSnapshot.events) {
     if (!isRecord(event) || typeof event.id !== "string") continue;
     const eventUsage =
       event.type === "usage"
@@ -264,6 +253,18 @@ export function readUsageSnapshot(runDir: string): UsageSnapshot {
     }
   }
   return { usage, models };
+}
+
+/** Events precede status writes, so only complete terminal totals can skip event-log recovery. */
+function hasCompleteUsage(snapshot: RunMetadata): boolean {
+  const run = snapshot.record as RunRecordFile | undefined;
+  const status = snapshot.status as RunStatusFile | undefined;
+  const children = run?.children;
+  if (!Array.isArray(children) || !children.every(validRunChild) || !isTerminalStatus(status?.status)) return false;
+  return children.every((child) => {
+    const childStatus = status?.children?.[child.id];
+    return validResolved(child.resolved) && isTerminalStatus(childStatus?.status) && validUsage(childStatus.usage);
+  });
 }
 
 function childKey(runDir: string, childId: string): string {

@@ -554,9 +554,8 @@ export function buildAgentView(
   reportError: (message: string) => void = (message) => reportDiagnostic(`[subagent-workflow] ${message}`),
   followUp?: AgentFollowUpControls,
 ): AgentView {
-  // One render pass reads the child row several times (header, live state,
-  // transcript path, eligibility). model.detail() bypasses the disk cache, so
-  // memoize per synchronous burst: the microtask reset keeps later frames fresh.
+  // Share one child row across a render's header, transcript and controls.
+  // The microtask reset lets the next frame observe file changes or live runner updates.
   let burstChild: ChildRow | undefined;
   let burstValid = false;
   const child = (): ChildRow | undefined => {

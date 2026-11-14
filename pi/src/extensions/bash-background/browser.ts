@@ -1,5 +1,6 @@
 /** Read-only process picker and live output browser for background bash commands. */
-import { readFileSync, watch, type FSWatcher } from "node:fs";
+import { closeSync, fstatSync, openSync, readSync, watch, type FSWatcher } from "node:fs";
+import { StringDecoder } from "node:string_decoder";
 import { stripVTControlCharacters } from "node:util";
 import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
@@ -12,21 +13,37 @@ interface BrowserServices {
   stop: (pid: number) => void;
 }
 
-/** A live log read on filesystem changes. No subprocess input or PTY is involved. */
+/** Follows the background command's append-only log while the output browser is open. */
 class LogOutput {
+  private file: number | undefined;
   private watcher: FSWatcher | undefined;
-  private raw = "";
-  private lines: string[] = [];
+  private pendingRefresh: NodeJS.Immediate | undefined;
+  private offset = 0;
+  private readonly buffer = Buffer.alloc(64 * 1024);
+  private readonly decoder = new StringDecoder("utf8");
+  /** Completed lines stay rendered; only the unfinished line is parsed again when text arrives. */
+  private unfinishedLine = "";
+  private endedWithCarriageReturn = false;
+  private readonly lines: string[] = [];
 
   constructor(
     path: string,
     private readonly changed: () => void,
   ) {
-    this.refresh(path);
-    this.watcher = watch(path, () => {
-      this.refresh(path);
-      this.changed();
-    });
+    this.file = openSync(path, "r");
+    try {
+      this.watcher = watch(path, () => {
+        if (this.pendingRefresh) return;
+        this.pendingRefresh = setImmediate(() => {
+          this.pendingRefresh = undefined;
+          if (this.refresh()) this.changed();
+        });
+      });
+      this.refresh();
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   snapshot(): string[] {
@@ -34,15 +51,39 @@ class LogOutput {
   }
 
   dispose(): void {
+    clearImmediate(this.pendingRefresh);
+    this.pendingRefresh = undefined;
     this.watcher?.close();
     this.watcher = undefined;
+    if (this.file !== undefined) closeSync(this.file);
+    this.file = undefined;
   }
 
-  private refresh(path: string): void {
-    const raw = readFileSync(path, "utf8");
-    if (raw === this.raw) return;
-    this.raw = raw;
-    this.lines = terminalLines(raw);
+  private refresh(): boolean {
+    if (this.file === undefined) return false;
+    const start = this.offset;
+    const size = fstatSync(this.file).size;
+    while (this.offset < size) {
+      const length = Math.min(this.buffer.length, size - this.offset);
+      const bytesRead = readSync(this.file, this.buffer, 0, length, this.offset);
+      if (bytesRead === 0) break;
+      this.offset += bytesRead;
+      this.append(this.decoder.write(this.buffer.subarray(0, bytesRead)));
+    }
+    return this.offset !== start;
+  }
+
+  private append(text: string): void {
+    if (!text) return;
+    // A CRLF split between writes is one line break, just like a CRLF in one write.
+    const added = this.endedWithCarriageReturn && text.startsWith("\n") ? text.slice(1) : text;
+    this.endedWithCarriageReturn = text.endsWith("\r");
+    if (!added) return;
+    const raw = this.unfinishedLine + added;
+    const lastBreak = Math.max(raw.lastIndexOf("\n"), raw.lastIndexOf("\r"));
+    this.unfinishedLine = raw.slice(lastBreak + 1);
+    this.lines.pop();
+    for (const line of terminalLines(raw)) this.lines.push(line);
   }
 }
 
