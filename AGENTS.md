@@ -68,3 +68,4 @@ docs/
 - 配置管理入口是 `dots`，安装入口是 `bootstrap.sh`。
 - `dots install` 安装显式声明的系统包与 Cargo binary；不安装包管理器本身、rustup、Node、pnpm 或 AI CLI。`bootstrap.sh` 要求本机已有 `cc`、Cargo、Node 22.19+ 与 pnpm 11.18，系统包管理器仅在有适用声明时需要；依次运行 `dots install` 和 `dots sync`。Pi SDK 依赖跟随 npm `latest`；sync 的 Pi hook 执行 `pnpm run update:pi`，更新已解析版本并写入 lockfile。
 - `.gen/`、`.dots/` 是机器本地派生物，不入库。
+- 我的pi 不用官方的extension管理, 我的所有extension都要么自己写, 要么vendor, 手动链接到pi目录下
