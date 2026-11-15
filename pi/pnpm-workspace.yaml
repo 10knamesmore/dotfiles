@@ -9,5 +9,5 @@ allowBuilds:
   protobufjs: false
 confirmModulesPurge: false
 minimumReleaseAgeExclude:
-  - '@earendil-works/chord'
-  - '@earendil-works/pi-*'
+  - "@earendil-works/chord"
+  - "@earendil-works/pi-*"

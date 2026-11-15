@@ -17,5 +17,5 @@
     "noEmit": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/extensions/design/web", "src/extensions/design/react"]
+  "exclude": ["src/extensions/design/web", "src/extensions/design/react", "src/extensions/openui"]
 }
