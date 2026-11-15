@@ -1,4 +1,5 @@
 import { getMarkdownTheme, type MarkdownTransformer } from "@earendil-works/pi-coding-agent";
+import { COPY_LABEL } from "@dotfiles/pi-ui/action-feedback";
 import { Marked, Markdown, truncateToWidth, visibleWidth, type Token, type Tokens } from "@earendil-works/pi-tui";
 
 const parser = new Marked();
@@ -48,7 +49,7 @@ function borderedCode(block: Tokens.Code, width: number, paint?: (line: string) 
   const theme = getMarkdownTheme();
   const border = theme.codeBlockBorder;
   const innerWidth = Math.max(1, width - 4);
-  const button = truncateToWidth("-[copy]-", innerWidth + 2, "");
+  const button = truncateToWidth(COPY_LABEL, innerWidth + 2, "");
   const titleWidth = innerWidth + 2 - visibleWidth(button);
   const heading = truncateToWidth(block.lang ? `─ ${block.lang} ` : "─", titleWidth, "");
   const marker = `\x1b]777;pi-code-copy;${visibleWidth(button)};${Buffer.from(block.text).toString("base64")}\x07`;

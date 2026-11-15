@@ -9,6 +9,7 @@ import {
   type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 import { CODE_COPY_MARKER } from "./reply-markdown.js";
+import { ACTION_STYLES, COPIED_LABEL, COPY_LABEL, FEEDBACK_DURATION_MS } from "@dotfiles/pi-ui/action-feedback";
 
 interface CopyButton {
   row: number;
@@ -69,7 +70,7 @@ class CodeButtons extends Container {
       const isHovered = hovered?.owner === this && hovered.index === index;
       if (!isCopied && !isHovered) return;
       const line = display[button.row]!;
-      const label = truncateToWidth(isCopied ? "-[✓ ok]-" : "-[copy]-", button.width, "");
+      const label = truncateToWidth(isCopied ? COPIED_LABEL : COPY_LABEL, button.width, "");
       display[button.row] =
         sliceByColumn(line, 0, button.column) +
         this.feedback.style(label, isCopied) +
@@ -130,14 +131,13 @@ export function createReplyCodeButtons(tui: TUI, ctx: ExtensionContext) {
           feedback.copied = undefined;
           resetCopied = undefined;
           tui.requestRender();
-        }, 1500);
+        }, FEEDBACK_DURATION_MS);
         tui.requestRender();
       } catch {
         ctx.ui.notify("Could not write to the clipboard. Check clipboard access and try again.", "error");
       }
     },
-    style: (label, copied) =>
-      ctx.ui.theme.style(label, { fg: copied ? "success" : "accent", bold: true, underline: !copied }),
+    style: (label, copied) => ctx.ui.theme.style(label, ACTION_STYLES[copied ? "success" : "active"]),
   };
 
   const attach = (parent: Pick<Container, "children">, body = false): boolean => {

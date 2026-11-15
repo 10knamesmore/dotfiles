@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./action-feedback": "./action-feedback.ts",
     "./expandable-message": "./expandable-message.ts"
   },
   "peerDependencies": {
