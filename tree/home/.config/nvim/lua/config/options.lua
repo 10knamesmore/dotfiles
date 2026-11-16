@@ -9,8 +9,9 @@ opt.autowrite = true
 -- 首次遇到未信任文件时先 (v)iew，再执行 :trust。
 opt.exrc = true
 
--- SSH 直连和 Rex remote session 都通过 OSC 52 把剪贴板送回本地。
-if vim.env.SSH_CONNECTION or vim.env.TERM_PROGRAM == "rex" then
+-- SSH 直连和没有本地 Rex server 的 remote session 都通过 OSC 52 把剪贴板送回本地。
+local remote_rex = vim.env.TERM_PROGRAM == "rex" and vim.env.REX_SERVER == nil
+if vim.env.SSH_CONNECTION or remote_rex then
   vim.g.clipboard = "osc52"
 end
 opt.clipboard = "unnamedplus"
