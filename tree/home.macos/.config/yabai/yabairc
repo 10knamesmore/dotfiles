@@ -40,8 +40,9 @@ yabai -m config \
 
 yabai -m rule --add app="^系统设置$" manage=off
 yabai -m rule --add app="小米互联服务" manage=off
-yabai -m rule --add app="^Rex Beta$" subrole="AXSystemDialog" manage=on
-yabai -m rule --add app="^Rex Beta$" subrole="AXStandardWindow" manage=off
+yabai -m rule --add app="^Rex Beta$" subrole="AXStandardWindow" manage=on
+yabai -m rule --add app="^Rex Beta$" title=".*Diagnostics.*" manage=off
+yabai -m rule --add app="^Rex Beta$" subrole="AXSystemDialog" manage=off
 
 yabai -m signal --add event=window_destroyed active=yes action="yabai -m query --windows --window &> /dev/null || yabai -m window --focus mouse &> /dev/null || yabai -m window --focus recent &> /dev/null"
 

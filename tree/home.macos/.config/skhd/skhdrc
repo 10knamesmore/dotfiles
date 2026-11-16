@@ -1,8 +1,20 @@
 # focus windows
-cmd - h : yabai -m window --focus west  || yabai -m display --focus west
-cmd - j : yabai -m window --focus south || yabai -m display --focus south
-cmd - k : yabai -m window --focus north || yabai -m display --focus north
-cmd - l : yabai -m window --focus east  || yabai -m display --focus east
+cmd - h [
+    "Rex Beta" ~
+    * : yabai -m window --focus west  || yabai -m display --focus west
+]
+cmd - j [
+    "Rex Beta" ~
+    * : yabai -m window --focus south || yabai -m display --focus south
+]
+cmd - k [
+    "Rex Beta" ~
+    * : yabai -m window --focus north || yabai -m display --focus north
+]
+cmd - l [
+    "Rex Beta" ~
+    * : yabai -m window --focus east  || yabai -m display --focus east
+]
 
 # move by direction; swap keeps a focused window's entire stack together
 cmd + shift - h : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap west; else yabai -m window --warp west; fi
