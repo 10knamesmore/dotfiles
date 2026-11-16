@@ -1,11 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { type NotificationFailureKind, sendSystemNotification } from "./backend.js";
-import { createSettledNotificationMessage, sanitizeSingleLine } from "./message.js";
+import { sendSystemNotification } from "./backend.js";
+import { createSettledNotificationMessage } from "./message.js";
 
 /** Marker written only into subprocesses launched by the vendored workflow runtime. */
 const SUBAGENT_CHILD_MARKER = "PI_SUBAGENT_SHIM_SPEC";
-
-const reportedFailures = new Set<NotificationFailureKind>();
 
 /** Register one settled notification per completed top-level TUI run sequence. */
 export function registerSettledNotification(pi: ExtensionAPI): void {
@@ -21,26 +19,8 @@ export function registerSettledNotification(pi: ExtensionAPI): void {
     const message = createSettledNotificationMessage(ctx.cwd);
 
     // Delivery owns a bounded child-process lifetime; Pi must not await the OS notification service.
-    void sendSystemNotification(message).then(
-      (delivery) => {
-        if (delivery.status === "failed") reportOnce(delivery.kind, delivery.reason);
-      },
-      (error: unknown) => reportOnce("unexpected", errorMessage(error)),
-    );
+    void sendSystemNotification(message);
   });
 }
 
 export default registerSettledNotification;
-
-/** Record each backend failure class once without mutating Pi session state. */
-function reportOnce(kind: NotificationFailureKind, reason: string): void {
-  if (reportedFailures.has(kind)) return;
-  reportedFailures.add(kind);
-  console.error(`[pi-notification] ${kind} failed: ${reason}`);
-}
-
-/** Convert an unexpected rejection into a bounded one-line diagnostic. */
-function errorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return sanitizeSingleLine(message).slice(0, 500) || "unknown error";
-}
