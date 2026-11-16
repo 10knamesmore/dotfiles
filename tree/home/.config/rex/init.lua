@@ -63,3 +63,13 @@ rex.bind("cmd+h", focus_or_yabai("left", "west"))
 rex.bind("cmd+j", focus_or_yabai("down", "south"))
 rex.bind("cmd+k", focus_or_yabai("up", "north"))
 rex.bind("cmd+l", focus_or_yabai("right", "east"))
+
+rex.bind("shift+cmd+h", "pane.move.left")
+rex.bind("shift+cmd+j", "pane.move.down")
+rex.bind("shift+cmd+k", "pane.move.up")
+rex.bind("shift+cmd+l", "pane.move.right")
+
+rex.bind("ctrl+cmd+h", "pane.resize", { direction = "left", amount = 5 })
+rex.bind("ctrl+cmd+j", "pane.resize", { direction = "down", amount = 5 })
+rex.bind("ctrl+cmd+k", "pane.resize", { direction = "up", amount = 5 })
+rex.bind("ctrl+cmd+l", "pane.resize", { direction = "right", amount = 5 })

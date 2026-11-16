@@ -17,16 +17,40 @@ cmd - l [
 ]
 
 # move by direction; swap keeps a focused window's entire stack together
-cmd + shift - h : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap west; else yabai -m window --warp west; fi
-cmd + shift - j : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap south; else yabai -m window --warp south; fi
-cmd + shift - k : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap north; else yabai -m window --warp north; fi
-cmd + shift - l : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap east; else yabai -m window --warp east; fi
+cmd + shift - h [
+    "Rex Beta" ~
+    * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap west; else yabai -m window --warp west; fi
+]
+cmd + shift - j [
+    "Rex Beta" ~
+    * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap south; else yabai -m window --warp south; fi
+]
+cmd + shift - k [
+    "Rex Beta" ~
+    * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap north; else yabai -m window --warp north; fi
+]
+cmd + shift - l [
+    "Rex Beta" ~
+    * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap east; else yabai -m window --warp east; fi
+]
 
 # resize windows
-cmd + ctrl - h : yabai -m window --resize right:-50:0   || yabai -m window --resize left:-50:0
-cmd + ctrl - j : yabai -m window --resize bottom:0:50   || yabai -m window --resize top:0:50
-cmd + ctrl - k : yabai -m window --resize bottom:0:-50  || yabai -m window --resize top:0:-50
-cmd + ctrl - l : yabai -m window --resize right:75:0    || yabai -m window --resize left:50:0
+cmd + ctrl - h [
+    "Rex Beta" ~
+    * : yabai -m window --resize right:-50:0   || yabai -m window --resize left:-50:0
+]
+cmd + ctrl - j [
+    "Rex Beta" ~
+    * : yabai -m window --resize bottom:0:50   || yabai -m window --resize top:0:50
+]
+cmd + ctrl - k [
+    "Rex Beta" ~
+    * : yabai -m window --resize bottom:0:-50  || yabai -m window --resize top:0:-50
+]
+cmd + ctrl - l [
+    "Rex Beta" ~
+    * : yabai -m window --resize right:75:0    || yabai -m window --resize left:50:0
+]
 
 # move window to spacea,  不可用因为系统完整性保护未禁用
 # spaces都是提前分配了六个,所以这里不做检查
