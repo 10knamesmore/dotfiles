@@ -9,8 +9,10 @@ opt.autowrite = true
 -- 首次遇到未信任文件时先 (v)iew，再执行 :trust。
 opt.exrc = true
 
--- 在SSH下用OSC 等插件处理剪切板.
-opt.clipboard = vim.env.SSH_CONNECTION and "" or "unnamedplus" -- Sync with system clipboard
+if vim.env.SSH_CONNECTION then
+  vim.g.clipboard = "osc52"
+end
+opt.clipboard = "unnamedplus"
 
 --- **menu**: 使用弹出菜单显示补全项
 --- **menuone**: 即使只有一个匹配项也显示菜单
