@@ -14,7 +14,22 @@ local remote_rex = vim.env.TERM_PROGRAM == "rex" and vim.env.REX_SERVER == nil
 if vim.env.SSH_CONNECTION or remote_rex then
   vim.g.clipboard = "osc52"
 end
-opt.clipboard = "unnamedplus"
+
+if remote_rex then
+  -- Rex 能接收 OSC 52 的复制，但不会回应 OSC 52 的剪贴板读取请求。
+  -- 保留 Neovim 内部的 unnamed 寄存器用于粘贴，再把普通 yank 单向同步到本地。
+  opt.clipboard = ""
+  vim.api.nvim_create_autocmd("TextYankPost", {
+    group = vim.api.nvim_create_augroup("dotfiles_remote_clipboard", { clear = true }),
+    callback = function()
+      if vim.v.event.operator == "y" and vim.v.event.regname == "" then
+        require("vim.ui.clipboard.osc52").copy("+")(vim.v.event.regcontents)
+      end
+    end,
+  })
+else
+  opt.clipboard = "unnamedplus"
+end
 
 --- **menu**: 使用弹出菜单显示补全项
 --- **menuone**: 即使只有一个匹配项也显示菜单
