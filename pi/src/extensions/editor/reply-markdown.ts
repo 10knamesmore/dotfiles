@@ -1,6 +1,15 @@
 import { getMarkdownTheme, type MarkdownTransformer } from "@earendil-works/pi-coding-agent";
 import { COPY_LABEL } from "@dotfiles/pi-ui/action-feedback";
-import { Marked, Markdown, truncateToWidth, visibleWidth, type Token, type Tokens } from "@earendil-works/pi-tui";
+import {
+  Marked,
+  Markdown,
+  sliceByColumn,
+  stripTerminalSequences,
+  truncateToWidth,
+  visibleWidth,
+  type Token,
+  type Tokens,
+} from "@earendil-works/pi-tui";
 
 const parser = new Marked();
 
@@ -71,6 +80,37 @@ function trailingNewlines(text: string): string {
   return /\n*$/.exec(text)![0];
 }
 
+function centeredTable(table: Tokens.Table, width: number): string {
+  // Pi displays raw Markdown when even one character per column cannot fit.
+  if (width < table.header.length * 4 + 1) return table.raw;
+  const lines = new Markdown(table.raw, 0, 0, getMarkdownTheme()).render(width);
+  const columnWidths = lines[0]!
+    .trimEnd()
+    .slice(1, -1)
+    .split("┬")
+    .map((cell) => cell.length - 2);
+  const centered = lines.map((line, index) => {
+    if (index === 0) return line.trimEnd().replace(/^┌/, "╭").replace(/┐$/, "╮");
+    if (index === lines.length - 1) return line.trimEnd().replace(/^└/, "╰").replace(/┘$/, "╯");
+    if (!line.startsWith("│")) return line.trimEnd();
+    let columnStart = 2;
+    const cells = columnWidths.map((columnWidth) => {
+      // Include the following space so truncation closes ANSI styles and hyperlinks.
+      const cell = sliceByColumn(line, columnStart, columnWidth + 1);
+      columnStart += columnWidth + 3;
+      const textWidth = visibleWidth(stripTerminalSequences(cell).trimEnd());
+      const padding = columnWidth - textWidth;
+      const left = Math.floor(padding / 2);
+      return " ".repeat(left) + truncateToWidth(cell, textWidth, "") + " ".repeat(padding - left);
+    });
+    return `│ ${cells.join(" │ ")} │`;
+  });
+  const tableWidth = visibleWidth(centered[0]!);
+  const margin = " ".repeat(Math.floor((width - tableWidth) / 2));
+  // Inline code preserves the laid-out rows; reset its foreground to normal table text.
+  return `\n\n${centered.map((line) => codeSpan(`\x1b[39m${margin}${line}`)).join("  \n")}\n\n`;
+}
+
 /** One renderer per extension instance; a copy wrapper scopes highlighting to its own text chunk. */
 export function createReplyMarkdown() {
   let highlight: CodeHighlight | undefined;
@@ -102,6 +142,10 @@ export function createReplyMarkdown() {
     };
 
     const transformToken = (token: Token, width: number): string => {
+      if (token.type === "table") {
+        renderedBlocks++;
+        return centeredTable(token as Tokens.Table, width);
+      }
       if (token.type === "code") {
         renderedBlocks++;
         const block = token as Tokens.Code;
