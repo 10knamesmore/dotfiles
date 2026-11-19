@@ -9,25 +9,39 @@ opt.autowrite = true
 -- 首次遇到未信任文件时先 (v)iew，再执行 :trust。
 opt.exrc = true
 
--- SSH 直连和没有本地 Rex server 的 remote session 都通过 OSC 52 把剪贴板送回本地。
 local remote_rex = vim.env.TERM_PROGRAM == "rex" and vim.env.REX_SERVER == nil
-if vim.env.SSH_CONNECTION or remote_rex then
-  vim.g.clipboard = "osc52"
-end
-
 if remote_rex then
-  -- Rex 能接收 OSC 52 的复制，但不会回应 OSC 52 的剪贴板读取请求。
-  -- 保留 Neovim 内部的 unnamed 寄存器用于粘贴，再把普通 yank 单向同步到本地。
+  -- 远程 Rex 不回应 OSC 52 读取。`+` / `*` 只回读本实例写入的内容；
+  -- 粘贴 Mac 剪贴板用 Rex 的 Cmd+V。
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local clipboard = { name = "OSC 52 (copy only)", copy = {}, paste = {} }
+  for _, register in ipairs({ "+", "*" }) do
+    local send = osc52.copy(register)
+    local last_copy = { {}, "v" }
+    clipboard.copy[register] = function(lines, regtype)
+      last_copy = { lines, regtype }
+      send(lines)
+    end
+    clipboard.paste[register] = function()
+      return last_copy
+    end
+  end
+  vim.g.clipboard = clipboard
+
   opt.clipboard = ""
   vim.api.nvim_create_autocmd("TextYankPost", {
     group = vim.api.nvim_create_augroup("dotfiles_remote_clipboard", { clear = true }),
     callback = function()
-      if vim.v.event.operator == "y" and vim.v.event.regname == "" then
-        require("vim.ui.clipboard.osc52").copy("+")(vim.v.event.regcontents)
+      local yank = vim.v.event
+      if yank.operator == "y" and yank.regname == "" then
+        vim.fn.setreg("+", yank.regcontents, yank.regtype)
       end
     end,
   })
 else
+  if vim.env.SSH_CONNECTION then
+    vim.g.clipboard = "osc52"
+  end
   opt.clipboard = "unnamedplus"
 end
 
