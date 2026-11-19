@@ -1,3 +1,4 @@
+import type { FastMode } from "@dotfiles/pi-config";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { PROMPT_EDITOR_CONFIGURE, type EditorStatus, type PromptEditorApi } from "./api.js";
 import { PromptEditor } from "./component.js";
@@ -21,7 +22,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     let navigation: InputNavigation | undefined;
     let footerNavigation: InputNavigation | undefined;
     let readStatus: (() => EditorStatus) | undefined;
-    let readFastRequested: (() => boolean) | undefined;
+    let readFastMode: (() => FastMode | undefined) | undefined;
     let readWorkflowUsage: (() => string | undefined) | undefined;
     const chainedNavigation = chainInputNavigation(
       () => navigation,
@@ -37,8 +38,8 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       useStatus: (contribution) => {
         readStatus = contribution;
       },
-      useFastRequested: (contribution) => {
-        readFastRequested = contribution;
+      useFastMode: (contribution) => {
+        readFastMode = contribution;
       },
       useWorkflowUsage: (contribution) => {
         readWorkflowUsage = contribution;
@@ -54,7 +55,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         () => chainedNavigation,
         () => readStatus?.(),
         () => currentContext,
-        () => readFastRequested?.() ?? false,
+        () => readFastMode?.(),
         () => readWorkflowUsage?.(),
       ));
     ctx.ui.setEditorComponent(installedFactory);

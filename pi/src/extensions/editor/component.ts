@@ -1,3 +1,4 @@
+import type { FastMode } from "@dotfiles/pi-config";
 import { CustomEditor, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
   stripTerminalSequences,
@@ -17,7 +18,10 @@ import { palette, separator } from "../footer/palette.js";
 import type { EditorActivity, EditorStatus } from "./api.js";
 import type { InputNavigation } from "./navigation.js";
 
-const FAST_BADGE = palette.yellow(" ⚡");
+const FAST_MODE_ICONS: Record<FastMode, string> = {
+  fast: palette.yellow(" \u{F0F85}"),
+  ultrafast: palette.peach(" \u{F04C5}"),
+};
 
 /** Pi's input editor, with session information on its borders and optional agent navigation. */
 export class PromptEditor extends CustomEditor {
@@ -28,7 +32,7 @@ export class PromptEditor extends CustomEditor {
     private readonly navigation: () => InputNavigation | undefined,
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
-    private readonly fastRequested: () => boolean,
+    private readonly fastMode: () => FastMode | undefined,
     private readonly workflowUsage: () => string | undefined = () => undefined,
   ) {
     super(tui, theme, keybindings);
@@ -84,9 +88,10 @@ export class PromptEditor extends CustomEditor {
     const top = status ? this.activityLabel(status.activity) + this.timingLabel(status) : palette.readyBadge(" READY ");
     const ctx = this.context();
     const model = ctx?.model;
-    const fast = this.fastRequested() ? FAST_BADGE : "";
+    const fastMode = this.fastMode();
+    const fastModeIcon = fastMode ? FAST_MODE_ICONS[fastMode] : "";
     const modelLabel = model
-      ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${fast}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
+      ? `${palette.overlay2(`${sanitizeFooterText(model.provider)}/`)}${palette.sky(sanitizeFooterText(model.name || model.id))}${fastModeIcon}${model.reasoning ? `${palette.overlay2(" · ")}${palette.mauve(ctx.thinkingLevel ?? "off")}` : ""}`
       : palette.sky("no-model");
     const modelAndContext = ctx ? `${modelLabel}${separator}${this.contextLabel(ctx)}` : modelLabel;
     const sides = [...lines.slice(1, bottom), ...lines.slice(bottom + 1)].map(

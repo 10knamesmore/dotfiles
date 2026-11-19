@@ -258,7 +258,7 @@ function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string
         key !== "todo" &&
         key !== "subagent-workflow" &&
         key !== "subagent-workflow:usage" &&
-        key !== "openai-fast" &&
+        key !== "openai-service-tier" &&
         key !== "bash-background",
     )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))

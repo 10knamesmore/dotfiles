@@ -29,6 +29,9 @@ const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> = {
 };
 
 const ModelReferenceSchema = Type.String({ pattern: "^[^/\]+/\\S+$" });
+const FastModeSchema = Type.Union([Type.Literal("fast"), Type.Literal("ultrafast")]);
+export type FastMode = Static<typeof FastModeSchema>;
+
 const PersonalConfigSchema = Type.Object(
   {
     language: Type.Optional(Type.String({ minLength: 1 })),
@@ -36,12 +39,7 @@ const PersonalConfigSchema = Type.Object(
     "apply-patch": Type.Optional(
       Type.Object({ replaceEditAndWrite: Type.Optional(Type.Boolean()) }, { additionalProperties: false }),
     ),
-    openai: Type.Optional(
-      Type.Object(
-        { fast: Type.Optional(Type.Record(ModelReferenceSchema, Type.Boolean())) },
-        { additionalProperties: false },
-      ),
-    ),
+    fast: Type.Optional(Type.Record(ModelReferenceSchema, FastModeSchema)),
     "model-tier": Type.Optional(
       Type.Object(
         {
@@ -65,8 +63,8 @@ export interface PersonalConfig {
   "subagent-workflow": WorkflowSettings;
   /** Remove edit/write from the active tool set when apply_patch is active. */
   "apply-patch": { replaceEditAndWrite: boolean };
-  /** Priority service by provider/model-id for official OpenAI OAuth; omitted models are off. */
-  openai: { fast: Record<string, boolean> };
+  /** The fast extension's selection by provider/model. Omitted models use Standard. */
+  fast: Record<string, FastMode>;
   [key: string]: unknown;
 }
 
@@ -82,6 +80,6 @@ export function parsePersonalConfig(value: unknown, path: string): PersonalConfi
     "model-tier": config["model-tier"] ?? {},
     "subagent-workflow": { ...DEFAULT_WORKFLOW_SETTINGS, ...config["subagent-workflow"] },
     "apply-patch": { replaceEditAndWrite: false, ...config["apply-patch"] },
-    openai: { fast: {}, ...config.openai },
+    fast: config.fast ?? {},
   };
 }

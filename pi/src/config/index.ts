@@ -6,6 +6,7 @@ import { parsePersonalConfig, type PersonalConfig } from "./schema.js";
 export {
   MODEL_TIERS,
   isModelTier,
+  type FastMode,
   type ModelTier,
   type ModelTiers,
   type PersonalConfig,
