@@ -11,6 +11,7 @@ import {
   readingOrder,
   reveal,
   targetAt,
+  WIDGET_COPY_ID,
   type Env,
   type NavKey,
 } from "../blocks/interact.ts";
@@ -489,24 +490,32 @@ export class OpenUIWidget {
     getEntry(id, root, mode, source);
   }
 
-  private header(e: Entry, width: number): Block {
+  private header(e: Entry, width: number, body: Block): Block {
     const controls: Array<{ text: string; role: string; target: Omit<Target, "rect"> }> = [
       {
         text: e.sourceOpen ? "-[widget]-" : "-[source]-",
         role: "action",
         target: { id: "widget:source", kind: "source", label: e.sourceOpen ? "show widget" : "view OpenUI source" },
       },
-      {
-        text: e.state.copied === "copy:source" ? COPIED_LABEL : COPY_LABEL,
-        role: e.state.copied === "copy:source" ? "action.success" : "action",
-        target: { id: "copy:source", kind: "copy", label: "copy OpenUI source", copy: e.source },
-      },
-      {
-        text: e.collapsed ? "-[show]-" : "-[hide]-",
-        role: "action",
-        target: { id: "widget:fold", kind: "fold", label: e.collapsed ? "expand widget" : "collapse widget" },
-      },
     ];
+    if (!e.collapsed) {
+      const copied = e.state.copied === WIDGET_COPY_ID;
+      controls.push({
+        text: copied ? COPIED_LABEL : COPY_LABEL,
+        role: copied ? "action.success" : "action",
+        target: {
+          id: WIDGET_COPY_ID,
+          kind: "copy",
+          label: e.sourceOpen ? "copy OpenUI source" : "copy rendered widget as text",
+          copy: e.sourceOpen ? e.source : rowsToLines(body.rows).join("\n"),
+        },
+      });
+    }
+    controls.push({
+      text: e.collapsed ? "-[show]-" : "-[hide]-",
+      role: "action",
+      target: { id: "widget:fold", kind: "fold", label: e.collapsed ? "expand widget" : "collapse widget" },
+    });
     const controlsWidth = controls.reduce((n, c) => n + textWidth(c.text), 0) + controls.length - 1;
     const inline = width >= controlsWidth + 12;
     const title = truncateText(` OpenUI · ${widgetTitle(e.root)} `, inline ? width - controlsWidth - 3 : width - 2);
@@ -562,7 +571,7 @@ export class OpenUIWidget {
           ],
         };
       }
-      e.block = vstack([this.header(e, width), block], 0, Math.max(width, block.w));
+      e.block = vstack([this.header(e, width, r.block), block], 0, Math.max(width, block.w));
       e.warnings = r.warnings;
       e.key = key;
     }

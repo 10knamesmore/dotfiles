@@ -1,54 +1,54 @@
 # focus windows
 cmd - h [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --focus west  || yabai -m display --focus west
 ]
 cmd - j [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --focus south || yabai -m display --focus south
 ]
 cmd - k [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --focus north || yabai -m display --focus north
 ]
 cmd - l [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --focus east  || yabai -m display --focus east
 ]
 
 # move by direction; swap keeps a focused window's entire stack together
 cmd + shift - h [
-    "Rex Beta" ~
+    "Rex" ~
     * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap west; else yabai -m window --warp west; fi
 ]
 cmd + shift - j [
-    "Rex Beta" ~
+    "Rex" ~
     * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap south; else yabai -m window --warp south; fi
 ]
 cmd + shift - k [
-    "Rex Beta" ~
+    "Rex" ~
     * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap north; else yabai -m window --warp north; fi
 ]
 cmd + shift - l [
-    "Rex Beta" ~
+    "Rex" ~
     * : if yabai -m query --windows --window | jq -e '."stack-index" > 0' >/dev/null; then yabai -m window --swap east; else yabai -m window --warp east; fi
 ]
 
 # resize windows
 cmd + ctrl - h [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --resize right:-50:0   || yabai -m window --resize left:-50:0
 ]
 cmd + ctrl - j [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --resize bottom:0:50   || yabai -m window --resize top:0:50
 ]
 cmd + ctrl - k [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --resize bottom:0:-50  || yabai -m window --resize top:0:-50
 ]
 cmd + ctrl - l [
-    "Rex Beta" ~
+    "Rex" ~
     * : yabai -m window --resize right:75:0    || yabai -m window --resize left:50:0
 ]
 

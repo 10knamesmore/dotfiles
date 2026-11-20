@@ -12,6 +12,7 @@ export interface Env {
 }
 
 const area = (t: Target) => t.rect.w * t.rect.h;
+export const WIDGET_COPY_ID = "widget:copy";
 
 /**
  * Which targets answer to the mouse and keyboard. Outside notes mode everything except note items. In notes mode: the note
@@ -28,7 +29,7 @@ export function isLive(t: Target, notes: boolean): boolean {
     t.kind === "notes" ||
     t.kind === "fold" ||
     t.kind === "source" ||
-    t.id === "copy:source"
+    t.id === WIDGET_COPY_ID
   );
 }
 
