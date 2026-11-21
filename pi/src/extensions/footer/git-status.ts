@@ -440,10 +440,9 @@ export class GitStatusCache {
       const operation = await readOperationState(gitDirectory);
       if (this.disposed || generation !== this.generation) return;
       this.installSnapshot(buildSnapshot(status, staged, unstaged, operation));
-    } catch (error) {
+    } catch {
       if (!this.disposed && generation === this.generation) {
         this.installSnapshot(UNAVAILABLE);
-        console.error("[pi-footer] Git refresh failed:", error);
       }
     } finally {
       this.refreshInFlight = false;

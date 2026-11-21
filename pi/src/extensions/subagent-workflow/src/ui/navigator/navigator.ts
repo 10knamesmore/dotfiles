@@ -7,8 +7,7 @@
  *
  * Data comes from the run store (kept current by the runner on every event); the
  * live runner is consulted only for pinning active runs, transcript refresh
- * events, and the steer/stop controls. Everything is guarded on
- * ctx.hasUI - in non-TUI modes the command prints a plain-text run summary.
+ * events, and the steer/stop controls. The navigator requires an interactive UI.
  */
 
 import { statSync } from "node:fs";
@@ -20,7 +19,7 @@ import { EMPTY_USAGE } from "../../store/run-store.js";
 import type { SubagentHandle } from "../../types.js";
 import { reportDiagnostic } from "../../diagnostics.js";
 import { errorMessage } from "../../util.js";
-import { formatTokenUsage, hasTokenUsage, type ThemeLike } from "../format.js";
+import type { ThemeLike } from "../format.js";
 import { sanitizeTerminalText } from "../sanitize.js";
 import { AgentView } from "./agent-view.js";
 import {
@@ -64,11 +63,10 @@ export function registerNavigator(
 ): (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget) => Promise<void> {
   let isOpen = false;
   const open = async (ctx: NavigatorOpenContext, target?: NavigatorOpenTarget): Promise<void> => {
-    if (!ctx.hasUI) return runNavigator(services, ctx, target);
-    if (isOpen) return;
+    if (!ctx.hasUI || isOpen) return;
     isOpen = true;
     try {
-      await runNavigator(services, ctx, target);
+      await openNavigator(services, ctx, new NavigatorModel(services.runner), target);
     } finally {
       isOpen = false;
     }
@@ -83,38 +81,6 @@ export function registerNavigator(
     handler: command,
   });
   return open;
-}
-
-async function runNavigator(
-  services: NavigatorServices,
-  ctx: NavigatorOpenContext,
-  target?: NavigatorOpenTarget,
-): Promise<void> {
-  const model = new NavigatorModel(services.runner);
-  if (!ctx.hasUI) {
-    console.log(formatPlainSummary(model.runs()));
-    return;
-  }
-  return openNavigator(services, ctx, model, target);
-}
-
-export function formatPlainSummary(runs: RunSummary[]): string {
-  const lines = [`Agents: ${runs.length} run(s)`];
-  for (const run of runs) {
-    if (run.corrupt) {
-      lines.push(`  · ${sanitizeTerminalText(run.label)} ${sanitizeTerminalText(run.runId)}`);
-      continue;
-    }
-    const usage = hasTokenUsage(run.usage) ? ` · ${formatTokenUsage(run.usage)}` : "";
-    const health =
-      run.kind === "workflow" && run.status === "completed" && (run.failed > 0 || run.aborted > 0)
-        ? `${run.completed} ok${run.failed > 0 ? ` · ${run.failed} failed` : ""}${run.aborted > 0 ? ` · ${run.aborted} aborted` : ""}`
-        : `${run.done}/${run.total}`;
-    lines.push(
-      `  ${sanitizeTerminalText(run.status).padEnd(9)} ${sanitizeTerminalText(run.label)}  [${run.kind} · ${health}${usage} · ${sanitizeTerminalText(run.runId)}]`,
-    );
-  }
-  return lines.join("\n");
 }
 
 function openNavigator(

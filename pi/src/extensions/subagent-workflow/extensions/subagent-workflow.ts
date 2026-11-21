@@ -42,7 +42,7 @@ import { FOLLOW_UP_PROMPT_PREFIX } from "../src/store/session-transcript.js";
 import { SubagentStatusWidget } from "../src/ui/status-widget.js";
 import { safeDeliveryValue } from "../src/ui/delivery-safe.js";
 import { SubagentUsageFooter } from "../src/ui/usage-footer.js";
-import { reportDiagnostic, setTuiSession } from "../src/diagnostics.js";
+import { reportDiagnostic } from "../src/diagnostics.js";
 import type { SubagentResult, ThinkingLevel } from "../src/types.js";
 import { childLabel, errorMessage } from "../src/util.js";
 import type { StartedWorkflow } from "../src/workflow/launch.js";
@@ -386,7 +386,6 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
     const sessionId = ctx.sessionManager.getSessionId();
     markSessionOpen(sessionId);
     editorContext = ctx;
-    if (ctx.hasUI) setTuiSession();
     try {
       catchUpUndeliveredRuns(pi, ctx);
     } catch (error) {
