@@ -3,6 +3,10 @@ packages:
   - src/ui
   - src/extensions/design/web
   - src/extensions/design/react
+catalog:
+  "@earendil-works/pi-ai": latest
+  "@earendil-works/pi-coding-agent": latest
+  "@earendil-works/pi-tui": latest
 allowBuilds:
   "@google/genai": false
   esbuild: false

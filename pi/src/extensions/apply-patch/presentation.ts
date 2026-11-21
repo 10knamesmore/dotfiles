@@ -186,7 +186,7 @@ class PatchFilePreview extends Box {
     this.needsTextUpdate = true;
   }
 
-  override render(width: number): string[] {
+  override render(width: number): readonly string[] {
     if (this.needsTextUpdate) {
       const title = this.theme.fg("toolTitle", this.theme.bold("apply_patch"));
       const heading = `${title}  ${fileSummary(this.file, this.context.cwd, this.theme)}`;
