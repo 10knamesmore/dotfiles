@@ -5,10 +5,11 @@ import { randomUUID } from "node:crypto";
 import { closeSync, openSync, readFileSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import {
   type BashOperations,
+  type BashSpawnHook,
   type BashToolDetails,
   CONFIG_DIR_NAME,
   createBashToolDefinition,
@@ -30,6 +31,13 @@ const BACKGROUND_EXIT_MESSAGE = "bash-background:exit";
 /** Pi keeps its bash parameter schema private. */
 const bashSchema = Type.Object({
   command: Type.String({ description: "Shell command to execute" }),
+  cwd: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "Working directory for this call only. Defaults to the session directory. Relative paths resolve from it; ~ denotes your home directory.",
+    }),
+  ),
   timeout: Type.Optional(
     Type.Number({
       description: `Timeout in seconds. Foreground commands default to ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS} seconds; Background commands have no default timeout; `,
@@ -97,7 +105,6 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     );
     return box;
   });
-  // Foreground rendering and prompt metadata remain Pi's.
   const builtInBash = createBashToolDefinition(process.cwd());
 
   pi.registerTool<typeof bashSchema, BashBackgroundDetails | undefined>({
@@ -106,21 +113,16 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     parameters: bashSchema,
 
     renderCall(params, theme, context) {
-      if (params.sudo === true) {
-        return builtInBash.renderCall!(
-          { ...params, command: `[root] ${visibleCommand(params.command ?? "")}` },
-          theme,
-          context,
-        );
-      }
-      if (params.background !== true) return builtInBash.renderCall!(params, theme, context);
-      const command = stripVTControlCharacters(params.command ?? "");
-      const timeout = params.timeout === undefined ? "" : theme.fg("muted", ` (timeout ${params.timeout}s)`);
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold(`$ ${command}`))} ${theme.fg("accent", "[background]")}${timeout}`,
-        0,
-        0,
-      );
+      if (context.executionStarted) context.state.startedAt ??= Date.now();
+      const root = params.sudo ? theme.fg("warning", "root ") : "";
+      const directory = params.cwd ? theme.fg("dim", `${visibleCommand(params.cwd)} `) : "";
+      const prompt = theme.fg("accent", "❯");
+      const command = params.command ? visibleCommand(params.command) : theme.fg("dim", "…");
+      const background = params.background ? theme.fg("accent", " · background") : "";
+      const timeout = params.timeout == null ? "" : theme.fg("muted", ` (timeout ${params.timeout}s)`);
+      const row = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+      row.setText(`${root}${directory}${prompt} ${command}${background}${timeout}`);
+      return row;
     },
 
     renderResult(result, options, theme, context) {
@@ -142,6 +144,8 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     },
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      const cwd = params.cwd === undefined ? ctx.cwd : resolve(ctx.cwd, expandHome(params.cwd));
+      const spawnHook: BashSpawnHook = (spawn) => ({ ...spawn, cwd });
       if (params.sudo === true) {
         if (params.background) throw new Error("sudo requires a foreground Bash command. Omit background: true.");
         if (ctx.mode !== "tui" || !process.stdin.isTTY || !process.stdout.isTTY) {
@@ -149,7 +153,7 @@ export function registerBashBackground(pi: ExtensionAPI): void {
         }
         const timeout = params.timeout ?? DEFAULT_FOREGROUND_TIMEOUT_SECONDS;
         const operations = sudoBashOperations(ctx, resolveTimeoutMs(timeout)!);
-        return createBashToolDefinition(ctx.cwd, { operations, exposeSessionEnvironment: false }).execute(
+        return createBashToolDefinition(ctx.cwd, { spawnHook, operations, exposeSessionEnvironment: false }).execute(
           toolCallId,
           { command: params.command, timeout },
           signal,
@@ -157,7 +161,7 @@ export function registerBashBackground(pi: ExtensionAPI): void {
           ctx,
         );
       }
-      const settings = readShellToolSettings(ctx);
+      const settings = { ...readShellToolSettings(ctx), spawnHook };
       if (params.background !== true) {
         return createBashToolDefinition(ctx.cwd, settings).execute(
           toolCallId,
