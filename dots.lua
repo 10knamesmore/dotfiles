@@ -96,6 +96,12 @@ dots.install.pacman({
   "uv",
   "trash-cli",
   "udisks2",
+  "qemu-desktop",
+  "libvirt",
+  "virt-manager",
+  "edk2-ovmf",
+  "swtpm",
+  "dnsmasq",
 })
 
 local macos_cargo_packages = {

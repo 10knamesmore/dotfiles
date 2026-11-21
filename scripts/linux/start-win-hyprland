@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 从 TTY 启动 AMD 桌面与 win11；桌面退出后正常关闭 Windows，再归还 NVIDIA。
+if [[ "${1:-}" == "--help" ]]; then
+    printf '%s\n' \
+        'Usage: start-win-hyprland' \
+        'Run from a TTY after exiting Hyprland.' \
+        'Starts win11 if stopped, takes over if running, or resumes if paused.' \
+        'Linux uses the internal display; Windows uses NVIDIA and its assigned USB devices.' \
+        'Logging out requests a normal Windows shutdown, then restores the Linux GPU setup.' \
+        'Requires sudo authentication; you may be prompted again during cleanup.'
+    exit 0
+fi
+if (($# != 0 || EUID == 0)); then
+    printf 'Run start-win-hyprland as a regular user, without arguments.\n' >&2
+    exit 1
+fi
+if [[ ! -t 0 ]] || pgrep -u "$UID" -x Hyprland >/dev/null; then
+    printf 'Save your work and exit Hyprland, then run this command from a TTY.\n' >&2
+    exit 1
+fi
+
+vm=win11
+connection=qemu:///system
+gpu_environment=(
+    AQ_DRM_DEVICES
+    LIBVA_DRIVER_NAME
+    __EGL_VENDOR_LIBRARY_FILENAMES
+    VK_DRIVER_FILES
+)
+
+vm_state() {
+    LC_ALL=C virsh --readonly --connect "$connection" domstate "$vm"
+}
+
+initial_vm_state=$(vm_state)
+case "$initial_vm_state" in
+    "shut off" | running | paused) ;;
+    *)
+        printf 'Cannot start this desktop while %s is in state: %s\n' "$vm" "$initial_vm_state" >&2
+        exit 1
+        ;;
+esac
+
+export AQ_DRM_DEVICES
+AQ_DRM_DEVICES=$(readlink -e /dev/dri/by-path/pci-0000:06:00.0-card)
+export LIBVA_DRIVER_NAME=radeonsi
+export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json
+export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.json
+export WIN_HYPRLAND=1
+
+sudo -v
+
+finish_session() {
+    local session_status=$?
+    trap - EXIT
+
+    # 图形会话已结束，先恢复用户服务环境；等待 Windows 时保留宿主音频。
+    systemctl --user stop hyprpolkitagent.service
+    systemctl --user unset-environment "${gpu_environment[@]}"
+    systemctl --user start wireplumber.service
+    sudo -v
+
+    # 暂停的 Windows 无法处理关机请求，必须先恢复执行。
+    local state
+    state=$(vm_state)
+    if [[ "$state" == "paused" ]]; then
+        printf '[win-desktop] Resuming Windows so it can shut down normally.\n'
+        sudo virsh --connect "$connection" resume "$vm"
+        state=$(vm_state)
+    fi
+
+    # Windows 必须停止后才能归还设备；关机失败时保留 VFIO，不强制断电。
+    if [[ "$state" != "shut off" ]]; then
+        printf '[win-desktop] Requesting Windows shutdown. Please wait and keep this TTY open.\n'
+        sudo virsh --connect "$connection" shutdown "$vm"
+        while true; do
+            state=$(vm_state)
+            [[ "$state" == "shut off" ]] && break
+            sleep 2
+        done
+    fi
+
+    printf '[win-desktop] Returning NVIDIA to Linux and restoring the desktop environment.\n'
+
+    # 预先手动 detach 的设备可能在虚拟机关闭后仍绑定 vfio-pci。
+    local function driver
+    for function in 0 1; do
+        driver=$(readlink -f "/sys/bus/pci/devices/0000:01:00.$function/driver")
+        if [[ "${driver##*/}" == "vfio-pci" ]]; then
+            sudo virsh --connect "$connection" nodedev-reattach "pci_0000_01_00_$function"
+        fi
+    done
+
+    systemctl --user restart wireplumber.service
+    sudo systemctl start nvidia-powerd.service
+    printf '[win-desktop] Back at the TTY. Run start-hyprland for the regular Linux desktop.\n'
+    exit "$session_status"
+}
+
+trap finish_session EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+printf '[win-desktop] Preparing host services for the Windows desktop.\n'
+sudo systemctl stop nvidia-powerd.service
+systemctl --user stop hyprpolkitagent.service
+systemctl --user stop wireplumber.service
+
+if [[ "$initial_vm_state" == "shut off" ]]; then
+    shopt -s nullglob
+    gpu_nodes=(
+        /dev/nvidia*
+        /dev/dri/by-path/pci-0000:01:00.0-*
+    )
+    if ((${#gpu_nodes[@]})) && sudo fuser -v "${gpu_nodes[@]}"; then
+        printf '[win-desktop] The processes listed above still hold NVIDIA devices. Exit them and retry.\n' >&2
+        exit 1
+    fi
+fi
+
+systemctl --user import-environment "${gpu_environment[@]}"
+
+# Docker 的 FORWARD 默认 DROP；保留只允许虚拟机出站及连接回包的规则。
+if sudo iptables -nL DOCKER-USER >/dev/null 2>&1; then
+    printf '[win-desktop] Configuring VM forwarding rules for wlan0.\n'
+    outbound=(-i virbr0 -o wlan0 -s 192.168.122.0/24 -j ACCEPT)
+    inbound=(-i wlan0 -o virbr0 -d 192.168.122.0/24
+        -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT)
+    sudo iptables -C DOCKER-USER "${outbound[@]}" 2>/dev/null ||
+        sudo iptables -I DOCKER-USER 1 "${outbound[@]}"
+    sudo iptables -C DOCKER-USER "${inbound[@]}" 2>/dev/null ||
+        sudo iptables -I DOCKER-USER 1 "${inbound[@]}"
+fi
+
+case "$initial_vm_state" in
+    "shut off")
+        printf '[win-desktop] Starting %s. Libvirt will attach its assigned PCI and USB devices.\n' "$vm"
+        sudo virsh --connect "$connection" start "$vm"
+        ;;
+    paused)
+        printf '[win-desktop] Taking over and resuming %s.\n' "$vm"
+        sudo virsh --connect "$connection" resume "$vm"
+        ;;
+    running)
+        printf '[win-desktop] Taking over the running %s VM.\n' "$vm"
+        ;;
+esac
+systemctl --user start wireplumber.service
+
+printf '[win-desktop] Starting Hyprland on AMD. The SPICE console will connect for microphone forwarding.\n'
+start-hyprland

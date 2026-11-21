@@ -46,11 +46,11 @@ end
 hl.env("XCURSOR_SIZE", "24")
 -- hl.env("XMODIFIERS", "@im=fcitx")
 hl.env("XDG_MENU_PREFIX", "arch-")
-hl.env("LIBVA_DRIVER_NAME", "nvidia") -- NVIDIA 硬件加速
+hl.env("LIBVA_DRIVER_NAME", os.getenv("LIBVA_DRIVER_NAME") or "nvidia")
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("QT_STYLE_OVERRIDE", "Breeze")
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
-hl.env("AQ_DRM_DEVICES", "/dev/dri/card0:/dev/dri/card1")
+hl.env("AQ_DRM_DEVICES", os.getenv("AQ_DRM_DEVICES") or "/dev/dri/card0:/dev/dri/card1")
 hl.env("WEBKIT_DISABLE_DMABUF_RENDERER", "1") -- NVIDIA 上 WebKit 渲染
 
 -- ============================================================
@@ -69,6 +69,7 @@ hl.config({
     touchpad = {
       disable_while_typing = true,
       natural_scroll = true,
+      scroll_factor = 1.5,
     },
     touchdevice = {
       enabled = false,
@@ -247,7 +248,12 @@ hl.animation({ leaf = "workspacesOut", enabled = true, speed = 7, spring = "easy
 -- 设备配置
 -- ============================================================
 
-hl.device({ name = "msft0001:00-04f3:317c-touchpad", enabled = false })
+hl.device({ name = "msft0001:00-04f3:317c-touchpad", enabled = true, sensitivity = 0.6, accel_profile = "adaptive" })
+hl.gesture({
+  fingers = 4,
+  direction = "horizontal",
+  action = "workspace",
+})
 
 -- ============================================================
 -- Window rules
@@ -526,13 +532,19 @@ end
 hl.on("hyprland.start", function()
   hl.exec_cmd(SCRIPTS .. "/dots-wallpaper")
   -- hl.exec_cmd("fcitx5 -d") -- 自带单实例锁，无需守卫
-  exec_once("hypridle")
   exec_once("xremap --watch=config,device ~/.config/xremap/config.yml")
   exec_once("wl-paste --watch cliphist store", "wl-paste")
   hl.exec_cmd("playerctld daemon")
   exec_once("quickshell") -- 屏幕效果 shader 也由它恢复（ScreenEffectsService）
   hl.exec_cmd('systemd-cat --identifier=rime-wayland "' .. HOME .. '/.cargo/bin/rime-wayland" serve') -- 数据目录锁保证单实例
-  exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent") -- polkit 认证代理，GUI 提权（pkexec）弹密码框
   hl.exec_cmd("clash-verge") -- tauri 单实例
-  exec_once("google-chrome-stable", "chrome") -- Chrome 进程名是 chrome
+  if os.getenv("WIN_HYPRLAND") == "1" then
+    exec_once("hypridle")
+    -- 内置麦克风通过 SPICE 转发，独显外屏工作时仍需保持控制台连接。
+    hl.exec_cmd(
+      "systemctl --user start hyprpolkitagent.service && virt-manager --connect qemu:///system --show-domain-console win11"
+    )
+  else
+    exec_once("systemctl --user start hyprpolkitagent", "hyprpolkitagent")
+  end
 end)
