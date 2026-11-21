@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { TUI } from "@earendil-works/pi-tui";
 import type { SourceDocument } from "./source-layout.js";
 
@@ -12,7 +12,6 @@ export async function viewSourceInEditor(
 ): Promise<void> {
   const command = configuredEditor?.trim() || process.env.VISUAL?.trim() || process.env.EDITOR?.trim() || "nvim";
   const [editor, ...args] = command.split(/\s+/);
-  if (basename(editor!) === "nvim") args.push("-M", "-n", "-i", "NONE");
 
   const directory = await mkdtemp(join(tmpdir(), "pi-context-"));
   try {

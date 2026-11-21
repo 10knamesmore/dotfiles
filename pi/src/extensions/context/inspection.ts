@@ -164,8 +164,12 @@ export function preparePayload(snapshot: PayloadSnapshot): PayloadInspection {
   };
 }
 
+const sizeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
 export function formatBytes(bytes: number): string {
-  return `${bytes.toLocaleString("en-US")} B`;
+  if (bytes >= 1_000_000) return `${sizeFormat.format(bytes / 1_000_000)} MB`;
+  if (bytes >= 1_000) return `${sizeFormat.format(bytes / 1_000)} KB`;
+  return `${bytes} B`;
 }
 
 const propertyColumns: ReportSection["columns"] = [

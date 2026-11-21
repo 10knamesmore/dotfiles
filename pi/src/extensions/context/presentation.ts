@@ -71,7 +71,7 @@ export class ContextAppearance {
     const height = Math.max(1, ...columns.map(({ lines }) => lines.length));
     return Array.from({ length: height }, (_, row) => {
       const line = columns.map((column) => {
-        const text = truncateToWidth(column.lines[row] ?? "", column.width, "…");
+        const text = stripTerminalSequences(truncateToWidth(column.lines[row] ?? "", column.width, "…"));
         const padding = " ".repeat(column.width - visibleWidth(text));
         const aligned = column.align === "right" ? padding + text : text + padding;
         return this.theme.style(aligned, { fg: column.color ?? "text", bold: column.bold });
@@ -85,10 +85,11 @@ export class ContextAppearance {
     if (this.frameWidth !== width) this.framedRows.clear();
     this.frameWidth = width;
     const nextFramedRows = new Map<string, string>();
+    const leftBorder = this.theme.style("│ ", { fg: "border", bg: this.surface });
+    const rightBorder = this.theme.style(" │", { fg: "border", bg: this.surface });
     const frame = (line: string) => {
       const rendered =
-        this.framedRows.get(line) ??
-        this.fill(`${this.theme.fg("border", "│")} ${this.fill(line, inner)} ${this.theme.fg("border", "│")}`, width);
+        this.framedRows.get(line) ?? truncateToWidth(leftBorder + this.fill(line, inner) + rightBorder, width);
       nextFramedRows.set(line, rendered);
       return rendered;
     };

@@ -177,26 +177,38 @@ export async function inspectContext(
     let followCursor = true;
     // Restore after layout: the cancelled filter may have shortened the scrollable content.
     let restoreListScroll: number | undefined;
+    let listLayout: (ReturnType<typeof pageTable> & { width: number }) | undefined;
+    let listRows = new Map<string, string>();
 
     // Unlike SelectList, /agents lets the viewport move independently of the selected item.
     const listScroll = new ScrollView(
       {
         render(width): string[] {
           if (!filtered.length) return [theme.fg("muted", "No matching sections or messages.")];
+          if (listLayout?.width !== width) {
+            listLayout = { width, ...pageTable(width) };
+            listRows.clear();
+          }
+          const { layout, showDetail } = listLayout;
           const start = listScroll.scrollTop;
           const visibleItems = filtered.slice(start, start + listScroll.viewportHeight);
-          const { layout, showDetail } = pageTable(width);
-          return visibleItems.map(({ page }, offset) => {
+          const nextRows = new Map<string, string>();
+          const lines = visibleItems.map(({ page, index }, offset) => {
             const selected = cursor === start + offset;
-            const background = selected
-              ? appearance.selected
-              : (start + offset) % 2 === 0
-                ? appearance.stripe
-                : appearance.surface;
-            return appearance.tableRow(layout, pageCells(page, showDetail, selected), width, background)[0]!;
+            const style = selected ? "selected" : (start + offset) % 2 === 0 ? "stripe" : "surface";
+            const key = `${index}:${style}`;
+            const line =
+              listRows.get(key) ??
+              appearance.tableRow(layout, pageCells(page, showDetail, selected), width, appearance[style])[0]!;
+            nextRows.set(key, line);
+            return line;
           });
+          listRows = nextRows;
+          return lines;
         },
-        invalidate() {},
+        invalidate() {
+          listRows.clear();
+        },
       },
       { scrollbar: "hidden" },
     );
@@ -299,13 +311,20 @@ export async function inspectContext(
           const detailLines = isList ? [] : scroll.render(innerWidth);
           const contentHeight = isList ? Math.max(1, filtered.length) : detailLines.length;
           const height = Math.min(Math.max(1, contentHeight), maxRows);
-          scroll.updateLayout(contentHeight, height, () => tui.requestRender());
+          // Input already requests a render, and any adjustment to scrollTop here is visible in this frame.
+          scroll.updateLayout(contentHeight, height, () => {});
           if (isList) {
             if (restoreListScroll !== undefined) {
               listScroll.scrollTo(restoreListScroll);
               restoreListScroll = undefined;
             } else if (followCursor) {
-              listScroll.scrollTo(cursor - Math.floor(height / 2));
+              const scrolloff = Math.min(4, Math.floor((height - 1) / 2));
+              const top = listScroll.scrollTop;
+              if (cursor < top + scrolloff) {
+                listScroll.scrollTo(cursor - scrolloff);
+              } else if (cursor >= top + height - scrolloff) {
+                listScroll.scrollTo(cursor - height + scrolloff + 1);
+              }
               followCursor = false;
             }
           }
@@ -400,6 +419,7 @@ export async function inspectContext(
       },
       invalidate() {
         appearance.refresh();
+        listScroll.invalidate();
         const themeChanged = sourceLayouts.updateTheme(theme);
         filterEditor?.input.invalidate();
         for (const detail of details.values()) {
