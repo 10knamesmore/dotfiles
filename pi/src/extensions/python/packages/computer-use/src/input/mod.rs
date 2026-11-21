@@ -4,7 +4,6 @@ mod keyboard;
 mod pointer;
 
 use pyo3::prelude::*;
-use serde_json::json;
 use std::time::{Duration, Instant};
 use wayland_client::protocol::wl_pointer::ButtonState;
 use xkbcommon::xkb;
@@ -111,12 +110,11 @@ impl Input {
             });
             acquisitions.push(acquisition);
         }
-        self.show_keys(control)?;
         Ok(acquisitions)
     }
 
     /// Release the given acquisitions on keys and buttons, newest first.
-    pub(crate) fn release_acquisitions(&mut self, control: &Control, acquisitions: &[u64]) {
+    pub(crate) fn release_acquisitions(&mut self, acquisitions: &[u64]) {
         for acquisition in acquisitions.iter().rev() {
             if let Some(index) = self
                 .keys
@@ -129,7 +127,7 @@ impl Input {
                 .iter()
                 .position(|held| held.acquisition == *acquisition)
             {
-                self.release_button_at(control, index);
+                self.release_button_at(index);
             }
         }
     }
@@ -147,10 +145,6 @@ impl Input {
         self.keys.iter().map(|held| held.key.name.clone()).collect()
     }
 
-    fn show_keys(&self, control: &Control) -> PyResult<()> {
-        control.event(json!({"type":"keys", "keys":self.held_keys()}))
-    }
-
     pub(crate) fn release_keys(&mut self) -> PyResult<()> {
         while !self.keys.is_empty() {
             self.release_key(self.keys.len() - 1);
@@ -162,9 +156,9 @@ impl Input {
         Ok(())
     }
 
-    fn release_all_buttons(&mut self, control: &Control) {
+    fn release_all_buttons(&mut self) {
         while !self.buttons.is_empty() {
-            self.release_button_at(control, self.buttons.len() - 1);
+            self.release_button_at(self.buttons.len() - 1);
         }
     }
 
@@ -188,32 +182,25 @@ impl Input {
             button,
             acquisition,
         });
-        control.event(
-            json!({"type":"button", "button":pointer::button_name(button), "pressed":true}),
-        )?;
         Ok(Some(acquisition))
     }
 
-    fn release_button_at(&mut self, control: &Control, index: usize) {
+    fn release_button_at(&mut self, index: usize) {
         let held = self.buttons.remove(index);
         held.pointer
             .button(self.time(), held.button, ButtonState::Released);
         held.pointer.frame();
-        // A failed display channel must never prevent the matching Wayland button release.
-        let _ = control.event(
-            json!({"type":"button", "button":pointer::button_name(held.button), "pressed":false}),
-        );
     }
 
-    fn release_button_code(&mut self, control: &Control, button: u32) {
+    fn release_button_code(&mut self, button: u32) {
         while let Some(index) = self.buttons.iter().position(|held| held.button == button) {
-            self.release_button_at(control, index);
+            self.release_button_at(index);
         }
     }
 
     /// Always attempt the Wayland releases, even after cancel, revoke or prompt EOF.
     pub(crate) fn release_all(&mut self, control: &Control) -> PyResult<()> {
-        self.release_all_buttons(control);
+        self.release_all_buttons();
         let keys = self.release_keys();
         let sync = self.desktop.sync(control, false);
         let result = keys.and(sync);
@@ -249,7 +236,7 @@ impl Input {
                 .chain(self.buttons.iter().map(|held| held.acquisition))
                 .filter(|acquisition| !previous.contains(acquisition))
                 .collect();
-            self.release_acquisitions(control, &acquired);
+            self.release_acquisitions(&acquired);
             if self.desktop.sync(control, false).is_err() {
                 control.disconnect();
                 logging::event("input.rollback", "connection-lost");
@@ -257,8 +244,7 @@ impl Input {
                 logging::event("input.rollback", "ok");
             }
         }
-        let shown = self.show_keys(control);
-        result.and_then(|value| shown.map(|_| value))
+        result
     }
 
     pub(crate) fn press(
@@ -277,8 +263,7 @@ impl Input {
             for iteration in 0..count {
                 control.check()?;
                 let acquired = input.acquire(control, &keys)?;
-                input.release_acquisitions(control, &acquired);
-                input.show_keys(control)?;
+                input.release_acquisitions(&acquired);
                 input.desktop.sync(control, true)?;
                 if iteration + 1 < count {
                     wait::pause(control, interval)?;
@@ -323,7 +308,7 @@ impl Input {
         let buttons = Self::resolve_buttons(names)?;
         self.run(control, |input| {
             for button in buttons {
-                input.release_button_code(control, button);
+                input.release_button_code(button);
             }
             Ok(())
         })
@@ -331,7 +316,7 @@ impl Input {
 
     pub(crate) fn release_buttons(&mut self, control: &Control) -> PyResult<()> {
         self.run(control, |input| {
-            input.release_all_buttons(control);
+            input.release_all_buttons();
             Ok(())
         })
     }
@@ -362,7 +347,6 @@ impl Input {
                     "release this desktop's held keys before type_text; use press for chords",
                 ));
             }
-            control.event(json!({"type":"text", "characters":text.chars().count()}))?;
             if chunks.is_empty() {
                 return Ok(());
             }

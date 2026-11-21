@@ -35,7 +35,7 @@ $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/
 
 SDK 独立打开 lockfile 并以 `LOCK_EX | LOCK_NB` 加锁，成功后写 PID；同进程或跨进程的第二个连接都立即失败。锁 FD 不传给启动的应用，文件不 unlink。锁由内核维护，不以文件存在或 PID 存活判断占用。
 
-加锁后 SDK 发送 hello，等 Quickshell 在所有屏幕显示提示后回复 ready，才允许操作。当前桌面显示淡紫边框、顶部断开按钮、Pi 虚拟光标和键鼠状态。移动动画与实际输入独立；不监听用户物理键鼠，文本只展示字符数。覆盖层仅断开按钮可交互，不抢焦点、不占布局。
+加锁后 SDK 发送 hello，等 Quickshell 在所有屏幕显示淡紫色边框和顶部接管提示后回复 ready，才允许操作。覆盖层仅「断开连接」按钮可交互，不抢焦点、不占布局。
 
 用户断开、提示服务退出或重载，会使对象失效。原生执行线程在 Python 空闲和长操作期间持续检查提示连接，释放自有输入并断开；后续捕获、输入、查询和应用启动均报错，不自动重连。`status` 为 `active`、`closed`、`revoked` 或 `disconnected`；关闭保留撤销或断连原因。
 
@@ -67,7 +67,7 @@ worker 在 cell 失败或取消时调用 `_close_all()`，关闭所有活动桌�
 
 单次输入失败会回滚本次新获取的键和按钮，已送达应用的动作不可回滚。清理错误写日志；compositor 已断开时无法保证其应用收到松键。worker 被强制终止时 host 依赖 Wayland 断开和 compositor 的虚拟键盘释放行为，不能承诺 Python 清理一定执行。
 
-日志写入 `COMPUTER_USE_LOG`，默认 `/tmp/computer-use-sdk.log`，到 1 MiB 后清空重写。记录操作名、PID、生命周期与成功/失败，不记录截图、坐标、键名、输入文字、窗口内容或 Lua 表达式。Quickshell 只记录连接、事件类型与固定关闭原因；其展示文案不直接使用后端错误文本。
+日志写入 `COMPUTER_USE_LOG`，默认 `/tmp/computer-use-sdk.log`，到 1 MiB 后清空重写。记录操作名、PID、生命周期与成功/失败，不记录截图、坐标、键名、输入文字、窗口内容或 Lua 表达式。Quickshell 只记录接管状态和固定的断开原因。
 
 ## 构建与维护
 

@@ -190,7 +190,6 @@ impl Control {
         self.shared.check()?;
         if let Some(prompt) = self.prompt.borrow_mut().as_mut() {
             let result = (|| {
-                prompt.flush()?;
                 while let Some(frame) = prompt.read()? {
                     if frame.get("type").and_then(Value::as_str) == Some("revoke") {
                         self.shared.invalidate(REVOKED);
@@ -213,16 +212,6 @@ impl Control {
             .is_some_and(|cancel| cancel.load(Ordering::Acquire))
         {
             return Err(wait::runtime("desktop operation was cancelled"));
-        }
-        Ok(())
-    }
-
-    pub fn event(&self, frame: Value) -> PyResult<()> {
-        if let Some(prompt) = self.prompt.borrow_mut().as_mut()
-            && let Err(error) = prompt.send(frame)
-        {
-            self.disconnect();
-            return Err(wait::runtime(error));
         }
         Ok(())
     }

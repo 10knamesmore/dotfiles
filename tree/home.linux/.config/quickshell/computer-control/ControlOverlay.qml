@@ -10,7 +10,6 @@ PanelWindow {
 
     required property var service
     property bool presented: false
-    readonly property ControlConnection connection: service.currentConnection
 
     anchors {
         top: true
@@ -61,13 +60,6 @@ PanelWindow {
             border.width: 2
             radius: 10
             Accessible.ignored: true
-        }
-
-        VirtualPointer {
-            connection: root.connection
-            screenName: root.screen.name
-            width: parent.width
-            height: parent.height
         }
 
         Rectangle {
@@ -134,14 +126,6 @@ PanelWindow {
                     }
                 }
             }
-        }
-
-        InputStatus {
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 28
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: Math.min(implicitWidth, parent.width - 32)
-            connection: root.connection
         }
     }
 }

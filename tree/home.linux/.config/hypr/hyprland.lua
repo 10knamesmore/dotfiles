@@ -345,7 +345,7 @@ hl.window_rule({
 -- ============================================================
 
 -- 面板通过 BackgroundEffect 提交局部模糊区域，材质与形变由 QML 驱动。
--- 接管边框和断开按钮必须从首帧起位于固定位置；光标动画由 QML 驱动。
+-- 接管边框和断开按钮从首帧起位于固定位置。
 hl.layer_rule({
   name = "computer_control",
   match = { namespace = "^pi-computer-control$" },

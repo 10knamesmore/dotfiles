@@ -1,25 +1,12 @@
 import QtQuick
 import Quickshell.Io
 
-// 单个 NDJSON 客户端的握手和输入状态；只接收 agent 发来的展示事件。
-// 不保留原始帧或文本，UI 仅能读取持有键、按钮及文本字符数。
 Socket {
     id: root
 
     required property var service
     property int clientPid: 0
     property string phase: "hello"
-    property var pointer: null // 输出内逻辑坐标 { monitor, x, y }，收到 pointer 前为空。
-    property QtObject input: QtObject {
-        property var keys: []
-        property var recentKeys: [] // 保留最近按下的组合键，避免相邻 down/up 在一帧内消失。
-        property var buttons: []
-        property bool clickFeedback: false
-        property string transientKind: ""
-        property int characters: 0
-        property real scrollAmount: 0
-        property bool horizontalScroll: false
-    }
 
     function confirmReady() {
         if (phase !== "overlay" || !connected)
@@ -54,10 +41,6 @@ Socket {
         disconnectGrace.restart();
     }
 
-    function validNumber(value) {
-        return typeof value === "number" && Number.isFinite(value);
-    }
-
     function receive(line) {
         if (phase === "closed")
             return;
@@ -82,75 +65,7 @@ Socket {
             service.register(root);
             return;
         }
-        if (event.type === "close") {
-            closeConnection("client-close");
-            return;
-        }
-        if (phase !== "ready") {
-            closeConnection("input-before-ready");
-            return;
-        }
-        switch (event.type) {
-        case "pointer":
-            if (typeof event.monitor !== "string" || !event.monitor.length || !validNumber(event.x) || !validNumber(event.y)) {
-                closeConnection("invalid-pointer");
-                return;
-            }
-            pointer = {
-                monitor: event.monitor,
-                x: event.x,
-                y: event.y
-            };
-            break;
-        case "button":
-            if (["left", "right", "middle", "back", "forward"].indexOf(event.button) < 0 || typeof event.pressed !== "boolean") {
-                closeConnection("invalid-button");
-                return;
-            }
-            input.buttons = input.buttons.filter(button => button !== event.button);
-            if (event.pressed) {
-                input.buttons = input.buttons.concat([event.button]);
-                input.clickFeedback = true;
-                clickFeedbackTimer.restart();
-            }
-            break;
-        case "keys":
-            if (!Array.isArray(event.keys) || !event.keys.every(key => typeof key === "string")) {
-                closeConnection("invalid-keys");
-                return;
-            }
-            const newlyPressed = event.keys.some(key => input.keys.indexOf(key) < 0);
-            input.keys = event.keys;
-            if (newlyPressed) {
-                input.recentKeys = event.keys;
-                input.transientKind = "keys";
-                transientTimer.restart();
-            }
-            break;
-        case "text":
-            if (!Number.isInteger(event.characters) || event.characters < 0) {
-                closeConnection("invalid-text-count");
-                return;
-            }
-            input.characters = event.characters;
-            input.transientKind = "text";
-            transientTimer.restart();
-            break;
-        case "scroll":
-            if (!validNumber(event.amount) || typeof event.horizontal !== "boolean") {
-                closeConnection("invalid-scroll");
-                return;
-            }
-            input.scrollAmount = event.amount;
-            input.horizontalScroll = event.horizontal;
-            input.transientKind = "scroll";
-            transientTimer.restart();
-            break;
-        default:
-            closeConnection("unknown-event");
-            return;
-        }
-        console.info("[computer-control] input pid=" + clientPid + " type=" + event.type);
+        closeConnection(event.type === "close" ? "client-close" : "unexpected-message");
     }
 
     onConnectedChanged: {
@@ -159,8 +74,6 @@ Socket {
         } else {
             phase = "closed";
             disconnectGrace.stop();
-            clickFeedbackTimer.stop();
-            transientTimer.stop();
             service.disconnected(root);
         }
     }
@@ -180,13 +93,5 @@ Socket {
     property Timer disconnectGrace: Timer {
         interval: 250
         onTriggered: root.connected = false
-    }
-    property Timer clickFeedbackTimer: Timer {
-        interval: 150
-        onTriggered: root.input.clickFeedback = false
-    }
-    property Timer transientTimer: Timer {
-        interval: 1600
-        onTriggered: root.input.transientKind = ""
     }
 }

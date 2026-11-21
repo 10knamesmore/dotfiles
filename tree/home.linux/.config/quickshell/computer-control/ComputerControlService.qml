@@ -12,7 +12,6 @@ Scope {
     readonly property string socketPath: runtimeDirectory + "/hypr/" + instanceSignature + "/computer-use.sock"
     property ControlConnection controller: null
     readonly property bool controlling: controller !== null && (controller.phase === "overlay" || controller.phase === "ready")
-    readonly property ControlConnection currentConnection: controlling ? controller : null
 
     function connected(connection) {
         console.info("[computer-control] connected");

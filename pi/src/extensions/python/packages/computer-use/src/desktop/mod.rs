@@ -94,9 +94,7 @@ impl Desktop {
             }
             self.handle.shared.check()?;
             self.handle.call(py, "move_pointer", move |session| {
-                session.input(|input, control, target| {
-                    input.move_pointer_relative(control, target, (x, y))
-                })
+                session.input(|input, control, _| input.move_pointer_relative(control, (x, y)))
             })
         } else {
             let point = self.point((x, y), relative_to)?;
@@ -329,7 +327,7 @@ impl Hold {
             let result = self.handle.call(py, "hold.exit", move |session| {
                 session.input(|input, control, _| {
                     input.run(control, |input| {
-                        input.release_acquisitions(control, &acquisitions);
+                        input.release_acquisitions(&acquisitions);
                         Ok(())
                     })
                 })

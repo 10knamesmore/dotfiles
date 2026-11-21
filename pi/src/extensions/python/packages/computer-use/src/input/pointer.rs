@@ -1,7 +1,6 @@
-//! Map desktop coordinates to output-local virtual pointer events and prompt events.
+//! Map desktop coordinates to output-local virtual pointer events.
 
 use pyo3::prelude::*;
-use serde_json::json;
 use std::time::{Duration, Instant};
 use wayland_client::protocol::wl_pointer::{Axis, AxisSource};
 
@@ -31,16 +30,6 @@ pub(super) fn button(name: &str) -> PyResult<u32> {
         _ => Err(wait::invalid(
             "button must be left, right, middle, back or forward",
         )),
-    }
-}
-
-pub(super) fn button_name(code: u32) -> &'static str {
-    match code {
-        0x110 => "left",
-        0x111 => "right",
-        0x112 => "middle",
-        0x116 => "back",
-        _ => "forward",
     }
 }
 
@@ -100,9 +89,6 @@ impl Input {
             extent,
         );
         pointer.frame();
-        control.event(
-            json!({"type":"pointer", "monitor":monitor.name, "x":point.0-x, "y":point.1-y}),
-        )?;
         Ok(pointer)
     }
 
@@ -123,7 +109,7 @@ impl Input {
                 input.move_to(control, &monitors, point).map(|_| ())
             } else {
                 let current = hyprland::cursor_position(control, target)?;
-                input.move_relative(control, target, (point.0 - current.0, point.1 - current.1))
+                input.move_relative(control, (point.0 - current.0, point.1 - current.1))
             }
         })
     }
@@ -151,7 +137,7 @@ impl Input {
                     .acquire_button(control, &pointer, button)?
                     .into_iter()
                     .collect();
-                input.release_acquisitions(control, &acquisitions);
+                input.release_acquisitions(&acquisitions);
                 input.desktop.sync(control, true)?;
                 if iteration + 1 < count {
                     wait::pause(control, Duration::from_millis(50))?;
@@ -208,7 +194,7 @@ impl Input {
                     Duration::from_millis(10).min(duration.saturating_sub(began.elapsed())),
                 )?;
             }
-            input.release_acquisitions(control, &acquisitions);
+            input.release_acquisitions(&acquisitions);
             Ok(())
         })
     }
@@ -216,7 +202,6 @@ impl Input {
     pub(crate) fn move_pointer_relative(
         &mut self,
         control: &Control,
-        target: &Target,
         delta: (f64, f64),
     ) -> PyResult<()> {
         if !delta.0.is_finite() || !delta.1.is_finite() {
@@ -224,30 +209,16 @@ impl Input {
         }
         self.run(control, |input| {
             input.settle_keyboard(control)?;
-            input.move_relative(control, target, delta)
+            input.move_relative(control, delta)
         })
     }
 
-    /// Move the cursor by a relative delta on the seat-wide pointer and report the result.
-    fn move_relative(
-        &mut self,
-        control: &Control,
-        target: &Target,
-        delta: (f64, f64),
-    ) -> PyResult<()> {
+    fn move_relative(&mut self, control: &Control, delta: (f64, f64)) -> PyResult<()> {
         let pointer = self.pointer(None)?;
         control.check()?;
         pointer.motion(self.time(), delta.0, delta.1);
         pointer.frame();
-        // The overlay cursor follows the real position, which only advances after the compositor applies motion.
-        self.desktop.sync(control, true)?;
-        let position = hyprland::cursor_position(control, target)?;
-        let monitors = hyprland::monitors(control, target)?;
-        let monitor = monitor_at(&monitors, position)?;
-        let (x, y, _, _) = monitor.bounds();
-        control.event(
-            json!({"type":"pointer", "monitor":monitor.name, "x":position.0 - x, "y":position.1 - y}),
-        )
+        Ok(())
     }
 
     pub(crate) fn scroll(
@@ -276,7 +247,6 @@ impl Input {
             } else {
                 Axis::VerticalScroll
             };
-            control.event(json!({"type":"scroll", "amount":amount, "horizontal":horizontal}))?;
             if continuous {
                 if amount != 0.0 {
                     control.check()?;

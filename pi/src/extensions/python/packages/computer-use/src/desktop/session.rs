@@ -232,10 +232,7 @@ impl Session {
     }
 
     pub fn release_inputs(&mut self) -> PyResult<()> {
-        let result = self.input.as_mut().unwrap().release_all(&self.control);
-        self.control
-            .event(serde_json::json!({"type":"keys", "keys":[]}))?;
-        result
+        self.input.as_mut().unwrap().release_all(&self.control)
     }
 
     pub fn launch(&mut self, argv: Vec<String>, cwd: Option<String>) -> PyResult<u32> {
