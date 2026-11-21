@@ -1,13 +1,14 @@
 import { constants } from "node:fs";
 import { access, open, readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import {
   createReadToolDefinition,
   detectSupportedImageMimeTypeFromFile,
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { getCapabilities, Text } from "@earendil-works/pi-tui";
 import { numberTextRead, splitNumberedRead, type NumberedReadDetails } from "./numbered-text.js";
-import { renderNumberedSource } from "./presentation.js";
+import { ReadCallHeader, renderNumberedSource } from "./presentation.js";
 
 async function* readLocalChunks(path: string) {
   const handle = await open(path, "r");
@@ -23,11 +24,11 @@ async function* readLocalChunks(path: string) {
 export default function registerNumberedRead(pi: ExtensionAPI): void {
   const builtin = createReadToolDefinition(process.cwd());
 
-  pi.registerTool<typeof builtin.parameters, NumberedReadDetails | undefined>({
+  pi.registerTool<typeof builtin.parameters, NumberedReadDetails | undefined, { header?: ReadCallHeader }>({
     ...builtin,
     description: `${builtin.description} line numbers are added for text file`,
     async execute(id, input, signal, onUpdate, ctx) {
-      let image = false;
+      let textPath: string | undefined;
       let fileLines = 0;
       const start = Math.max(0, (input.offset ?? 1) - 1);
       const end = input.limit === undefined ? undefined : Math.trunc(start + input.limit);
@@ -38,12 +39,12 @@ export default function registerNumberedRead(pi: ExtensionAPI): void {
           createReadStream: readLocalChunks,
           async detectImageMimeType(path) {
             const mimeType = await detectSupportedImageMimeTypeFromFile(path);
-            image = mimeType !== null;
+            if (mimeType === null) textPath = path;
             return mimeType;
           },
           async readFile(path) {
             const bytes = await readFile(path);
-            if (!image && end !== undefined && end < 0) {
+            if (textPath && end !== undefined && end < 0) {
               fileLines = bytes.toString("utf8").split("\n").length;
             }
             return bytes;
@@ -51,15 +52,24 @@ export default function registerNumberedRead(pi: ExtensionAPI): void {
         },
       });
       const result = await read.execute(id, input, signal, onUpdate, ctx);
-      if (image) return result;
+      if (!textPath) return result;
 
       const firstIndex = Math.trunc(start);
       const requestedLines =
         end === undefined ? undefined : Math.max(0, (end < 0 ? fileLines + end : end) - firstIndex);
-      return numberTextRead(result, firstIndex + 1, requestedLines);
+      const numbered = numberTextRead(result, firstIndex + 1, requestedLines);
+      return { ...numbered, details: { ...numbered.details, sourcePath: textPath } };
+    },
+    renderCall(args, theme, context) {
+      const header = (context.state.header ??= new ReadCallHeader("", 0, 0));
+      return builtin.renderCall!(args, theme, { ...context, lastComponent: header });
     },
     renderResult(result, options, theme, context) {
       const range = result.details?.sourceRange;
+      const path = result.details?.sourcePath;
+      if (!context.isError && getCapabilities().hyperlinks && (path || range)) {
+        context.state.header?.linkToLine(range?.firstLine ?? 1, path && pathToFileURL(path).href);
+      }
       const block = result.content[0];
       const builtinContext = {
         ...context,

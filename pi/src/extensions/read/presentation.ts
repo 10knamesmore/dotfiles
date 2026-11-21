@@ -1,12 +1,41 @@
 import { getLanguageFromPath, highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
 import {
+  hyperlink,
   replaceControlCharacters,
   stripTerminalSequences,
+  Text,
   truncateToWidth,
   wrapTextWithAnsi,
   type Component,
 } from "@earendil-works/pi-tui";
 import { GUTTER_DIVIDER, lineNumberWidth, type SourceRange } from "./numbered-text.js";
+
+// Pi formats both regular and compact read headers through Text.setText().
+export class ReadCallHeader extends Text {
+  private title = "";
+
+  override setText(title: string): void {
+    this.title = title;
+    super.setText(title);
+  }
+
+  linkToLine(line: number, sourceUrl?: string): void {
+    const fileLink = /\x1b\]8;;(file:[^\x1b\x07]*)\x1b\\/.exec(this.title);
+    const url = sourceUrl ?? fileLink?.[1];
+    if (!url) return;
+
+    const target = `${url}#L${line}`;
+    if (fileLink) {
+      const prefix = this.title.slice(0, fileLink.index);
+      const pathAndRange = this.title.slice(fileLink.index + fileLink[0].length).replace("\x1b]8;;\x1b\\", "");
+      super.setText(prefix + hyperlink(pathAndRange, target));
+    } else {
+      // Compact skill, resource and docs headers end in a parenthesized expand hint.
+      const hint = this.title.lastIndexOf(" (");
+      super.setText(hyperlink(this.title.slice(0, hint), target) + this.title.slice(hint));
+    }
+  }
+}
 
 export function renderNumberedSource(
   source: string,

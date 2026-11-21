@@ -6,6 +6,7 @@ export interface SourceRange {
 }
 
 export interface NumberedReadDetails extends ReadToolDetails {
+  sourcePath?: string;
   sourceRange?: SourceRange;
 }
 
