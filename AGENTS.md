@@ -24,7 +24,6 @@ dots.lua          # 例外清单（人手编辑，LuaLS 类型补全见 .luarc.j
 cli/              # 按职责组织管理工具与独立程序，各项目自行构建
   dots/           # 专属 workspace：crates/dots + crates/dots-core，lua-api/ 类型标注
   programs/       # 随仓库分发的独立程序，不限定语言、工具链或依赖管理方式
-    agent-hooks/  # 跨平台，binary: agent-hook
     desktop-backend/ # 仅 Linux，Quickshell 的截图、录屏与状态采集后端
     window-borders/ # 仅 macOS，binary: window-borders
 pi/               # vanilla Pi 的 TypeScript extension source 与 pnpm workspace

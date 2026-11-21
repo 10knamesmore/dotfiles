@@ -31,7 +31,7 @@ PATH 中必须有 `codex`。扩展通过 `codex --codex-run-as-apply-patch <patc
 - Pi 内部参数：`{ input: string }`。
 - `constrainedSampling` 使用 Codex 的 Lark grammar。Pi 对声明支持 grammar tools 的模型发送 custom/freeform 工具；其余模型收到上述 JSON 参数。
 - description 区分这两种输入形式；patch 语法通过 `promptGuidelines` 提供。
-- 不提供 Codex 的多环境选择或审批沙箱。Pi 的 `tool_call` hook 照常触发，但按 `Edit` / `Write` 名称匹配的共享规则不会自动匹配 `apply_patch`。
+- 不提供 Codex 的多环境选择或审批沙箱。
 
 ## 调用显示
 

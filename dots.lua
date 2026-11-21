@@ -68,19 +68,9 @@ distribute("agents-md", {
   mode = "file",
 })
 
--- Hook 定义与规则源都住中立的 .agents/ 命名空间，再分发到各 harness。
 distribute("codex-hooks", {
   src = "tree/home/.agents/codex/hooks.json",
   to = { "~/.codex/hooks.json" },
-  mode = "file",
-})
-distribute("agent-hook-rules", {
-  src = "tree/home/.agents/hooks/pretool.toml",
-  to = {
-    "~/.codex/pretool.toml",
-    "~/.kimi-code/pretool.toml",
-    "~/.pi/agent/pretool.toml",
-  },
   mode = "file",
 })
 
@@ -124,14 +114,6 @@ for _, package in ipairs(macos_cargo_packages) do
     platforms = { "macos" },
   })
 end
-
-dots.install.cargo({
-  source = {
-    path = "cli/programs/agent-hooks",
-    binary = "agent-hook",
-  },
-  root = "~/.local",
-})
 
 dots.install.cargo({
   source = {

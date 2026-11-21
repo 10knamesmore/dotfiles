@@ -13,7 +13,6 @@ cli/
 │   │   └── dots-core/      # 声明解析与资源规划的纯逻辑
 │   └── lua-api/            # dots.lua 的 LuaLS 类型标注
 ├── programs/
-│   ├── agent-hooks/        # 独立 Cargo package；binary: agent-hook
 │   └── window-borders/     # 独立 Cargo package；仅 macOS
 ├── rustfmt.toml            # Rust 项目的共享格式配置
 └── clippy.toml             # Rust 项目的共享 Clippy 配置
@@ -41,12 +40,12 @@ cargo build --locked --release --manifest-path cli/dots/Cargo.toml
 
 ### 现有 Rust 程序
 
-`agent-hooks` 和 `window-borders` 各自维护 Cargo manifest、lockfile、
+`window-borders` 自己维护 Cargo manifest、lockfile、
 构建产物和 lint 声明，不依赖 `dots` 的 workspace。
 `cli/rustfmt.toml` 与 `cli/clippy.toml` 提供共享配置；Clippy 配置不替代
 各 Cargo manifest 的 lint 级别声明。
 
-这两个程序通过仓库根 `dots.lua` 的本地 Cargo 安装声明接入，例如：
+`window-borders` 通过仓库根 `dots.lua` 的本地 Cargo 安装声明接入：
 
 ```lua
 dots.install.cargo({
@@ -65,7 +64,6 @@ dots.install.cargo({
 
 ```sh
 ./dots.sh install --dry-run
-cargo build --locked --release --manifest-path cli/programs/agent-hooks/Cargo.toml
 # 仅 macOS
 cargo build --locked --release --manifest-path cli/programs/window-borders/Cargo.toml
 ```
