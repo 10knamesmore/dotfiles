@@ -15,7 +15,6 @@ from ._connection import Connection, bridge, seconds
 from ._diagnostics import event
 from ._discovery import resolve
 from ._lsp import Lsp
-from ._showcast import Showcast
 
 T = TypeVar("T")
 _identity: dict[str, Any] | None = None
@@ -61,7 +60,6 @@ class Session:
         self._responses_lock = threading.Lock()
         self._connection = Connection(record, identity, self._notification, timeout)
         self.lsp = Lsp(self)
-        self.showcast = Showcast(self)
         event(
             "connect",
             "completed",

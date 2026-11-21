@@ -1,6 +1,6 @@
 ---
 name: nvim-use
-description: 连接已有 Neovim，读取编辑现场、调用 LSP、操作编辑器，或用 showcast 发布带高亮、讲解和原 buffer diff 预览的代码 tour。用于现场排查、导航、展示改动和跨文件讲解。
+description: 连接已有 Neovim，读取当前窗口和未保存的 buffer、调用 LSP、操作编辑器。用于现场排查和源码导航。
 ---
 
 # Neovim Use
@@ -25,84 +25,6 @@ editor = nvim.select(instance_id="从 discover 选择的完整 ID")
 每个 Neovim 只接受一个 Pi 会话。连接在 Python cells 之间保持。`select()` 成功后释放之前选中的连接；需要同时操作多个实例时，用 `connect()` 独立连接。
 
 `discover()` 返回登记摘要，包括 `instance_id`、`pid`、`socket`、`cwd`、`current_file`、`workspace_roots`、`connection`。
-
-## Showcast：带讲解的代码 tour
-
-先确认当前窗口是用户要使用的代码窗口；若焦点在留白或说明窗口，显式切到代码窗口。读取真实 buffer，确认行号、列和内容，再组织有顺序的站点。每站指定 buffer、光标、标题、Markdown comment 和可选的多个高亮范围；需要预览修改时附上 `proposed_text`。讲解应说明该位置与用户问题的关系。
-
-```python
-editor.showcast.start(
-    title="连接如何建立",
-    stops=[
-        {
-            "buffer": "/absolute/project/connection.py",
-            "position": (42, 4),
-            "title": "取得连接",
-            "comment": "这里发起握手。下一站查看服务端如何登记 owner。",
-            "highlights": [
-                {"start": (42, 4), "end": (45, 0)},
-            ],
-        },
-        {
-            "buffer": buffer_id,
-            "position": (18, 0),
-            "title": "登记 owner",
-            "comment": "此 buffer 的未保存内容也会原样展示。",
-        },
-    ],
-)
-```
-
-坐标统一为 `(1-based row, 0-based UTF-8 byte column)`；高亮区间左闭右开。`buffer` 接受已有 buffer ID 或绝对文件路径。
-
-Tour 直接复用当前代码窗口，切换真实 buffer，不新建 tab 或分屏，也不保存文件。Comment 浮窗贴在当前站可见高亮范围的下方；下方放不下时改放上方，两侧都不足时选空间较大的一侧并缩短高度。多个高亮取可见范围的整体边界；无高亮时锚定站点光标位置。浮窗随代码窗口滚动、缩放重新定位，水平位置限制在代码窗口内。
-
-高亮离开 viewport，或上下都容不下边框与一行说明时，浮窗自动隐藏；空间恢复后重新显示。这个自动显隐不改变 `Tab` 设置。重新定位保留说明 buffer 和阅读位置。手动关闭说明窗口会进入隐藏状态，`Tab` 可重新打开。
-
-| 按键                | 行为                                                                |
-| ------------------- | ------------------------------------------------------------------- |
-| `n` / `N`           | 下一站 / 上一站，到边界停留                                         |
-| `Tab`               | 显示或隐藏 comment；隐藏状态跨站保留                                |
-| `<leader>up`        | 显示或隐藏当前站的 diff；隐藏状态跨站保留，无 diff 的站点不改变开关 |
-| `Enter`             | 聚焦 comment，可用 `j/k`、`Ctrl-f/Ctrl-b` 滚动                      |
-| `Esc`（comment 内） | 返回代码窗口                                                        |
-| `q`                 | 结束 tour，在原窗口恢复开始前的 buffer、光标、滚动位置和 winbar     |
-
-按键临时绑定到当前站的代码 buffer 和说明 buffer。离开站点恢复原代码 buffer 的映射；同一 buffer 在其他窗口中也使用这些临时映射。新 tour 替换旧 tour，关闭代码窗口或断开 Pi 时清理高亮与映射。结束 tour 不关闭代码窗口；若原 buffer 已被删除或卸载，保留当前 buffer 并恢复 winbar。
-
-Pi 可调用 `editor.showcast.toggle_comment()`、`editor.showcast.toggle_diff()` 或 `editor.showcast.stop()`。站点坐标按发布时的内容解释；修改源码后需要重新发布 tour。
-
-## 站点 diff：预览拟修改内容
-
-先读取目标真实 buffer，包括未保存内容，再生成拟修改后的完整文本，填入站点的 `proposed_text`。它接受 LF 分行文本，不接受 patch；省略时该站只讲解代码，空字符串表示预览删除全部内容。差异以发布 tour 时的原文为基准，不会把前一站的拟议结果当作下一站的原文。
-
-```python
-buffer_id, before = editor.run(
-    lambda nv: (
-        nv.current.buffer.handle,
-        "\n".join(nv.current.buffer[:])
-        + ("\n" if nv.current.buffer.options["endofline"] else ""),
-    )
-)
-editor.showcast.start(
-    title="重命名讲解",
-    stops=[
-        {
-            "buffer": buffer_id,
-            "position": (1, 0),
-            "title": "拟重命名 old_name",
-            "comment": "查看名称变化；按 <leader>up 对照原文。",
-            "proposed_text": before.replace("old_name", "new_name"),
-        }
-    ],
-)
-```
-
-进入站点时显示对应 diff，离开时清除；结束或替换 tour、关闭代码窗口、断开连接时一并清理。原 buffer 上的删除行使用 `DiffDelete` 高亮并标 `-`，新增行以 `DiffAdd` 虚拟行显示并标 `+`。Diff 本身不创建 tab、window 或 buffer，讲解仍使用 tour 的 comment 浮窗。原文、未保存修改、undo 历史和磁盘内容保持不变。虚拟行不随 `wrap` 折行；长行在 `nowrap` 下可水平滚动。
-
-**告知用户：`<leader>up` 切换 diff 显示 / 原始代码，`q` 结束整个 tour。** 显示开关跨站保留，`Tab` 独立控制讲解浮窗。源码编辑或 buffer 卸载后，该 buffer 所有站点的 diff 失效，返回站点也不会重新显示旧差异；需重新读取源码并发布 tour。
-
-预览没有 apply/accept 操作。实际修改仍用 `apply_patch` 或其他明确写入工具；写入前重新读取真实 buffer，保留用户的未保存修改。完整约定见 [README](../../README.md#站点-diff-预览)。
 
 ## 原生编辑器 API
 

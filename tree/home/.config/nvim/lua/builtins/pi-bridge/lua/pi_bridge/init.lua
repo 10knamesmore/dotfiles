@@ -134,10 +134,6 @@ local function release(reason)
   owner = nil
   owner_timer:stop()
   cancel_pending(previous)
-  local showcast = package.loaded["pi_bridge.showcast"]
-  if showcast then
-    showcast.release()
-  end
   log("disconnected", { channel = previous.channel, reason = reason })
   changed()
   if not stopped then

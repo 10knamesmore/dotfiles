@@ -64,7 +64,7 @@ export function registerNeovimCommand(pi: ExtensionAPI, getSession: (ctx: Extens
           `Neovim connected: ${instance.cwd} (PID ${instance.pid}).\n` +
             `Instance: ${instanceId}\n` +
             "Selected connection is available in python_repl as: import nvim_use as nvim; editor = nvim.current()\n" +
-            "Read the nvim-use skill before editor operations or showcast. This selection lasts until disconnect or Python environment reset.",
+            "Read the nvim-use skill before editor operations. This selection lasts until disconnect or Python environment reset.",
         );
       } catch (error) {
         appendResult(`Neovim connection failed:\n${error instanceof Error ? error.message : String(error)}`);
