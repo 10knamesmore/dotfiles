@@ -481,6 +481,7 @@ export class OpenUIWidget {
   private root: El;
   private mode: Mode;
   private source: string;
+  private contentWidth: number | undefined;
   constructor(id: string, root: El, theme: any, mode: Mode, source: string) {
     this.id = id;
     this.theme = theme;
@@ -583,6 +584,16 @@ export class OpenUIWidget {
     return entries.get(this.id)?.block ?? null;
   }
 
+  copyRenderedText(): string | undefined {
+    const width = this.contentWidth;
+    const entry = entries.get(this.id);
+    if (width === undefined || !entry) return undefined;
+    if (!entry.collapsed && !entry.sourceOpen)
+      return this.layout(width).block?.targets.find((target) => target.id === WIDGET_COPY_ID)?.copy;
+    const { block } = renderTree(entry.root, width, entry.state, { images: imageService });
+    return rowsToLines(block.rows).join("\n");
+  }
+
   /**
    * pi calls this for every widget in the transcript on every frame (up to 60 a second, and again for each mouse event), so
    * the work is done once per distinct appearance. What changes the picture is in the key: the layout (width and version), the
@@ -593,6 +604,7 @@ export class OpenUIWidget {
     try {
       const avail = Math.max(24, width - GUTTER - RIGHT);
       const e = this.layout(avail);
+      this.contentWidth = avail;
       const s = e.state;
       const key = `${e.key}|${s.hover}|${s.focus}|${s.tip}|${s.copied}|${s.noteMode}|${s.notes.length}|${e.notice?.text}|${e.notice?.tone}|${active.id === this.id}`;
       if (e.lines && e.lineKey === key) return e.lines;

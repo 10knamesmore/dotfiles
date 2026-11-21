@@ -33,6 +33,6 @@ export function registerModelTierGuidance(pi: ExtensionAPI): void {
       reportDiagnostic(`[subagent-workflow] personal configuration could not be loaded: ${errorMessage(error)}`);
       guidance = `${selectionGuidance()}\nPersonal configuration is unreadable or invalid. Delegation is unavailable until the user repairs ${getPersonalConfigPath()}.`;
     }
-    return { systemPrompt: `${event.systemPrompt}\n\n${guidance}` };
+    event.systemPromptOptions.sections.model_tiers = guidance;
   });
 }

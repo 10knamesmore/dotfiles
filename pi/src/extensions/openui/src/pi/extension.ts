@@ -1,27 +1,21 @@
-// pi extension: render_widget (OpenUI Lang -> interactive terminal widget) and the component gallery.
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text, truncateToWidth } from "@earendil-works/pi-tui";
-import { Type, type Static } from "typebox";
-import { compile, LIMITS, reference, type Compiled, type El } from "../lang/library.ts";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import { REPLY_BLOCKS_CONFIGURE, type RegisterReplyBlock } from "../../../editor/api.ts";
+import { compile, LIMITS, type Compiled, type El } from "../lang/library.ts";
 import { markdownImages } from "../lang/md.ts";
 import { LANG_SAMPLES } from "../lang/samples.ts";
-import { getCapabilities } from "@earendil-works/pi-tui";
 import { loadImage } from "./images.ts";
 import { syncWidths } from "./widths.ts";
 import { active, confirmDelivery, entryOf, handleKey, hooks, OpenUIWidget, resetAll } from "./widget.ts";
 
+const SHOW_ME_SKILL = fileURLToPath(new URL("../../skills/show-me/SKILL.md", import.meta.url));
 const compiled = new Map<string, Compiled>();
-const widgetParameters = Type.Object({
-  source: Type.Optional(
-    Type.String({ description: "OpenUI Lang source: root = Stack([...]) first, one statement per line" }),
-  ),
-  reference: Type.Optional(Type.Boolean({ description: "Return the component reference instead of drawing" })),
-});
-type WidgetDetails = { kind: "reference" } | { kind: "widget"; source: string };
 let compiledChars = 0;
 /** A source is the key, so the cache is bounded by size as well as count: 64 sources at the 100 KB limit would be 6 MB. */
 const CACHE_CHARS = 2_000_000;
-export function compileCached(source: string): Compiled {
+function compileCached(source: string): Compiled {
   if (source.length > LIMITS.source) return compile(source); // rejected at once; never kept
   let c = compiled.get(source);
   if (!c) {
@@ -37,14 +31,14 @@ export function compileCached(source: string): Compiled {
 }
 
 /** A picture the widget will draw: an Image component, or a `![alt](path)` line in a Markdown or an FAQ answer. */
-export interface Picture {
+interface Picture {
   src: string;
   line: number;
   via: "Image" | "Markdown picture";
 }
 
 /** Every picture in a compiled tree, wherever it was written. */
-export function picturesIn(el: El | undefined, out: Picture[] = []): Picture[] {
+function picturesIn(el: El | undefined, out: Picture[] = []): Picture[] {
   if (!el || typeof el !== "object") return out;
   if (el.type === "Image") out.push({ src: String(el.props.src ?? ""), line: el.line, via: "Image" });
   const text = el.type === "Markdown" ? el.props.text : el.type === "FaqItem" ? el.props.answer : undefined;
@@ -56,8 +50,7 @@ export function picturesIn(el: El | undefined, out: Picture[] = []): Picture[] {
   return out;
 }
 
-/** Problems the model can fix: the picture must exist and be a format a terminal can show. */
-export function checkImages(root: El | undefined): string[] {
+function checkImages(root: El | undefined): string[] {
   const errs: string[] = [];
   for (const im of picturesIn(root)) {
     const r = loadImage(im.src);
@@ -75,63 +68,33 @@ export default function (pi: ExtensionAPI) {
   hooks.sendEcho = (text) =>
     pi.sendMessage({ customType: "openui-click", content: `[widget click → assistant] ${text}`, display: true });
 
-  pi.registerTool<typeof widgetParameters, WidgetDetails>({
-    name: "render_widget",
-    label: "render_widget",
-    description:
-      "Draw an interactive widget in the terminal: dashboards, tables, charts (bar, line, area, pie, radar), diagrams (DAG, ER, infrastructure map, sequence), maps, tabs, buttons and choices. Pass OpenUI Lang as `source`. Call with reference=true once to get the component signatures. A Button click sends its text back to you as the user's next message. Choice answers are staged and arrive together as one message when the user presses Send answers.",
-    promptSnippet: "Draw interactive terminal tables, charts and diagrams from OpenUI Lang",
-    promptGuidelines: [
-      "Before the first render_widget call in a session, call render_widget with reference=true to read the component signatures. Never guess a signature.",
-      "If render_widget returns errors, fix exactly the errors listed and call it again with the full corrected source.",
-    ],
-    parameters: widgetParameters,
-    renderShell: "self",
-    async execute(_id: string, params: Static<typeof widgetParameters>) {
-      if (params.reference || params.source === undefined)
-        return { content: [{ type: "text" as const, text: reference() }], details: { kind: "reference" } };
-      const c = compileCached(params.source);
-      if (!c.ok)
-        throw new Error(
-          `The widget was not drawn: ${c.errors.length} error(s). Fix these and call render_widget again with the full corrected source.\n${c.errors.map((e) => `- ${e}`).join("\n")}`,
-        );
-      const imgErrs = checkImages(c.root);
-      if (imgErrs.length)
-        throw new Error(
-          `The widget was not drawn: ${imgErrs.length} error(s). Fix these and call render_widget again with the full corrected source.\n${imgErrs.map((e) => `- ${e}`).join("\n")}`,
-        );
-      const hasImage = picturesIn(c.root).length > 0;
-      const noPics = hasImage && getCapabilities().images !== "kitty";
-      const note = [
-        ...c.warnings,
-        ...(noPics
-          ? ["this terminal cannot show pictures, so each Image is drawn as a labelled frame with its file details"]
-          : []),
-      ];
-      const noteText = note.length ? ` Notes: ${note.join("; ")}.` : "";
-      return {
-        content: [{ type: "text" as const, text: `Widget drawn in the terminal.${noteText}` }],
-        details: { kind: "widget", source: params.source },
-      };
-    },
-    renderCall(args: any, theme: any) {
-      const n = typeof args?.source === "string" ? args.source.split("\n").length : 0;
-      const label = args?.reference ? "reference" : n ? `${n} lines of OpenUI` : "…";
-      return new Text(theme.fg("toolTitle", theme.bold("render_widget")) + theme.fg("dim", ` ${label}`), 0, 0);
-    },
-    renderResult(result: any, _opts: any, theme: any, ctx: any) {
-      if (ctx.isError) {
-        // the model gets the whole list; show a person the same thing
-        const lines = String(result?.content?.[0]?.text ?? "failed")
-          .split("\n")
-          .slice(0, 9);
-        return new Text(lines.map((l) => theme.fg("error", l)).join("\n"), 0, 0);
-      }
-      if (result?.details?.kind !== "widget") return new Text(theme.fg("dim", "component reference loaded"), 0, 0);
-      const c = compileCached(String(result.details.source ?? ""));
-      if (!c.ok || !c.root) return new Text(theme.fg("error", "widget could not be restored"), 0, 0);
-      return new OpenUIWidget(ctx.toolCallId, c.root, theme, "live", result.details.source);
-    },
+  let rendersReplyBlocks = false;
+  pi.events.on(REPLY_BLOCKS_CONFIGURE, (data) => {
+    const register = data as RegisterReplyBlock;
+    register("openui", (source, id, theme) => {
+      const compiled = compileCached(source);
+      if (!compiled.ok || !compiled.root) return { errors: compiled.errors };
+      const errors = checkImages(compiled.root);
+      if (errors.length) return { errors };
+      return { component: new OpenUIWidget(id, compiled.root, theme, "live", source) };
+    });
+    rendersReplyBlocks = true;
+  });
+
+  pi.on("resources_discover", () => (rendersReplyBlocks ? { skillPaths: [SHOW_ME_SKILL] } : undefined));
+
+  pi.on("before_agent_start", ({ systemPromptOptions }, ctx) => {
+    if (ctx.mode !== "tui" || !rendersReplyBlocks) return;
+    const guidance = [
+      "Pi renders top-level fenced `openui` blocks in assistant replies as interactive diagrams, charts, and tables.",
+      "Write OpenUI Lang directly in the block, starting with `root = Stack([...])`.",
+    ];
+    const skill = systemPromptOptions.skills.find(({ name }) => name === "show-me");
+    if (skill) {
+      const reference = join(dirname(skill.filePath), "references", "openui.md");
+      guidance.push(`Read \`${reference}\` only if you need syntax or component signatures.`);
+    }
+    systemPromptOptions.sections.openui = guidance.join(" ");
   });
 
   pi.registerMessageRenderer("openui-widget", (message: any, _o: any, theme: any) => {
@@ -221,6 +184,7 @@ export default function (pi: ExtensionAPI) {
     });
   });
   pi.on("session_shutdown", async () => {
+    rendersReplyBlocks = false;
     unsub?.();
     unsub = undefined;
     resetAll(); // a pi process lives for days across /new and resume: each session's widgets must not pile up

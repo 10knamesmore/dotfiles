@@ -1,11 +1,18 @@
 import type { FastMode } from "@dotfiles/pi-config";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { PROMPT_EDITOR_CONFIGURE, type EditorStatus, type PromptEditorApi } from "./api.js";
+import {
+  PROMPT_EDITOR_CONFIGURE,
+  REPLY_BLOCKS_CONFIGURE,
+  type EditorStatus,
+  type PromptEditorApi,
+  type RegisterReplyBlock,
+  type ReplyBlockRenderer,
+} from "./api.js";
 import { PromptEditor } from "./component.js";
 import { installCopyCommand } from "./copy.js";
 import { chainInputNavigation, type InputNavigation } from "./navigation.js";
 import { createReplyMarkdown } from "./reply-markdown.js";
-import { createReplyCodeButtons } from "./reply-code-buttons.js";
+import { createReplyBodies } from "./reply-body.js";
 
 type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
 
@@ -46,6 +53,11 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       },
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
+    const blockRenderers = new Map<string, ReplyBlockRenderer>();
+    const registerReplyBlock: RegisterReplyBlock = (language, render) => {
+      blockRenderers.set(language, render);
+    };
+    pi.events.emit(REPLY_BLOCKS_CONFIGURE, registerReplyBlock);
     let editor!: PromptEditor;
     installedFactory = (tui, theme, keybindings) =>
       (editor = new PromptEditor(
@@ -59,8 +71,8 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         () => readWorkflowUsage?.(),
       ));
     ctx.ui.setEditorComponent(installedFactory);
-    installCopyCommand(editor, ctx, replyMarkdown);
-    ctx.ui.setWidget("reply-code-buttons", (tui) => createReplyCodeButtons(tui, ctx));
+    installCopyCommand(editor, ctx);
+    ctx.ui.setWidget("reply-bodies", (tui) => createReplyBodies(tui, ctx, replyMarkdown, blockRenderers));
   });
 
   pi.on("model_select", (_event, ctx) => {
@@ -70,7 +82,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     currentContext = ctx;
   });
   pi.on("session_shutdown", (_event, ctx) => {
-    ctx.ui.setWidget("reply-code-buttons", undefined);
+    ctx.ui.setWidget("reply-bodies", undefined);
     if (installedFactory && ctx.ui.getEditorComponent() === installedFactory) ctx.ui.setEditorComponent(undefined);
     installedFactory = undefined;
     currentContext = undefined;

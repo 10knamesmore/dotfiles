@@ -1006,13 +1006,15 @@ function compileProgram(source: string): Compiled {
   return { ok: uniq.length === 0 && !!rootEl, errors: uniq, warnings, root: uniq.length === 0 ? rootEl : undefined };
 }
 
-/** Text for the model: syntax rules, signatures, actions, tooltips, examples. */
 export function reference(): string {
   const sig = (s: CompSpec) =>
     `${s.name}(${s.params.map((q) => `${q.name}${q.opt ? "?" : ""}: ${showType(q.t)}`).join(", ")}) — ${s.desc}`;
-  return `You write OpenUI Lang to draw an interactive widget in the terminal (unicode, drawn inline in the pi transcript). Pass it as the \`source\` of render_widget. Output only OpenUI Lang statements.
+  return `# OpenUI Lang
+
+Write OpenUI Lang statements in a top-level \`openui\` fenced code block in the assistant reply.
 
 ## Syntax
+
 1. One statement per line: \`name = Expression\`. \`root = Stack([...])\` comes first.
 2. Expressions: "strings" (backslash escapes, use \\n for newlines), numbers, true/false, null, [arrays], {objects}, Component(args), @Step(args), references to other names.
 3. Arguments are POSITIONAL. Write Metric("CPU", "38%", "+2%", "good"), never delta: "+2%". Skip an optional argument in the middle with null.
@@ -1021,25 +1023,34 @@ export function reference(): string {
 6. The widget is drawn in a terminal of about 100 columns: keep labels short, tables under about 12 rows.
 
 ## Components
+
+\`\`\`text
 ${SPECS.map(sig).join("\n")}
+\`\`\`
 
 ## Tooltips
+
 \`tooltips: Tooltip[]\` is the LAST argument of Dag, Erd, InfraMap, SequenceDiagram, Table, Metric, BarChart, LineChart, AreaChart, PieChart, RadarChart, GeoMap and Image, so write null for each skipped optional argument before it, e.g. Dag(nodes, edges, null, null, [t1]).
 Targets: Dag node id; Erd entity name or entity.column; InfraMap node id, zone:<zone name> or <fromId>><toId>; SequenceDiagram participant id or SeqMessage id; Table row:3, col:status or cell:3.status; Metric its own label; BarChart a bar label; GeoMap a point label or A>B; Image the word image; LineChart and AreaChart an x label (that point) or series:<name>; PieChart a slice label; RadarChart an axis label or series:<name>.
 An element that has a tooltip shows a small ◆ on it. Hovering shows the hint; clicking (or Enter) opens the panel with detail, code and link. Use a tooltip for context the reader may want but should not have to read: why a point spiked, what a slice contains, what a node does.
 hint is the short text shown on hover (140 characters). detail (800), code (40 lines) and link (http/https) open in a panel when the element is clicked.
 
 ## Limits
+
 A widget over a limit is not drawn, and the error says which. Source ${LIMITS.source / 1000} KB, ${LIMITS.elements} components, ${LIMITS.depth} levels of nesting, ${LIMITS.children} children per Stack or Card, ${LIMITS.tabs} tabs. Text ${LIMITS.text} characters, Markdown ${LIMITS.markdown}, any other string ${LIMITS.string}, a table cell ${LIMITS.cell}. Table ${LIMITS.tableRows} rows by ${LIMITS.tableCols} columns. BarChart ${LIMITS.bars} bars. LineChart and AreaChart ${LIMITS.points} points and ${LIMITS.series} series. RadarChart ${LIMITS.axes} axes. Dag ${LIMITS.dagNodes} nodes and ${LIMITS.dagEdges} edges. Erd ${LIMITS.entities} entities, ${LIMITS.fields} fields each, ${LIMITS.relations} relations. InfraMap ${LIMITS.infraNodes} nodes and ${LIMITS.infraLinks} links. GeoMap ${LIMITS.geoPoints} points and ${LIMITS.links} links. Faq ${LIMITS.faq} items. Pictures ${LIMITS.images} (Image components and markdown picture lines together). CodeBlock ${LIMITS.codeLines} lines. Choices ${LIMITS.choices} per widget, a question ${LIMITS.question} characters, an option ${LIMITS.option}, ${LIMITS.choiceOptions} options, the user's Other answer ${LIMITS.other}. A SequenceDiagram ${LIMITS.steps} steps. Prefer far less: the reader sees one terminal screen.
 
 ## Actions
+
 Button("Restart", @ToAssistant("Restart the vllm service")) sends that text to the assistant as the user's next turn (500 characters at most). A Button without an action sends its label. Several steps: Action([@ToAssistant("...")]). Do not use @OpenUrl: put links in a Text.
 Choice(question, options, hint, multiple, other) asks the user. A click only stages an answer; the user's Send answers button sends every Choice of the widget together as ONE message (one single question gives "<question> — <option>"; otherwise a numbered list, "(no answer)" for a skipped question, "other: ..." for typed text). multiple: true allows several options; other (default true) adds an Other... row for the user's own answer. Write null for a skipped optional argument: Choice("Which checks?", ["Disk", "Memory"], null, true).
 
 ## Choosing components
+
 Metric for a number, Table for comparisons, BarChart for one series of categories, LineChart for trends with several series, AreaChart for stacked volume, PieChart for parts of a whole (8 slices at most), RadarChart for comparing entities across metrics, Dag for task graphs and pipelines, Erd for database schemas, InfraMap for how systems connect, SequenceDiagram for call flows, GeoMap for places, Tabs/Card to organise. Series values must have the same length as labels. All data is literal: no queries, no variables. Image shows a real picture in terminals that support it (Kitty, Ghostty, WezTerm, Warp, herdr): src is an absolute file path (png, jpg, gif, webp) or a data: URI.
 
 ## Example
+
+\`\`\`openui
 root = Stack([title, kpis, load, go])
 title = Text("Cluster status", "title")
 kpis = Stack([m1, m2, m3], "row")
@@ -1049,5 +1060,6 @@ m3 = Metric("Queue", "12", "-3", "good")
 load = Card([chart], "Load by node")
 chart = BarChart(["spark-1", "spark-2", "spark-3", "spark-4"], [91, 84, 77, 62], null, "%")
 go = Button("Show slowest requests", @ToAssistant("Show the 10 slowest vLLM requests from the last hour"))
+\`\`\`
 `;
 }

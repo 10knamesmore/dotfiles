@@ -13,8 +13,9 @@ import {
 
 const parser = new Marked();
 
-// The button component reads and removes this zero-width marker after Markdown has laid out the header.
+// ReplyBody consumes these markers after Pi lays out Markdown, before any lines reach the terminal.
 export const CODE_COPY_MARKER = /\x1b\]777;pi-code-copy;(\d+);([A-Za-z0-9+/=]*)\x07/g;
+export const REPLY_BLOCK_MARKER = /\x1b\]777;pi-reply-block;(\d+)\x07/;
 
 export interface ReplyCodeBlock {
   text: string;
@@ -28,6 +29,8 @@ export interface CodeHighlight {
   occurrence: number;
   paint: (line: string) => string;
 }
+
+type ResolveReplyBlock = (block: ReplyCodeBlock) => { slot: number } | { errors: readonly string[] } | undefined;
 
 function blockKey(block: Tokens.Code): string {
   return JSON.stringify([block.lang ?? "", block.text.replace(/\t/g, "   ")]);
@@ -80,6 +83,13 @@ function trailingNewlines(text: string): string {
   return /\n*$/.exec(text)![0];
 }
 
+function hasClosingFence(raw: string, isStreaming: boolean): boolean {
+  const open = /^ {0,3}(`{3,}|~{3,})[^\n]*\n/u.exec(raw);
+  if (!open) return false;
+  const close = /(?:^|\n) {0,3}(`{3,}|~{3,})[ \t]*(\n*)$/u.exec(raw.slice(open[0].length));
+  return !!close && close[1]![0] === open[1]![0] && close[1]!.length >= open[1]!.length && (!isStreaming || !!close[2]);
+}
+
 function centeredTable(table: Tokens.Table, width: number): string {
   // Pi displays raw Markdown when even one character per column cannot fit.
   if (width < table.header.length * 4 + 1) return table.raw;
@@ -114,6 +124,7 @@ function centeredTable(table: Tokens.Table, width: number): string {
 /** One renderer per extension instance; a copy wrapper scopes highlighting to its own text chunk. */
 export function createReplyMarkdown() {
   let highlight: CodeHighlight | undefined;
+  let resolveBlock: ResolveReplyBlock | undefined;
 
   const transform: MarkdownTransformer = (markdown, context) => {
     if (context.messageType !== "assistant") return markdown;
@@ -141,7 +152,7 @@ export function createReplyMarkdown() {
       return renderedBlocks === before ? list.raw : items.join("").replace(/\n*$/u, trailingNewlines(list.raw));
     };
 
-    const transformToken = (token: Token, width: number): string => {
+    const transformToken = (token: Token, width: number, topLevel = false, streamingTail = false): string => {
       if (token.type === "table") {
         renderedBlocks++;
         return centeredTable(token as Tokens.Table, width);
@@ -153,6 +164,19 @@ export function createReplyMarkdown() {
         const occurrence = occurrences.get(key) ?? 0;
         occurrences.set(key, occurrence + 1);
         const paint = highlight?.key === key && highlight.occurrence === occurrence ? highlight.paint : undefined;
+        if (topLevel && block.lang && resolveBlock && hasClosingFence(block.raw, streamingTail)) {
+          const custom = resolveBlock({ language: block.lang, text: block.text, key, occurrence });
+          if (custom && "slot" in custom) {
+            return `\n\n${codeSpan(`\x1b]777;pi-reply-block;${custom.slot}\x07·`)}\n\n`;
+          }
+          if (custom) {
+            const theme = getMarkdownTheme();
+            const diagnostics = custom.errors
+              .slice(0, 9)
+              .map((error) => codeSpan(theme.codeBlockBorder(stripTerminalSequences(error).replace(/\s+/gu, " "))));
+            return `${borderedCode(block, width, paint)}${diagnostics.join("  \n")}\n\n`;
+          }
+        }
         return borderedCode(block, width, paint);
       }
       if (token.type === "blockquote") {
@@ -175,20 +199,25 @@ export function createReplyMarkdown() {
 
     const rendered = parser
       .lexer(markdown)
-      .map((token) => transformToken(token, context.availableWidth))
+      .map((token, index, tokens) =>
+        transformToken(token, context.availableWidth, true, context.isStreaming && index === tokens.length - 1),
+      )
       .join("");
     return renderedBlocks ? rendered.trim() : markdown;
   };
 
   return {
     transform,
-    withCodeHighlight<T>(selection: CodeHighlight | undefined, render: () => T): T {
-      const previous = highlight;
+    renderBody<T>(resolve: ResolveReplyBlock, selection: CodeHighlight | undefined, render: () => T): T {
+      const previousHighlight = highlight;
+      const previousResolve = resolveBlock;
       highlight = selection;
+      resolveBlock = resolve;
       try {
         return render();
       } finally {
-        highlight = previous;
+        highlight = previousHighlight;
+        resolveBlock = previousResolve;
       }
     },
   };

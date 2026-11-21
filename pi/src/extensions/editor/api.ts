@@ -1,4 +1,6 @@
 import type { FastMode } from "@dotfiles/pi-config";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
 import type { InputNavigation } from "./navigation.js";
 
 /** UI capabilities offered to other extensions for the current Pi session. */
@@ -29,3 +31,17 @@ export interface EditorStatus {
 
 /** The editor requests contributions after all extension factories have registered. */
 export const PROMPT_EDITOR_CONFIGURE = "dotfiles:prompt-editor:configure";
+
+export interface ReplyBlock extends Component {
+  copyRenderedText(): string | undefined;
+}
+
+export type ReplyBlockRenderer = (
+  source: string,
+  id: string,
+  theme: Theme,
+) => { component: ReplyBlock } | { errors: readonly string[] };
+
+export type RegisterReplyBlock = (language: string, render: ReplyBlockRenderer) => void;
+
+export const REPLY_BLOCKS_CONFIGURE = "dotfiles:reply-blocks:configure";

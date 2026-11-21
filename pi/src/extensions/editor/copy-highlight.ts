@@ -1,6 +1,6 @@
 import { AssistantMessageComponent, type Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, parseColor, type Component, type TUI } from "@earendil-works/pi-tui";
-import type { ReplyMarkdown } from "./reply-markdown.js";
+import { Container, parseColor, type TUI } from "@earendil-works/pi-tui";
+import { ReplyBody } from "./reply-body.js";
 
 const COPY_BACKGROUNDS = {
   dark: parseColor("#403454"),
@@ -18,59 +18,31 @@ export function highlightCopySource(
   tui: TUI,
   theme: Theme,
   messageTimestamp: number,
-  renderer: ReplyMarkdown,
   selectedTarget: () => CopyTarget | undefined,
-): { refresh: () => void; dispose: () => void } {
+) {
   const reply = findAssistant(tui, messageTimestamp);
-  const chunks: { parent: Container; markdown: Markdown; wrapper: Component; position: { index: number } }[] = [];
   const paint = (line: string) => theme.style(line, { bg: COPY_BACKGROUNDS[theme.appearance] });
+  let highlightedBody: ReplyBody | undefined;
   let restoreReply = () => {};
-  let nextTextChunk = 0;
-
-  const wrapText = (parent: Container) => {
-    parent.children.forEach((child, index) => {
-      const existing = chunks.find((chunk) => chunk.markdown === child || chunk.wrapper === child);
-      if (existing) {
-        existing.position.index = nextTextChunk++;
-        parent.children[index] = existing.wrapper;
-        return;
-      }
-      if (child instanceof Markdown) {
-        const position = { index: nextTextChunk++ };
-        const wrapper: Component = {
-          render(width) {
-            const target = selectedTarget();
-            return renderer.withCodeHighlight(
-              target?.chunk === position.index ? { ...target, paint } : undefined,
-              () => {
-                const lines = child.render(width);
-                return target === undefined ? lines.map(paint) : lines;
-              },
-            );
-          },
-          invalidate: () => child.invalidate(),
-        };
-        chunks.push({ parent, markdown: child, wrapper, position });
-        parent.children[index] = wrapper;
-        child.invalidate();
-      } else if (child instanceof Container) {
-        wrapText(child);
-      }
-    });
-  };
   if (reply) {
     const { parent, source } = reply;
-    const wrapper: Component = {
-      render(width) {
-        // Expanding thinking rebuilds the reply's children. Compose the body wrappers before each draw.
-        // Thinking itself is inside a MouseRegion, not these body Markdown children.
-        nextTextChunk = 0;
-        wrapText(source);
-        return source.render(width);
-      },
-      invalidate: () => source.invalidate(),
-      handleMouse: (event) => source.handleMouse(event),
-    };
+    const wrapper = new (class extends Container {
+      override render(width: number): readonly string[] {
+        const target = selectedTarget();
+        const bodies = replyBodies(source);
+        const body = target && bodies[target.chunk];
+        if (highlightedBody !== body) highlightedBody?.setHighlight(undefined);
+        highlightedBody = body;
+        if (target) body?.setHighlight({ ...target, paint });
+        if (!target) for (const chunk of bodies) chunk.setPaint(paint);
+        try {
+          return super.render(width);
+        } finally {
+          if (!target) for (const chunk of bodies) chunk.setPaint(undefined);
+        }
+      }
+    })();
+    wrapper.addChild(source);
     parent.children[parent.children.indexOf(source)] = wrapper;
     restoreReply = () => {
       const index = parent.children.indexOf(wrapper);
@@ -79,20 +51,26 @@ export function highlightCopySource(
   }
 
   return {
+    copyRenderedBlock(target: CopyTarget): string | undefined {
+      return reply && replyBodies(reply.source)[target.chunk]?.copyRenderedBlock(target);
+    },
     refresh() {
-      for (const { markdown } of chunks) markdown.invalidate();
       tui.requestRender();
     },
     dispose() {
       restoreReply();
-      for (const { parent, markdown, wrapper } of chunks) {
-        const index = parent.children.indexOf(wrapper);
-        if (index !== -1) parent.children[index] = markdown;
-        markdown.invalidate();
-      }
+      highlightedBody?.setHighlight(undefined);
       tui.requestRender();
     },
   };
+}
+
+function replyBodies(parent: Container): ReplyBody[] {
+  return parent.children.flatMap((child) => {
+    if (child instanceof ReplyBody) return [child];
+    if (child instanceof Container) return replyBodies(child);
+    return [];
+  });
 }
 
 function findAssistant(
