@@ -68,7 +68,7 @@ export function registerTodoTool(pi: ExtensionAPI, store: TodoSessionStore, pres
     label: "Todo",
     description:
       "Apply one atomic operation to the parent session's phased todo list. init replaces the list; start selects one task; done and drop target a task, phase, or all tasks; rm removes one task, clears one phase, or clears all tasks; block and unblock require one task or phase; append adds tasks to a phase; view is read-only. Task content and phase names are stable exact identifiers. After each mutation, the first pending task becomes active when no task is active. Use view if an identifier is unknown.",
-    promptSnippet: "Track multi-step work as a parent-session phase and task list",
+    promptSnippet: "Track multi-step work to help user and you to keep in pace",
     promptGuidelines: [
       "Use todo for multi-step work and keep every introduced task and phase string stable for later operations. make sure update todos once a task was done to help user keep in pace",
       "After a successful todo mutation, continue the real work in the same turn instead of spending a turn only updating progress.",

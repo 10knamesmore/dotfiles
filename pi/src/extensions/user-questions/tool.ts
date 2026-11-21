@@ -97,11 +97,6 @@ function optionLabel(option: UserQuestionOption, index: number): string {
   return `${index + 1}. ${sanitizeQuestionDisplay(option.label)}${description}`;
 }
 
-function isOtherOptionLabel(label: string): boolean {
-  const normalized = sanitizeQuestionDisplay(label).trim().toLowerCase();
-  return normalized === "other" || normalized === "其他";
-}
-
 class UserQuestionsComponent implements Component, Focusable {
   private currentIndex = 0;
   private optionIndex = 0;
@@ -326,16 +321,14 @@ class UserQuestionsComponent implements Component, Focusable {
   private renderOptions(question: UserQuestion): RenderOption[] {
     const options = question.options ?? [];
     if (options.length === 0) return [];
-    const allowOther = question.allowOther !== false;
-    const rendered: RenderOption[] = options.map((option, index) => ({
-      label: optionLabel(option, index),
-      option,
-      isOther: allowOther && isOtherOptionLabel(option.label),
-    }));
-    if (allowOther && !rendered.some((option) => option.isOther)) {
-      rendered.push({ label: OTHER_OPTION_LABEL, isOther: true });
-    }
-    return rendered;
+    return [
+      ...options.map((option, index) => ({
+        label: optionLabel(option, index),
+        option,
+        isOther: false,
+      })),
+      { label: OTHER_OPTION_LABEL, isOther: true },
+    ];
   }
 
   private allAnswered(): boolean {
@@ -615,7 +608,7 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
     name: "ask_user_questions",
     label: "Ask User Questions",
     description:
-      "Ask the user one or more questions. Configure each question independently: provide options for a selection question, omit options for free text, and set allowOther to control custom answers for that question. The user may attach a note to any answer; it is returned as an additional `<id> note:` line.",
+      "Ask the user one or more questions. Provide options for a selection question or omit them for free text. Every selection question lets the user write a custom answer via Other. Notes are returned as additional `<id> note:` lines.",
     promptSnippet: "Ask the user configured questions and collect structured answers",
     promptGuidelines: [
       "Use ask_user_questions when progress depends on information only the user can provide.",

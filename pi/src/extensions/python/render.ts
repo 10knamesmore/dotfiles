@@ -39,7 +39,6 @@ export function executionText(result: PythonExecutionResult): string {
   return lines.join("\n");
 }
 
-/** Show the highlighted code, execution limit, and any explicitly selected working directory. */
 export function renderPythonCall(
   args: { code?: string; cwd?: string; timeout?: number },
   theme: Theme,
@@ -49,15 +48,12 @@ export function renderPythonCall(
   const lines = source.split("\n");
   const preview = context.expanded ? source : lines.slice(0, 6).join("\n");
   const more = !context.expanded && lines.length > 6 ? theme.fg("dim", `\n… ${lines.length - 6} more lines`) : "";
-  return new Text(
-    theme.fg("toolTitle", theme.bold("python_repl")) +
-      theme.fg("muted", ` · ${args.timeout ?? 60}s`) +
-      (args.cwd ? theme.fg("muted", ` · ${clean(args.cwd)}`) : "") +
-      (preview ? `\n${highlightCode(preview, "python").join("\n")}` : "") +
-      more,
-    0,
-    0,
-  );
+  const directory = theme.fg("dim", clean(args.cwd || "."));
+  const prompt = theme.fg("accent", "❯");
+  const title = theme.fg("toolTitle", theme.bold("python_repl"));
+  const timeout = theme.fg("muted", ` (${args.timeout ?? 60}s)`);
+  const highlighted = preview ? `\n${highlightCode(preview, "python").join("\n")}` : "";
+  return new Text(`${directory} ${prompt} ${title}${timeout}${highlighted}${more}`, 0, 0);
 }
 
 /** UI failure labels come from execution status; infrastructure diagnostics stay in their log file. */

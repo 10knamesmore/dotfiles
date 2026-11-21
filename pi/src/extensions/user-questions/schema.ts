@@ -19,12 +19,6 @@ const UserQuestionSchema = Type.Object(
         description: "Options for this question; omit or leave empty for a free-text question",
       }),
     ),
-    allowOther: Type.Optional(
-      Type.Boolean({
-        description:
-          "For option questions, whether the user may enter a custom answer; defaults to true. When enabled, an option labeled Other is also treated as the custom-answer entry",
-      }),
-    ),
     placeholder: Type.Optional(
       Type.String({
         description: "Hint text shown while the free-text answer is empty; never part of the answer",
