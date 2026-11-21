@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$PI_ASKPASS_NODE" "${0%/*}/askpass.mjs"

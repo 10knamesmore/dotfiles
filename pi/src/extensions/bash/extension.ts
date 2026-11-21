@@ -1,22 +1,4 @@
-/**
- * Hosts background `bash` commands.
- *
- * Pi's built-in `bash` tool waits for every command, so a dev server or a
- * watcher holds the turn until it exits. This module re-registers `bash` with
- * one extra parameter, `background`. With `background: true` the command starts
- * detached, stdout and stderr go to a log file, and the call returns the pid
- * immediately instead of waiting. Exit notifications steer the session or
- * start a new turn when it is idle.
- *
- * Foreground commands default to 120 seconds and otherwise use Pi's own tool
- * definition. Background commands have no default timeout and swap only process
- * spawning by handing `operations` to that definition. Session
- * environment variables, `shellCommandPrefix`, and `shellPath` therefore keep
- * coming from Pi.
- *
- * Background processes belong to the session: `session_shutdown` kills their
- * process groups.
- */
+/** Extends Pi's bash tool with session-owned background jobs and one-shot foreground sudo. */
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -39,22 +21,30 @@ import { Box, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { createBackgroundSession, publishProcesses, type BackgroundProcess, type BackgroundSession } from "./model.js";
 import { registerBackgroundUi } from "./ui.js";
+import { sudoBashOperations } from "./sudo.js";
+import { visibleCommand } from "./sudo-approval.js";
 
 const DEFAULT_FOREGROUND_TIMEOUT_SECONDS = 120;
 const BACKGROUND_EXIT_MESSAGE = "bash-background:exit";
 
-/** Pi keeps its schema private; declare the foreground deadline and background lifetime here. */
+/** Pi keeps its bash parameter schema private. */
 const bashSchema = Type.Object({
   command: Type.String({ description: "Shell command to execute" }),
   timeout: Type.Optional(
     Type.Number({
-      description: `Timeout in seconds. Foreground commands default to ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS} seconds; an explicit value overrides it. Background commands have no default timeout; an explicit timeout limits their lifetime, and session shutdown also kills them.`,
+      description: `Timeout in seconds. Foreground commands default to ${DEFAULT_FOREGROUND_TIMEOUT_SECONDS} seconds; Background commands have no default timeout; `,
     }),
   ),
   background: Type.Optional(
     Type.Boolean({
       description:
-        "Start the command detached and return its pid instead of waiting; output goes to a log file and an exit notification triggers a turn",
+        "Start the command detached and return its pid instead of waiting; output goes to a log file and an exit notification",
+    }),
+  ),
+  sudo: Type.Optional(
+    Type.Boolean({
+      description:
+        "Request approval to run this entire command once as root using /bin/bash. Supply the command without sudo.",
     }),
   ),
 });
@@ -116,6 +106,13 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     parameters: bashSchema,
 
     renderCall(params, theme, context) {
+      if (params.sudo === true) {
+        return builtInBash.renderCall!(
+          { ...params, command: `[root] ${visibleCommand(params.command ?? "")}` },
+          theme,
+          context,
+        );
+      }
       if (params.background !== true) return builtInBash.renderCall!(params, theme, context);
       const command = stripVTControlCharacters(params.command ?? "");
       const timeout = params.timeout === undefined ? "" : theme.fg("muted", ` (timeout ${params.timeout}s)`);
@@ -127,6 +124,14 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     },
 
     renderResult(result, options, theme, context) {
+      if (context.args.sudo === true && !options.isPartial && !context.isError) {
+        return builtInBash.renderResult!(
+          { ...result, content: [...result.content, { type: "text", text: "Exit code: 0" }] },
+          options,
+          theme,
+          context,
+        );
+      }
       const started = result.details?.background;
       if (started === undefined) return builtInBash.renderResult!(result, options, theme, context);
       return new Text(
@@ -137,6 +142,21 @@ export function registerBashBackground(pi: ExtensionAPI): void {
     },
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      if (params.sudo === true) {
+        if (params.background) throw new Error("sudo requires a foreground Bash command. Omit background: true.");
+        if (ctx.mode !== "tui" || !process.stdin.isTTY || !process.stdout.isTTY) {
+          throw new Error("sudo requires a local interactive Pi terminal. The command did not run.");
+        }
+        const timeout = params.timeout ?? DEFAULT_FOREGROUND_TIMEOUT_SECONDS;
+        const operations = sudoBashOperations(ctx, resolveTimeoutMs(timeout)!);
+        return createBashToolDefinition(ctx.cwd, { operations, exposeSessionEnvironment: false }).execute(
+          toolCallId,
+          { command: params.command, timeout },
+          signal,
+          onUpdate,
+          ctx,
+        );
+      }
       const settings = readShellToolSettings(ctx);
       if (params.background !== true) {
         return createBashToolDefinition(ctx.cwd, settings).execute(
