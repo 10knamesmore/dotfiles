@@ -8,42 +8,42 @@
 
 [mgr]
 prepend_keymap = [
-	# 退出 / 标签（q 进等待：qq 退出、qt 关标签）
-	{ on = ["q", "q"], run = "quit", desc = "Quit" },
-	{ on = ["q", "t"], run = "close", desc = "Close tab (quit if last)" },
-	{ on = "t", run = "tab_create --current", desc = "New tab (cwd)" },
+    # 退出 / 标签（q 进等待：qq 退出、qt 关标签）
+    { on = ["q", "q"], run = "quit", desc = "Quit" },
+    { on = ["q", "t"], run = "close", desc = "Close tab (quit if last)" },
+    { on = "t", run = "tab_create --current", desc = "New tab (cwd)" },
 
-	# 移动（覆盖默认 J/K = 预览窗 seek——光标五行跳更常用）
-	{ on = "K", run = "arrow -5", desc = "Move cursor 5 up" },
-	{ on = "J", run = "arrow 5", desc = "Move cursor 5 down" },
+    # 移动（覆盖默认 J/K = 预览窗 seek——光标五行跳更常用）
+    { on = "K", run = "arrow -5", desc = "Move cursor 5 up" },
+    { on = "J", run = "arrow 5", desc = "Move cursor 5 down" },
 
-	# 进入：文件直接打开、目录下钻，一键两用
-	{ on = "l", run = "plugin smart-enter", desc = "Enter dir / open file" },
+    # 进入：文件直接打开、目录下钻，一键两用
+    { on = "l", run = "plugin smart-enter", desc = "Enter dir / open file" },
 
-	# vim 风格 复制/剪切/删除（序列键，遮蔽危险单键）
-	{ on = ["y", "y"], run = "yank", desc = "Yank (copy)" },
-	{ on = ["y", "d"], run = "copy dirname", desc = "Copy dirname" },
-	{ on = ["y", "f"], run = "copy filename", desc = "Copy filename" },
-	{ on = "Y", run = "copy path", desc = "Copy full path" },
-	{ on = ["d", "d"], run = "yank --cut", desc = "Cut" },
-	{ on = ["d", "D"], run = "remove", desc = "Trash" },
-	{ on = ["d", "d", "d"], run = "remove --permanently", desc = "Delete permanently" },
-	# 粘贴用默认单键 p / P（--force）
+    # vim 风格 复制/剪切/删除（序列键，遮蔽危险单键）
+    { on = ["y", "y"], run = "yank", desc = "Yank (copy)" },
+    { on = ["y", "d"], run = "copy dirname", desc = "Copy dirname" },
+    { on = ["y", "f"], run = "copy filename", desc = "Copy filename" },
+    { on = ["y", "D"], run = "copy path", desc = "Copy full path" },
+    { on = ["d", "d"], run = "yank --cut", desc = "Cut" },
+    { on = ["d", "D"], run = "remove", desc = "Trash" },
+    { on = ["d", "d", "d"], run = "remove --permanently", desc = "Delete permanently" },
+    # 粘贴用默认单键 p / P（--force）
 
-	# 新建 / 重命名（o 覆盖默认 open——打开走 l/<Enter>）
-	{ on = "o", run = "create", desc = "Create file (dir ends with /)" },
-	{ on = "I", run = "rename --cursor=start", desc = "Rename from start" },
-	{ on = "A", run = "rename --cursor=end", desc = "Rename from end" },
+    # 新建 / 重命名（o 覆盖默认 open——打开走 l/<Enter>）
+    { on = "o", run = "create", desc = "Create file (dir ends with /)" },
+    { on = "I", run = "rename --cursor=start", desc = "Rename from start" },
+    { on = "A", run = "rename --cursor=end", desc = "Rename from end" },
 
-	# 选择
-	{ on = "<C-S-a>", run = "toggle_all", desc = "Toggle all" },
+    # 选择
+    { on = "<C-S-a>", run = "toggle_all", desc = "Toggle all" },
 
-	# 书签跳转
-	{ on = ["g", "p"], run = "cd ~/Documents", desc = "Go to Documents" },
-	{ on = ["g", "e"], run = "cd ~/Desktop", desc = "Go to Desktop" },
+    # 书签跳转
+    { on = ["g", "p"], run = "cd ~/Documents", desc = "Go to Documents" },
+    { on = ["g", "e"], run = "cd ~/Desktop", desc = "Go to Desktop" },
 ]
 
 [confirm]
 prepend_keymap = [
-	{ on = "q", run = "close", desc = "Cancel" },
+    { on = "q", run = "close", desc = "Cancel" },
 ]
