@@ -1,4 +1,3 @@
-import type { Usage } from "@earendil-works/pi-ai";
 import type { BuildSystemPromptOptions, ContextWithSystemEvent } from "@earendil-works/pi-coding-agent";
 
 /** Owned request data captured before later handlers can mutate it; replaced on each observation. */
@@ -8,12 +7,11 @@ export interface ContextSnapshot {
   readonly selectedModel: string;
   readonly runtimePrompt: string;
   readonly messages: ContextWithSystemEvent["messages"];
-  readonly options: Pick<BuildSystemPromptOptions, "cwd" | "contextFiles" | "skills">;
+  readonly options: Pick<BuildSystemPromptOptions, "cwd" | "skills"> & { contextFilePaths?: string[] };
   readonly response?: {
     model: string;
     responseModel?: string;
     stopReason: string;
-    usage: Usage;
   };
 }
 

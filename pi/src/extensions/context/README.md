@@ -2,7 +2,7 @@
 
 `/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器在输入区域打开，不使用悬浮层。命令直接打开导航列表，首项为总览；有 provider payload 时，第二项为最近一次观察的 **Full request JSON**。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
 
-分区标题使用整行背景条，字段标签、数值和说明分色；增删改分别使用成功、错误和警告色。JSON 与 prompt 标签使用语法高亮并显示行号。列表按内容类别标注，选中项使用整行背景。颜色跟随当前 Pi 主题。
+导航列表、总览和按键说明使用对齐的表格，数字列右对齐，选中项使用整行背景。JSON 与 prompt 正文使用语法高亮并显示行号。颜色跟随当前 Pi 主题。
 
 请求时只保存独立快照：上下文消息与来源配置使用深拷贝，provider payload 保存为一份紧凑 JSON 字符串。打开检查器后才转换消息、生成目录、计算字节数和来源证据。
 
@@ -11,9 +11,9 @@
 可查看：
 
 - 会话配置生成的 runtime prompt，包含 forced-prompt 覆盖；另列 transcript 中的 prompt section 和工具声明。
-- 转换后的上下文消息，按体积排序；显示转换后序号与原消息类型，包括压缩摘要。
-- 配置中的 context 文件正文是否出现在 runtime prompt 中；此项是文本查找，不判断正文来自哪个 section。
-- 配置中的 skill 目录，以及匹配的成功 `read(path)` 结果是否仍在上下文中。读取结果可能只是片段；通过其他工具读取、调用记录被移除或历史已压缩时，不能据此判断 skill 正文加载情况。
+- 转换后的上下文消息按请求快照中的顺序列出，筛选不改变顺序；类型包含压缩摘要。
+- 总览中的 Context files：Pi 配置的上下文文件路径。
+- 总览中的 Configured skills：当前请求中是否仍有匹配的成功 `read(path)` 调用及结果。读取结果可能只是片段；这一检查只考虑 `read` 工具与保留在当前请求中的记录。
 - `before_provider_request` 观察到的完整原生 payload JSON，以及拆分后的各顶层字段。
 
 ## 快捷键
@@ -25,6 +25,7 @@
 | `j/k`、`↓/↑`      | 移动选中项             | 滚动一行                   |
 | `J/K`             | 移动七项               | 滚动七行                   |
 | `Enter/l/→`       | 打开选中项             | —                          |
+| `Ctrl+G`          | —                      | 在外部编辑器查看 Markdown 或 JSON |
 | `h/Esc/←`         | 关闭检查器             | 返回上一层                 |
 | `g/G`、`Home/End` | 首项／末项             | 顶部／底部                 |
 | `Ctrl+U/D`        | 滚动一行，不改变选中项 | 滚动一行                   |
@@ -36,12 +37,14 @@
 
 筛选模式独占文字输入，`j/k/h/l/q` 都作为筛选词输入。`Enter` 保留筛选并回到普通模式，`Esc` 或 `Ctrl+C` 取消本次编辑，恢复之前的筛选、选中项和视口。
 
+外部编辑器按 Pi 的 `externalEditor`、`$VISUAL`、`$EDITOR` 的顺序选择，均未配置时用 `nvim`。退出编辑器后删除临时文件并回到原详情；文件改动不会写回快照。
+
 ## 数据边界
 
 上下文在 `context_with_system` 事件采集，早于 Pi 的 forced-prompt 替换、hidden-tool 过滤、provider 转换和图片过滤。transcript prompt 和工具由 Pi 的 replay API 计算；它们是投影前的状态。另用 `ctx.getSystemPrompt()` 读取当时会话配置生成的 runtime prompt，方便查看 forced-prompt 覆盖。context 文件与 skill 来源目录取自 `before_agent_start` 的 prompt 配置。
 
 payload 在 `before_provider_request` 采集。主请求、重试和缓存预热都会触发此 hook，且事件不提供请求身份，因此 payload 使用独立编号与时间戳，不归属到某个上下文快照。后续 extension handler 与 provider transport 仍可能修改数据。
 
-体积使用 UTF-8 字节：prompt 是原始文本，其他内容按紧凑 JSON 计量，详情展示格式化 JSON。section、工具与消息显示各条目体积之和，不含条目间分隔符；payload 显示完整 JSON 的体积。消息体积排除响应 usage、时间戳与工具显示详情，但包含图片数据、opaque signature 和序列化结构。prompt、工具也出现在 system 消息中，几项体积有重叠，不能相加当作请求总量。字节数不换算成 token；token 使用当前请求对应 assistant 响应中由 Pi 归一化的 usage，全零时注明未观察到非零统计，不做 section 级归因。请求模型与 provider 返回的 `responseModel` 分开显示，后者缺失时明确标注。
+体积使用 UTF-8 字节：prompt 是原始文本，其他内容按紧凑 JSON 计量，详情展示格式化 JSON。section、工具与消息显示各条目体积之和，不含条目间分隔符；payload 显示完整 JSON 的体积。消息体积排除响应 usage、时间戳与工具显示详情，但包含图片数据、opaque signature 和序列化结构。prompt、工具也出现在 system 消息中，几项体积有重叠，不能相加当作请求总量。字节数不换算成 token。请求模型与 provider 返回的 `responseModel` 分开显示，后者缺失时明确标注。
 
 只在交互式 TUI 中采集，在内存保留最近一次主会话上下文与最近一次 provider payload，不写日志、不追加会话消息、不调用模型。`/reload`、切换会话或树导航后清空。检查器固定使用打开时的快照；后续请求与响应统计不会改变当前页面。

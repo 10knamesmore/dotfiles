@@ -1,4 +1,4 @@
-import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   mixColors,
   stripTerminalSequences,
@@ -8,18 +8,24 @@ import {
   type Color,
   type Component,
 } from "@earendil-works/pi-tui";
-import type { ReportRow, ReportTone } from "./report.js";
+import type { ReportSection, TableCell, TableColumn } from "./report.js";
 import type { SourceDocument } from "./source-layout.js";
 
-export type PageContent = { kind: "report"; rows: ReportRow[] } | ({ kind: "source" } & SourceDocument);
+export type PageContent = { kind: "report"; sections: ReportSection[] } | ({ kind: "source" } & SourceDocument);
 
-const valueColors: Record<ReportTone, ThemeColor> = {
-  value: "text",
-  number: "syntaxNumber",
-  success: "success",
-  warning: "warning",
-  error: "error",
-};
+const columnDivider = " │ ";
+
+export function tableLayout(width: number, columns: readonly TableColumn[]) {
+  let remainingWidth = Math.max(columns.length, width - (columns.length - 1) * columnDivider.length);
+  let remainingWeight = columns.reduce((sum, column) => sum + column.weight, 0);
+  return columns.map((column, index) => {
+    const available = remainingWidth - (columns.length - index - 1);
+    const width = Math.max(1, Math.min(available, Math.floor((remainingWidth * column.weight) / remainingWeight)));
+    remainingWidth -= width;
+    remainingWeight -= column.weight;
+    return { ...column, width };
+  });
+}
 
 export class ContextAppearance {
   public surface!: Color;
@@ -47,7 +53,34 @@ export class ContextAppearance {
     return this.theme.style(clipped + padding, { fg: "text", bg: background });
   }
 
-  public panel(body: string[], width: number, title: string, help: string): string[] {
+  public tableRow(
+    layout: ReturnType<typeof tableLayout>,
+    cells: readonly TableCell[],
+    width: number,
+    background = this.surface,
+    wrap = false,
+  ): string[] {
+    const columns = layout.map((column, index) => {
+      const cell = cells[index] ?? "";
+      const { text, color, bold } = typeof cell === "string" ? { text: cell, color: undefined, bold: undefined } : cell;
+      const clean = stripTerminalSequences(text);
+      const lines = wrap ? wrapTextWithAnsi(clean, column.width) : [clean];
+      return { ...column, lines, color, bold };
+    });
+    const divider = this.theme.fg("border", columnDivider);
+    const height = Math.max(1, ...columns.map(({ lines }) => lines.length));
+    return Array.from({ length: height }, (_, row) => {
+      const line = columns.map((column) => {
+        const text = truncateToWidth(column.lines[row] ?? "", column.width, "…");
+        const padding = " ".repeat(column.width - visibleWidth(text));
+        const aligned = column.align === "right" ? padding + text : text + padding;
+        return this.theme.style(aligned, { fg: column.color ?? "text", bold: column.bold });
+      });
+      return this.fill(line.join(divider), width, background);
+    });
+  }
+
+  public panel(body: string[], width: number, selection?: string): string[] {
     const inner = Math.max(1, width - 4);
     if (this.frameWidth !== width) this.framedRows.clear();
     this.frameWidth = width;
@@ -59,17 +92,15 @@ export class ContextAppearance {
       nextFramedRows.set(line, rendered);
       return rendered;
     };
-    const edge = (left: string, right: string) =>
-      this.fill(this.theme.fg("border", `${left}${"─".repeat(Math.max(0, width - 2))}${right}`), width);
-    const lines = [
-      edge("┌", "┐"),
-      frame(
-        this.fill(this.theme.style(stripTerminalSequences(title), { fg: "accent", bold: true }), inner, this.selected),
-      ),
-      ...body.map(frame),
-      frame(this.fill(this.theme.fg("muted", help), inner, this.section)),
-      edge("└", "┘"),
-    ];
+    const edge = (left: string, right: string, counter = "") => {
+      const inset = counter && width >= counter.length + 4 ? ` ${counter} ` : "";
+      const rule = "─".repeat(Math.max(0, width - 2 - inset.length));
+      const border = inset
+        ? this.theme.fg("border", left + rule) + this.theme.fg("syntaxNumber", inset) + this.theme.fg("border", right)
+        : this.theme.fg("border", left + rule + right);
+      return this.fill(border, width);
+    };
+    const lines = [edge("╭", "╮"), ...body.map(frame), edge("╰", "╯", selection)];
     this.framedRows = nextFramedRows;
     return lines;
   }
@@ -80,14 +111,14 @@ export class ContextReport implements Component {
   private cachedLines: string[] | undefined;
 
   public constructor(
-    private readonly rows: ReportRow[],
+    private readonly sections: ReportSection[],
     private readonly appearance: ContextAppearance,
   ) {}
 
   public render(width: number): string[] {
     if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
     this.cachedWidth = width;
-    this.cachedLines = this.reportLines(this.rows, width);
+    this.cachedLines = this.reportLines(width);
     return this.cachedLines;
   }
 
@@ -96,45 +127,29 @@ export class ContextReport implements Component {
     this.appearance.refresh();
   }
 
-  private reportLines(rows: ReportRow[], width: number): string[] {
+  private reportLines(width: number): string[] {
     const { theme } = this.appearance;
-    const labelWidth = Math.min(22, Math.floor(width * 0.34));
     const lines: string[] = [];
-    let fieldIndex = 0;
-    for (const row of rows) {
-      if (row.kind === "heading") {
-        if (lines.length) lines.push(this.appearance.fill("", width));
-        fieldIndex = 0;
-        const title = theme.style(`▌ ${stripTerminalSequences(row.text)}`, { fg: "accent", bold: true });
-        for (const line of wrapTextWithAnsi(title, width)) {
-          lines.push(this.appearance.fill(line, width, this.appearance.section));
-        }
-      } else if (row.kind === "field") {
-        const background = fieldIndex++ % 2 === 0 ? this.appearance.stripe : this.appearance.surface;
-        const label = stripTerminalSequences(row.label);
-        const value = theme.style(stripTerminalSequences(row.value), { fg: valueColors[row.tone], bold: true });
-        const detail = row.detail ? `  ${theme.fg("muted", stripTerminalSequences(row.detail))}` : "";
-        const inline = visibleWidth(label) <= labelWidth;
-        if (!inline) {
-          for (const line of wrapTextWithAnsi(theme.fg("muted", label), Math.max(1, width - 2))) {
-            lines.push(this.appearance.fill(` ${line}`, width, background));
-          }
-        }
-        const indent = inline ? labelWidth + 2 : 2;
-        const valueLines = wrapTextWithAnsi(value + detail, Math.max(1, width - indent));
-        valueLines.forEach((line, index) => {
-          const prefix =
-            inline && index === 0
-              ? ` ${theme.fg("muted", label)}${" ".repeat(labelWidth - visibleWidth(label) + 1)}`
-              : " ".repeat(indent);
-          lines.push(this.appearance.fill(prefix + line, width, background));
+    for (const section of this.sections) {
+      if (lines.length) lines.push(this.appearance.fill("", width));
+      const title = theme.style(section.title, { fg: "accent", bold: true });
+      lines.push(this.appearance.fill(title, width, this.appearance.selected));
+      if (section.rows.length) {
+        const layout = tableLayout(width, section.columns);
+        const headings = section.columns.map(({ heading }): TableCell => ({
+          text: heading,
+          color: "muted",
+          bold: true,
+        }));
+        lines.push(...this.appearance.tableRow(layout, headings, width, this.appearance.section));
+        section.rows.forEach((row, index) => {
+          const background = index % 2 === 0 ? this.appearance.stripe : this.appearance.surface;
+          lines.push(...this.appearance.tableRow(layout, row, width, background, true));
         });
-      } else {
-        for (const line of wrapTextWithAnsi(
-          theme.fg("muted", stripTerminalSequences(row.text)),
-          Math.max(1, width - 2),
-        )) {
-          lines.push(this.appearance.fill(` ${line}`, width));
+      }
+      if (section.note) {
+        for (const line of wrapTextWithAnsi(theme.fg("muted", section.note), width)) {
+          lines.push(this.appearance.fill(line, width));
         }
       }
     }

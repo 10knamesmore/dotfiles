@@ -1,16 +1,17 @@
-export type ReportTone = "value" | "number" | "success" | "warning" | "error";
+import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 
-export type ReportRow =
-  | { kind: "heading"; text: string }
-  | { kind: "field"; label: string; value: string; detail?: string; tone: ReportTone }
-  | { kind: "note"; text: string };
+export interface TableColumn {
+  weight: number;
+  align?: "right";
+}
 
-export const heading = (text: string): ReportRow => ({ kind: "heading", text });
-export const note = (text: string): ReportRow => ({ kind: "note", text });
-export const field = (label: string, value: string, detail?: string, tone: ReportTone = "value"): ReportRow => ({
-  kind: "field",
-  label,
-  value,
-  detail,
-  tone,
-});
+export type TableCell = string | { text: string; color?: ThemeColor; bold?: boolean };
+
+export interface ReportSection {
+  title: string;
+  columns: readonly (TableColumn & { heading: string })[];
+  rows: readonly (readonly TableCell[])[];
+  note?: string;
+}
+
+export const numberCell = (text: string): TableCell => ({ text, color: "syntaxNumber" });

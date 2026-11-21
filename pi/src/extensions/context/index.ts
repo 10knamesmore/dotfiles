@@ -1,4 +1,4 @@
-import type { BuildSystemPromptOptions, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { captureContext, capturePayload, type ContextSnapshot, type PayloadSnapshot } from "./snapshot.js";
 import { inspectContext } from "./view.js";
 
@@ -6,7 +6,7 @@ export default function contextInspector(pi: ExtensionAPI): void {
   let current: ContextSnapshot | undefined;
   let latestPayload: PayloadSnapshot | undefined;
   let awaitingResponse = false;
-  let promptSources: Pick<BuildSystemPromptOptions, "contextFiles" | "skills"> = {};
+  let promptSources: Omit<ContextSnapshot["options"], "cwd"> = {};
   let requestNumber = 0;
   let payloadNumber = 0;
 
@@ -24,10 +24,10 @@ export default function contextInspector(pi: ExtensionAPI): void {
 
   pi.on("before_agent_start", (event, ctx) => {
     if (ctx.mode !== "tui") return;
-    promptSources = structuredClone({
-      contextFiles: event.systemPromptOptions.contextFiles,
-      skills: event.systemPromptOptions.skills,
-    });
+    promptSources = {
+      contextFilePaths: event.systemPromptOptions.contextFiles.map((file) => file.path),
+      skills: structuredClone(event.systemPromptOptions.skills),
+    };
   });
 
   pi.on("context_with_system", (event, ctx) => {
@@ -55,7 +55,6 @@ export default function contextInspector(pi: ExtensionAPI): void {
         model: `${event.message.provider}/${event.message.model}`,
         responseModel: event.message.responseModel,
         stopReason: event.message.stopReason,
-        usage: structuredClone(event.message.usage),
       },
     };
     awaitingResponse = false;
@@ -76,7 +75,7 @@ export default function contextInspector(pi: ExtensionAPI): void {
         return;
       }
       // Observations are replaced, so this inspector keeps its opening snapshot.
-      await inspectContext(ctx, current, latestPayload);
+      await inspectContext(ctx, current, latestPayload, pi.getSettings().externalEditor);
     },
   });
 }

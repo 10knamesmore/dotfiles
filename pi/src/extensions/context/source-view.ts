@@ -20,14 +20,7 @@ export class SourceContent implements Component {
     private readonly requestRender: () => void,
   ) {}
 
-  public get position(): string {
-    if (this.contentHeight === undefined) return "preparing";
-    const start = this.scroll.scrollTop;
-    const end = Math.min(start + this.scroll.viewportHeight, this.contentHeight);
-    return `${start + 1}–${end}/${this.contentHeight}`;
-  }
-
-  public renderViewport(width: number, height: number): string[] {
+  public renderViewport(width: number, height: number): readonly string[] {
     this.scroll.updateLayout(this.contentHeight ?? height, height, this.requestRender);
     return this.scroll.render(width);
   }

@@ -1,23 +1,20 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Input, fuzzyFilter, ScrollView, stripTerminalSequences } from "@earendil-works/pi-tui";
+import { Input, fuzzyMatch, ScrollView, stripTerminalSequences } from "@earendil-works/pi-tui";
 import { contextNavigationAction } from "./controls.js";
-import { ContextAppearance, ContextReport, type PageContent } from "./presentation.js";
-import { field, heading, note } from "./report.js";
+import { ContextAppearance, ContextReport, tableLayout, type PageContent } from "./presentation.js";
+import { numberCell, type TableCell, type TableColumn } from "./report.js";
+import { viewSourceInEditor } from "./source-editor.js";
 import { SourceLayouts } from "./source-layout.js";
 import { SourceContent } from "./source-view.js";
-import {
-  formatBytes,
-  overviewReport,
-  payloadReport,
-  prepareContext,
-  preparePayload,
-  type ContextEntry,
-} from "./inspection.js";
+import { formatBytes, overviewReport, prepareContext, preparePayload, type ContextEntry } from "./inspection.js";
 import type { ContextSnapshot, PayloadSnapshot } from "./snapshot.js";
 
 interface InspectionPage {
   label: string;
   group: string;
+  number?: number;
+  detail?: string;
+  bytes?: number;
   content: PageContent;
 }
 
@@ -34,10 +31,34 @@ interface FilterEditor {
 
 function entryPages(entries: ContextEntry[], group: string): InspectionPage[] {
   return entries.map((entry) => ({
-    label: `${entry.label} · ${formatBytes(entry.bytes)}`,
+    label: entry.label,
     group,
+    bytes: entry.bytes,
     content: { kind: "source", body: entry.body, format: entry.format },
   }));
+}
+
+function pageTable(width: number, showDetail = width >= 60) {
+  const textWidth = width - 39;
+  const nameWidth = showDetail ? Math.max(17, Math.floor(textWidth * 0.45)) : Math.max(12, width - 36);
+  const columns: TableColumn[] = [
+    { weight: 10 },
+    { weight: 5, align: "right" },
+    { weight: nameWidth },
+    { weight: 12, align: "right" },
+  ];
+  if (showDetail) columns.splice(3, 0, { weight: textWidth - nameWidth });
+  return { layout: tableLayout(width, columns), showDetail };
+}
+
+function pageCells(page: InspectionPage, showDetail: boolean, highlighted: boolean): TableCell[] {
+  return [
+    { text: page.group, color: highlighted ? "accent" : "muted", bold: highlighted },
+    page.number === undefined ? "" : numberCell(`#${page.number}`),
+    { text: page.label, bold: highlighted },
+    ...(showDetail ? [page.detail ?? ""] : []),
+    page.bytes === undefined ? "" : numberCell(formatBytes(page.bytes)),
+  ];
 }
 
 const keyboardPage: InspectionPage = {
@@ -45,26 +66,42 @@ const keyboardPage: InspectionPage = {
   group: "Help",
   content: {
     kind: "report",
-    rows: [
-      heading("Normal mode · /agents navigation"),
-      field("j / k · ↓ / ↑", "Move one item", "scroll one line in details"),
-      field("J / K", "Move seven items", "scroll seven lines in details"),
-      field("Enter / l / →", "Open the selected page"),
-      field("h / Esc / ←", "Back", "close at the list"),
-      field("g / G · Home / End", "First / last", "list item or detail line"),
-      field("Ctrl+U / Ctrl+D", "Scroll one line", "keep list selection"),
-      field("Ctrl+B / Ctrl+F", "Scroll half a page", "keep list selection"),
-      field("PgUp / PgDn", "Move a full page", "list focus or detail viewport"),
-      field("q / Ctrl+C", "Close the inspector"),
-      field("?", "Open / dismiss this reference"),
-      heading("List filtering"),
-      field("/ · f", "Enter filter mode"),
-      field("Enter", "Keep the filter and return to normal mode"),
-      field("Esc / Ctrl+C", "Cancel editing", "restore the previous filter and selection"),
-      note("Typing only edits the filter in filter mode. Navigation keys are ordinary text there."),
-      note(
-        "Returning from details preserves list selection, filter and viewport. Reopening a page restores its scroll position.",
-      ),
+    sections: [
+      {
+        title: "Navigation",
+        columns: [
+          { heading: "Keys", weight: 4 },
+          { heading: "List", weight: 5 },
+          { heading: "Details", weight: 5 },
+        ],
+        rows: [
+          ["j/k or ↓/↑", "Select one item", "Scroll one line"],
+          ["J/K", "Select seven items away", "Scroll seven lines"],
+          ["Enter, l, or →", "Open selection", ""],
+          ["Ctrl+G", "", "View in external editor"],
+          ["h, Esc, or ←", "Close inspector", "Back"],
+          ["g/G or Home/End", "First/last item", "Top/bottom"],
+          ["Ctrl+U/D", "Scroll one line", "Scroll one line"],
+          ["Ctrl+B/F", "Scroll half a page", "Scroll half a page"],
+          ["PgUp/PgDn", "Select a page away", "Scroll one page"],
+          ["q or Ctrl+C", "Close inspector", "Close inspector"],
+          ["?", "Open help", "Open or dismiss help"],
+        ],
+        note: "Ctrl+U/D and Ctrl+B/F keep the selection. Reopening a page restores its scroll position.",
+      },
+      {
+        title: "List filtering",
+        columns: [
+          { heading: "Keys", weight: 2 },
+          { heading: "Action", weight: 5 },
+        ],
+        rows: [
+          ["/ or f", "Edit filter"],
+          ["Enter", "Apply filter"],
+          ["Esc or Ctrl+C", "Restore previous filter, selection, and scroll position"],
+        ],
+        note: "Navigation keys enter text while you edit the filter.",
+      },
     ],
   },
 };
@@ -73,6 +110,7 @@ export async function inspectContext(
   ctx: ExtensionCommandContext,
   snapshot: ContextSnapshot,
   payloadSnapshot: PayloadSnapshot | undefined,
+  externalEditor?: string,
 ): Promise<void> {
   const current = prepareContext(snapshot);
   const payload = payloadSnapshot && preparePayload(payloadSnapshot);
@@ -80,31 +118,31 @@ export async function inspectContext(
     {
       label: `Request #${current.number}`,
       group: "Overview",
-      content: { kind: "report", rows: overviewReport(current, payload) },
+      content: { kind: "report", sections: overviewReport(current) },
     },
     ...(payload
       ? [
           {
-            label: `Full request JSON · observation #${payload.number} · ${formatBytes(payload.bytes)}`,
+            label: "Full request JSON",
             group: "Payload",
+            detail: `Observation #${payload.number} (${new Date(payload.capturedAt).toLocaleTimeString()})`,
+            bytes: payload.bytes,
             content: { kind: "source", body: payload.json, format: "json" },
           } satisfies InspectionPage,
         ]
       : []),
-    { label: "Context files and skill evidence", group: "Sources", content: { kind: "report", rows: current.sources } },
     ...entryPages([current.runtimePrompt], "Prompt"),
-    {
-      label: "Independent timeline",
-      group: "Provider",
-      content: { kind: "report", rows: payloadReport(payload) },
-    },
     ...entryPages(payload?.entries ?? [], "Payload"),
     ...entryPages(current.prompt, "Prompt"),
     ...entryPages(current.tools, "Tool"),
-    ...entryPages(
-      [...current.messages].sort((a, b) => b.bytes - a.bytes),
-      "Message",
-    ),
+    ...current.messages.map((message): InspectionPage => ({
+      label: message.label,
+      group: "Message",
+      number: message.number,
+      detail: message.path,
+      bytes: message.bytes,
+      content: { kind: "source", body: message.body, format: message.format },
+    })),
     keyboardPage,
   ];
 
@@ -117,7 +155,15 @@ export async function inspectContext(
     const items = pages.map((page, index) => ({
       index,
       page,
-      searchText: `${page.group} ${stripTerminalSequences(page.label)}`,
+      searchText: stripTerminalSequences(
+        [
+          page.group,
+          page.number === undefined ? "" : `#${page.number}`,
+          page.label,
+          page.detail,
+          page.bytes === undefined ? "" : formatBytes(page.bytes),
+        ].join(" "),
+      ),
     }));
     const details = new Map<number, DetailView>();
     const pageStack: number[] = [];
@@ -126,6 +172,7 @@ export async function inspectContext(
     let query = "";
     let cursor = 0;
     let filterEditor: FilterEditor | undefined;
+    let openingEditor = false;
     let focused = false;
     let followCursor = true;
     // Restore after layout: the cancelled filter may have shortened the scrollable content.
@@ -135,15 +182,18 @@ export async function inspectContext(
     const listScroll = new ScrollView(
       {
         render(width): string[] {
-          if (!filtered.length) return [theme.fg("muted", " No matching sections or messages.")];
+          if (!filtered.length) return [theme.fg("muted", "No matching sections or messages.")];
           const start = listScroll.scrollTop;
           const visibleItems = filtered.slice(start, start + listScroll.viewportHeight);
+          const { layout, showDetail } = pageTable(width);
           return visibleItems.map(({ page }, offset) => {
             const selected = cursor === start + offset;
-            const marker = theme.fg(selected ? "accent" : "muted", selected ? "❯ " : "  ");
-            const group = theme.fg(selected ? "accent" : "muted", `${page.group.padEnd(9)} `);
-            const label = theme.style(stripTerminalSequences(page.label), { fg: "text", bold: selected });
-            return appearance.fill(marker + group + label, width, selected ? appearance.selected : appearance.surface);
+            const background = selected
+              ? appearance.selected
+              : (start + offset) % 2 === 0
+                ? appearance.stripe
+                : appearance.surface;
+            return appearance.tableRow(layout, pageCells(page, showDetail, selected), width, background)[0]!;
           });
         },
         invalidate() {},
@@ -159,7 +209,7 @@ export async function inspectContext(
           const content = new SourceContent(index, page, sourceLayouts, appearance, () => tui.requestRender());
           detail = { kind: "source", content, scroll: content.scroll };
         } else {
-          const content = new ContextReport(page.rows, appearance);
+          const content = new ContextReport(page.sections, appearance);
           detail = { kind: "report", content, scroll: new ScrollView(content, { scrollbar: "hidden" }) };
         }
         details.set(index, detail);
@@ -177,7 +227,11 @@ export async function inspectContext(
     };
     const applyFilter = (next: string) => {
       query = next;
-      filtered = fuzzyFilter(items, query, (item) => item.searchText);
+      const tokens = query
+        .trim()
+        .split(/[\s/]+/)
+        .filter(Boolean);
+      filtered = items.filter((item) => tokens.every((token) => fuzzyMatch(token, item.searchText).matches));
       moveCursor(0);
     };
     const finishFilter = (accept: boolean) => {
@@ -211,14 +265,36 @@ export async function inspectContext(
         const innerWidth = Math.max(1, width - 4);
         const index = pageStack.at(-1);
         const isList = index === undefined;
+        const page = isList ? undefined : pages[index]!;
+        const title = page
+          ? appearance.tableRow(
+              pageTable(innerWidth, false).layout,
+              pageCells(page, false, true),
+              innerWidth,
+              appearance.selected,
+            )
+          : [];
+        const pageDetail = page?.detail
+          ? appearance.tableRow(
+              tableLayout(innerWidth, [{ weight: 1 }]),
+              [page.detail],
+              innerWidth,
+              appearance.selected,
+              true,
+            )
+          : [];
         const scroll = activeScroll();
         const detail = isList ? undefined : detailView(index);
-        const maxRows = Math.max(1, Math.floor(tui.terminal.rows * 0.9) - 5);
-        let visible: string[];
-        let position: string;
+        const filterLines =
+          filterEditor?.input.render(innerWidth).map((line) => appearance.fill(line, innerWidth, appearance.section)) ??
+          [];
+        const maxRows = Math.max(
+          1,
+          Math.floor(tui.terminal.rows * 0.9) - 2 - title.length - pageDetail.length - filterLines.length,
+        );
+        let visible: readonly string[];
         if (detail?.kind === "source") {
           visible = detail.content.renderViewport(innerWidth, maxRows);
-          position = detail.content.position;
         } else {
           const detailLines = isList ? [] : scroll.render(innerWidth);
           const contentHeight = isList ? Math.max(1, filtered.length) : detailLines.length;
@@ -236,40 +312,12 @@ export async function inspectContext(
           visible = isList
             ? listScroll.render(innerWidth)
             : detailLines.slice(scroll.scrollTop, scroll.scrollTop + height);
-          position = `${scroll.scrollTop + 1}–${Math.min(scroll.scrollTop + height, contentHeight)}/${contentHeight}`;
         }
-        let status: string[];
-        if (filterEditor) {
-          status = filterEditor.input.render(innerWidth);
-        } else if (isList) {
-          status = [
-            theme.fg(
-              "muted",
-              `NORMAL · selected ${filtered.length ? cursor + 1 : 0}/${filtered.length} · rows ${position} · / ${query || "all"}`,
-            ),
-          ];
-        } else {
-          status = [
-            theme.fg(
-              "muted",
-              `NORMAL · rows ${position} · h back to ${pageStack.length > 1 ? "previous page" : "list"}`,
-            ),
-          ];
-        }
-        const title = isList ? "Context · sections and messages" : `${pages[index]!.group} · ${pages[index]!.label}`;
-        const help = filterEditor
-          ? "FILTER · Enter apply · Esc cancel"
-          : isList
-            ? "j/k · J/K ±7 · enter/l open · esc/h close · / filter · ? keys"
-            : "j/k · J/K ±7 · esc/h back · g/G ends · ? keys";
-        return appearance.panel(
-          [...status.map((line) => appearance.fill(line, innerWidth, appearance.section)), ...visible],
-          width,
-          title,
-          help,
-        );
+        const selection = isList ? `${filtered.length ? cursor + 1 : 0}/${filtered.length}` : undefined;
+        return appearance.panel([...title, ...pageDetail, ...filterLines, ...visible], width, selection);
       },
       handleInput(data) {
+        if (openingEditor) return;
         if (filterEditor) {
           if (keybindings.matches(data, "tui.select.cancel")) finishFilter(false);
           else {
@@ -280,8 +328,24 @@ export async function inspectContext(
           return;
         }
 
-        const action = contextNavigationAction(data);
         const index = pageStack.at(-1);
+        if (keybindings.matches(data, "app.editor.external")) {
+          const page = index === undefined ? undefined : pages[index]?.content;
+          if (page?.kind !== "source") return;
+          openingEditor = true;
+          void viewSourceInEditor(page, tui, externalEditor)
+            .catch((error: unknown) => {
+              ctx.ui.notify(
+                `Could not open context in editor: ${error instanceof Error ? error.message : String(error)}`,
+                "error",
+              );
+            })
+            .finally(() => {
+              openingEditor = false;
+            });
+          return;
+        }
+        const action = contextNavigationAction(data);
         const isList = index === undefined;
         const scroll = activeScroll();
         switch (action.type) {
