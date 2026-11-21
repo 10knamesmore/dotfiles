@@ -13,9 +13,6 @@ export interface TranscriptMessage {
   isError?: boolean;
   responseId?: string;
   timestamp?: number;
-  entryId?: string;
-  /** Carries an in-flight message's UI identity across its first persisted entry. */
-  viewId?: string;
   omitted?: boolean;
 }
 
@@ -392,7 +389,7 @@ export function sessionEntriesToMessages(entries: PersistedTranscriptEntry[]): T
     if (entry.type !== "message") continue;
     const message = (entry as { message?: TranscriptMessage }).message;
     if (message && typeof message.role === "string") {
-      messages.push({ ...message, entryId: (entry as { id?: string }).id });
+      messages.push(message);
     }
   }
   return messages;

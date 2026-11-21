@@ -1,5 +1,5 @@
 /**
- * The /agents input-area navigator and its command registration.
+ * The /agents navigator and its command registration.
  *
  * `/agents` and `/workflows` open the same three-level browser:
  *   runs ──enter/l──▶ run detail ──enter/l──▶ agent transcript
@@ -11,8 +11,14 @@
  */
 
 import { statSync } from "node:fs";
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+  KeybindingsManager,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
+import { matchesKey, parseKey, truncateToWidth, type TUI, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import type { ChildSession } from "../../runner/child-session.js";
 import type { SubagentRunner } from "../../runner/runner.js";
 import { EMPTY_USAGE } from "../../store/run-store.js";
@@ -106,8 +112,9 @@ function openNavigator(
     if (visibleLiveRunIds.length === 1) state.seedRun(visibleLiveRunIds[0]!);
   }
 
-  return ctx.ui.custom<void>((tui: TUI, theme: Theme, _keybindings, done: (result: void) => void) => {
+  const createView = (tui: TUI, theme: Theme, keybindings: KeybindingsManager, done: () => void) => {
     let agentView: AgentView | undefined;
+    let focused = false;
     let timer: ReturnType<typeof setInterval> | undefined;
     let stopArmedRunId: string | undefined;
     let stoppingRunId: string | undefined;
@@ -135,7 +142,8 @@ function openNavigator(
       agentView = undefined;
     };
     const reportError = (message: string) => {
-      ctx.ui.notify(message, "error");
+      if (agentView) agentView.showError(message);
+      else ctx.ui.notify(message, "error");
       reportDiagnostic(`[subagent-workflow] ${message}`);
     };
     const openAgentView = () => {
@@ -145,7 +153,7 @@ function openNavigator(
         const sourceChildId = state.childId;
         agentView = buildAgentView(
           runner,
-          tui,
+          { tui, theme, keybindings, cwd: ctx.cwd },
           model,
           sourceRunId,
           sourceChildId,
@@ -184,6 +192,7 @@ function openNavigator(
               }
             : undefined,
         );
+        agentView.focused = focused;
       }
     };
     if (state.level === "agent") openAgentView();
@@ -245,9 +254,8 @@ function openNavigator(
 
     const act = (data: string) => {
       const keyId = navigatorKeyId(data);
-      // AgentView owns block navigation and composer input before navigator shortcuts.
-      if (state.level === "agent" && agentView?.handleInput(data, keyId)) return;
       const action = keyToAction(keyId, state.level);
+      if (agentView && (agentView.handleInput(data, keyId) || action.type !== "back")) return;
       if (action.type !== "stop") stopArmedRunId = undefined;
       switch (action.type) {
         case "move":
@@ -308,8 +316,6 @@ function openNavigator(
           disposeAgentView();
           if (!state.back()) return finish();
           break;
-        case "close":
-          return finish();
         case "filter":
           state.filter = cycleFilter(state.filter);
           if (state.level === "run" && state.runId)
@@ -326,37 +332,47 @@ function openNavigator(
       rerender();
     };
 
-    const component: Component & { dispose?(): void } = {
+    const updateSpinner = (hasSpinner: boolean) => {
+      if (hasSpinner && !timer) timer = setInterval(rerender, 100);
+      if (!hasSpinner && timer) {
+        clearInterval(timer);
+        timer = undefined;
+      }
+    };
+
+    return {
+      get focused() {
+        return focused;
+      },
+      set focused(value: boolean) {
+        focused = value;
+        if (agentView) agentView.focused = value;
+      },
       render: (width: number) => {
         const maxTotal = navigatorRowBudget(tui);
-        const inner = Math.max(20, width - 4);
-        const content = renderContent(
-          runner,
-          state,
-          model,
-          agentView,
-          theme,
-          inner,
-          maxTotal - 3,
-          actionsFor,
-          stopArmedRunId,
-        );
-        if (content.hasSpinner && !timer) timer = setInterval(rerender, 100);
-        if (!content.hasSpinner && timer) {
-          clearInterval(timer);
-          timer = undefined;
-        }
-        return boxLines(content.lines, content.footer, inner, maxTotal, theme);
+        const inner = Math.max(1, width - 2 * BOX_INSET_X);
+        const bodyRows = maxTotal - 3;
+        const content = agentView
+          ? agentView.render(inner, bodyRows)
+          : renderContent(runner, state, model, theme, inner, bodyRows, actionsFor, stopArmedRunId);
+        updateSpinner(content.hasSpinner);
+        return boxLines(content.lines, content.footer, inner, bodyRows, theme);
       },
       handleInput: act,
+      handleMouse: (event: TuiMouseEvent) => {
+        const x = event.x - BOX_INSET_X;
+        const width = event.width - 2 * BOX_INSET_X;
+        if (!agentView || x < 0 || x >= width) return undefined;
+        return agentView.handleMouse({ ...event, x, y: event.y - 1, width, height: event.height - 2 });
+      },
       invalidate: () => {
         agentView?.invalidate();
       },
       dispose: () => cleanup(),
     };
+  };
 
-    return component;
-  });
+  return ctx.ui.custom<void>(createView, { overlay: true, overlayOptions: { width: "100%" } });
 }
 
 interface RenderedContent {
@@ -369,7 +385,6 @@ function renderContent(
   runner: SubagentRunner,
   state: NavigatorState,
   model: NavigatorModel,
-  agentView: AgentView | undefined,
   theme: ThemeLike,
   inner: number,
   budget: number,
@@ -377,25 +392,6 @@ function renderContent(
   stopArmedRunId?: string,
 ): RenderedContent {
   const now = Date.now();
-  if (state.level === "agent" && agentView) {
-    return {
-      lines: agentView.render(inner, budget, theme),
-      footer: footerHint(
-        {
-          level: "agent",
-          canSteer: agentView.canSteer,
-          canMessage: agentView.canMessage,
-          canStop: agentView.canStop,
-          stopArmed: agentView.isStopArmed,
-        },
-        theme,
-      ),
-      hasSpinner:
-        !!state.runId &&
-        !!state.childId &&
-        model.detail(state.runId).children.find((child) => child.id === state.childId)?.status === "running",
-    };
-  }
   if (state.level === "run" && state.runId) {
     const detail = model.detail(state.runId);
     const actions = actionsFor(detail);
@@ -470,39 +466,6 @@ function navigationPageSize(tui: TUI): number {
   return Math.max(1, navigatorRowBudget(tui) - 7);
 }
 
-function lastAssistant(messages: readonly TranscriptMessage[]): TranscriptMessage | undefined {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role === "assistant") return messages[index];
-  }
-  return undefined;
-}
-
-function sameAssistantResponse(a: TranscriptMessage, b: TranscriptMessage): boolean {
-  if (a.responseId && b.responseId) return a.responseId === b.responseId;
-  return a.timestamp !== undefined && a.timestamp === b.timestamp;
-}
-
-function isNewerAssistant(current: TranscriptMessage, persisted: TranscriptMessage | undefined): boolean {
-  if (!persisted) return true;
-  const currentResponseId = typeof current.responseId === "string" ? current.responseId : undefined;
-  const persistedResponseId = typeof persisted.responseId === "string" ? persisted.responseId : undefined;
-  if (currentResponseId !== undefined && persistedResponseId !== undefined)
-    return currentResponseId !== persistedResponseId;
-  if (typeof current.timestamp !== "number") return false;
-  if (typeof persisted.timestamp === "number" && current.timestamp < persisted.timestamp) return false;
-  if (typeof persisted.timestamp !== "number" || current.timestamp > persisted.timestamp) return true;
-  // Equal id-less timestamps: this is either the persisted message itself
-  // crossing the persistence boundary (suppress: splicing it again would
-  // duplicate it) or a distinct response whose provider reuses the response
-  // timestamp across every delta (keep it visible for its whole stream).
-  // Serialized content is the only identity left to tell them apart.
-  try {
-    return JSON.stringify(current.content) !== JSON.stringify(persisted.content);
-  } catch {
-    return false;
-  }
-}
-
 interface AgentFollowUpControls {
   onMessage: (text: string) => boolean;
 }
@@ -511,18 +474,18 @@ interface AgentFollowUpControls {
  * Display-time eligibility from the projection the view already renders; the
  * follow-up resolver revalidates authoritatively when the message is sent.
  */
-export function isMessageableChild(child: ChildRow | undefined): boolean {
+function isMessageableChild(child: ChildRow | undefined): boolean {
   if (!child?.sessionFile) return false;
   return child.status === "completed" || child.status === "failed" || child.status === "aborted";
 }
 
-export function buildAgentView(
+function buildAgentView(
   runner: SubagentRunner,
-  tui: TUI,
+  ui: { tui: TUI; theme: Theme; keybindings: KeybindingsManager; cwd: string },
   model: NavigatorModel,
   runId: string,
   childId: string,
-  reportError: (message: string) => void = (message) => reportDiagnostic(`[subagent-workflow] ${message}`),
+  reportError: (message: string) => void,
   followUp?: AgentFollowUpControls,
 ): AgentView {
   // Share one child row across a render's header, transcript and controls.
@@ -569,51 +532,8 @@ export function buildAgentView(
   let cachedSize: number | undefined;
   let cachedMtimeMs: number | undefined;
   let cachedMissing = false;
-  let cachedMessages: ReturnType<typeof readSessionMessages> = [];
-  let combinedPersisted: TranscriptMessage[] | undefined;
-  let combinedCurrent: TranscriptMessage | undefined;
-  let combinedMessages: TranscriptMessage[] | undefined;
-  let liveAssistant: TranscriptMessage | undefined;
-  let liveMessageSequence = 0;
-  const persistedViewIds = new Map<string, string>();
-  const withCurrentAssistant = (
-    persisted: TranscriptMessage[],
-    live: ChildSession | undefined,
-  ): TranscriptMessage[] => {
-    const current = live?.currentAssistant;
-    if (persisted === combinedPersisted && current === combinedCurrent && combinedMessages) return combinedMessages;
-    const latest = lastAssistant(persisted);
-    if (
-      liveAssistant?.viewId &&
-      latest?.entryId &&
-      sameAssistantResponse(liveAssistant, latest) &&
-      !isNewerAssistant(liveAssistant, latest)
-    ) {
-      persistedViewIds.set(latest.entryId, liveAssistant.viewId);
-      liveAssistant = undefined;
-    }
-    if (!current) liveAssistant = undefined;
-    const entryIds = new Set(persisted.map((message) => message.entryId));
-    for (const id of persistedViewIds.keys()) if (!entryIds.has(id)) persistedViewIds.delete(id);
-    combinedPersisted = persisted;
-    combinedCurrent = current;
-    combinedMessages = persisted.map((message) => {
-      const viewId = message.entryId ? persistedViewIds.get(message.entryId) : undefined;
-      return viewId ? { ...message, viewId } : message;
-    });
-    if (current && isNewerAssistant(current, latest)) {
-      const viewId =
-        liveAssistant && sameAssistantResponse(liveAssistant, current)
-          ? liveAssistant.viewId
-          : `live-assistant-${++liveMessageSequence}`;
-      liveAssistant = { ...current, viewId };
-      combinedMessages.push(liveAssistant);
-    }
-    return combinedMessages;
-  };
-  const messages = () => {
-    const live = session();
-    const path = live?.sessionFile ?? child()?.sessionFile;
+  let cachedMessages: TranscriptMessage[] = [];
+  const history = (path: string | undefined): readonly TranscriptMessage[] => {
     if (!path) {
       if (cachedPath !== undefined) {
         cachedPath = undefined;
@@ -622,27 +542,26 @@ export function buildAgentView(
         cachedMissing = false;
         cachedMessages = [];
       }
-      return withCurrentAssistant(cachedMessages, live);
+      return cachedMessages;
     }
 
     try {
       const stat = statSync(path);
       if (path === cachedPath && !cachedMissing && stat.size === cachedSize && stat.mtimeMs === cachedMtimeMs) {
-        return withCurrentAssistant(cachedMessages, live);
+        return cachedMessages;
       }
       cachedPath = path;
       cachedSize = stat.size;
       cachedMtimeMs = stat.mtimeMs;
       cachedMissing = false;
     } catch {
-      if (path === cachedPath && cachedMissing) return withCurrentAssistant(cachedMessages, live);
+      if (path === cachedPath && cachedMissing) return cachedMessages;
       cachedPath = path;
       cachedSize = undefined;
       cachedMtimeMs = undefined;
       cachedMissing = true;
     }
-    cachedMessages = readSessionMessages(path);
-    return withCurrentAssistant(cachedMessages, live);
+    return (cachedMessages = readSessionMessages(path));
   };
 
   const runControl = (action: "steer" | "stop", invoke: (handle: SubagentHandle) => Promise<void>): void => {
@@ -656,16 +575,23 @@ export function buildAgentView(
   };
 
   return new AgentView({
-    tui,
+    tui: ui.tui,
+    theme: ui.theme,
+    keybindings: ui.keybindings,
+    settingsCwd: ui.cwd,
+    cwd: () => child()?.resolved?.cwd ?? ui.cwd,
     header,
-    messages,
+    messages: () => {
+      const live = session();
+      return { history: history(live?.sessionFile ?? child()?.sessionFile), current: live?.currentAssistant };
+    },
     result: () => child()?.result,
     live: () => {
       const status = child()?.status;
       return runner.get(childId) !== undefined && (status === "running" || status === "pending");
     },
     onSteer: (text) => runControl("steer", (handle) => handle.steer(text)),
-    canMessage: followUp ? () => isMessageableChild(child()) : undefined,
+    canMessage: () => !!followUp && isMessageableChild(child()),
     onMessage: followUp?.onMessage,
     onSteerUnavailable: () => reportError(`Agent ${sanitizeTerminalText(childId)} ended and cannot be steered`),
     onStop: () => runControl("stop", (handle) => handle.abort()),
@@ -683,20 +609,21 @@ export function buildAgentView(
 }
 
 const BORDER = "muted";
+const BOX_INSET_X = 2;
 
 /** Wrap content in a stable-height titled box, padded to `inner` width. */
 export function boxLines(
   content: string[],
   footer: string,
   inner: number,
-  totalRows: number,
+  bodyRows: number,
   theme: ThemeLike,
 ): string[] {
   const border = (text: string) => theme.fg(BORDER, text);
   const pad = (line: string) => `${border("│")} ${truncateToWidth(line, inner, "", true)} ${border("│")}`;
-  const top = border(`╭─${theme.fg("dim", " agents ")}${"─".repeat(Math.max(0, inner - 7))}╮`);
+  const title = " agents ".slice(0, inner + 1);
+  const top = border(`╭─${theme.fg("dim", title)}${"─".repeat(inner + 1 - title.length)}╮`);
   const bottom = border(`╰${"─".repeat(inner + 2)}╯`);
-  const bodyRows = Math.max(1, totalRows - 3);
   const rows = content.slice(0, bodyRows).map(pad);
   while (rows.length < bodyRows) rows.push(pad(""));
   rows.push(pad(footer));

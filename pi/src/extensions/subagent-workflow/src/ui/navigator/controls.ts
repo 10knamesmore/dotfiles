@@ -1,14 +1,3 @@
-/**
- * Pure interaction logic for the navigator: status filter cycling, child
- * ordering, key-to-action mapping, and footer-hint composition. Kept free of any
- * pi-tui or filesystem dependency so it unit tests directly.
- *
- * Pause is deliberately absent from the verb set: the phase-3 runner exposes no
- * pause/resume seam (a child Handle offers only abort/steer, the
- * workflow VM runs to completion, and the semaphore gates concurrency, not
- * suspension). Faking it is disallowed, so `p` maps to no action.
- */
-
 import type { SubagentStatus } from "../../types.js";
 import type { ThemeLike } from "../format.js";
 import type { ChildRow, RunDetail } from "../../store/run-projection.js";
@@ -87,10 +76,8 @@ type NavAction =
   | { type: "scroll"; amount: ScrollAmount }
   | { type: "drill" }
   | { type: "back" }
-  | { type: "close" }
   | { type: "stop" }
   | { type: "filter" }
-  | { type: "steer" }
   | { type: "none" };
 
 /** Map a parsed key id to an action for the given level. */
@@ -118,8 +105,6 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
       return { type: "pageMove", delta: 1 };
     case "enter":
     case "return":
-      if (level === "agent") return { type: "steer" };
-      return { type: "drill" };
     case "l":
     case "right":
       return level === "agent" ? { type: "none" } : { type: "drill" };
@@ -138,34 +123,24 @@ export function keyToAction(keyId: string | undefined, level: Level): NavAction 
 }
 
 interface FooterState {
-  level: Level;
+  level: Exclude<Level, "agent">;
   /** Run-detail only: the active status filter, shown in the hint. */
   filter?: FilterMode;
-  /** Whether the selected run or agent can currently be stopped. */
+  /** Whether the selected run can currently be stopped. */
   canStop?: boolean;
-  /** Agent-detail only: whether the steering composer is available. */
-  canSteer?: boolean;
-  /** Agent-detail only: whether a persisted child can start a follow-up thread. */
-  canMessage?: boolean;
   /** Whether a same-view, second-press stop confirmation is armed. */
   stopArmed?: boolean;
 }
 
 /** Compose the footer key-hint line for a level. Matches pi's dim selector footers. */
 export function footerHint(state: FooterState, theme: ThemeLike): string {
-  const parts: string[] = state.level === "agent" ? [] : ["j/k focus", "J/K ±7"];
+  const parts = ["j/k focus", "J/K ±7", "enter/l open"];
   if (state.level === "runs") {
-    parts.push("enter/l open", "esc/h close");
-    if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
-  } else if (state.level === "run") {
-    parts.push("enter/l open", "esc/h back", `f filter: ${state.filter ?? "all"}`);
-    if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
+    parts.push("esc/h close");
   } else {
-    if (state.canSteer) parts.push("enter steer");
-    else if (state.canMessage) parts.push("enter message");
-    if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
-    parts.push("esc/h back");
+    parts.push("esc/h back", `f filter: ${state.filter ?? "all"}`);
   }
+  if (state.canStop) parts.push(state.stopArmed ? "x again to STOP" : "x stop");
   parts.push("ctrl+u/d line", "ctrl+b/f ½ page");
   return theme.fg("dim", parts.join(" · "));
 }

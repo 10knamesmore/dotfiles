@@ -1,21 +1,16 @@
-import type { AssistantMessage, AssistantMessageEvent, Message } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 import type { UsageSummary } from "../types.js";
 
 /** Events consumed at the subprocess child-session seam. Pi coding-agent custom,
  * bash-execution, branch-summary, and compaction-summary messages are intentionally
  * outside this runner contract and are ignored by the RPC adapter. */
-export interface OpaqueAssistantMessageUpdate {
-  readonly opaqueType: string;
-}
-
 export type ChildSessionEvent =
   | { type: "tool_execution_start"; toolCallId: string; toolName: string; args: unknown }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "turn_end"; message: Message }
   | { type: "message_start"; message: Message }
-  | { type: "message_update"; message: AssistantMessage; assistantMessageEvent: AssistantMessageEvent }
-  | { type: "message_update"; opaqueAssistantMessageUpdate: OpaqueAssistantMessageUpdate }
+  | { type: "message_update" }
   | { type: "message_end"; message: Message }
   | { type: "agent_start" }
   | { type: "context_usage"; contextUsage: ContextUsage | undefined }

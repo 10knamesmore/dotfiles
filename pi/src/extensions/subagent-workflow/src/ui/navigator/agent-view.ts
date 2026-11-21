@@ -1,345 +1,163 @@
-/** Child conversation browser: typed blocks, folding, stable scrolling, and an inline message composer. */
-import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
-import { Input, truncateToWidth, type TUI } from "@earendil-works/pi-tui";
-import type { SubagentStatus, UsageSummary } from "../../types.js";
-import { formatTokenUsage, modelEffort, PLAIN, statusGlyph, type ThemeLike } from "../format.js";
-import { sanitizeTerminalText } from "../sanitize.js";
-import { keyToAction, scrollDistance } from "./controls.js";
-import {
-  blockCanCollapse,
-  blockIsExpanded,
-  buildTranscriptBlocks,
-  type TranscriptBlock,
-  type TranscriptResult,
-} from "./transcript-blocks.js";
-import { renderTranscript, type TranscriptLayout } from "./transcript-render.js";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import { keyText, SettingsManager, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
+import { Input, ScrollView, truncateToWidth, type TUI, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import type { TranscriptMessage } from "../../store/session-transcript.js";
-
-interface AgentHeader {
-  label: string;
-  model: string;
-  thinking?: string;
-  status: SubagentStatus;
-  usage: UsageSummary;
-}
-
-type ComposerKind = "steer" | "message";
+import type { SubagentResult, SubagentStatus, UsageSummary } from "../../types.js";
+import { formatTokenUsage, modelEffort, statusGlyph } from "../format.js";
+import { sanitizeTerminalText } from "../sanitize.js";
+import { AgentTranscript } from "./agent-transcript.js";
+import { keyToAction, scrollDistance } from "./controls.js";
 
 interface AgentViewDeps {
   tui: TUI;
-  header: () => AgentHeader;
-  messages: () => TranscriptMessage[];
-  /** Persisted terminal output, also available after the child process has exited. */
-  result: () => TranscriptResult | undefined;
+  theme: Theme;
+  keybindings: KeybindingsManager;
+  settingsCwd: string;
+  cwd: () => string;
+  header: () => { label: string; model: string; thinking?: string; status: SubagentStatus; usage: UsageSummary };
+  messages: () => { history: readonly TranscriptMessage[]; current?: AssistantMessage };
+  result: () => Pick<SubagentResult, "status" | "text" | "structured"> | undefined;
   live: () => boolean;
-  onSteer?: (text: string) => void;
-  canMessage?: () => boolean;
-  /** True only after a new follow-up run has started successfully. */
+  onSteer: (text: string) => void;
+  canMessage: () => boolean;
   onMessage?: (text: string) => boolean;
-  onSteerUnavailable?: () => void;
-  onStop?: () => void;
-  subscribe?: (listener: () => void) => () => void;
-}
-
-interface TranscriptCache {
-  messages: TranscriptMessage[];
-  resultKey: string;
-  live: boolean;
-  theme: ThemeLike;
-  width: number;
-  blocks: TranscriptBlock[];
-  layout: TranscriptLayout;
+  onSteerUnavailable: () => void;
+  onStop: () => void;
+  subscribe: (listener: () => void) => () => void;
 }
 
 export class AgentView {
-  private scrollOffset = 0;
-  private autoScroll = true;
+  private readonly transcript: AgentTranscript;
+  private readonly scroll: ScrollView;
+  private readonly unsubscribe: () => void;
+  private readonly requestRender = () => this.deps.tui.requestRender();
   private stopArmed = false;
-  private composer: { input: Input; kind: ComposerKind } | undefined;
-  private unsubscribe: (() => void) | undefined;
-  private lastWidth = 20;
-  private lastViewport = 1;
-  private lastTheme: ThemeLike = PLAIN;
-  private transcriptCache: TranscriptCache | undefined;
-  private lastLayout: TranscriptLayout | undefined;
-  private expanded = new Map<string, boolean>();
-  private selectedId: string | undefined;
-  private outputOnly = false;
-  private fullContentPosition:
-    { blockId?: string; offset: number; scroll: number; follow: boolean; selectedId?: string } | undefined;
+  private composer: Input | undefined;
+  private error: string | undefined;
+  private hasFocus = false;
+  private contentHeight = 0;
 
   constructor(private readonly deps: AgentViewDeps) {
-    this.unsubscribe = deps.subscribe?.(() => {
-      this.invalidate();
-      deps.tui.requestRender();
-    });
+    const settings = SettingsManager.create(deps.settingsCwd);
+    this.transcript = new AgentTranscript(deps.tui, deps.cwd, settings);
+    this.scroll = new ScrollView(this.transcript, { follow: "end" });
+    this.unsubscribe = deps.subscribe(this.requestRender);
+  }
+
+  set focused(value: boolean) {
+    this.hasFocus = value;
+    if (this.composer) this.composer.focused = value;
   }
 
   dispose(): void {
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
+    this.unsubscribe();
   }
 
-  /** Keep fold choices and scroll anchors when a new event or theme invalidates the rendered rows. */
   invalidate(): void {
-    this.transcriptCache = undefined;
+    this.transcript.invalidate();
   }
 
-  get canSteer(): boolean {
-    return !!this.deps.onSteer && this.deps.live() && this.isActive();
-  }
-  get canMessage(): boolean {
-    return !!this.deps.onMessage && !this.deps.live() && !!this.deps.canMessage?.();
-  }
-  get canStop(): boolean {
-    return !!this.deps.onStop && this.deps.live() && this.isActive();
-  }
-  get isStopArmed(): boolean {
-    return this.stopArmed;
+  showError(message: string): void {
+    this.error = message;
+    this.requestRender();
   }
 
-  private isActive(): boolean {
-    const status = this.deps.header().status;
-    return status === "running" || status === "pending";
-  }
-
-  /** The composer owns all input; browser shortcuts never intercept text being typed. */
   handleInput(data: string, keyId: string | undefined): boolean {
+    this.error = undefined;
     if (this.composer) {
-      this.composer.input.handleInput(data);
-      this.deps.tui.requestRender();
+      this.composer.handleInput(data);
+      this.requestRender();
       return true;
     }
-    if (keyId === "enter" || keyId === "return") {
-      const kind = this.canSteer ? "steer" : this.canMessage ? "message" : undefined;
-      if (kind) {
-        this.stopArmed = false;
-        this.openComposer(kind);
-        return true;
-      }
-    }
-    if (keyId === "x") {
-      if (!this.canStop) return false;
-      if (this.stopArmed) {
-        this.stopArmed = false;
-        this.deps.onStop?.();
-      } else this.stopArmed = true;
-      this.deps.tui.requestRender();
-      return true;
-    }
+    const confirmStop = this.stopArmed;
     this.stopArmed = false;
-    if (keyId === "j" || keyId === "k" || keyId === "shift+j" || keyId === "shift+k") {
-      const direction = keyId.endsWith("j") ? 1 : -1;
-      const distance = keyId.startsWith("shift+") ? 7 : 1;
-      this.selectBlock(direction * distance);
-    } else if (keyId === "g" || keyId === "shift+g") {
-      this.focusBlock(keyId === "g" ? 0 : -1);
-    } else if (keyId === "l" || keyId === "space" || data === " ") {
-      this.toggleSelected();
-    } else if (keyId === "t" || keyId === "o") {
-      this.toggleKind(keyId === "t" ? "thinking" : "tool");
-    } else if (keyId === "f") {
-      this.toggleOutputFilter();
-    } else if (!this.scroll(keyId)) return false;
-    this.deps.tui.requestRender();
+    const keys = this.deps.keybindings;
+    if (keys.matches(data, "app.tools.expand")) this.transcript.toggleTools();
+    else if (keys.matches(data, "app.thinking.toggle")) this.transcript.toggleThinking();
+    else if (keys.matches(data, "tui.altScreen.top")) this.scroll.scrollToStart();
+    else if (keys.matches(data, "tui.altScreen.bottom")) this.scroll.scrollToEnd();
+    else if (keys.matches(data, "tui.altScreen.pageUp")) this.scroll.scrollBy(-this.scroll.viewportHeight);
+    else if (keys.matches(data, "tui.altScreen.pageDown")) this.scroll.scrollBy(this.scroll.viewportHeight);
+    else if (keys.matches(data, "tui.select.confirm")) {
+      if (this.deps.live() || this.deps.canMessage()) this.openComposer();
+    } else if (keyId === "x") {
+      if (this.deps.live()) {
+        if (confirmStop) this.deps.onStop();
+        else this.stopArmed = true;
+      }
+    } else {
+      const action = keyToAction(keyId, "agent");
+      if (action.type === "scroll") this.scroll.scrollBy(scrollDistance(action.amount, this.scroll.viewportHeight));
+      else if (action.type === "move") this.scroll.scrollBy(action.delta);
+      else return false;
+    }
+    this.requestRender();
     return true;
   }
 
-  private currentTranscript(): TranscriptCache {
-    const messages = this.deps.messages();
-    const result = this.deps.result();
-    const resultKey = result ? JSON.stringify(result) : "";
-    const live = this.deps.live();
-    const cached = this.transcriptCache;
-    if (
-      cached &&
-      cached.messages === messages &&
-      cached.resultKey === resultKey &&
-      cached.live === live &&
-      cached.theme === this.lastTheme &&
-      cached.width === this.lastWidth
-    )
-      return cached;
-
-    const previous = this.lastLayout;
-    const anchor = !this.autoScroll ? previous?.blocks.find((block) => block.end > this.scrollOffset) : undefined;
-    const offsetInBlock = anchor ? this.scrollOffset - anchor.start : 0;
-    const blocks = buildTranscriptBlocks(messages, result, live);
-    const present = new Set(blocks.map((block) => block.id));
-    for (const id of this.expanded.keys()) if (!present.has(id)) this.expanded.delete(id);
-    if (this.selectedId && !present.has(this.selectedId)) this.selectedId = undefined;
-    const layout = renderTranscript(
-      blocks,
-      { expanded: this.expanded, outputOnly: this.outputOnly },
-      this.lastWidth,
-      this.lastTheme,
-      getMarkdownTheme(),
-    );
-    if (anchor) {
-      const next = layout.blocks.find((block) => block.id === anchor.id);
-      if (next) this.scrollOffset = Math.max(0, next.start + Math.min(offsetInBlock, next.end - next.start - 1));
+  handleMouse(event: TuiMouseEvent) {
+    const y = event.y - 1;
+    if (y < 0 || y >= this.scroll.viewportHeight) return undefined;
+    if (event.type === "wheel" && event.wheelDelta) {
+      this.scroll.scrollBy(event.wheelDelta);
+      return { handled: true };
     }
-    this.lastLayout = layout;
-    return (this.transcriptCache = {
-      messages,
-      resultKey,
-      live,
-      theme: this.lastTheme,
-      width: this.lastWidth,
-      blocks,
-      layout,
-    });
+    return this.transcript.handleMouse({ ...event, y: y + this.scroll.scrollTop, height: this.contentHeight });
   }
 
-  private selectBlock(delta: number): void {
-    const { layout } = this.currentTranscript();
-    if (layout.blocks.length === 0) return;
-    let index = layout.blocks.findIndex((block) => block.id === this.selectedId);
-    if (index < 0) {
-      const visible = layout.blocks.filter(
-        (block) => block.end > this.scrollOffset && block.start < this.scrollOffset + this.lastViewport,
-      );
-      const target = delta > 0 ? visible[0] : visible.at(-1);
-      index = target ? layout.blocks.indexOf(target) : delta > 0 ? 0 : layout.blocks.length - 1;
-    } else index = Math.max(0, Math.min(layout.blocks.length - 1, index + delta));
-    this.focusBlock(index);
-  }
-
-  private focusBlock(index: number): void {
-    const block = this.currentTranscript().layout.blocks.at(index);
-    if (!block) return;
-    this.selectedId = block.id;
-    this.autoScroll = false;
-    if (block.start < this.scrollOffset || block.start >= this.scrollOffset + this.lastViewport)
-      this.scrollOffset = block.start;
-  }
-
-  private toggleSelected(): void {
-    if (!this.selectedId) this.selectBlock(1);
-    const block = this.currentTranscript().blocks.find((item) => item.id === this.selectedId);
-    if (!block || !blockCanCollapse(block)) return;
-    if (this.outputOnly && block.kind === "tool") {
-      this.outputOnly = false;
-      this.expanded.set(block.id, true);
-      this.autoScroll = false;
-      this.invalidate();
-      const target = this.currentTranscript().layout.blocks.find((item) => item.id === block.id);
-      if (target) this.scrollOffset = target.start;
-      return;
-    }
-    this.expanded.set(block.id, !blockIsExpanded(block, this.expanded));
-    // Folding is an inspection action, even when the cursor was at the live tail.
-    this.autoScroll = false;
-    this.invalidate();
-  }
-
-  private toggleOutputFilter(): void {
-    if (!this.outputOnly) {
-      const anchor = this.currentTranscript().layout.blocks.find((block) => block.end > this.scrollOffset);
-      this.fullContentPosition = {
-        blockId: anchor?.id,
-        offset: anchor ? this.scrollOffset - anchor.start : 0,
-        scroll: this.scrollOffset,
-        follow: this.autoScroll,
-        selectedId: this.selectedId,
-      };
-      this.outputOnly = true;
-      this.selectedId = undefined;
-      this.invalidate();
-      return;
-    }
-    this.outputOnly = false;
-    const saved = this.fullContentPosition;
-    this.fullContentPosition = undefined;
-    this.selectedId = saved?.selectedId;
-    this.invalidate();
-    const layout = this.currentTranscript().layout;
-    if (saved) {
-      this.autoScroll = saved.follow;
-      const anchor = layout.blocks.find((block) => block.id === saved.blockId);
-      this.scrollOffset = anchor
-        ? Math.max(0, anchor.start + Math.min(saved.offset, anchor.end - anchor.start - 1))
-        : saved.scroll;
-    }
-  }
-
-  private toggleKind(kind: "thinking" | "tool"): void {
-    if (this.outputOnly) return;
-    const blocks = this.currentTranscript().blocks.filter((block) => block.kind === kind);
-    if (blocks.length === 0) return;
-    const expand = blocks.some((block) => !blockIsExpanded(block, this.expanded));
-    for (const block of blocks) this.expanded.set(block.id, expand);
-    this.autoScroll = false;
-    this.invalidate();
-  }
-
-  private scroll(keyId: string | undefined): boolean {
-    const action = keyToAction(keyId, "agent");
-    if (action.type !== "scroll" && action.type !== "pageMove") return false;
-    const amount = action.type === "scroll" ? action.amount : { pages: action.delta };
-    const distance = scrollDistance(amount, this.lastViewport);
-    const max = Math.max(0, this.currentTranscript().layout.lines.length - this.lastViewport);
-    this.scrollOffset = Math.max(0, Math.min(max, this.scrollOffset + distance));
-    this.autoScroll = distance > 0 && this.scrollOffset >= max;
-    return true;
-  }
-
-  private openComposer(kind: ComposerKind): void {
+  private openComposer(): void {
     const input = new Input();
-    input.focused = true;
-    input.onSubmit = (value: string) => {
-      const message = value.trim();
-      const submitKind = this.canSteer ? "steer" : this.canMessage ? "message" : undefined;
-      if (submitKind === "steer") {
+    input.focused = this.hasFocus;
+    input.onSubmit = (value) => {
+      const text = value.trim();
+      if (this.deps.live()) {
         this.composer = undefined;
-        if (message) this.deps.onSteer?.(message);
-      } else if (submitKind === "message" || kind === "message") {
-        if (this.deps.onMessage?.(message)) this.composer = undefined;
-      } else this.deps.onSteerUnavailable?.();
-      this.deps.tui.requestRender();
+        if (text) this.deps.onSteer(text);
+      } else if (this.deps.canMessage()) {
+        if (this.deps.onMessage?.(text)) this.composer = undefined;
+      } else this.deps.onSteerUnavailable();
     };
     input.onEscape = () => {
       this.composer = undefined;
-      this.deps.tui.requestRender();
     };
-    this.composer = { input, kind };
-    this.deps.tui.requestRender();
+    this.composer = input;
   }
 
-  /** Render within the navigator's total row budget, including header, filter, position and composer. */
-  render(width: number, totalRows: number, theme: ThemeLike): string[] {
-    const cap = Math.max(20, width);
-    this.lastWidth = cap;
-    this.lastTheme = theme;
-    const viewport = Math.max(1, totalRows - 4 - (this.composer ? 1 : 0));
-    this.lastViewport = viewport;
-    const head = this.deps.header();
-    const glyph = statusGlyph(head.status, theme, Date.now(), head.status === "running");
-    const label = sanitizeTerminalText(head.label);
-    const model = sanitizeTerminalText(head.model ? modelEffort(head.model, head.thinking, 28) : "?");
-    const title = `${glyph} ${theme.bold(label)} ${theme.fg("dim", `· ${model} · ${head.status} · ${formatTokenUsage(head.usage)}`)}`;
-    const mode = this.outputOnly ? "Output only" : "All content";
-    const filterHint = this.outputOnly
-      ? `${mode} [f] · failed tools remain visible`
-      : `${mode} [f] · t thinking · o tool details`;
-    const lines = [title, theme.fg("muted", filterHint), theme.fg("dim", "─".repeat(cap))];
-    const { layout } = this.currentTranscript();
-    const max = Math.max(0, layout.lines.length - viewport);
-    this.scrollOffset = this.autoScroll ? max : Math.min(this.scrollOffset, max);
-    const selected = layout.blocks.find((block) => block.id === this.selectedId);
-    for (let index = 0; index < viewport; index += 1) {
-      const row = this.scrollOffset + index;
-      lines.push(selected?.start === row ? selected.selectedHeading : (layout.lines[row] ?? ""));
+  render(width: number, bodyRows: number) {
+    const { header, messages, result, live, theme } = this.deps;
+    const canSteer = live();
+    const { history, current } = messages();
+    this.transcript.update(history, current, canSteer, result());
+    const lines = this.scroll.render(width);
+    const viewport = Math.max(1, bodyRows - 1 - (this.composer ? 1 : 0));
+    this.contentHeight = lines.length;
+    // Custom overlays render into a row budget supplied by the navigator.
+    this.scroll.updateLayout(lines.length, viewport, this.requestRender);
+    const top = this.scroll.scrollTop;
+    const visible = lines.length ? lines.slice(top, top + viewport) : [theme.fg("muted", "No transcript yet.")];
+    const { label, model, thinking, status, usage } = header();
+    const glyph = statusGlyph(status, theme, Date.now(), status === "running");
+    const displayModel = sanitizeTerminalText(model ? modelEffort(model, thinking, 28) : "?");
+    const title = `${glyph} ${theme.bold(sanitizeTerminalText(label))} ${theme.fg("dim", `· ${displayModel} · ${status} · ${formatTokenUsage(usage)}`)}`;
+
+    const hints = this.composer ? [canSteer ? "Steer" : "Message", "esc cancel"] : ["esc back"];
+    if (!this.composer) {
+      if (canSteer) hints.push("enter steer", this.stopArmed ? "x again to stop" : "x stop");
+      else if (this.deps.canMessage()) hints.push("enter message");
+      const tools = keyText("app.tools.expand");
+      const thinking = keyText("app.thinking.toggle");
+      if (tools) hints.push(`${tools} tools`);
+      if (thinking) hints.push(`${thinking} thinking`);
     }
-    const position = this.autoScroll ? (this.isActive() ? "Following latest" : "End of transcript") : "Reading history";
-    lines.push(
-      theme.fg("muted", `${position} · g first block · G last block · j/k block · J/K 7 blocks · l/Space fold`),
-    );
-    if (this.composer) {
-      const kind = this.canSteer ? "steer" : this.canMessage ? "message" : this.composer.kind;
-      const prefix = `✎ ${kind}: `;
-      lines.push(theme.fg("accent", prefix) + (this.composer.input.render(Math.max(1, cap - prefix.length))[0] ?? ""));
-    }
-    return lines.map((line) => truncateToWidth(line, cap));
+    return {
+      lines: [
+        truncateToWidth(title, width),
+        ...visible,
+        ...Array<string>(viewport - visible.length).fill(""),
+        ...(this.composer?.render(width) ?? []),
+      ],
+      footer: this.error ? theme.fg("error", this.error) : theme.fg("dim", hints.join(" · ")),
+      hasSpinner: status === "running",
+    };
   }
 }

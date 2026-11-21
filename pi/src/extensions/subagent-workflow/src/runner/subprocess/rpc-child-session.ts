@@ -4,7 +4,7 @@
  * and delegates process-group termination to the transport.
  */
 
-import type { AssistantMessage, AssistantMessageEvent, Message } from "@earendil-works/pi-ai";
+import { ToolCallArgumentsStream, type AssistantMessage, type Message, type ToolCall } from "@earendil-works/pi-ai";
 import type { ContextUsage } from "@earendil-works/pi-coding-agent";
 import type { UsageSummary } from "../../types.js";
 import { errorMessage, isRecord } from "../../util.js";
@@ -57,21 +57,6 @@ function contextUsageFromStats(stats: unknown): ContextUsage | undefined {
   return { tokens: usage.tokens, contextWindow: usage.contextWindow, percent: usage.percent };
 }
 
-const KNOWN_ASSISTANT_UPDATE_TYPES = new Set([
-  "start",
-  "text_start",
-  "text_delta",
-  "text_end",
-  "thinking_start",
-  "thinking_delta",
-  "thinking_end",
-  "toolcall_start",
-  "toolcall_delta",
-  "toolcall_end",
-  "done",
-  "error",
-]);
-
 function isRunActivity(event: ChildSessionEvent): boolean {
   if (event.type === "message_start" || event.type === "message_end") {
     return event.message.role === "assistant" || event.message.role === "user" || event.message.role === "toolResult";
@@ -115,33 +100,9 @@ function childSessionEvent(event: Record<string, unknown>): ChildSessionEvent | 
       return isRecord(event.message) && typeof event.message.role === "string"
         ? { type: event.type, message: event.message as unknown as Message }
         : undefined;
-    case "message_update": {
-      const update = event.assistantMessageEvent;
-      if (!isRecord(update) || typeof update.type !== "string") return undefined;
-      if (!KNOWN_ASSISTANT_UPDATE_TYPES.has(update.type)) {
-        return isRecord(event.message) && event.message.role === "assistant"
-          ? { type: "message_update", opaqueAssistantMessageUpdate: { opaqueType: update.type } }
-          : undefined;
-      }
-      return isRecord(event.message) && event.message.role === "assistant"
-        ? {
-            type: "message_update",
-            message: event.message as unknown as AssistantMessage,
-            assistantMessageEvent: update as unknown as AssistantMessageEvent,
-          }
-        : undefined;
-    }
     default:
       return undefined;
   }
-}
-
-type KnownAssistantMessageUpdate = Extract<ChildSessionEvent, { type: "message_update"; message: AssistantMessage }>;
-
-function knownAssistantMessageUpdate(event: ChildSessionEvent): KnownAssistantMessageUpdate | undefined {
-  return event.type === "message_update" && Object.hasOwn(event, "message")
-    ? (event as KnownAssistantMessageUpdate)
-    : undefined;
 }
 
 interface FoldedAssistantUsage {
@@ -243,6 +204,7 @@ interface RpcChildSessionInit {
 
 export class RpcChildSession implements ChildSession {
   private assistantInProgress: AssistantMessage | undefined;
+  private readonly toolArguments = new Map<number, ToolCallArgumentsStream>();
   /** Folding at message_end - not turn_end - means a process that dies
    * mid-turn still exposes its newest result and counts its billed usage. */
   latestAssistant: AssistantMessage | undefined;
@@ -271,11 +233,19 @@ export class RpcChildSession implements ChildSession {
       // contaminate the first prompt's assistant, usage, attempts, or subscribers.
       if (!this.lifecycleEventsEnabled) return;
       this.observeContextChange(event);
+      if (event.type === "message_update") {
+        const update = event.assistantMessageEvent;
+        if (!isRecord(update) || typeof update.type !== "string") return;
+        this.applyAssistantDelta(update);
+        this.handleEvent({ type: "message_update" });
+        return;
+      }
       const classified = childSessionEvent(event);
       if (classified) this.handleEvent(classified);
     });
     rpc.onExit((exit) => {
       this.assistantInProgress = undefined;
+      this.toolArguments.clear();
       this.exitError = new Error(
         `Child pi process exited before settling (code ${exit.code ?? "null"}, signal ${exit.signal ?? "null"}). Stderr: ${rpc.stderrTail() || "(empty)"}`,
       );
@@ -501,9 +471,79 @@ export class RpcChildSession implements ChildSession {
     });
   }
 
+  /** RPC sends only block deltas between the initial and final assistant messages. */
+  private applyAssistantDelta(update: Record<string, unknown>): void {
+    const current = this.assistantInProgress;
+    const index = update.contentIndex;
+    if (
+      !current ||
+      typeof index !== "number" ||
+      !Number.isSafeInteger(index) ||
+      index < 0 ||
+      index > current.content.length
+    )
+      return;
+
+    const previous = current.content[index];
+    let block: AssistantMessage["content"][number];
+    switch (update.type) {
+      case "text_start":
+        block = { type: "text", text: "" };
+        break;
+      case "thinking_start":
+        block = { type: "thinking", thinking: "" };
+        break;
+      case "text_delta":
+        if (previous?.type !== "text" || typeof update.delta !== "string") return;
+        block = { type: "text", text: previous.text + update.delta };
+        break;
+      case "thinking_delta":
+        if (previous?.type !== "thinking" || typeof update.delta !== "string") return;
+        block = { type: "thinking", thinking: previous.thinking + update.delta };
+        break;
+      case "text_end":
+        if (typeof update.content !== "string") return;
+        block = { type: "text", text: update.content };
+        break;
+      case "thinking_end":
+        if (typeof update.content !== "string") return;
+        block = { type: "thinking", thinking: update.content };
+        break;
+      case "toolcall_start":
+        if (typeof update.id !== "string" || typeof update.toolName !== "string") return;
+        this.toolArguments.set(index, new ToolCallArgumentsStream());
+        block = { type: "toolCall", id: update.id, name: update.toolName, arguments: {} };
+        break;
+      case "toolcall_delta": {
+        const args = this.toolArguments.get(index);
+        if (!args || previous?.type !== "toolCall" || typeof update.delta !== "string") return;
+        block = { ...previous, arguments: args.append(update.delta) };
+        break;
+      }
+      case "toolcall_end": {
+        const tool = update.toolCall;
+        this.toolArguments.delete(index);
+        if (
+          !isRecord(tool) ||
+          typeof tool.id !== "string" ||
+          typeof tool.name !== "string" ||
+          !isRecord(tool.arguments)
+        )
+          return;
+        block = tool as unknown as ToolCall;
+        break;
+      }
+      default:
+        return;
+    }
+
+    const content = current.content.slice();
+    content[index] = block;
+    this.assistantInProgress = { ...current, content };
+  }
+
   private handleEvent(event: ChildSessionEvent): void {
     const activeTurn = this.turn;
-    const assistantUpdate = knownAssistantMessageUpdate(event);
     if (activeTurn) {
       this.emitPromptAttempt({ type: "event", attempt: activeTurn.attempt, event });
       if (event.type === "agent_start" || isRunActivity(event)) activeTurn.observeAcceptance();
@@ -511,9 +551,8 @@ export class RpcChildSession implements ChildSession {
     // The retained assistant survives non-assistant lifecycle events (tool
     // results in a multi-step turn); only a newer assistant message replaces
     // it, and only agent_settled or process exit clears it.
-    if (assistantUpdate) {
-      this.assistantInProgress = assistantUpdate.message;
-    } else if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
+    if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
+      this.toolArguments.clear();
       this.assistantInProgress = event.message;
     }
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -529,6 +568,7 @@ export class RpcChildSession implements ChildSession {
       }
     }
     if (event.type === "agent_settled") {
+      this.toolArguments.clear();
       this.assistantInProgress = undefined;
       this.turn?.observeSettlement();
     }
