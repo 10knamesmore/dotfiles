@@ -1,0 +1,30 @@
+textures a persist
+
+startgroup
+    animation_step 0
+    output_texture a
+    var int PASS = 0
+    shaders powerline-wipe
+endgroup
+
+startgroup
+    animation_start tab-change
+    animation_stop 180
+    animation_curve ease-in-out
+    animation_step 8
+    var int PASS = 1
+    shaders powerline-wipe
+endgroup
+
+startgroup
+    animation_step 0
+    output_texture persist
+    var int PASS = 2
+    shaders powerline-wipe
+endgroup
+
+startgroup
+    animation_step 0
+    var int PASS = 3
+    shaders powerline-wipe
+endgroup
