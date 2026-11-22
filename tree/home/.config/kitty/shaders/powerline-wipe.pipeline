@@ -10,7 +10,7 @@ endgroup
 startgroup
     animation_start tab-change
     animation_stop 180
-    animation_curve ease-in-out
+    animation_curve cubic-bezier(0.12, 0.62, 0.25, 1)
     animation_step 8
     var int PASS = 1
     shaders powerline-wipe
