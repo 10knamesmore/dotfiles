@@ -237,13 +237,13 @@ export function registerSubagentTool(pi: ExtensionAPI, runner: SubagentRunner, s
         initialDetails(spec, handle, display),
       );
     },
-    renderCall(args, theme) {
+    renderCall(args, theme, { expanded }) {
       // For a follow-up, prefer the caller's name for the turn; the source child
       // id is the fallback and stays visible in the run record either way.
       const label = args.followUp
         ? `follow-up · ${args.label ?? args.followUp.id}`
         : (args.label ?? (args.prompt ? childLabel({ prompt: args.prompt }) : "Subagent"));
-      return renderCallHeader(label, theme);
+      return renderCallHeader(label, args.followUp?.prompt, expanded, theme);
     },
     renderResult(result, _options, theme, context) {
       return renderSubagentResult(result, theme, context.lastComponent);

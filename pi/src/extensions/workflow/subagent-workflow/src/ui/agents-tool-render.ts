@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";
 import type { SubagentStatus } from "../types.js";
-import { linesComponent } from "./component.js";
+import { linesComponent, quotedLines } from "./component.js";
 import type { ThemeLike } from "./format.js";
 import { sanitizeTerminalText } from "./sanitize.js";
 
@@ -30,7 +30,6 @@ export interface AgentsToolRenderState {
 }
 
 const COLLAPSED_ROWS = 5;
-const COLLAPSED_QUOTE_LINES = 3;
 
 function glyph(status: SubagentStatus, theme: ThemeLike): string {
   switch (status) {
@@ -107,11 +106,7 @@ export function renderAgentsResult(
       lines.push(truncateToWidth(theme.fg("muted", sanitizeTerminalText(snapshot.activity)), width));
     }
     if (snapshot.quote) {
-      const quote = sanitizeTerminalText(snapshot.quote, undefined, true);
-      const wrapped = wrapTextWithAnsi(quote, Math.max(1, width - 2));
-      const shown = options.expanded ? wrapped : wrapped.slice(0, COLLAPSED_QUOTE_LINES);
-      lines.push(...shown.map((line) => truncateToWidth(`${theme.fg("dim", "│")} ${line}`, width)));
-      if (shown.length < wrapped.length) lines.push(truncateToWidth(theme.fg("dim", "│ …"), width));
+      lines.push(...quotedLines(snapshot.quote, width, options.expanded, theme));
     }
     if (options.expanded && snapshot.expandedLines.length > 0) {
       if (lines.length > 0) lines.push("");

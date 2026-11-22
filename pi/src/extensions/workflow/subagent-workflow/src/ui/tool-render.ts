@@ -18,7 +18,7 @@
 
 import { wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";
 import type { SubagentHandle, SubagentSpec, ThinkingLevel } from "../types.js";
-import { guardedLines, linesComponent } from "./component.js";
+import { guardedLines, linesComponent, quotedLines } from "./component.js";
 import { childLabel, formatFullModel, shortModel, type ThemeLike } from "./format.js";
 import { sanitizeTerminalText, sanitizeTerminalTextChunks, UNTRUSTED_FIELD_MAX } from "./sanitize.js";
 import { isRecord } from "../util.js";
@@ -84,12 +84,17 @@ export function callHeaderLine(label: string, theme: ThemeLike): string {
   return theme.fg("toolTitle", theme.bold(`subagent · ${sanitizeTerminalText(label)}`));
 }
 
-/** Call header component that wraps the full label to the available width. */
-export function renderCallHeader(label: string, theme: ThemeLike): Component {
-  return linesComponent(
-    (width) => wrapTextWithAnsi(callHeaderLine(label, theme), Math.max(1, width)),
-    "subagent call header",
-  );
+export function renderCallHeader(
+  label: string,
+  prompt: string | undefined,
+  expanded: boolean,
+  theme: ThemeLike,
+): Component {
+  return linesComponent((width) => {
+    const lines = wrapTextWithAnsi(callHeaderLine(label, theme), width);
+    if (prompt) lines.push(...quotedLines(prompt, width, expanded, theme));
+    return lines;
+  }, "subagent call header");
 }
 
 /** Component rendering rows straight from the result's snapshot. */

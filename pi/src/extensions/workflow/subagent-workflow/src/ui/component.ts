@@ -1,10 +1,21 @@
-import { truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { truncateToWidth, wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";
 import { reportDiagnostic } from "../diagnostics.js";
 import { errorMessage } from "../util.js";
+import type { ThemeLike } from "./format.js";
 import { sanitizeTerminalText } from "./sanitize.js";
 
 /** Shown in place of a view that threw. Kept short, and clamped to the width. */
 const NOTICE = "[subagent-workflow] render failed";
+
+const COLLAPSED_QUOTE_LINES = 3;
+
+export function quotedLines(text: string, width: number, expanded: boolean, theme: ThemeLike): string[] {
+  const wrapped = wrapTextWithAnsi(sanitizeTerminalText(text, undefined, true), Math.max(1, width - 2));
+  const shown = expanded ? wrapped : wrapped.slice(0, COLLAPSED_QUOTE_LINES);
+  const lines = shown.map((line) => truncateToWidth(`${theme.fg("dim", "│")} ${line}`, width));
+  if (shown.length < wrapped.length) lines.push(truncateToWidth(theme.fg("dim", "│ …"), width));
+  return lines;
+}
 
 /**
  * Run a line producer so a throw degrades to a notice instead of killing pi.
