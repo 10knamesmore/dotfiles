@@ -5,8 +5,8 @@ use std::path::Path;
 use std::rc::Rc;
 
 use dots_core::manifest::{
-    BeforeSyncHook, CargoBinaryDeclaration, CargoBinarySource, DistributeSpec, GranularitySpec,
-    Manifest, ResourceDeclaration, RootSpec,
+    BeforeSyncHook, CargoBinaryDeclaration, CargoBinarySource, DistributeSource, DistributeSpec,
+    GranularitySpec, Manifest, ResourceDeclaration, RootSpec,
 };
 use dots_core::{LinkMode, Os, RepoPath};
 use mlua::{Lua, Table, Value};
@@ -76,14 +76,31 @@ fn register_distribute(lua: &Lua, builder: &Builder) -> mlua::Result<()> {
     let builder_ref = builder.clone();
     let function = lua.create_function(move |_, (name, spec): (String, Table)| {
         reject_action_fields(&spec, "distribute")?;
-        let source: String = spec.get("src")?;
+        let src: Option<String> = spec.get("src")?;
+        let glob: Option<String> = spec.get("glob")?;
+        let mode: Option<String> = spec.get("mode")?;
+        let source = match (src, glob) {
+            (Some(path), None) => match parse_mode(mode)? {
+                LinkMode::Dir | LinkMode::File => DistributeSource::Exact(RepoPath::new(path)),
+                LinkMode::Children => DistributeSource::Children(RepoPath::new(path)),
+            },
+            (None, Some(pattern)) => {
+                if mode.is_some() {
+                    return Err(mlua::Error::external("distribute.mode 只适用于 src"));
+                }
+                DistributeSource::Glob(pattern)
+            }
+            _ => {
+                return Err(mlua::Error::external(
+                    "distribute 需指定 src 或 glob 其中一项",
+                ));
+            }
+        };
         let targets = string_sequence(&spec, "to")?;
-        let mode = parse_mode(spec.get::<Option<String>>("mode")?)?;
         builder_ref.borrow_mut().distribute.push(DistributeSpec {
             name,
-            src: RepoPath::new(source),
+            source,
             to: targets,
-            mode,
             required: spec.get::<Option<bool>>("required")?.unwrap_or(false),
         });
         Ok(())

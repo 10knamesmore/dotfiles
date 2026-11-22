@@ -1,0 +1,37 @@
+import { basename } from "node:path";
+import type { EditorActivity } from "@dotfiles/pi-ui/prompt-editor";
+import { sanitizeFooterText } from "@dotfiles/pi-ui/status-format";
+
+/**
+ * Prefix Pi writes in front of its own terminal title. Pi derives it from the
+ * package config and the deployed package declares no `piConfig.name`, so the
+ * literal default is stable for this distribution.
+ */
+const TITLE_PREFIX = "π";
+
+type BusyActivity = Exclude<EditorActivity, { kind: "ready" }>;
+
+/** Session identity Pi shows in the title. */
+export interface TitleContext {
+  sessionName: string | undefined;
+  cwd: string;
+}
+
+/** Pi's own title, restored whenever the agent is idle. */
+export function baseTitle(context: TitleContext): string {
+  const directory = basename(context.cwd);
+  return context.sessionName
+    ? `${TITLE_PREFIX} - ${context.sessionName} - ${directory}`
+    : `${TITLE_PREFIX} - ${directory}`;
+}
+
+/** Busy title: the activity frame the footer publishes, in front of the base title. */
+export function busyTitle(activity: BusyActivity, context: TitleContext): string {
+  const label =
+    activity.kind === "tool"
+      ? activity.toolCount > 1
+        ? `TOOLS ${activity.toolCount}`
+        : `TOOL · ${sanitizeFooterText(activity.toolName)}`
+      : activity.kind.toUpperCase();
+  return `${activity.spinner} ${label} · ${baseTitle(context)}`;
+}

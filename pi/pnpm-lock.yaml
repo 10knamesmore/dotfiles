@@ -73,7 +73,7 @@ importers:
         specifier: '*'
         version: 1.3.7
 
-  src/extensions/design/react:
+  src/extensions/tools/design/react:
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -97,7 +97,7 @@ importers:
         specifier: ^7.0.0
         version: 7.3.7(@types/node@22.19.19)(jiti@2.7.0)(yaml@2.9.0)
 
-  src/extensions/design/web:
+  src/extensions/tools/design/web:
     dependencies:
       '@pi-design/react':
         specifier: workspace:*
@@ -133,6 +133,10 @@ importers:
       '@earendil-works/pi-tui':
         specifier: 'catalog:'
         version: 1.6.0
+    devDependencies:
+      '@dotfiles/pi-config':
+        specifier: workspace:*
+        version: link:../config
 
 packages:
 

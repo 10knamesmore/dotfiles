@@ -11,11 +11,11 @@
     "fmt": "pnpm run fmt:web && pnpm run fmt:python && pnpm run fmt:rust",
     "fmt:web": "prettier --write . --ignore-path ../.gitignore",
     "fmt:python": "uvx ruff format .",
-    "fmt:rust": "cargo fmt --manifest-path src/extensions/design/native/Cargo.toml && cargo fmt --manifest-path src/extensions/python/packages/computer-use/Cargo.toml && cargo fmt --manifest-path src/extensions/python/packages/pi-repl-tools/Cargo.toml",
+    "fmt:rust": "cargo fmt --manifest-path src/extensions/tools/design/native/Cargo.toml && cargo fmt --manifest-path src/extensions/tools/python/packages/computer-use/Cargo.toml && cargo fmt --manifest-path src/extensions/tools/python/packages/pi-repl-tools/Cargo.toml",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm run typecheck:openui && pnpm --filter @pi-design/react --filter @pi-design/editor run typecheck",
-    "typecheck:openui": "tsc --noEmit -p src/extensions/openui/tsconfig.json",
+    "typecheck:openui": "tsc --noEmit -p src/extensions/tui/openui/tsconfig.json",
     "build:design": "pnpm --filter @pi-design/react run build && pnpm --filter @pi-design/editor run build",
-    "typecheck:design": "tsc --noEmit -p src/extensions/design/tsconfig.json && pnpm --filter @pi-design/react --filter @pi-design/editor run typecheck",
+    "typecheck:design": "tsc --noEmit -p src/extensions/tools/design/tsconfig.json && pnpm --filter @pi-design/react --filter @pi-design/editor run typecheck",
     "update:pi": "pnpm update --recursive --latest --no-save @earendil-works/pi-ai @earendil-works/pi-coding-agent @earendil-works/pi-tui"
   },
   "dependencies": {

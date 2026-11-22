@@ -5,7 +5,13 @@
   "type": "module",
   "exports": {
     "./action-feedback": "./action-feedback.ts",
-    "./expandable-message": "./expandable-message.ts"
+    "./expandable-message": "./expandable-message.ts",
+    "./prompt-editor": "./prompt-editor.ts",
+    "./status-format": "./status-format.ts",
+    "./palette": "./palette.ts"
+  },
+  "devDependencies": {
+    "@dotfiles/pi-config": "workspace:*"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",

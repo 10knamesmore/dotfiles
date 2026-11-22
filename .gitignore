@@ -28,8 +28,8 @@ node_modules
 __pycache__
 
 **/*/target/
-/pi/src/extensions/design/web/dist/
-/pi/src/extensions/design/react/dist/
+/pi/src/extensions/tools/design/web/dist/
+/pi/src/extensions/tools/design/react/dist/
 
 .superpowers/
 

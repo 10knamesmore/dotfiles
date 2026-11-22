@@ -33,14 +33,14 @@ dots.hook.before_sync({
 -- 安装 Python SDK 与本地原生扩展。
 dots.hook.before_sync({
   name = "prepare Pi Python environment",
-  cwd = dots.repo .. "/pi/src/extensions/python",
+  cwd = dots.repo .. "/pi/src/extensions/tools/python",
   program = "uv",
   args = { "sync", "--locked" },
 })
 -- Pi 启动只读清单；包版本在下次 sync 后更新。
 dots.hook.before_sync({
   name = "write Pi Python environment manifest",
-  cwd = dots.repo .. "/pi/src/extensions/python",
+  cwd = dots.repo .. "/pi/src/extensions/tools/python",
   program = "uv",
   args = { "run", "--no-sync", "--", "python", "environment_manifest.py" },
 })
@@ -49,16 +49,15 @@ dots.resource.directory({
   mode = "0700",
 })
 dots.resource.symlink({
-  source = "pi/src/extensions/python/packages/terminal-use/src/terminal_use/bridge.py",
+  source = "pi/src/extensions/tools/python/packages/terminal-use/src/terminal_use/bridge.py",
   target = "~/.local/share/terminal-use/bridge.py",
 })
 
 -- Pi 逐个加载 extension；jiti 沿 source realpath 从 pi/node_modules 解析依赖。
 -- agent 目录也可能尚不存在，因此首次 sync 就要创建这些链接。
 distribute("pi-extensions", {
-  src = "pi/src/extensions",
+  glob = "pi/src/extensions/*/*",
   to = { "~/.pi/agent/extensions" },
-  mode = "children",
   required = true,
 })
 -- 全局指令源统一放在 .agents；各工具从自己的全局目录加载同一文件。

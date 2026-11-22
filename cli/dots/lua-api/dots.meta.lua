@@ -12,10 +12,18 @@
 ---@param spec GranularitySpec 粒度设置
 function granularity(path, spec) end
 
----@class DistributeSpec
----@field src string 仓库内唯一真相源
+---@class DistributeTargets
 ---@field to string[] 目标列表，可使用 `~`
----@field mode? "dir"|"children"|"file" 目标粒度，缺省为 "dir"
+---@field required? boolean 目标父目录不存在时仍创建链接，默认 false
+
+---@class DistributePathSpec: DistributeTargets
+---@field src string 仓库相对路径
+---@field mode? "dir"|"children"|"file" 链接粒度，缺省为 "dir"
+
+---@class DistributeGlobSpec: DistributeTargets
+---@field glob string 仓库相对 glob；每个匹配项按原名链接到各目标目录
+
+---@alias DistributeSpec DistributePathSpec|DistributeGlobSpec
 
 --- 把一份仓库 source 映射到多个工具目录。
 ---@param name string 用于诊断的分发组名

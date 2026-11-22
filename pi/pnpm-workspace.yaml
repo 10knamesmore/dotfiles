@@ -1,8 +1,8 @@
 packages:
   - src/config
   - src/ui
-  - src/extensions/design/web
-  - src/extensions/design/react
+  - src/extensions/tools/design/web
+  - src/extensions/tools/design/react
 catalog:
   "@earendil-works/pi-ai": latest
   "@earendil-works/pi-coding-agent": latest

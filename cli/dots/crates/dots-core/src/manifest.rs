@@ -82,14 +82,23 @@ pub struct GranularitySpec {
 pub struct DistributeSpec {
     /// 分发组名（如 `skills`）。
     pub name: String,
-    /// 唯一真相源（仓库内）。
-    pub src: RepoPath,
+    /// 仓库内的链接来源及展开方式。
+    pub source: DistributeSource,
     /// 落点列表（`$HOME` 侧绝对/`~` 路径，bin 负责展开 `~`）。
     pub to: Vec<String>,
-    /// 落点处的链接粒度（`children` 逐项 / `dir` 整目录）。
-    pub mode: LinkMode,
     /// 目标父目录不存在时仍收敛链接；sync 会创建所需父目录。
     pub required: bool,
+}
+
+/// 一条 distribute 声明选择哪些源路径。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DistributeSource {
+    /// 将文件或目录直接链接到每个目标路径。
+    Exact(RepoPath),
+    /// 将目录的直接子项按原名链接到每个目标目录。
+    Children(RepoPath),
+    /// 将仓库相对 glob 的匹配项按原名链接到每个目标目录。
+    Glob(String),
 }
 
 /// 非 `$HOME` 镜像的额外层（罕见，如 macOS App Support）。

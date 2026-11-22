@@ -15,11 +15,11 @@ use crate::managed_block;
 use crate::realfs::RealFs;
 use crate::state::State;
 use color_eyre::eyre::Context;
-use dots_core::manifest::{DistributeSpec, Manifest, ResourceDeclaration};
+use dots_core::manifest::{DistributeSource, Manifest, ResourceDeclaration};
 use dots_core::{
-    AbsPath, AppliedResource, ExpectedLink, FileSystem, Layer, LinkMode, ManagedBlockPlacement,
-    NodeKind, ObservedState, Os, OwnershipSurface, Plan, ResourceSpec, ResourceState,
-    content_sha256, expand_layers, plan_scripts, reconcile,
+    AbsPath, AppliedResource, ExpectedLink, FileSystem, ManagedBlockPlacement, NodeKind,
+    ObservedState, Os, OwnershipSurface, Plan, ResourceSpec, ResourceState, content_sha256,
+    expand_layers, plan_scripts, reconcile,
 };
 
 /// 一次 planning 所需的完整机器与仓库上下文。
@@ -163,8 +163,7 @@ fn collect_desired(
         });
     resources.extend(layer_links.map(symlink_resource));
 
-    let distribute_links = collect_distribute_links(filesystem, &repo, manifest, home);
-    resources.extend(distribute_links.map(symlink_resource));
+    resources.extend(distribute_resources(filesystem, repo_root, manifest, home)?);
 
     let (script_links, conflicts) =
         plan_scripts(filesystem, &repo, os, &manifest.scripts_ignore_tree);
@@ -197,64 +196,79 @@ fn symlink_resource(link: ExpectedLink) -> ResourceSpec {
 }
 
 /// 展开 distribute mapping；可选目标的父目录不存在时不进入 Desired Set。
-fn collect_distribute_links(
+fn distribute_resources(
     filesystem: &dyn FileSystem,
-    repo: &AbsPath,
+    repo: &Path,
     manifest: &Manifest,
     home: &Path,
-) -> impl Iterator<Item = ExpectedLink> {
-    let mut links = Vec::new();
-    let via = Layer {
-        name: "distribute".to_owned(),
-        os: None,
-    };
+) -> crate::Result<Vec<ResourceSpec>> {
+    let mut resources = Vec::new();
     for spec in &manifest.distribute {
-        let source = repo.join(spec.src.as_path());
+        let (sources, by_name) = match &spec.source {
+            DistributeSource::Exact(path) => (vec![repo.join(path.as_path())], false),
+            DistributeSource::Children(path) => {
+                (filesystem.read_dir(&repo.join(path.as_path())), true)
+            }
+            DistributeSource::Glob(pattern) => (
+                expand_repo_glob(repo, pattern)
+                    .wrap_err_with(|| format!("distribute `{}` glob `{pattern}`", spec.name))?,
+                true,
+            ),
+        };
         for target in &spec.to {
-            let target = AbsPath::new(expand_home(target, home));
-            if !spec.required
-                && target
-                    .as_path()
-                    .parent()
-                    .is_some_and(|parent| !parent.exists())
-            {
+            let target = expand_home(target, home);
+            if !spec.required && target.parent().is_some_and(|parent| !parent.exists()) {
                 continue;
             }
-            push_distribute(filesystem, spec, &source, &target, &via, &mut links);
-        }
-    }
-    links.into_iter()
-}
-
-/// 按 distribute 粒度展开一条 mapping。
-fn push_distribute(
-    filesystem: &dyn FileSystem,
-    spec: &DistributeSpec,
-    source: &AbsPath,
-    target: &AbsPath,
-    via: &Layer,
-    links: &mut Vec<ExpectedLink>,
-) {
-    match spec.mode {
-        LinkMode::Children => {
-            for child in filesystem.read_dir(source.as_path()) {
-                if let Some(name) = child.file_name() {
-                    links.push(ExpectedLink {
-                        target: AbsPath::new(target.as_path().join(name)),
-                        source: AbsPath::new(child),
-                        via: via.clone(),
-                        shadowed: Vec::new(),
-                    });
-                }
+            for source in &sources {
+                let target = if by_name {
+                    target.join(source.file_name().ok_or_else(|| {
+                        color_eyre::eyre::eyre!("distribute 来源缺少文件名：{}", source.display())
+                    })?)
+                } else {
+                    target.clone()
+                };
+                resources.push(ResourceSpec::Symlink {
+                    target: AbsPath::new(target),
+                    source: AbsPath::new(source),
+                    source_is_dir: source.is_dir(),
+                    origin: format!("distribute `{}`: {}", spec.name, source.display()),
+                });
             }
         }
-        LinkMode::Dir | LinkMode::File => links.push(ExpectedLink {
-            target: target.clone(),
-            source: source.clone(),
-            via: via.clone(),
-            shadowed: Vec::new(),
-        }),
     }
+    Ok(resources)
+}
+
+/// 只将仓库相对部分解释为 glob；checkout 路径中的通配字符按字面匹配。
+fn expand_repo_glob(repo: &Path, pattern: &str) -> crate::Result<Vec<PathBuf>> {
+    let path = Path::new(pattern);
+    if path.file_name().is_none()
+        || path.is_absolute()
+        || path
+            .components()
+            .any(|part| part == std::path::Component::ParentDir)
+    {
+        color_eyre::eyre::bail!("glob 需要仓库内的相对模式");
+    }
+    let root = repo
+        .to_str()
+        .ok_or_else(|| color_eyre::eyre::eyre!("仓库路径不是 UTF-8：{}", repo.display()))?;
+    let mut query = glob::Pattern::escape(root);
+    for component in pattern.split('/') {
+        query.push('/');
+        // glob 会为以字面点开头的通配段补出 `.` 和 `..`。字符类只匹配实际目录项。
+        if let Some(rest) = component
+            .strip_prefix('.')
+            .filter(|rest| rest.contains(['*', '?', '[']))
+        {
+            query.push_str("[.]");
+            query.push_str(rest);
+        } else {
+            query.push_str(component);
+        }
+    }
+    Ok(glob::glob(&query)?.collect::<Result<_, _>>()?)
 }
 
 /// 编译一个参与 sync lifecycle 的显式 Lua Resource declaration。
