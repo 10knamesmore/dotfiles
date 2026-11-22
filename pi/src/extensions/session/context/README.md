@@ -1,20 +1,20 @@
 # Context Inspector
 
-`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器在输入区域打开，不使用悬浮层。命令直接打开导航列表，首项为总览；有 provider payload 时，第二项为最近一次观察的 **Full request JSON**。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
+`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器在输入区域打开，不使用悬浮层。导航列表依次显示 **Full payload**（已采集时）、**Full system prompt**、system prompt 各分段、各项工具声明和各条消息。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回，`?` 查看按键说明；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
 
-导航列表、总览和按键说明使用对齐的表格，数字列右对齐，选中项使用整行背景。JSON 与 prompt 正文使用语法高亮并显示行号。颜色跟随当前 Pi 主题。
+导航列表和按键说明使用对齐的表格，数字列右对齐，选中项使用整行背景。JSON 与 prompt 正文使用语法高亮并显示行号。颜色跟随当前 Pi 主题。
 
-请求时只保存独立快照：上下文消息与来源配置使用深拷贝，provider payload 保存为一份紧凑 JSON 字符串。打开检查器后才转换消息、生成目录、计算字节数和来源证据。
+导航列表用横线分组。prompt 分段、工具声明和消息各用一套线性刻度，组内字节数最大的条目占满大小条；筛选后仍沿用本次请求的刻度。
+
+请求时只保存独立快照：上下文消息使用深拷贝，provider payload 保存为一份紧凑 JSON 字符串。打开检查器后才转换消息、生成目录并计算字节数。
 
 列表只渲染可见条目。首次打开某份正文时，才将它交给检查器独占的 Worker；Worker 格式化该文档的 JSON，再高亮、换行并缓存。主线程只接收视口及前后各一屏的行，并为可见行绘制行号和背景。准备内容时显示 `Preparing source…`，仍可返回或关闭。调整窗口宽度复用高亮结果，改变语法颜色后重新处理；关闭检查器时终止 Worker。
 
 可查看：
 
-- 会话配置生成的 runtime prompt，包含 forced-prompt 覆盖；另列 transcript 中的 prompt section 和工具声明。
+- 会话配置生成的完整 system prompt，包含 forced-prompt 覆盖。Section 分组展示 transcript 中的基础和追加指令（合为一项）及各具名分段，可分别打开正文。
 - 转换后的上下文消息按请求快照中的顺序列出，筛选不改变顺序；类型包含压缩摘要。
-- 总览中的 Context files：Pi 配置的上下文文件路径。
-- 总览中的 Configured skills：当前请求中是否仍有匹配的成功 `read(path)` 调用及结果。读取结果可能只是片段；这一检查只考虑 `read` 工具与保留在当前请求中的记录。
-- `before_provider_request` 观察到的完整原生 payload JSON，以及拆分后的各顶层字段。
+- `before_provider_request` 观察到的完整原生 payload JSON。
 
 ## 快捷键
 
@@ -41,10 +41,10 @@
 
 ## 数据边界
 
-上下文在 `context_with_system` 事件采集，早于 Pi 的 forced-prompt 替换、hidden-tool 过滤、provider 转换和图片过滤。transcript prompt 和工具由 Pi 的 replay API 计算；它们是投影前的状态。另用 `ctx.getSystemPrompt()` 读取当时会话配置生成的 runtime prompt，方便查看 forced-prompt 覆盖。context 文件与 skill 来源目录取自 `before_agent_start` 的 prompt 配置。
+上下文在 `context_with_system` 事件采集，早于 Pi 的 forced-prompt 替换、hidden-tool 过滤、provider 转换和图片过滤。prompt 分段和工具声明由 Pi 的 replay API 从 transcript 计算。**Full system prompt** 来自此时的 `ctx.getSystemPrompt()`，包含会话配置中的 forced-prompt 覆盖。
 
 payload 在 `before_provider_request` 采集。主请求、重试和缓存预热都会触发此 hook，且事件不提供请求身份，因此 payload 使用独立编号与时间戳，不归属到某个上下文快照。后续 extension handler 与 provider transport 仍可能修改数据。
 
-体积使用 UTF-8 字节：prompt 是原始文本，其他内容按紧凑 JSON 计量，详情展示格式化 JSON。section、工具与消息显示各条目体积之和，不含条目间分隔符；payload 显示完整 JSON 的体积。消息体积排除响应 usage、时间戳与工具显示详情，但包含图片数据、opaque signature 和序列化结构。prompt、工具也出现在 system 消息中，几项体积有重叠，不能相加当作请求总量。字节数不换算成 token。请求模型与 provider 返回的 `responseModel` 分开显示，后者缺失时明确标注。
+体积使用 UTF-8 字节：prompt 是原始文本，其他内容按紧凑 JSON 计量，详情展示格式化 JSON。消息体积排除响应 usage、时间戳与工具显示详情，但包含图片数据、opaque signature 和序列化结构。prompt、工具也出现在 system 消息中，几项体积有重叠，不能相加当作请求总量。字节数不换算成 token。
 
-只在交互式 TUI 中采集，在内存保留最近一次主会话上下文与最近一次 provider payload，不写日志、不追加会话消息、不调用模型。`/reload`、切换会话或树导航后清空。检查器固定使用打开时的快照；后续请求与响应统计不会改变当前页面。
+只在交互式 TUI 中采集，在内存保留最近一次主会话上下文与最近一次 provider payload，不写日志、不追加会话消息、不调用模型。`/reload`、切换会话或树导航后清空。检查器固定使用打开时的快照。

@@ -6,7 +6,7 @@ import { numberCell, type TableCell, type TableColumn } from "./report.js";
 import { viewSourceInEditor } from "./source-editor.js";
 import { SourceLayouts } from "./source-layout.js";
 import { SourceContent } from "./source-view.js";
-import { formatBytes, overviewReport, prepareContext, preparePayload, type ContextEntry } from "./inspection.js";
+import { formatBytes, prepareContext, type ContextEntry } from "./inspection.js";
 import type { ContextSnapshot, PayloadSnapshot } from "./snapshot.js";
 
 interface InspectionPage {
@@ -29,35 +29,55 @@ interface FilterEditor {
   previousScroll: number;
 }
 
-function entryPages(entries: ContextEntry[], group: string): InspectionPage[] {
-  return entries.map((entry) => ({
+function entryPage(entry: ContextEntry, group: string): InspectionPage {
+  return {
     label: entry.label,
     group,
     bytes: entry.bytes,
     content: { kind: "source", body: entry.body, format: entry.format },
-  }));
+  };
 }
 
-function pageTable(width: number, showDetail = width >= 60) {
-  const textWidth = width - 39;
+function pageTable(width: number, showDetail = width >= 60, sizeWidth = 16) {
+  const textWidth = width - 27 - sizeWidth;
   const nameWidth = showDetail ? Math.max(17, Math.floor(textWidth * 0.45)) : Math.max(12, width - 36);
   const columns: TableColumn[] = [
     { weight: 10 },
     { weight: 5, align: "right" },
     { weight: nameWidth },
-    { weight: 12, align: "right" },
+    { weight: sizeWidth, align: "right" },
   ];
   if (showDetail) columns.splice(3, 0, { weight: textWidth - nameWidth });
   return { layout: tableLayout(width, columns), showDetail };
 }
 
-function pageCells(page: InspectionPage, showDetail: boolean, highlighted: boolean): TableCell[] {
+function listLayoutRows(items: readonly { section: string }[]) {
+  const itemRows: number[] = [];
+  const rowItems: (number | null)[] = [];
+  items.forEach((item, index) => {
+    if (index > 0 && items[index - 1]!.section !== item.section) rowItems.push(null);
+    itemRows.push(rowItems.length);
+    rowItems.push(index);
+  });
+  return { itemRows, rowItems };
+}
+
+function sizeBarCell(bytes: number, maximum: number, width: number): string {
+  const size = formatBytes(bytes);
+  const columns = Math.min(8, width - 9);
+  if (columns < 1) return size;
+  const eighths = bytes ? Math.max(1, Math.round((bytes / maximum) * columns * 8)) : 0;
+  const bar = "█".repeat(Math.floor(eighths / 8)) + ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"][eighths % 8];
+  return `${bar.padEnd(columns)} ${size.padStart(8)}`;
+}
+
+function pageCells(page: InspectionPage, showDetail: boolean, highlighted: boolean, size = ""): TableCell[] {
   return [
     { text: page.group, color: highlighted ? "accent" : "muted", bold: highlighted },
     page.number === undefined ? "" : numberCell(`#${page.number}`),
     { text: page.label, bold: highlighted },
     ...(showDetail ? [page.detail ?? ""] : []),
-    page.bytes === undefined ? "" : numberCell(formatBytes(page.bytes)),
+    numberCell(size),
   ];
 }
 
@@ -90,6 +110,18 @@ const keyboardPage: InspectionPage = {
         note: "Ctrl+U/D and Ctrl+B/F keep the selection. Reopening a page restores its scroll position.",
       },
       {
+        title: "Size bars",
+        columns: [
+          { heading: "View", weight: 1 },
+          { heading: "Scale", weight: 4 },
+        ],
+        rows: [
+          ["Sections", "Relative to the largest system prompt section."],
+          ["Tools", "Relative to the largest tool declaration."],
+          ["Messages", "Relative to the largest message."],
+        ],
+      },
+      {
         title: "List filtering",
         columns: [
           { heading: "Keys", weight: 2 },
@@ -109,32 +141,25 @@ const keyboardPage: InspectionPage = {
 export async function inspectContext(
   ctx: ExtensionCommandContext,
   snapshot: ContextSnapshot,
-  payloadSnapshot: PayloadSnapshot | undefined,
+  payload: PayloadSnapshot | undefined,
   externalEditor?: string,
 ): Promise<void> {
   const current = prepareContext(snapshot);
-  const payload = payloadSnapshot && preparePayload(payloadSnapshot);
-  const pages: InspectionPage[] = [
-    {
-      label: `Request #${current.number}`,
-      group: "Overview",
-      content: { kind: "report", sections: overviewReport(current) },
-    },
+  const entries: InspectionPage[] = [
     ...(payload
       ? [
           {
-            label: "Full request JSON",
+            label: "Full payload",
             group: "Payload",
             detail: `Observation #${payload.number} (${new Date(payload.capturedAt).toLocaleTimeString()})`,
-            bytes: payload.bytes,
+            bytes: Buffer.byteLength(payload.json, "utf8"),
             content: { kind: "source", body: payload.json, format: "json" },
           } satisfies InspectionPage,
         ]
       : []),
-    ...entryPages([current.runtimePrompt], "Prompt"),
-    ...entryPages(payload?.entries ?? [], "Payload"),
-    ...entryPages(current.prompt, "Prompt"),
-    ...entryPages(current.tools, "Tool"),
+    entryPage(current.runtimePrompt, "Prompt"),
+    ...current.promptSections.map((section) => entryPage(section, "Section")),
+    ...current.tools.map((tool) => entryPage(tool, "Tool")),
     ...current.messages.map((message): InspectionPage => ({
       label: message.label,
       group: "Message",
@@ -143,8 +168,15 @@ export async function inspectContext(
       bytes: message.bytes,
       content: { kind: "source", body: message.body, format: message.format },
     })),
-    keyboardPage,
   ];
+  const pages = [...entries, keyboardPage];
+  const helpIndex = entries.length;
+  const largestBytes = (entries: ContextEntry[]) => entries.reduce((max, entry) => Math.max(max, entry.bytes), 0);
+  const sizeScales = new Map([
+    ["Section", largestBytes(current.promptSections)],
+    ["Tool", largestBytes(current.tools)],
+    ["Message", largestBytes(current.messages)],
+  ]);
 
   await ctx.ui.custom<void>((tui, theme, keybindings, done) => {
     const appearance = new ContextAppearance(theme);
@@ -152,9 +184,10 @@ export async function inspectContext(
       ctx.ui.notify(`Context layout failed: ${error.message}`, "error");
       done();
     });
-    const items = pages.map((page, index) => ({
+    const items = entries.map((page, index) => ({
       index,
       page,
+      section: page.group === "Payload" || page.group === "Prompt" ? "Full" : page.group,
       searchText: stripTerminalSequences(
         [
           page.group,
@@ -167,8 +200,8 @@ export async function inspectContext(
     }));
     const details = new Map<number, DetailView>();
     const pageStack: number[] = [];
-    const helpIndex = pages.length - 1;
     let filtered = items;
+    let rows = listLayoutRows(filtered);
     let query = "";
     let cursor = 0;
     let filterEditor: FilterEditor | undefined;
@@ -191,15 +224,26 @@ export async function inspectContext(
           }
           const { layout, showDetail } = listLayout;
           const start = listScroll.scrollTop;
-          const visibleItems = filtered.slice(start, start + listScroll.viewportHeight);
+          const visibleRows = rows.rowItems.slice(start, start + listScroll.viewportHeight);
           const nextRows = new Map<string, string>();
-          const lines = visibleItems.map(({ page, index }, offset) => {
-            const selected = cursor === start + offset;
-            const style = selected ? "selected" : (start + offset) % 2 === 0 ? "stripe" : "surface";
+          const lines = visibleRows.map((item) => {
+            if (item === null) return theme.fg("border", layout.map((column) => "─".repeat(column.width)).join("─┼─"));
+            const { page, index } = filtered[item]!;
+            const selected = cursor === item;
+            const style = selected ? "selected" : item % 2 === 0 ? "stripe" : "surface";
             const key = `${index}:${style}`;
-            const line =
-              listRows.get(key) ??
-              appearance.tableRow(layout, pageCells(page, showDetail, selected), width, appearance[style])[0]!;
+            let line = listRows.get(key);
+            if (line === undefined) {
+              const maximum = sizeScales.get(page.group);
+              const size =
+                page.bytes === undefined
+                  ? ""
+                  : maximum !== undefined
+                    ? sizeBarCell(page.bytes, maximum, layout.at(-1)!.width)
+                    : formatBytes(page.bytes);
+              const cells = pageCells(page, showDetail, selected, size);
+              line = appearance.tableRow(layout, cells, width, appearance[style])[0]!;
+            }
             nextRows.set(key, line);
             return line;
           });
@@ -244,6 +288,7 @@ export async function inspectContext(
         .split(/[\s/]+/)
         .filter(Boolean);
       filtered = items.filter((item) => tokens.every((token) => fuzzyMatch(token, item.searchText).matches));
+      rows = listLayoutRows(filtered);
       moveCursor(0);
     };
     const finishFilter = (accept: boolean) => {
@@ -280,8 +325,8 @@ export async function inspectContext(
         const page = isList ? undefined : pages[index]!;
         const title = page
           ? appearance.tableRow(
-              pageTable(innerWidth, false).layout,
-              pageCells(page, false, true),
+              pageTable(innerWidth, false, 12).layout,
+              pageCells(page, false, true, page.bytes === undefined ? "" : formatBytes(page.bytes)),
               innerWidth,
               appearance.selected,
             )
@@ -309,7 +354,7 @@ export async function inspectContext(
           visible = detail.content.renderViewport(innerWidth, maxRows);
         } else {
           const detailLines = isList ? [] : scroll.render(innerWidth);
-          const contentHeight = isList ? Math.max(1, filtered.length) : detailLines.length;
+          const contentHeight = isList ? Math.max(1, rows.rowItems.length) : detailLines.length;
           const height = Math.min(Math.max(1, contentHeight), maxRows);
           // Input already requests a render, and any adjustment to scrollTop here is visible in this frame.
           scroll.updateLayout(contentHeight, height, () => {});
@@ -320,10 +365,11 @@ export async function inspectContext(
             } else if (followCursor) {
               const scrolloff = Math.min(4, Math.floor((height - 1) / 2));
               const top = listScroll.scrollTop;
-              if (cursor < top + scrolloff) {
-                listScroll.scrollTo(cursor - scrolloff);
-              } else if (cursor >= top + height - scrolloff) {
-                listScroll.scrollTo(cursor - height + scrolloff + 1);
+              const row = rows.itemRows[cursor] ?? 0;
+              if (row < top + scrolloff) {
+                listScroll.scrollTo(row - scrolloff);
+              } else if (row >= top + height - scrolloff) {
+                listScroll.scrollTo(row - height + scrolloff + 1);
               }
               followCursor = false;
             }
@@ -373,8 +419,11 @@ export async function inspectContext(
             else scroll.scrollBy(action.rows);
             break;
           case "page":
-            if (isList) moveCursor(cursor + action.direction * scroll.viewportHeight);
-            else scroll.scrollBy(action.direction * scroll.viewportHeight);
+            if (isList && filtered.length) {
+              const target = rows.itemRows[cursor]! + action.direction * scroll.viewportHeight;
+              const row = Math.max(0, Math.min(target, rows.rowItems.length - 1));
+              moveCursor(rows.rowItems[row] ?? rows.rowItems[row + action.direction]!);
+            } else scroll.scrollBy(action.direction * scroll.viewportHeight);
             break;
           case "scroll":
             if (isList) followCursor = false;
