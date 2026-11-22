@@ -309,7 +309,7 @@ export function placePin(block: Block, t: Target, n: number): boolean {
 }
 
 /** Pins on the elements that have notes, then the tray under the widget: one entry per note and the two buttons. */
-export function decorateNotes(block: Block, state: WState, width: number): Block {
+export function decorateNotes(block: Block, state: WState, width: number, sendNotes: boolean): Block {
   if (!state.notes.length) return block;
   state.notes.forEach((n, i) => {
     const t = block.targets.find((x) => x.id === n.itemId);
@@ -335,7 +335,9 @@ export function decorateNotes(block: Block, state: WState, width: number): Block
       noteId: n.id,
     });
   });
-  const addLabel = `[ Add ${state.notes.length} note${state.notes.length === 1 ? "" : "s"} to your message ]`;
+  const addLabel = sendNotes
+    ? "[ Send notes ]"
+    : `[ Add ${state.notes.length} note${state.notes.length === 1 ? "" : "s"} to your message ]`;
   const clearLabel = "[ Clear ]";
   const btn: Cell[] = [...textCells(addLabel, "btn"), cell(" "), cell(" "), ...textCells(clearLabel, "btn")];
   targets.push({

@@ -1,6 +1,8 @@
 import {
   AssistantMessageComponent,
   copyToClipboard,
+  ExtensionEditorComponent,
+  getMarkdownTheme,
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -22,7 +24,13 @@ import {
   type ReplyMarkdown,
 } from "./reply-markdown.js";
 import { ACTION_STYLES, COPIED_LABEL, COPY_LABEL, FEEDBACK_DURATION_MS } from "@dotfiles/pi-ui/action-feedback";
-import type { ReplyBlock, ReplyBlockRenderer } from "@dotfiles/pi-ui/prompt-editor";
+import type {
+  ReplyBlock,
+  ReplyBlockRenderer,
+  ReplyBlockScope,
+  ReplyBodyComponent,
+  ReplyBodyOptions,
+} from "@dotfiles/pi-ui/prompt-editor";
 
 interface CopyButton {
   row: number;
@@ -121,7 +129,6 @@ function highlightBlock(component: ReplyBlock, paint: CodeHighlight["paint"]): C
   };
 }
 
-/** Pi owns the original Markdown and updates its source while the reply streams. */
 export class ReplyBody extends Container {
   private sourceLines: readonly string[] | undefined;
   private blockCache = new Map<string, ReturnType<ReplyBlockRenderer>>();
@@ -135,20 +142,23 @@ export class ReplyBody extends Container {
     private readonly renderer: ReplyMarkdown,
     private readonly blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
     private readonly theme: Theme,
+    private readonly scope?: ReplyBlockScope,
   ) {
     super();
   }
 
   override render(width: number): readonly string[] {
     const nextBlocks: typeof this.inlineBlocks = [];
+    const usedKeys = this.scope && new Set<string>();
     const lines = this.renderer.renderBody(
       (block) => {
         const render = this.blockRenderers.get(block.language);
         if (!render) return undefined;
         const key = JSON.stringify([block.key, block.occurrence]);
+        usedKeys?.add(key);
         let result = this.blockCache.get(key);
         if (!result) {
-          result = render(block.text, `reply-block-${++nextReplyBlockId}`, this.theme);
+          result = render(block.text, `reply-block-${++nextReplyBlockId}`, this.theme, this.scope);
           this.blockCache.set(key, result);
         }
         if ("errors" in result) return result;
@@ -160,6 +170,13 @@ export class ReplyBody extends Container {
       () => this.markdown.render(width),
     );
     if (lines !== this.sourceLines) {
+      if (usedKeys) {
+        for (const [key, block] of this.blockCache) {
+          if (usedKeys.has(key)) continue;
+          if ("component" in block) block.component.dispose?.();
+          this.blockCache.delete(key);
+        }
+      }
       this.sourceLines = lines;
       this.inlineBlocks = nextBlocks;
       this.clear();
@@ -216,25 +233,31 @@ export class ReplyBody extends Container {
     this.markdown.invalidate();
     super.invalidate();
   }
+
+  handleBlockInput(data: string): boolean {
+    return this.inlineBlocks.some(({ component }) => component.handleInput?.(data));
+  }
+
+  dispose(): void {
+    for (const block of this.blockCache.values()) {
+      if ("component" in block) block.component.dispose?.();
+    }
+    this.blockCache.clear();
+    this.inlineBlocks = [];
+    this.clear();
+  }
 }
 
-/** An empty UI component keeps body wrappers attached as Pi creates or rebuilds assistant replies. */
-export function createReplyBodies(
-  tui: TUI,
-  ctx: ExtensionContext,
-  renderer: ReplyMarkdown,
-  blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
-) {
+function createButtonFeedback(requestRender: () => void, ui: ExtensionContext["ui"]) {
   let disposed = false;
   let resetCopied: ReturnType<typeof setTimeout> | undefined;
-  const wrappers = new WeakMap<Markdown, ReplyBody>();
   const feedback: ButtonFeedback = {
     hovered: undefined,
     copied: undefined,
     hover(button) {
       if (feedback.hovered?.owner === button?.owner && feedback.hovered?.index === button?.index) return;
       feedback.hovered = button;
-      tui.requestRender();
+      requestRender();
     },
     async copy(button, code) {
       try {
@@ -245,15 +268,114 @@ export function createReplyBodies(
         resetCopied = setTimeout(() => {
           feedback.copied = undefined;
           resetCopied = undefined;
-          tui.requestRender();
+          requestRender();
         }, FEEDBACK_DURATION_MS);
-        tui.requestRender();
+        requestRender();
       } catch {
-        ctx.ui.notify("Could not write to the clipboard. Check clipboard access and try again.", "error");
+        if (!disposed) ui.notify("Could not write to the clipboard. Check clipboard access and try again.", "error");
       }
     },
-    style: (label, copied) => ctx.ui.theme.style(label, ACTION_STYLES[copied ? "success" : "active"]),
+    style: (label, copied) => ui.theme.style(label, ACTION_STYLES[copied ? "success" : "active"]),
   };
+  return {
+    feedback,
+    dispose() {
+      disposed = true;
+      if (resetCopied) clearTimeout(resetCopied);
+      feedback.hovered = undefined;
+      feedback.copied = undefined;
+    },
+  };
+}
+
+async function promptInOverlay(
+  ui: ExtensionContext["ui"],
+  title: string,
+  initial: string,
+  signal: AbortSignal,
+): Promise<string | undefined> {
+  if (signal.aborted) return undefined;
+  let cancel: (() => void) | undefined;
+  const onAbort = () => cancel?.();
+  try {
+    return await ui.custom<string | undefined>(
+      (tui, _theme, keys, done) => {
+        cancel = () => done(undefined);
+        return new ExtensionEditorComponent(tui, keys, title, initial, done, cancel);
+      },
+      {
+        overlay: true,
+        blocked: { kind: "question", message: title },
+        onHandle: () => {
+          if (signal.aborted) onAbort();
+          else signal.addEventListener("abort", onAbort, { once: true });
+        },
+      },
+    );
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
+export function createReplyBody(
+  options: ReplyBodyOptions,
+  ui: ExtensionContext["ui"],
+  renderer: ReplyMarkdown,
+  blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
+  outputPad: number,
+): ReplyBodyComponent {
+  let disposed = false;
+  const scope: ReplyBlockScope = {
+    requestRender: () => {
+      if (!disposed) options.requestRender();
+    },
+    sendFollowUp: (text) => !disposed && options.sendFollowUp(text),
+    prompt: (title, initial, cancelled) =>
+      options.prompt ? options.prompt(title, initial, cancelled) : promptInOverlay(ui, title, initial, cancelled),
+  };
+  const buttons = createButtonFeedback(scope.requestRender, ui);
+  let streaming = false;
+  let text = "";
+  const markdown = new Markdown("", outputPad, 0, getMarkdownTheme(), undefined, {
+    transform: (source, availableWidth) =>
+      renderer.transform(source, {
+        messageType: "assistant",
+        isStreaming: streaming,
+        availableWidth,
+      }),
+  });
+  const body = new ReplyBody(markdown, buttons.feedback, renderer, blockRenderers, ui.theme, scope);
+  return {
+    setText(next, isStreaming = false) {
+      if (disposed || (next === text && isStreaming === streaming)) return;
+      text = next;
+      streaming = isStreaming;
+      markdown.setText(next);
+      scope.requestRender();
+    },
+    render: (width) => (disposed ? [] : body.render(width)),
+    handleInput: (data) => !disposed && body.handleBlockInput(data),
+    handleMouse: (event) => (disposed ? undefined : body.handleMouse(event)),
+    invalidate: () => body.invalidate(),
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      body.dispose();
+      buttons.dispose();
+    },
+  };
+}
+
+/** An empty UI component keeps body wrappers attached as Pi creates or rebuilds assistant replies. */
+export function createReplyBodies(
+  tui: TUI,
+  ctx: ExtensionContext,
+  renderer: ReplyMarkdown,
+  blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
+) {
+  let disposed = false;
+  const wrappers = new WeakMap<Markdown, ReplyBody>();
+  const buttons = createButtonFeedback(() => tui.requestRender(), ctx.ui);
 
   const attach = (parent: Pick<Container, "children">, body = false): boolean => {
     let changed = false;
@@ -262,7 +384,7 @@ export function createReplyBodies(
       if (body && child instanceof Markdown) {
         let wrapper = wrappers.get(child);
         if (!wrapper) {
-          wrapper = new ReplyBody(child, feedback, renderer, blockRenderers, ctx.ui.theme);
+          wrapper = new ReplyBody(child, buttons.feedback, renderer, blockRenderers, ctx.ui.theme);
           wrappers.set(child, wrapper);
           child.invalidate();
         }
@@ -294,7 +416,7 @@ export function createReplyBodies(
     invalidate() {},
     dispose() {
       disposed = true;
-      if (resetCopied) clearTimeout(resetCopied);
+      buttons.dispose();
       detach(tui);
     },
   };

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
+    "./openai-service-tier": "./openai-service-tier.ts",
     "./python-environment": "./python-environment.ts"
   },
   "peerDependencies": {

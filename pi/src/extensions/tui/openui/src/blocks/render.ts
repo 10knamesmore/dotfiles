@@ -49,6 +49,7 @@ export function renderTree(
   width: number,
   state: WState,
   services: Services = {},
+  sendNotes = false,
 ): { block: Block; warnings: string[] } {
   const warnings: string[] = [];
   const ctx: Ctx = { state, warnings, services, tabs: [], render: (el, w, path) => renderEl(el, w, path, ctx) };
@@ -57,7 +58,7 @@ export function renderTree(
   // every Choice of the widget, also on tabs nobody opened, shares one bar under the widget (after the row cap, so it is never cut)
   const choices = collectChoices(root);
   if (choices.length) base = vstack([base, answerBar(choices, state, widgetTitle(root), w)], 1, Math.max(base.w, w));
-  const block = decorateNotes(base, state, w);
+  const block = decorateNotes(base, state, w, sendNotes);
   return { block, warnings };
 }
 

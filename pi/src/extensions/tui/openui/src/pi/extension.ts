@@ -1,14 +1,23 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
-import { REPLY_BLOCKS_CONFIGURE, type RegisterReplyBlock } from "@dotfiles/pi-ui/prompt-editor";
+import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
+import { REPLY_BLOCKS_CONFIGURE, SIDE_CONVERSATION_OPEN, type RegisterReplyBlock, type ReplyBlockScope } from "@dotfiles/pi-ui/prompt-editor";
 import { compile, LIMITS, type Compiled, type El } from "../lang/library.ts";
 import { markdownImages } from "../lang/md.ts";
 import { LANG_SAMPLES } from "../lang/samples.ts";
 import { loadImage } from "./images.ts";
 import { syncWidths } from "./widths.ts";
-import { active, confirmDelivery, entryOf, handleKey, hooks, OpenUIWidget, resetAll } from "./widget.ts";
+import {
+  active,
+  confirmDelivery,
+  entryOf,
+  handleKey,
+  hooks,
+  OpenUIWidget,
+  resetAll,
+  type OverlayWidgets,
+} from "./widget.ts";
 
 const SHOW_ME_SKILL = fileURLToPath(new URL("../../skills/show-me/SKILL.md", import.meta.url));
 const compiled = new Map<string, Compiled>();
@@ -69,14 +78,25 @@ export default function (pi: ExtensionAPI) {
     pi.sendMessage({ customType: "openui-click", content: `[widget click → assistant] ${text}`, display: true });
 
   let rendersReplyBlocks = false;
+  let sideConversationOpen = false;
+  pi.events.on(SIDE_CONVERSATION_OPEN, (open) => { sideConversationOpen = open === true; });
+  const overlays = new WeakMap<ReplyBlockScope, OverlayWidgets>();
   pi.events.on(REPLY_BLOCKS_CONFIGURE, (data) => {
     const register = data as RegisterReplyBlock;
-    register("openui", (source, id, theme) => {
+    register("openui", (source, id, theme, scope) => {
       const compiled = compileCached(source);
       if (!compiled.ok || !compiled.root) return { errors: compiled.errors };
       const errors = checkImages(compiled.root);
       if (errors.length) return { errors };
-      return { component: new OpenUIWidget(id, compiled.root, theme, "live", source) };
+      let overlay: OverlayWidgets | undefined;
+      if (scope) {
+        overlay = overlays.get(scope);
+        if (!overlay) {
+          overlay = { ...scope, focus: { id: null, dialog: null } };
+          overlays.set(scope, overlay);
+        }
+      }
+      return { component: new OpenUIWidget(id, compiled.root, theme, overlay ?? "live", source) };
     });
     rendersReplyBlocks = true;
   });
@@ -152,7 +172,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   let unsub: (() => void) | undefined;
-  pi.on("session_start", async (_e: any, ctx: any) => {
+  pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
     unsub?.();
     hooks.queued = () => {
@@ -162,15 +182,17 @@ export default function (pi: ExtensionAPI) {
         return false; // a context from a replaced session
       }
     };
-    unsub = ctx.ui.onTerminalInput((data: string) => (handleKey(data) ? { consume: true } : undefined));
+    unsub = ctx.ui.onTerminalInput((data: string) =>
+      !sideConversationOpen && handleKey(data) ? { consume: true } : undefined,
+    );
     // the note editor is pi's own multi-line editor: Enter saves, Shift+Enter adds a line, Esc cancels
     hooks.prompt = (title: string, initial: string) => ctx.ui.editor(title, initial);
     hooks.toEditor = (text: string) => ctx.ui.pasteToEditor(text);
-    ctx.ui.setWidget("openui-hint", (tui: any, theme: any) => {
-      hooks.requestRender = () => tui.requestRender();
+    ctx.ui.setWidget("openui-hint", (view: TUI, theme) => {
+      hooks.requestRender = () => view.requestRender();
       return {
         render: (w: number) => {
-          if (!active.id) return [];
+          if (sideConversationOpen || !active.id) return [];
           const e = entryOf(active.id);
           const keys = e?.state.noteMode
             ? "notes: click or Enter writes a note  arrows/Tab move  Shift+Enter picks the parent  Esc leaves"
@@ -187,6 +209,7 @@ export default function (pi: ExtensionAPI) {
     rendersReplyBlocks = false;
     unsub?.();
     unsub = undefined;
+    sideConversationOpen = false;
     resetAll(); // a pi process lives for days across /new and resume: each session's widgets must not pile up
   });
 }

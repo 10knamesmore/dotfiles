@@ -3,8 +3,8 @@ import { buildMessage, progress, toggleOption } from "./choice.ts";
 import type { Block, Target, WState } from "./types.ts";
 
 export interface Env {
-  /** send text to the assistant as the user's next turn. `confirm`: the sender will lock something until the host says it took the text */
-  send(text: string, opts?: { confirm?: boolean; targetId?: string }): void;
+  /** Returns whether the destination accepted or queued the text. `confirm` requests delivery feedback for the target. */
+  send(text: string, opts?: { confirm?: boolean; targetId?: string }): boolean;
   /** Write to the clipboard; the host updates feedback after the write completes. */
   copy(text: string, targetId: string): void;
   /** show a short notice under the widget */
@@ -216,7 +216,7 @@ export function activate(t: Target, state: WState, env: Env): boolean {
       // built now, from the answers as they are: an answer staged since the last frame is in the message, a cleared one is not
       const x = t.bar;
       if (!x || state.sent || !progress(x.choices, state.answers).answered) return false;
-      env.send(buildMessage(x.choices, state.answers, x.title), { confirm: true });
+      if (!env.send(buildMessage(x.choices, state.answers, x.title), { confirm: true })) return false;
       state.sent = true;
       return true;
     }
@@ -260,7 +260,7 @@ export function reveal(t: Target, state: WState): boolean {
 }
 
 /** The one-line explanation shown for a hovered or focused target. */
-export function describe(t: Target): string {
+export function describe(t: Target, sendNotes = false): string {
   const bits: string[] = [];
   switch (t.kind) {
     case "sort":
@@ -321,7 +321,9 @@ export function describe(t: Target): string {
       bits.push("notes: click an element, or Tab to it and press Enter, to write a note about it");
       break;
     case "noteadd":
-      bits.push("put the notes in your message box (nothing is sent)");
+      bits.push(
+        sendNotes ? "send the notes as a side follow-up" : "put the notes in your message box (nothing is sent)",
+      );
       break;
     case "noteclear":
       bits.push("discard all notes on this widget");

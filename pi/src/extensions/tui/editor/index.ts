@@ -13,7 +13,7 @@ import { PromptEditor } from "./component.js";
 import { installCopyCommand } from "./copy.js";
 import { chainInputNavigation } from "./navigation.js";
 import { createReplyMarkdown } from "./reply-markdown.js";
-import { createReplyBodies } from "./reply-body.js";
+import { createReplyBody, createReplyBodies } from "./reply-body.js";
 
 type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
 
@@ -36,6 +36,11 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       () => navigation,
       () => footerNavigation,
     );
+    const blockRenderers = new Map<string, ReplyBlockRenderer>();
+    const registerReplyBlock: RegisterReplyBlock = (language, render) => {
+      blockRenderers.set(language, render);
+    };
+    pi.events.emit(REPLY_BLOCKS_CONFIGURE, registerReplyBlock);
     const api: PromptEditorApi = {
       useAgentNavigation: (contribution) => {
         navigation = contribution;
@@ -52,13 +57,9 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       useWorkflowUsage: (contribution) => {
         readWorkflowUsage = contribution;
       },
+      createReplyBody: (options) => createReplyBody(options, ctx.ui, replyMarkdown, blockRenderers, pi.getSettings().outputPad ?? 1),
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
-    const blockRenderers = new Map<string, ReplyBlockRenderer>();
-    const registerReplyBlock: RegisterReplyBlock = (language, render) => {
-      blockRenderers.set(language, render);
-    };
-    pi.events.emit(REPLY_BLOCKS_CONFIGURE, registerReplyBlock);
     let editor!: PromptEditor;
     installedFactory = (tui, theme, keybindings) =>
       (editor = new PromptEditor(
