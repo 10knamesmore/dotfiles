@@ -45,6 +45,10 @@ export function chainInputNavigation(
       const status = footer();
       return status?.hasSelection() === true && status.openSelection();
     },
+    setExpanded(expanded) {
+      const agent = agents();
+      return agent?.hasSelection() === true && (agent.setExpanded?.(expanded) ?? false);
+    },
     clearSelection() {
       agents()?.clearSelection();
       footer()?.clearSelection();

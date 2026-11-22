@@ -9,6 +9,8 @@ export interface InputNavigation {
   hasSelection(): boolean;
   openSelection(): boolean;
   clearSelection(): void;
+  /** Expand or collapse the selected row when that navigation supports it. */
+  setExpanded?(expanded: boolean): boolean;
 }
 
 /** UI capabilities offered to other extensions for the current Pi session. */

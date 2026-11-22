@@ -27,7 +27,6 @@ import { initialDetails, renderCallHeader, renderSubagentResult, type SubagentDe
 import { appendEntrySafely } from "../ui/entry-markers.js";
 import { buildDeliveryEnvelope } from "../ui/delivery-envelope.js";
 import { chunkDeliveryText, formatFailureText, safeDeliveryValue, stringifyDeliveryJson } from "../ui/delivery-safe.js";
-import type { SubagentStatusWidget } from "../ui/status-widget.js";
 import { reportDiagnostic } from "../diagnostics.js";
 import { createDeliveryBody, type DeliveryRunResult } from "../delivery-message.js";
 import { bindAbort, childLabel, errorMessage } from "../util.js";
@@ -161,12 +160,7 @@ export function withFollowUpLabel(resolved: ResolvedFollowUpSpec, label: string 
   return label === undefined || label.trim() === "" ? resolved : { ...resolved, spec: { ...resolved.spec, label } };
 }
 
-export function registerSubagentTool(
-  pi: ExtensionAPI,
-  runner: SubagentRunner,
-  selfPath: string,
-  widget?: SubagentStatusWidget,
-): void {
+export function registerSubagentTool(pi: ExtensionAPI, runner: SubagentRunner, selfPath: string): void {
   const tool: ToolDefinition<typeof SubagentToolParameters, SubagentDetails | undefined> = {
     name: "subagent",
     label: "Subagent",
@@ -210,13 +204,6 @@ export function registerSubagentTool(
         childIds: [handle.id],
         labels: [spec.label ?? childLabel(spec)],
       });
-      try {
-        widget?.track(runId, handle, ctx, { model: display.modelId, thinking: display.thinking });
-      } catch (error) {
-        // The status widget is observational. Delivery and runner cleanup must
-        // remain wired even if a host UI implementation rejects the widget.
-        reportDiagnostic(`[subagent-workflow] status widget failed: ${errorMessage(error)}`);
-      }
       const sessionId = ctx.sessionManager.getSessionId();
       if (!ctx.hasUI) {
         // Headless hosts (print/json mode) end the session when this turn

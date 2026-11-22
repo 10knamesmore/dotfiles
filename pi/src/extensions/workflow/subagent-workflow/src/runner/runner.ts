@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
@@ -77,6 +78,7 @@ export interface ChildRunEvent {
 }
 
 class Handle implements SubagentHandle {
+  readonly display: Pick<SpawnedRun, "model" | "thinking">;
   readonly spec: SubagentSpec;
   readonly forkSessionFile: string | undefined;
   readonly followUpOf: FollowUpReference | undefined;
@@ -115,6 +117,7 @@ class Handle implements SubagentHandle {
     readonly parent: ParentContext,
   ) {
     this.spec = submittedSpec(spawnSpec);
+    this.display = spawnDisplaySpec(spawnSpec, parent);
     const followUp = followUpSpawn(spawnSpec);
     this.forkSessionFile = followUp?.forkSessionFile;
     this.followUpOf = followUp?.followUpOf;
@@ -339,6 +342,7 @@ export class SubagentRunner {
   private agentTimeoutMinutes = 0;
   private spawnListeners = new Set<(run: SpawnedRun) => void>();
   private childEventListeners = new Set<(event: ChildRunEvent) => void>();
+  private readonly liveStatusEvents = new EventEmitter();
   // Per-process nonce so child IDs never collide across a process restart. On
   // resume a fresh process restarts childCounter at 0; without the nonce the
   // first newly-spawned child would reuse an existing persisted child's ID and
@@ -388,6 +392,45 @@ export class SubagentRunner {
     return structuredClone(projection.detail);
   }
 
+  /** Compact live snapshots omit child transcripts, prompts and terminal results. */
+  liveStatuses() {
+    return this.liveRunIds()
+      .map((id) => {
+        const { summary, detail } = this.projections.get(id)!;
+        const children = detail.children.flatMap((child) => {
+          const handle = this.handles.get(child.id);
+          if (!handle?.isLive) return [];
+          const resolved = handle.resolved;
+          return [
+            {
+              id: child.id,
+              label: child.label,
+              status: handle.status,
+              model: resolved ? `${resolved.provider}/${resolved.modelId}` : handle.display.model,
+              thinking: resolved?.thinkingLevel ?? handle.display.thinking,
+              context: handle.contextUsage,
+              usage: child.usage,
+            },
+          ];
+        });
+        let phase = detail.children.at(-1)?.phase ?? detail.phases[0]?.title;
+        for (let i = detail.narrator.length - 1; i >= 0; i--) {
+          const entry = detail.narrator[i]!;
+          if (entry.kind === "phase") {
+            phase = entry.text;
+            break;
+          }
+        }
+        return { ...summary, children, phase, phases: detail.phases };
+      })
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  subscribeLiveStatus(listener: () => void): () => void {
+    this.liveStatusEvents.on("change", listener);
+    return () => this.liveStatusEvents.off("change", listener);
+  }
+
   /** Apply this session's admission limit. Existing agents are never cancelled. */
   setMaxConcurrentAgents(capacity: number): void {
     this.semaphore.resize(capacity);
@@ -419,6 +462,7 @@ export class SubagentRunner {
   publishChildEvent(event: ChildRunEvent): void {
     const projection = this.projections.get(event.runId);
     if (projection) foldProjection(projection, { ...event.event, timestamp: event.timestamp } as RunProjectionEvent);
+    if (event.event.type !== "activity") this.liveStatusEvents.emit("change");
     for (const listener of this.childEventListeners) {
       try {
         listener(event);
@@ -506,13 +550,13 @@ export class SubagentRunner {
     }
     this.stores.set(runId, store);
     this.handles.set(handle.id, handle);
-    const display = spawnDisplaySpec(spec, parent);
     this.notifySpawn({
       runId,
       runDir: store.runDir,
-      ...display,
+      ...handle.display,
       handle,
     });
+    this.liveStatusEvents.emit("change");
     handle.trackStartup(this.start(handle, store));
     return handle;
   }
@@ -532,6 +576,7 @@ export class SubagentRunner {
   foldRunProjection(runId: string, event: RunProjectionEvent): void {
     const projection = this.projections.get(runId);
     if (projection) foldProjection(projection, event);
+    if (event.type === "phase" || event.type === "resolved") this.liveStatusEvents.emit("change");
   }
   /** Incremental activity retained through workflow result delivery. */
   runActivityFold(runId: string): RunActivityFold | undefined {
@@ -595,9 +640,11 @@ export class SubagentRunner {
     isExpectedStop: (error: unknown) => boolean = () => false,
   ): void {
     this.runControllers.set(runId, { controller, execution, isExpectedStop });
+    this.liveStatusEvents.emit("change");
   }
   unregisterRunController(runId: string): void {
     this.runControllers.delete(runId);
+    this.liveStatusEvents.emit("change");
   }
   /** Stop an entire run and wait for its workflow teardown or direct children. */
   async stopRun(runId: string): Promise<void> {
@@ -719,14 +766,12 @@ export class SubagentRunner {
       handle.resolved = child.resolved;
       handle.schemaCapture = child.schemaCapture;
       store.resolveChild(handle.id, child.resolved, child.session.sessionFile);
-      const projection = this.projections.get(handle.runId);
-      if (projection)
-        foldProjection(projection, {
-          type: "resolved",
-          id: handle.id,
-          resolved: child.resolved,
-          sessionFile: child.session.sessionFile,
-        });
+      this.foldRunProjection(handle.runId, {
+        type: "resolved",
+        id: handle.id,
+        resolved: child.resolved,
+        sessionFile: child.session.sessionFile,
+      });
       this.subscribe(handle);
       await handle.flushSteering();
       if (handle.isTerminal) {

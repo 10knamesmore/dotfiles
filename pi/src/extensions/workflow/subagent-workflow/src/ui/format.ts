@@ -75,8 +75,13 @@ export function formatContextUsage(usage: Pick<ContextUsage, "tokens" | "context
 }
 
 /** Format cumulative usage as `in:<input + cacheRead> out:<output>`, matching the distribution footer. */
+export function tokenUsageColumns(usage: Pick<UsageSummary, "input" | "cacheRead" | "output">) {
+  return { input: `in:${formatTokens(usage.input + usage.cacheRead)}`, output: `out:${formatTokens(usage.output)}` };
+}
+
 export function formatTokenUsage(usage: Pick<UsageSummary, "input" | "cacheRead" | "output">): string {
-  return `in:${formatTokens(usage.input + usage.cacheRead)} out:${formatTokens(usage.output)}`;
+  const { input, output } = tokenUsageColumns(usage);
+  return `${input} ${output}`;
 }
 
 /** Whether the compact in/out display has any tokens to show. */

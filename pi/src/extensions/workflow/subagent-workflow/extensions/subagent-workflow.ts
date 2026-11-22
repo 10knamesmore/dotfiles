@@ -55,12 +55,7 @@ const CATCH_UP_RUN_CAP = 10;
 
 type TerminalStatus = "completed" | "failed" | "aborted";
 
-function createNavigatorFollowUp(
-  pi: ExtensionAPI,
-  runner: SubagentRunner,
-  extensionPath: string,
-  widget: SubagentStatusWidget,
-): NavigatorFollowUp {
+function createNavigatorFollowUp(pi: ExtensionAPI, runner: SubagentRunner, extensionPath: string): NavigatorFollowUp {
   return {
     send(runId, childId, prompt, ctx) {
       const message = prompt.trim();
@@ -73,7 +68,7 @@ function createNavigatorFollowUp(
         selfPath: extensionPath,
       };
       const sessionId = ctx.sessionManager.getSessionId();
-      const childDisplay = preflightSubprocessChild(resolved.spec, parent, {
+      preflightSubprocessChild(resolved.spec, parent, {
         forkSessionFile: resolved.forkSessionFile,
       });
       // directDelivery rides inside run.json, written before any child starts:
@@ -92,14 +87,6 @@ function createNavigatorFollowUp(
         .catch((error) => {
           reportDiagnostic(`[subagent-workflow] navigator follow-up completion failed: ${errorMessage(error)}`);
         });
-      try {
-        widget.track(handle.runId, handle, ctx, {
-          model: `${childDisplay.model.provider}/${childDisplay.model.id}`,
-          thinking: childDisplay.thinking,
-        });
-      } catch (error) {
-        reportDiagnostic(`[subagent-workflow] status widget failed: ${errorMessage(error)}`);
-      }
       return { runId: handle.runId, childId: handle.id };
     },
   };
@@ -334,18 +321,15 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
   registerDeliveryMessageRenderer(pi);
   registerModelTiersCommand(pi);
   registerModelTierGuidance(pi);
-  registerSubagentTool(pi, runner, selfPath, widget);
+  registerSubagentTool(pi, runner, selfPath);
   registerAgentsTool(pi, runner);
-  const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => {
-    usageFooter.trackRun(run.runId, ctx);
-    widget.observeWorkflowStarted(run, ctx);
-  };
+  const observeRun = (run: StartedWorkflow, ctx: ExtensionContext) => usageFooter.trackRun(run.runId, ctx);
   registerWorkflowTool(pi, selfPath, { runner, approvalPolicy: settings.workflowApproval, observeRun });
 
   // /agents is the canonical name; /workflows stays registered as a public alias.
   const openNavigator = registerNavigator(pi, {
     runner,
-    followUp: createNavigatorFollowUp(pi, runner, selfPath, widget),
+    followUp: createNavigatorFollowUp(pi, runner, selfPath),
   });
   pi.registerShortcut("shift+down", {
     description: "Open the agent navigator (/agents)",
@@ -373,6 +357,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
         });
         return true;
       },
+      setExpanded: (expanded) => widget.setExpanded(expanded),
       clearSelection: () => widget.clearSelectedRun(),
     });
   });
@@ -392,6 +377,7 @@ export default function subagentWorkflow(pi: ExtensionAPI): void {
       reportDiagnostic(`[subagent-workflow] startup catch-up failed: ${errorMessage(error)}`);
     }
     runner.restoreSession(sessionId, (script) => parseWorkflowScript(script).meta.name);
+    widget.attach(ctx);
     usageFooter.attach(ctx);
   });
   pi.on("session_shutdown", async (_event, ctx) => {

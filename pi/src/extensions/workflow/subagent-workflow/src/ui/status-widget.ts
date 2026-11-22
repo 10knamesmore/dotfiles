@@ -1,528 +1,221 @@
-/**
- * Below-editor status widget: a glanceable, keyboard-selectable list of running subagent work.
- *
- * Visible only while at least one child is running or queued; cleared when idle.
- * Register the factory once and re-render by calling tui.requestRender(), rather
- * than re-registering per update.
- *
- * Re-renders are event-driven and skipped when displayed content is unchanged.
- * Elapsed time lives in the tool row and the /agents navigator.
- */
-
-import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { SpawnedRun, SubagentRunner } from "../runner/runner.js";
-import type { StartedWorkflow } from "../workflow/launch.js";
-import type { SubagentEvent, SubagentHandle, ThinkingLevel, UsageSummary, WorkflowPhase } from "../types.js";
-import { sumUsage } from "../store/run-store.js";
+import type { TUI } from "@earendil-works/pi-tui";
 import { reportDiagnostic } from "../diagnostics.js";
+import type { SubagentRunner } from "../runner/runner.js";
 import { errorMessage } from "../util.js";
-import {
-  childLabel,
-  countStatuses,
-  formatFullModel,
-  formatContextUsage,
-  formatTokenUsage,
-  statusGlyph,
-  type StatusCounts,
-  type ThemeLike,
-} from "./format.js";
+import { formatContextUsage, formatFullModel, tokenUsageColumns } from "./format.js";
 import { sanitizeTerminalText } from "./sanitize.js";
+import { renderStatusRows, type StatusRow } from "./status-layout.js";
 
 const WIDGET_KEY = "subagent-workflow";
-const STATUS_KEY = "subagent-workflow";
-const FALLBACK_ROW_CAP = 6;
-const LABEL_WIDTH = 26;
+const CHILD_PREVIEW = 3;
 
-type WidgetCtx = Pick<ExtensionContext, "ui" | "hasUI">;
+type LiveRun = ReturnType<SubagentRunner["liveStatuses"]>[number];
+type WidgetRow = StatusRow & { runId: string; childId?: string };
 
-interface TrackedRun {
-  kind: "subagent" | "workflow";
-  /** Sanitized display label: workflow meta name, or the child's label for a direct spawn. */
-  label: string;
-  /** Declared phase skeleton (workflow runs only). */
-  phases: WorkflowPhase[];
-  /** Phase of the most recently admitted child (workflow runs only). */
-  currentPhase?: string;
-  handles: SubagentHandle[];
-  seenHandles: Set<string>;
-  startedAt: number;
-  usage: Map<string, UsageSummary>;
-  /** Effective model/effort display per child, including workflow fan-outs. */
-  models: Map<string, string>;
-  unsubscribers: Array<() => void>;
+function activityCounts(running: number, queued: number): string[] {
+  return [running && `${running} running`, queued && `${queued} queued`].filter((part): part is string => !!part);
 }
 
-/** Per-run view used by the pure line renderer. */
-export interface WidgetRunView {
-  kind?: "subagent" | "workflow";
-  label: string;
-  /** Formatted current-phase segment for workflow rows, e.g. "Research (2/3)". */
-  phase?: string;
-  /** Direct subagent model; workflow child models are shown in the expanded run detail. */
-  model?: string;
-  counts: StatusCounts;
-  startedAt: number;
-  usage: UsageSummary;
-  /** Each workflow child keeps its own named context; direct spawns use the run label. */
-  contexts: string[];
-  /** Whether this row owns keyboard selection from the editor. */
-  selected?: boolean;
+function singleLine(value: string): string {
+  return sanitizeTerminalText(value, undefined, true).replace(/[\t\n]/g, " ");
 }
 
-/** Run target selected from the below-editor widget. */
-export interface ActiveRunTarget {
-  runId: string;
-  childId?: string;
+function agentRow(runId: string, child: LiveRun["children"][number], prefix: string): WidgetRow {
+  return {
+    key: child.id,
+    kind: prefix ? "child" : "agent",
+    runId,
+    childId: child.id,
+    prefix,
+    label: singleLine(child.label),
+    status: child.status,
+    model: formatFullModel(child.model && singleLine(child.model), child.thinking),
+    context: child.context ? formatContextUsage(child.context) : child.status === "pending" ? "queued" : "—",
+    ...tokenUsageColumns(child.usage),
+  };
 }
 
-function phaseView(run: Pick<TrackedRun, "kind" | "phases" | "currentPhase">): string | undefined {
-  if (run.kind !== "workflow" || !run.currentPhase) return undefined;
-  const index = run.phases.findIndex((phase) => phase.title === run.currentPhase);
-  const position = index >= 0 && run.phases.length > 1 ? ` (${index + 1}/${run.phases.length})` : "";
-  return `${sanitizeTerminalText(run.currentPhase)}${position}`;
-}
+function workflowRows(run: LiveRun, collapsed: boolean): WidgetRow[] {
+  const phaseIndex = run.phases.findIndex(({ title }) => title === run.phase);
+  const position = phaseIndex >= 0 && run.phases.length > 1 ? ` (${phaseIndex + 1}/${run.phases.length})` : "";
+  const phase = run.phase && singleLine(run.phase) + position;
+  const progress = run.total ? `${run.done}/${run.total} done` : "starting";
+  const rows: WidgetRow[] = [
+    {
+      key: run.runId,
+      kind: "workflow",
+      runId: run.runId,
+      prefix: collapsed ? "▸ " : "▾ ",
+      label: singleLine(run.label),
+      phaseProgress: [phase, progress].filter(Boolean).join(" · "),
+      ...tokenUsageColumns(run.usage),
+    },
+  ];
+  if (collapsed) return rows;
 
-function runContexts(run: TrackedRun): string[] {
-  return run.handles.flatMap((handle) => {
-    if (handle.status !== "running" || !handle.contextUsage) return [];
-    const context = formatContextUsage(handle.contextUsage);
-    const label = truncateToWidth(sanitizeTerminalText(childLabel(handle.spec)), LABEL_WIDTH, "…", true);
-    return [run.kind === "workflow" ? `${label} ${context}` : context];
-  });
-}
-
-function modelDisplay(model: string | undefined, thinking: ThinkingLevel | undefined): string | undefined {
-  const formatted = formatFullModel(model ? sanitizeTerminalText(model) : undefined, thinking);
-  return formatted || undefined;
-}
-
-function resolvedModelDisplay(handle: SubagentHandle): string | undefined {
-  const resolved = handle.resolved;
-  return resolved ? modelDisplay(`${resolved.provider}/${resolved.modelId}`, resolved.thinkingLevel) : undefined;
-}
-
-function runModelDisplay(run: TrackedRun): string | undefined {
-  const models = new Set(run.models.values());
-  for (const handle of run.handles) {
-    const display = resolvedModelDisplay(handle);
-    if (display) models.add(display);
+  const ordered = [...run.children].sort((a, b) => Number(b.status === "running") - Number(a.status === "running"));
+  for (const [i, child] of ordered.slice(0, CHILD_PREVIEW).entries()) {
+    rows.push(agentRow(run.runId, child, i === ordered.length - 1 ? "└─ " : "├─ "));
   }
-  return models.size > 0 ? [...models].join(", ") : undefined;
-}
-
-/** Keep the widget near one quarter of the terminal, or retain the old cap when height is unavailable. */
-export function statusWidgetRowCap(terminalRows: number | undefined): number {
-  if (terminalRows === undefined || !Number.isFinite(terminalRows) || terminalRows < 1) return FALLBACK_ROW_CAP;
-  return Math.max(1, Math.floor(terminalRows / 4));
-}
-
-function summaryParts(runs: WidgetRunView[]): string[] {
-  const running = runs.reduce((sum, run) => sum + run.counts.running, 0);
-  const queued = runs.reduce((sum, run) => sum + run.counts.pending, 0);
-  const workflows = runs.filter((run) => run.kind === "workflow").length;
-  const parts: string[] = [];
-  if (workflows > 0) parts.push(`${workflows} workflow${workflows === 1 ? "" : "s"}`);
-  if (running > 0) parts.push(`${running} running`);
-  if (queued > 0) parts.push(`${queued} queued`);
-  return parts;
-}
-
-/** Build the widget lines from active run views. Pure and unit tested. */
-export function renderWidgetLines(
-  runs: WidgetRunView[],
-  theme: ThemeLike,
-  width: number,
-  maxRows = FALLBACK_ROW_CAP,
-): string[] {
-  if (runs.length === 0) return [];
-  // Never exceed the host-supplied width: pi-tui kills the process on any
-  // over-wide line, so there is no minimum layout width worth crashing for.
-  const cap = Math.max(1, width);
-  const selectionHint = runs.some((run) => run.selected) ? " · ↑↓ select · enter view" : " · ↓ select";
-  const header = `${theme.fg("accent", "▸")} ${theme.bold("agents")} ${theme.fg("dim", `${summaryParts(runs).join(" · ")}${selectionHint}`)}`;
-  const lines: string[] = [truncateToWidth(header, cap)];
-
-  for (const run of runs.slice(0, maxRows)) {
-    const cursor = run.selected ? "❯" : " ";
-    const glyph = statusGlyph("running", theme, 0, false);
-    const rawLabel = truncateToWidth(run.label, LABEL_WIDTH, "…", true);
-    const label = run.selected ? theme.bold(rawLabel) : rawLabel;
-    const model = run.model ? theme.fg("dim", run.model) : "";
-    const phase = run.phase ? theme.fg("dim", run.phase) : "";
-    const progress = theme.fg("dim", run.counts.total > 0 ? `${run.counts.done}/${run.counts.total}` : "starting");
-    const context = run.contexts.length > 0 ? theme.fg("dim", run.contexts.join(" · ")) : "";
-    const metadata = [context, model, phase, progress].filter((part) => part.length > 0).join("  ");
-    const usage = theme.fg("dim", formatTokenUsage(run.usage));
-    const row = `${cursor} ${glyph} ${label}  ${metadata}  ${usage}`;
-    lines.push(truncateToWidth(run.selected ? theme.bg("selectedBg", row) : row, cap));
+  const hidden = ordered.slice(CHILD_PREVIEW);
+  if (hidden.length) {
+    const running = hidden.filter((child) => child.status === "running").length;
+    rows.push({
+      key: `${run.runId}:more`,
+      kind: "more",
+      runId: run.runId,
+      prefix: "└─ ",
+      label: `+${activityCounts(running, hidden.length - running).join(" · ")}`,
+    });
   }
-  if (runs.length > maxRows) lines.push(truncateToWidth(theme.fg("dim", `  +${runs.length - maxRows} more runs`), cap));
-  return lines;
-}
-
-/**
- * Identity of the painted content, excluding anything clock-derived. Two views
- * with the same signature render identical text, so a repaint would be a no-op.
- *
- * JSON rather than joined delimiters: a run label is arbitrary text, so any
- * separator has to be one a label cannot contain. Encoding sidesteps the question
- * instead of answering it, and keeps the source free of the raw control
- * characters that previously made this file register as binary to grep.
- */
-function widgetSignature(runs: WidgetRunView[]): string {
-  return JSON.stringify(
-    runs.map((run) => [
-      run.kind,
-      run.label,
-      run.phase ?? "",
-      run.model ?? "",
-      run.counts.done,
-      run.counts.total,
-      run.counts.running,
-      run.counts.failed,
-      run.contexts,
-      formatTokenUsage(run.usage),
-      run.selected === true,
-    ]),
-  );
+  return rows;
 }
 
 export class SubagentStatusWidget {
-  private ctx: WidgetCtx | undefined;
-  private readonly runs = new Map<string, TrackedRun>();
-  private tui: TUI | undefined;
-  private registered = false;
-  private lastStatus: string | undefined;
-  /** Painted-content identity, so an unchanged update skips the repaint. */
-  private lastSignature: string | undefined;
-  private selectedRunId: string | undefined;
+  private ctx?: ExtensionContext;
+  private tui?: TUI;
+  private unsubscribe?: () => void;
   private enabled = true;
-  private unsubscribeSpawns: (() => void) | undefined;
+  private collapsed = new Set<string>();
+  private rows: WidgetRow[] = [];
+  private selected?: WidgetRow;
+  private summary = "";
+  private signature = "";
 
-  constructor(private readonly runner?: Pick<SubagentRunner, "subscribeSpawns" | "isRunActive">) {
-    this.unsubscribeSpawns = runner?.subscribeSpawns((run) => this.observeSpawn(run));
-  }
+  constructor(private readonly runner: SubagentRunner) {}
 
-  /**
-   * Show a workflow row from launch, before its first child spawns, and keep
-   * it while the run controller is registered - a workflow between agent
-   * batches (or replaying its journal) has no live child but is still running.
-   */
-  observeWorkflowStarted(started: StartedWorkflow, ctx: WidgetCtx): void {
+  attach(ctx: ExtensionContext): void {
     if (!ctx.hasUI) return;
-    this.setCtx(ctx);
-    const existing = this.runs.get(started.runId);
-    if (existing) {
-      existing.label = sanitizeTerminalText(started.name);
-      existing.phases = started.phases;
-    } else {
-      this.runs.set(started.runId, {
-        kind: "workflow",
-        label: sanitizeTerminalText(started.name),
-        phases: started.phases,
-        currentPhase: started.phases[0]?.title,
-        handles: [],
-        seenHandles: new Set(),
-        startedAt: Date.now(),
-        usage: new Map(),
-        models: new Map(),
-        unsubscribers: [],
-      });
-    }
-    this.safeUpdate();
+    this.ctx = ctx;
+    this.unsubscribe = this.runner.subscribeLiveStatus(() => this.refresh());
+    this.refresh();
   }
 
-  /** Merge workflow child spawns into their run's row as agent() calls admit them. */
-  private observeSpawn(spawned: SpawnedRun): void {
-    const run = this.runs.get(spawned.runId);
-    if (!run || run.kind !== "workflow") return;
-    const handle = spawned.handle;
-    if (run.seenHandles.has(handle.id)) return;
-    run.seenHandles.add(handle.id);
-    run.handles.push(handle);
-    const model = modelDisplay(spawned.model, spawned.thinking) ?? resolvedModelDisplay(handle);
-    if (model) run.models.set(handle.id, model);
-    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(spawned.runId, run, event)));
-    if (handle.spec.phase !== undefined) run.currentPhase = handle.spec.phase;
-    this.safeUpdate();
-  }
-
-  /** Apply display settings immediately, including to an already-visible widget. */
   configure(enabled: boolean): void {
     this.enabled = enabled;
-    this.safeUpdate();
+    this.refresh();
   }
 
-  /** Register a spawned run for live display. No-op without dialog-capable UI. */
-  track(
-    runId: string,
-    handle: SubagentHandle,
-    ctx: WidgetCtx,
-    display: { model?: string; thinking?: ThinkingLevel } = {},
-  ): void {
-    if (!ctx.hasUI) return;
-    this.setCtx(ctx);
-    const usage = new Map<string, UsageSummary>();
-    const models = new Map<string, string>();
-    const model = modelDisplay(display.model, display.thinking) ?? resolvedModelDisplay(handle);
-    if (model) models.set(handle.id, model);
-    const run: TrackedRun = {
-      kind: "subagent",
-      // Computed once: the label is fixed for the run's life, and childLabel
-      // rescans the whole prompt - not worth repeating on every repaint.
-      label: sanitizeTerminalText(childLabel(handle.spec)),
-      phases: [],
-      handles: [handle],
-      seenHandles: new Set([handle.id]),
-      startedAt: handle.startedAt,
-      usage,
-      models,
-      unsubscribers: [],
-    };
-    run.unsubscribers.push(handle.subscribe((event) => this.onEvent(runId, run, event)));
-    this.runs.set(runId, run);
-    this.safeUpdate();
-  }
-
-  /** Drop all runs and clear the widget. Called on session shutdown. */
   dispose(): void {
-    this.unsubscribeSpawns?.();
-    this.unsubscribeSpawns = undefined;
-    for (const run of this.runs.values()) run.unsubscribers.forEach((fn) => fn());
-    this.runs.clear();
-    this.selectedRunId = undefined;
-    this.lastSignature = undefined;
-    if (this.ctx) {
-      try {
-        this.ctx.ui.setWidget(WIDGET_KEY, undefined);
-      } catch (error) {
-        this.logFailure(error);
-      }
-      try {
-        this.ctx.ui.setStatus(STATUS_KEY, undefined);
-      } catch (error) {
-        this.logFailure(error);
-      }
-    }
-    this.registered = false;
-    this.tui = undefined;
-    this.lastStatus = undefined;
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    this.hide();
+    this.ctx = undefined;
+    this.collapsed.clear();
   }
 
-  private setCtx(ctx: WidgetCtx): void {
-    if (ctx === this.ctx) return;
-    this.ctx = ctx;
-    this.registered = false;
-    this.tui = undefined;
-    this.lastStatus = undefined;
-  }
-
-  /**
-   * Move through visible active runs without wrapping at either end.
-   *
-   * Moving down from the last row reports a boundary while retaining the row,
-   * so editor-level navigation can move into its trailing footer selection.
-   * Moving up with no selection enters at the last row when returning from that
-   * footer. Moving up from the first row returns to the editor.
-   *
-   * Returns whether a run remains selected. Moving up from the first row clears
-   * selection; the editor must consume that key without moving its cursor or history.
-   */
+  /** A downward step past the last row lets the editor move focus to its footer. */
   selectRun(delta: -1 | 1): boolean {
-    if (!this.enabled) return false;
-    const runs = this.selectableRuns();
-    if (runs.length === 0) {
-      this.selectedRunId = undefined;
-      return false;
-    }
-    const current = runs.findIndex(([runId]) => runId === this.selectedRunId);
-    if (current < 0 && delta < 0) {
-      this.selectedRunId = runs.at(-1)![0];
-      this.safeUpdate();
-      return true;
-    }
-    const next = current < 0 ? 0 : current + delta;
-    if (next >= runs.length) return false;
-    if (next < 0) {
-      this.selectedRunId = undefined;
-      this.safeUpdate();
-      return false;
-    }
-    this.selectedRunId = runs[Math.min(next, runs.length - 1)]![0];
-    this.safeUpdate();
+    const index = this.selected ? this.rows.indexOf(this.selected) + delta : delta > 0 ? 0 : this.rows.length - 1;
+    if (index >= this.rows.length) return false;
+    this.selected = this.rows[index];
+    this.tui?.requestRender();
+    return !!this.selected;
+  }
+
+  hasSelectedRun(): boolean {
+    return !!this.selected;
+  }
+
+  takeSelectedRun(): { runId: string; childId?: string } | undefined {
+    if (!this.selected) return undefined;
+    const { runId, childId } = this.selected;
+    this.clearSelectedRun();
+    return { runId, childId };
+  }
+
+  clearSelectedRun(): void {
+    if (!this.selected) return;
+    this.selected = undefined;
+    this.tui?.requestRender();
+  }
+
+  private selectedWorkflow(): WidgetRow | undefined {
+    return this.rows.find((row) => row.kind === "workflow" && row.key === this.selected?.runId);
+  }
+
+  setExpanded(expanded: boolean): boolean {
+    const workflow = this.selectedWorkflow();
+    if (!workflow) return false;
+    if (expanded) this.collapsed.delete(workflow.runId);
+    else this.collapsed.add(workflow.runId);
+    this.refresh();
     return true;
   }
 
-  /** Whether the editor currently owns a visible run selection. */
-  hasSelectedRun(): boolean {
-    return this.enabled && this.selectableRuns().some(([runId]) => runId === this.selectedRunId);
+  private hide(): void {
+    this.rows = [];
+    this.selected = undefined;
+    this.tui = undefined;
+    if (!this.signature) return;
+    this.signature = "";
+    this.summary = "";
+    this.ctx?.ui.setWidget(WIDGET_KEY, undefined);
+    this.ctx?.ui.setStatus(WIDGET_KEY, undefined);
   }
 
-  /** Consume the current widget selection and return its navigator target. */
-  takeSelectedRun(): ActiveRunTarget | undefined {
-    const selectedRunId = this.selectedRunId;
-    const selected = this.selectableRuns().find(([runId]) => runId === selectedRunId);
-    this.selectedRunId = undefined;
-    this.safeUpdate();
-    if (!selected) return undefined;
-    const [, run] = selected;
-    const childId = run.kind === "subagent" ? run.handles[0]?.id : undefined;
-    return childId === undefined ? { runId: selected[0] } : { runId: selected[0], childId };
-  }
-
-  /** Leave widget selection mode without changing editor text. */
-  clearSelectedRun(): void {
-    if (this.selectedRunId === undefined) return;
-    this.selectedRunId = undefined;
-    this.safeUpdate();
-  }
-
-  private selectableRuns(): Array<[string, TrackedRun]> {
-    return this.activeRuns().slice(0, statusWidgetRowCap(this.tui?.terminal?.rows));
-  }
-
-  private activeRuns(): Array<[string, TrackedRun]> {
-    const active: Array<[string, TrackedRun]> = [];
-    for (const [runId, run] of this.runs) {
-      if (!this.runIsActive(runId, run)) {
-        this.pruneRun(runId);
-        continue;
-      }
-      active.push([runId, run]);
+  private refresh(): void {
+    try {
+      this.update();
+    } catch (error) {
+      reportDiagnostic(`[subagent-workflow] status widget failed: ${errorMessage(error)}`);
     }
-    return active.sort(([, left], [, right]) => left.startedAt - right.startedAt);
-  }
-
-  private onEvent(runId: string, run: TrackedRun, event: SubagentEvent): void {
-    if (event.type === "usage") run.usage.set(event.id, { ...event.usage });
-    if (event.type === "result") run.usage.set(event.id, { ...event.result.usage });
-    const handle = run.handles.find((candidate) => candidate.id === event.id);
-    const model = handle ? resolvedModelDisplay(handle) : undefined;
-    if (model) run.models.set(event.id, model);
-    if (event.type === "status" || event.type === "result") this.pruneRun(runId);
-    this.safeUpdate();
-  }
-
-  /**
-   * An idle run leaves the widget immediately - except a workflow whose run
-   * controller is still registered: it is between agent batches or replaying,
-   * and its row must not flicker away.
-   */
-  private pruneRun(runId: string): void {
-    const run = this.runs.get(runId);
-    if (!run || this.runIsActive(runId, run)) return;
-    run.unsubscribers.forEach((fn) => fn());
-    this.runs.delete(runId);
-    if (this.selectedRunId === runId) this.selectedRunId = undefined;
-  }
-
-  private runIsActive(runId: string, run: TrackedRun): boolean {
-    const counts = countStatuses(run.handles.map((handle) => handle.status));
-    if (counts.active) return true;
-    return run.kind === "workflow" && (this.runner?.isRunActive(runId) ?? false);
-  }
-
-  private views(): WidgetRunView[] {
-    return this.activeRuns().map(([runId, run]) => ({
-      kind: run.kind,
-      label: run.label,
-      phase: phaseView(run),
-      model: run.kind === "subagent" ? runModelDisplay(run) : undefined,
-      counts: countStatuses(run.handles.map((handle) => handle.status)),
-      startedAt: run.startedAt,
-      usage: sumUsage(run.usage.values()),
-      contexts: runContexts(run),
-      selected: runId === this.selectedRunId,
-    }));
   }
 
   private update(): void {
     if (!this.ctx) return;
-    if (!this.enabled) {
-      this.hide();
-      return;
-    }
-    const views = this.views();
-
-    if (views.length === 0) {
+    const runs = this.enabled ? this.runner.liveStatuses() : [];
+    for (const id of this.collapsed) if (!runs.some((run) => run.runId === id)) this.collapsed.delete(id);
+    if (!runs.length) {
       this.hide();
       return;
     }
 
-    const status = summaryParts(views).join(", ");
-    if (status !== this.lastStatus) {
-      this.ctx.ui.setStatus(STATUS_KEY, status);
-      this.lastStatus = status;
+    const workflows = runs.filter((run) => run.kind === "workflow");
+    this.rows = [
+      ...runs
+        .filter((run) => run.kind === "subagent")
+        .flatMap((run) => run.children.map((child) => agentRow(run.runId, child, ""))),
+      ...workflows.flatMap((run) => workflowRows(run, this.collapsed.has(run.runId))),
+    ];
+    const previous = this.selected;
+    if (previous) {
+      this.selected =
+        this.rows.find((row) => row.key === previous.key) ?? this.rows.find((row) => row.key === previous.runId);
     }
-
-    // Context updates can leave the formatted text unchanged.
-    const signature = widgetSignature(views);
-    const changed = signature !== this.lastSignature;
-    this.lastSignature = signature;
-
-    if (!this.registered) {
+    const children = runs.flatMap((run) => run.children);
+    const running = children.filter((child) => child.status === "running").length;
+    const parts = activityCounts(running, children.length - running);
+    if (workflows.length) parts.unshift(`${workflows.length} workflow${workflows.length > 1 ? "s" : ""}`);
+    const summary = parts.join(" · ");
+    const signature = JSON.stringify([summary, this.rows]);
+    if (this.signature === signature) return;
+    const register = !this.signature;
+    if (this.summary !== summary) this.ctx.ui.setStatus(WIDGET_KEY, summary);
+    this.summary = summary;
+    if (register) {
       this.ctx.ui.setWidget(
         WIDGET_KEY,
         (tui, theme) => {
           this.tui = tui;
           return {
-            render: (width: number) =>
-              renderWidgetLines(this.views(), theme, Math.max(1, width), statusWidgetRowCap(tui.terminal?.rows)),
-            invalidate: () => {
-              // Rendering reads live state; invalidation does not unmount the widget.
-            },
+            render: (width) =>
+              renderStatusRows(
+                this.rows,
+                this.selected?.key,
+                theme,
+                width,
+                Math.max(1, Math.floor(tui.terminal.rows / 4)),
+              ),
+            invalidate() {},
           };
         },
         { placement: "belowEditor" },
       );
-      this.registered = true;
-    } else if (changed) {
+    } else {
       this.tui?.requestRender();
     }
-  }
-
-  private hide(): void {
-    this.selectedRunId = undefined;
-    if (!this.ctx) return;
-    if (this.registered) {
-      this.ctx.ui.setWidget(WIDGET_KEY, undefined);
-      this.registered = false;
-      this.tui = undefined;
-    }
-    if (this.lastStatus !== undefined) {
-      this.ctx.ui.setStatus(STATUS_KEY, undefined);
-      this.lastStatus = undefined;
-    }
-    this.lastSignature = undefined;
-  }
-
-  private safeUpdate(): void {
-    try {
-      this.update();
-    } catch (error) {
-      for (const run of this.runs.values()) run.unsubscribers.forEach((fn) => fn());
-      this.runs.clear();
-      this.selectedRunId = undefined;
-      this.lastSignature = undefined;
-      this.registered = false;
-      this.tui = undefined;
-      this.lastStatus = undefined;
-      try {
-        this.ctx?.ui.setWidget(WIDGET_KEY, undefined);
-      } catch {
-        /* host UI already failed */
-      }
-      try {
-        this.ctx?.ui.setStatus(STATUS_KEY, undefined);
-      } catch {
-        /* host UI already failed */
-      }
-      this.logFailure(error);
-    }
-  }
-
-  private logFailure(error: unknown): void {
-    reportDiagnostic(`[subagent-workflow] status widget failed: ${errorMessage(error)}`);
+    this.signature = signature;
   }
 }

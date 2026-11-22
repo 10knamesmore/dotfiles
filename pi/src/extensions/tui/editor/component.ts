@@ -1,12 +1,14 @@
 import type { FastMode } from "@dotfiles/pi-config";
 import { CustomEditor, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
+  CURSOR_MARKER,
   stripTerminalSequences,
   truncateToWidth,
   visibleWidth,
   type EditorTheme,
   type TUI,
 } from "@earendil-works/pi-tui";
+import { FAKE_CURSOR_END, FAKE_CURSOR_START } from "@earendil-works/pi-tui/dist/tui.js";
 import {
   formatDuration,
   formatTokens,
@@ -60,6 +62,12 @@ export class PromptEditor extends CustomEditor {
       return;
     }
     if (selected) {
+      if (this.inputKeybindings.matches(data, "tui.editor.cursorLeft") && navigation.setExpanded?.(false)) {
+        return;
+      }
+      if (this.inputKeybindings.matches(data, "tui.editor.cursorRight") && navigation.setExpanded?.(true)) {
+        return;
+      }
       if (this.inputKeybindings.matches(data, "tui.input.submit") && navigation.openSelection()) return;
       if (this.inputKeybindings.matches(data, "app.interrupt")) {
         navigation.clearSelection();
@@ -71,6 +79,14 @@ export class PromptEditor extends CustomEditor {
   }
 
   override render(width: number): string[] {
+    const lines = this.renderFrame(width);
+    if (!this.navigation()?.hasSelection()) return lines;
+    return lines.map((line) =>
+      line.replaceAll(CURSOR_MARKER, "").replaceAll(FAKE_CURSOR_START, "").replaceAll(FAKE_CURSOR_END, ""),
+    );
+  }
+
+  private renderFrame(width: number): string[] {
     if (width < 6) return super.render(width);
     // Reserve one column on each side before the base Editor lays out text,
     // its hardware cursor, scroll indicators, and autocomplete suggestions.
