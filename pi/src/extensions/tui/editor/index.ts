@@ -41,7 +41,9 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       blockRenderers.set(language, render);
     };
     pi.events.emit(REPLY_BLOCKS_CONFIGURE, registerReplyBlock);
+    let editor!: PromptEditor;
     const api: PromptEditorApi = {
+      hasEditorFocus: () => editor?.focused === true,
       useAgentNavigation: (contribution) => {
         navigation = contribution;
       },
@@ -60,7 +62,6 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       createReplyBody: (options) => createReplyBody(options, ctx.ui, replyMarkdown, blockRenderers, pi.getSettings().outputPad ?? 1),
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
-    let editor!: PromptEditor;
     installedFactory = (tui, theme, keybindings) =>
       (editor = new PromptEditor(
         tui,

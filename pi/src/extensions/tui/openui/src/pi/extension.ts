@@ -2,7 +2,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
-import { REPLY_BLOCKS_CONFIGURE, SIDE_CONVERSATION_OPEN, type RegisterReplyBlock, type ReplyBlockScope } from "@dotfiles/pi-ui/prompt-editor";
+import {
+  PROMPT_EDITOR_CONFIGURE,
+  REPLY_BLOCKS_CONFIGURE,
+  type PromptEditorApi,
+  type RegisterReplyBlock,
+  type ReplyBlockScope,
+} from "@dotfiles/pi-ui/prompt-editor";
 import { compile, LIMITS, type Compiled, type El } from "../lang/library.ts";
 import { markdownImages } from "../lang/md.ts";
 import { LANG_SAMPLES } from "../lang/samples.ts";
@@ -78,8 +84,10 @@ export default function (pi: ExtensionAPI) {
     pi.sendMessage({ customType: "openui-click", content: `[widget click → assistant] ${text}`, display: true });
 
   let rendersReplyBlocks = false;
-  let sideConversationOpen = false;
-  pi.events.on(SIDE_CONVERSATION_OPEN, (open) => { sideConversationOpen = open === true; });
+  let editor: PromptEditorApi | undefined;
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (api) => {
+    editor = api as PromptEditorApi;
+  });
   const overlays = new WeakMap<ReplyBlockScope, OverlayWidgets>();
   pi.events.on(REPLY_BLOCKS_CONFIGURE, (data) => {
     const register = data as RegisterReplyBlock;
@@ -183,7 +191,7 @@ export default function (pi: ExtensionAPI) {
       }
     };
     unsub = ctx.ui.onTerminalInput((data: string) =>
-      !sideConversationOpen && handleKey(data) ? { consume: true } : undefined,
+      editor?.hasEditorFocus() !== false && handleKey(data) ? { consume: true } : undefined,
     );
     // the note editor is pi's own multi-line editor: Enter saves, Shift+Enter adds a line, Esc cancels
     hooks.prompt = (title: string, initial: string) => ctx.ui.editor(title, initial);
@@ -192,7 +200,7 @@ export default function (pi: ExtensionAPI) {
       hooks.requestRender = () => view.requestRender();
       return {
         render: (w: number) => {
-          if (sideConversationOpen || !active.id) return [];
+          if (editor?.hasEditorFocus() === false || !active.id) return [];
           const e = entryOf(active.id);
           const keys = e?.state.noteMode
             ? "notes: click or Enter writes a note  arrows/Tab move  Shift+Enter picks the parent  Esc leaves"
@@ -209,7 +217,7 @@ export default function (pi: ExtensionAPI) {
     rendersReplyBlocks = false;
     unsub?.();
     unsub = undefined;
-    sideConversationOpen = false;
+    editor = undefined;
     resetAll(); // a pi process lives for days across /new and resume: each session's widgets must not pile up
   });
 }

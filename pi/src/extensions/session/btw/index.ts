@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { PROMPT_EDITOR_CONFIGURE, SIDE_CONVERSATION_OPEN, type PromptEditorApi } from "@dotfiles/pi-ui/prompt-editor";
+import { openBottomPanel } from "@dotfiles/pi-ui/bottom-panel";
+import { PROMPT_EDITOR_CONFIGURE, type PromptEditorApi } from "@dotfiles/pi-ui/prompt-editor";
 import { registerSideRequests } from "./request.js";
 import { createPanel, type SideTurn } from "./panel.js";
 
@@ -36,7 +37,6 @@ export default function registerBtw(pi: ExtensionAPI): void {
   function reset(_event: unknown, ctx: ExtensionContext): void {
     thread.request?.abort();
     thread = newThread();
-    if (panel) pi.events.emit(SIDE_CONVERSATION_OPEN, false);
     panel?.close?.();
     panel = undefined;
     updateFooter(ctx);
@@ -91,7 +91,6 @@ export default function registerBtw(pi: ExtensionAPI): void {
       const owner = thread;
       const current: OpenPanel = {};
       panel = current;
-      pi.events.emit(SIDE_CONVERSATION_OPEN, true);
       owner.unread = false;
       updateFooter(ctx);
 
@@ -100,7 +99,7 @@ export default function registerBtw(pi: ExtensionAPI): void {
       else if (question) void ask(ctx, question);
 
       try {
-        await ctx.ui.custom<void>((tui, theme, keys, done) => {
+        await openBottomPanel(ctx.ui, (tui, theme, keys, done) => {
           current.close = done;
           current.redraw = () => tui.requestRender();
           return createPanel(tui, theme, keys, renderReply, {
@@ -115,11 +114,10 @@ export default function registerBtw(pi: ExtensionAPI): void {
               done();
             },
           });
-        });
+        }, { heightPercent: 40 });
       } finally {
         if (panel === current) {
           panel = undefined;
-          pi.events.emit(SIDE_CONVERSATION_OPEN, false);
           updateFooter(ctx);
         }
       }

@@ -3,7 +3,8 @@ import { closeSync, fstatSync, openSync, readSync, watch, type FSWatcher } from 
 import { StringDecoder } from "node:string_decoder";
 import { stripVTControlCharacters } from "node:util";
 import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
-import { matchesKey, parseKey, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
+import { matchesKey, parseKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { fillPanelRows, openBottomPanel } from "@dotfiles/pi-ui/bottom-panel";
 import { formatDuration, sanitizeFooterText } from "@dotfiles/pi-ui/status-format";
 import { runningProcesses, subscribeToProcesses, type BackgroundProcess, type BackgroundSession } from "./model.js";
 
@@ -136,16 +137,14 @@ function panelLines(
   content: readonly string[],
   footer: string,
   inner: number,
-  totalRows: number,
+  bodyRows: number,
   theme: Theme,
 ): string[] {
   const border = (text: string) => theme.fg("muted", text);
   const pad = (line: string) => `${border("│")} ${truncateToWidth(line, inner, "", true)} ${border("│")}`;
   const heading = truncateToWidth(` ${title} `, inner + 1, "…", true);
   const top = border(`╭─${heading}${"─".repeat(Math.max(0, inner - heading.length))}╮`);
-  const bodyRows = Math.max(1, totalRows - 3);
-  const rows = content.slice(0, bodyRows).map(pad);
-  while (rows.length < bodyRows) rows.push(pad(""));
+  const rows = fillPanelRows(content, bodyRows).map(pad);
   rows.push(pad(footer));
   return [top, ...rows, border(`╰${"─".repeat(inner + 2)}╯`)];
 }
@@ -166,13 +165,14 @@ export async function openBackgroundBrowser(
   }
   if (ctx.mode !== "tui") return;
 
-  await ctx.ui.custom<void>((tui: TUI, theme: Theme, _keybindings, done: (result: void) => void) => {
+  await openBottomPanel(ctx.ui, (tui, theme, _keybindings, done) => {
     let page: "picker" | "output" = running.length === 1 ? "output" : "picker";
     let returnToPicker = running.length !== 1;
     let selectedPid = running[0]?.pid ?? tasks[0]!.pid;
     let outputProcess = running.length === 1 ? running[0] : undefined;
     let output: LogOutput | undefined;
     let scroll = 0;
+    let pickerScroll = 0;
     let follow = true;
     let viewport = 1;
     let stopArmedPid: number | undefined;
@@ -226,14 +226,19 @@ export async function openBackgroundBrowser(
       render();
     };
 
-    const component: Component & { dispose(): void } = {
-      render(width: number) {
-        const totalRows = Math.max(8, Math.floor((tui.terminal?.rows ?? 24) * 0.9));
-        const bodyRows = Math.max(1, totalRows - 3);
+    return {
+      render(width, panelRows) {
+        const bodyRows = Math.max(1, panelRows - 3);
         const inner = Math.max(20, width - 4);
         if (page === "picker") {
           const runningCount = runningProcesses(session).length;
-          const lines = tasks.map((process) => {
+          const selectedIndex = tasks.findIndex((task) => task.pid === selectedPid);
+          pickerScroll = Math.max(
+            0,
+            selectedIndex - bodyRows + 1,
+            Math.min(pickerScroll, selectedIndex, tasks.length - bodyRows),
+          );
+          const lines = tasks.slice(pickerScroll, pickerScroll + bodyRows).map((process) => {
             const status = processStatus(process);
             const cursor = process.pid === selectedPid ? theme.fg("accent", "❯") : " ";
             const command = truncateToWidth(commandLine(process), Math.max(12, inner - 44), "…", true);
@@ -248,7 +253,7 @@ export async function openBackgroundBrowser(
             lines,
             theme.fg("dim", footer),
             inner,
-            totalRows,
+            bodyRows,
             theme,
           );
         }
@@ -262,7 +267,6 @@ export async function openBackgroundBrowser(
         if (follow) scroll = max;
         else scroll = Math.min(scroll, max);
         const visible = lines.slice(scroll, scroll + viewport);
-        while (visible.length < viewport) visible.push("");
         const content = [
           `${theme.fg(status.color, status.glyph)} ${theme.bold(title)}`,
           theme.fg("dim", "─".repeat(inner)),
@@ -276,7 +280,7 @@ export async function openBackgroundBrowser(
           content,
           theme.fg("dim", `${position} · ↑↓/j/k line · PgUp/PgDn page · g/G ends · esc ${back}${stopHint} · q close`),
           inner,
-          totalRows,
+          bodyRows,
           theme,
         );
       },
@@ -333,6 +337,5 @@ export async function openBackgroundBrowser(
       },
       dispose: cleanup,
     };
-    return component;
   });
 }

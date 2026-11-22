@@ -19,6 +19,7 @@ import type {
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey, parseKey, truncateToWidth, type TUI, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { fillPanelRows, openBottomPanel } from "@dotfiles/pi-ui/bottom-panel";
 import type { ChildSession } from "../../runner/child-session.js";
 import type { SubagentRunner } from "../../runner/runner.js";
 import { EMPTY_USAGE } from "../../store/run-store.js";
@@ -252,6 +253,7 @@ function openNavigator(
       }
     };
 
+    let bodyRows = 1;
     const act = (data: string) => {
       const keyId = navigatorKeyId(data);
       const action = keyToAction(keyId, state.level);
@@ -273,7 +275,7 @@ function openNavigator(
               runs.length,
               state.cursor,
               action.amount,
-              navigatorRowBudget(tui) - 3,
+              bodyRows,
               state.scroll,
             );
           } else if (state.level === "run" && state.runId) {
@@ -284,14 +286,15 @@ function openNavigator(
               state.cursor,
               state.filter,
               action.amount,
-              navigatorRowBudget(tui) - 3,
+              bodyRows,
               state.scroll,
             );
           }
           break;
-        case "pageMove":
+        case "pageMove": {
+          const pageSize = Math.max(1, bodyRows - 4);
           if (state.level === "runs") {
-            state.pageMoveRun(action.delta, model.runs(), navigationPageSize(tui));
+            state.pageMoveRun(action.delta, model.runs(), pageSize);
             state.scroll = undefined;
           } else if (state.level === "run" && state.runId) {
             const detail = model.detail(state.runId);
@@ -302,13 +305,14 @@ function openNavigator(
               state.cursor,
               state.filter,
               action.delta,
-              navigationPageSize(tui),
+              pageSize,
               state.scroll,
             );
             state.setChildCursor(page.cursor, children);
             state.scroll = page.row;
-          } else state.pageMove(action.delta, currentCount(), navigationPageSize(tui));
+          } else state.pageMove(action.delta, currentCount(), pageSize);
           break;
+        }
         case "drill":
           if (state.drill(model) === "agent") openAgentView();
           break;
@@ -348,10 +352,9 @@ function openNavigator(
         focused = value;
         if (agentView) agentView.focused = value;
       },
-      render: (width: number) => {
-        const maxTotal = navigatorRowBudget(tui);
+      render: (width: number, panelRows: number) => {
         const inner = Math.max(1, width - 2 * BOX_INSET_X);
-        const bodyRows = maxTotal - 3;
+        bodyRows = Math.max(1, panelRows - 3);
         const content = agentView
           ? agentView.render(inner, bodyRows)
           : renderContent(runner, state, model, theme, inner, bodyRows, actionsFor, stopArmedRunId);
@@ -372,7 +375,7 @@ function openNavigator(
     };
   };
 
-  return ctx.ui.custom<void>(createView, { overlay: true, overlayOptions: { width: "100%" } });
+  return openBottomPanel(ctx.ui, createView);
 }
 
 interface RenderedContent {
@@ -455,15 +458,6 @@ function navigatorKeyId(data: string): string | undefined {
 function orderedLiveRunIds(runs: readonly RunSummary[], liveRunIds: readonly string[]): string[] {
   const live = new Set(liveRunIds);
   return runs.filter((run) => live.has(run.runId)).map((run) => run.runId);
-}
-
-function navigatorRowBudget(tui: TUI): number {
-  return Math.max(8, Math.floor((tui.terminal?.rows ?? 24) * 0.9));
-}
-
-/** Approximate selectable rows in one navigator viewport, excluding box chrome and headers. */
-function navigationPageSize(tui: TUI): number {
-  return Math.max(1, navigatorRowBudget(tui) - 7);
 }
 
 interface AgentFollowUpControls {
@@ -611,7 +605,7 @@ function buildAgentView(
 const BORDER = "muted";
 const BOX_INSET_X = 2;
 
-/** Wrap content in a stable-height titled box, padded to `inner` width. */
+/** Wrap content in a titled box, padded to `inner` width. */
 export function boxLines(
   content: string[],
   footer: string,
@@ -624,8 +618,7 @@ export function boxLines(
   const title = " agents ".slice(0, inner + 1);
   const top = border(`╭─${theme.fg("dim", title)}${"─".repeat(inner + 1 - title.length)}╮`);
   const bottom = border(`╰${"─".repeat(inner + 2)}╯`);
-  const rows = content.slice(0, bodyRows).map(pad);
-  while (rows.length < bodyRows) rows.push(pad(""));
+  const rows = fillPanelRows(content, bodyRows).map(pad);
   rows.push(pad(footer));
   return [top, ...rows, bottom];
 }

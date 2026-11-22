@@ -15,6 +15,7 @@ export interface InputNavigation {
 
 /** UI capabilities offered to other extensions for the current Pi session. */
 export interface PromptEditorApi {
+  hasEditorFocus(): boolean;
   useAgentNavigation(navigation: InputNavigation): void;
   /** Navigation for a status entry visited after the last below-editor agent. */
   useFooterNavigation(navigation: InputNavigation): void;
@@ -81,6 +82,3 @@ export type ReplyBlockRenderer = (
 export type RegisterReplyBlock = (language: string, render: ReplyBlockRenderer) => void;
 
 export const REPLY_BLOCKS_CONFIGURE = "dotfiles:reply-blocks:configure";
-
-/** The side conversation dispatches input to its own widgets while open. */
-export const SIDE_CONVERSATION_OPEN = "dotfiles:side-conversation:open";

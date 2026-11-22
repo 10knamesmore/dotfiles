@@ -1,6 +1,6 @@
 # Context Inspector
 
-`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器在输入区域打开，不使用悬浮层。导航列表依次显示 **Full payload**（已采集时）、**Full system prompt**、system prompt 各分段、各项工具声明和各条消息。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回，`?` 查看按键说明；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
+`/context` 只读查看最近一次主会话上下文，以及独立采集的 provider payload。检查器显示在共享贴底面板中，面板高度随终端尺寸调整，正文可滚动。导航列表依次显示 **Full payload**（已采集时）、**Full system prompt**、system prompt 各分段、各项工具声明和各条消息。用 `j/k` 选择，`Enter/l` 打开，`h/Esc` 返回，`?` 查看按键说明；列表筛选、选中项和滚动位置在返回后保留，重新打开详情时恢复其滚动位置。
 
 导航列表和按键说明使用对齐的表格，数字列右对齐，选中项使用整行背景。JSON 与 prompt 正文使用语法高亮并显示行号。颜色跟随当前 Pi 主题。
 

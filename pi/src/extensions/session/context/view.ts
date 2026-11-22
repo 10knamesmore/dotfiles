@@ -1,4 +1,5 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { fillPanelRows, openBottomPanel } from "@dotfiles/pi-ui/bottom-panel";
 import { Input, fuzzyMatch, ScrollView, stripTerminalSequences } from "@earendil-works/pi-tui";
 import { contextNavigationAction } from "./controls.js";
 import { ContextAppearance, ContextReport, tableLayout, type PageContent } from "./presentation.js";
@@ -27,6 +28,7 @@ interface FilterEditor {
   previousQuery: string;
   previousCursor: number;
   previousScroll: number;
+  previousFollowCursor: boolean;
 }
 
 function entryPage(entry: ContextEntry, group: string): InspectionPage {
@@ -178,7 +180,7 @@ export async function inspectContext(
     ["Message", largestBytes(current.messages)],
   ]);
 
-  await ctx.ui.custom<void>((tui, theme, keybindings, done) => {
+  await openBottomPanel(ctx.ui, (tui, theme, keybindings, done) => {
     const appearance = new ContextAppearance(theme);
     const sourceLayouts = new SourceLayouts(theme, (error) => {
       ctx.ui.notify(`Context layout failed: ${error.message}`, "error");
@@ -297,7 +299,7 @@ export async function inspectContext(
         applyFilter(editor.previousQuery);
         cursor = editor.previousCursor;
         restoreListScroll = editor.previousScroll;
-        followCursor = false;
+        followCursor = editor.previousFollowCursor;
       }
       filterEditor = undefined;
     };
@@ -307,7 +309,13 @@ export async function inspectContext(
       input.focused = focused;
       input.onSubmit = () => finishFilter(true);
       input.onEscape = () => finishFilter(false);
-      filterEditor = { input, previousQuery: query, previousCursor: cursor, previousScroll: listScroll.scrollTop };
+      filterEditor = {
+        input,
+        previousQuery: query,
+        previousCursor: cursor,
+        previousScroll: listScroll.scrollTop,
+        previousFollowCursor: followCursor,
+      };
     };
 
     return {
@@ -318,7 +326,7 @@ export async function inspectContext(
         focused = value;
         if (filterEditor) filterEditor.input.focused = value;
       },
-      render(width) {
+      render(width, panelRows) {
         const innerWidth = Math.max(1, width - 4);
         const index = pageStack.at(-1);
         const isList = index === undefined;
@@ -345,17 +353,16 @@ export async function inspectContext(
         const filterLines =
           filterEditor?.input.render(innerWidth).map((line) => appearance.fill(line, innerWidth, appearance.section)) ??
           [];
-        const maxRows = Math.max(
+        const height = Math.max(
           1,
-          Math.floor(tui.terminal.rows * 0.9) - 2 - title.length - pageDetail.length - filterLines.length,
+          panelRows - 2 - title.length - pageDetail.length - filterLines.length,
         );
         let visible: readonly string[];
         if (detail?.kind === "source") {
-          visible = detail.content.renderViewport(innerWidth, maxRows);
+          visible = detail.content.renderViewport(innerWidth, height);
         } else {
           const detailLines = isList ? [] : scroll.render(innerWidth);
           const contentHeight = isList ? Math.max(1, rows.rowItems.length) : detailLines.length;
-          const height = Math.min(Math.max(1, contentHeight), maxRows);
           // Input already requests a render, and any adjustment to scrollTop here is visible in this frame.
           scroll.updateLayout(contentHeight, height, () => {});
           if (isList) {
@@ -371,7 +378,6 @@ export async function inspectContext(
               } else if (row >= top + height - scrolloff) {
                 listScroll.scrollTo(row - height + scrolloff + 1);
               }
-              followCursor = false;
             }
           }
           visible = isList
@@ -379,7 +385,11 @@ export async function inspectContext(
             : detailLines.slice(scroll.scrollTop, scroll.scrollTop + height);
         }
         const selection = isList ? `${filtered.length ? cursor + 1 : 0}/${filtered.length}` : undefined;
-        return appearance.panel([...title, ...pageDetail, ...filterLines, ...visible], width, selection);
+        return appearance.panel(
+          [...title, ...pageDetail, ...filterLines, ...fillPanelRows(visible, height)],
+          width,
+          selection,
+        );
       },
       handleInput(data) {
         if (openingEditor) return;

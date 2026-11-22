@@ -1,6 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { keyText, SettingsManager, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
 import { Input, ScrollView, truncateToWidth, type TUI, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { fillPanelRows } from "@dotfiles/pi-ui/bottom-panel";
 import type { TranscriptMessage } from "../../store/session-transcript.js";
 import type { SubagentResult, SubagentStatus, UsageSummary } from "../../types.js";
 import { formatTokenUsage, modelEffort, statusGlyph } from "../format.js";
@@ -152,8 +153,7 @@ export class AgentView {
     return {
       lines: [
         truncateToWidth(title, width),
-        ...visible,
-        ...Array<string>(viewport - visible.length).fill(""),
+        ...fillPanelRows(visible, viewport),
         ...(this.composer?.render(width) ?? []),
       ],
       footer: this.error ? theme.fg("error", this.error) : theme.fg("dim", hints.join(" · ")),

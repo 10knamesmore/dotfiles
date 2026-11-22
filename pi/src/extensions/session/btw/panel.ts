@@ -1,8 +1,9 @@
+import { fillPanelRows, type BottomPanel } from "@dotfiles/pi-ui/bottom-panel";
 import type { PromptEditorApi, ReplyBodyComponent } from "@dotfiles/pi-ui/prompt-editor";
 import { getSelectListTheme, UserMessageComponent, type Theme } from "@earendil-works/pi-coding-agent";
 import {
   Editor, type KeybindingsManager, matchesKey, mixColors, replaceControlCharacters, ScrollView, stripTerminalSequences,
-  Text, truncateToWidth, type Component, type Focusable, type TUI, type TuiMouseEvent,
+  Text, truncateToWidth, type Component, type TUI, type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 
 export interface SideTurn {
@@ -42,7 +43,7 @@ export function createPanel(
   keys: KeybindingsManager,
   createReplyBody: PromptEditorApi["createReplyBody"],
   conversation: Conversation,
-): Component & Focusable & { dispose(): void } {
+): BottomPanel {
   const redraw = () => tui.requestRender();
   const views = new Map<SideTurn, TurnView>();
   const replyRegions: { body: ReplyBodyComponent; top: number; height: number }[] = [];
@@ -140,19 +141,23 @@ export function createPanel(
       }
       return undefined;
     },
-    render(width) {
+    render(width, panelRows) {
       const gutter = gutterWidth(width);
       const inner = width - gutter;
       const lines = scroll.render(inner);
       const input = editor.render(inner);
-      const height = Math.min(lines.length, Math.max(0, Math.floor(tui.terminal.rows * 0.9) - input.length - 1));
-      scroll.updateLayout(lines.length, height, redraw);
-      editorRow = 1 + height;
       const title = conversation.answering() ? "btw · Answering…" : "btw";
-      const rail = gutter ? theme.style("▎", { fg: mixColors(theme.colors.borderMuted, theme.colors.accent, 0.2) }) + " " : "";
+      const showTitle = panelRows > input.length;
+      const titleRows = showTitle ? 1 : 0;
+      const height = Math.max(0, panelRows - input.length - titleRows);
+      scroll.updateLayout(lines.length, height, redraw);
+      editorRow = titleRows + height;
+      const rail = gutter
+        ? theme.style("▎", { fg: mixColors(theme.colors.borderMuted, theme.colors.accent, 0.2) }) + " "
+        : "";
       return [
-        theme.fg("accent", truncateToWidth(title, inner)),
-        ...lines.slice(scroll.scrollTop, scroll.scrollTop + height),
+        ...(showTitle ? [theme.fg("accent", truncateToWidth(title, inner))] : []),
+        ...fillPanelRows(lines.slice(scroll.scrollTop, scroll.scrollTop + height), height),
         ...input,
       ].map((line) => line.replace(promptMarkers, (markers) => markers + rail));
     },
