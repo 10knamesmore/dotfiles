@@ -1,0 +1,29 @@
+---
+title: 社区工坊工具借用
+config:
+  themeVariables:
+    primaryBorderColor: "#94a3b8"
+---
+usecase-beta
+accDescr {
+  每次借用都查额度。
+  借期超过七天时，由管理员审批。
+}
+
+actor Member("会员")
+systemBoundary "工具柜系统"
+  Borrow("借工具")
+  CheckQuota("查额度")
+  LongLoan("审批长借")
+end
+actor Steward("管理员")
+
+Member -- Borrow
+Borrow ..> : include CheckQuota
+LongLoan ..> : extend Borrow
+Steward -- LongLoan
+
+style Member stroke:#7dd3fc,color:#7dd3fc
+style Borrow stroke:#5eead4,color:#5eead4
+style Steward stroke:#c4b5fd,color:#c4b5fd
+style LongLoan stroke:#c4b5fd,color:#c4b5fd

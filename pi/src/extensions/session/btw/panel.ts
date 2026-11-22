@@ -41,13 +41,12 @@ export function createPanel(
   tui: TUI,
   theme: Theme,
   keys: KeybindingsManager,
-  createReplyBody: PromptEditorApi["createReplyBody"],
+  { createReplyBody, blockPointer }: Pick<PromptEditorApi, "createReplyBody" | "blockPointer">,
   conversation: Conversation,
 ): BottomPanel {
   const redraw = () => tui.requestRender();
   const views = new Map<SideTurn, TurnView>();
   const replyRegions: { body: ReplyBodyComponent; top: number; height: number }[] = [];
-  let selected: ReplyBodyComponent | undefined;
   let editorRow = 0;
 
   const editor = new Editor(tui, { borderColor: (s) => theme.fg("borderMuted", s), selectList: getSelectListTheme() });
@@ -107,7 +106,6 @@ export function createPanel(
     handleInput(data) {
       if (matchesKey(data, "escape")) conversation.dismiss(editor.getExpandedText());
       else if (matchesKey(data, "ctrl+c")) conversation.cancel();
-      else if (selected?.handleInput(data)) return;
       else if (keys.matches(data, "tui.editor.pageUp")) scroll.scrollBy(-scroll.viewportHeight);
       else if (keys.matches(data, "tui.editor.pageDown")) scroll.scrollBy(scroll.viewportHeight);
       else {
@@ -124,18 +122,15 @@ export function createPanel(
         const region = replyRegions.find(({ top, height }) => y >= top && y < top + height);
         if (region) {
           const result = region.body.handleMouse({ ...event, x, width, y: y - region.top, height: region.height });
-          if (result?.handled) {
-            if (event.type === "click" || event.type === "press") selected = region.body;
-            return { handled: true, render: result.render };
-          }
+          if (result?.handled) return { handled: true, render: result.render };
         }
       }
+      if (event.type === "move" || event.type === "press") blockPointer.leave?.();
       if (event.type === "wheel" && event.wheelDelta) {
         scroll.scrollBy(event.wheelDelta);
         return { handled: true };
       }
       if (x >= 0 && event.type === "click" && event.y >= editorRow) {
-        selected = undefined;
         editor.handleMouse({ ...event, x, width, y: event.y - editorRow });
         return { handled: true };
       }

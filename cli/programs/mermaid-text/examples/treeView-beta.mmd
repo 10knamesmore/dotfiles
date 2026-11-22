@@ -1,0 +1,26 @@
+---
+title: 社区诊所信息系统目录
+config:
+  themeVariables:
+    treeView:
+      lineColor: "#94a3b8"
+      labelColor: "#7dd3fc"
+      descriptionColor: "#c4b5fd"
+---
+treeView-beta
+"诊所平台" ## 服务端仓库
+  "apps" ## 可独立部署的应用
+    "预约服务" ## 号源查询与预约确认
+      "src" ## 业务逻辑与 HTTP 接口
+      "migrations" ## PostgreSQL schema 变更
+    "患者门户" ## 患者自助查询与提醒
+      "web" ## Vue 页面与路由
+      "assets" ## 图标与本地化资源
+  "packages" ## 跨应用共享代码
+    "医嘱模型" ## API 类型与校验规则
+    "短信客户端" ## 模板渲染及供应商适配
+  "ops" ## 本地开发与上线运维
+    "compose.yaml" ## PostgreSQL 和消息队列
+    "dashboards" ## 延迟、错误率与预约量面板
+  "docs" ## 面向团队的工程说明
+    "runbook.md" ## 故障处理与回滚步骤

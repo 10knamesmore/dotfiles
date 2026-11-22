@@ -199,9 +199,16 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
+local mermaid = require("utils.markdown_mermaid")
+
 ---@type render.md.UserConfig
 local render_md_opt = {
   render_modes = true,
+  on = {
+    attach = mermaid.attach,
+    render = mermaid.render,
+    clear = mermaid.clear,
+  },
   anti_conceal = {
     -- normal 模式整页保持渲染（含光标行），只在 insert 等模式下取消渲染光标行
     disabled_modes = { "n" },
@@ -219,6 +226,11 @@ local render_md_opt = {
     sign = true,
     width = "block",
     right_pad = 4,
+  },
+  overrides = {
+    filetype = {
+      markdown = { code = { disable = { "mermaid" } } },
+    },
   },
     -- stylua: ignore
     callout = {
@@ -371,7 +383,12 @@ return {
       Snacks.toggle({
         name = "Render Markdown",
         get = render_md.get,
-        set = render_md.set,
+        set = function(enabled)
+          render_md.set(enabled)
+          if not enabled then
+            mermaid.disable()
+          end
+        end,
       }):map("<leader>um")
 
       -- 只在 markdown 下切换 paragraph left_margin
@@ -380,7 +397,8 @@ return {
         callback = function()
           vim.b.md_left_margin = vim.b.md_left_margin or 0.5
           vim.keymap.set("n", "<leader>cm", function()
-            local cfg = vim.deepcopy(render_md_opt)
+            local cfg = vim.deepcopy(opts)
+            cfg.enabled = render_md.get()
 
             if vim.b.md_left_margin == 0.5 then
               cfg.latex.position = "center"
@@ -393,6 +411,7 @@ return {
             cfg.paragraph.left_margin = vim.b.md_left_margin
 
             render_md.setup(cfg)
+            render_md.render({ buf = vim.api.nvim_get_current_buf() })
           end, { buffer = true, desc = "切换 Paragraph Left Margin" })
         end,
       })

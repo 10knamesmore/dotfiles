@@ -1,4 +1,5 @@
 import type { FastMode } from "@dotfiles/pi-config";
+import type { CodeBlockPointer } from "@dotfiles/pi-ui/code-block";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   PROMPT_EDITOR_CONFIGURE,
@@ -7,7 +8,7 @@ import {
   type InputNavigation,
   type PromptEditorApi,
   type RegisterReplyBlock,
-  type ReplyBlockRenderer,
+  type ReplyBlockRegistration,
 } from "@dotfiles/pi-ui/prompt-editor";
 import { PromptEditor } from "./component.js";
 import { installCopyCommand } from "./copy.js";
@@ -36,14 +37,15 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       () => navigation,
       () => footerNavigation,
     );
-    const blockRenderers = new Map<string, ReplyBlockRenderer>();
-    const registerReplyBlock: RegisterReplyBlock = (language, render) => {
-      blockRenderers.set(language, render);
+    const blockRenderers = new Map<string, ReplyBlockRegistration>();
+    const registerReplyBlock: RegisterReplyBlock = (language, registration) => {
+      blockRenderers.set(language.toLowerCase(), registration);
     };
     pi.events.emit(REPLY_BLOCKS_CONFIGURE, registerReplyBlock);
     let editor!: PromptEditor;
+    const pointer: CodeBlockPointer = {};
     const api: PromptEditorApi = {
-      hasEditorFocus: () => editor?.focused === true,
+      blockPointer: pointer,
       useAgentNavigation: (contribution) => {
         navigation = contribution;
       },
@@ -59,7 +61,8 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       useWorkflowUsage: (contribution) => {
         readWorkflowUsage = contribution;
       },
-      createReplyBody: (options) => createReplyBody(options, ctx.ui, replyMarkdown, blockRenderers, pi.getSettings().outputPad ?? 1),
+      createReplyBody: (options) =>
+        createReplyBody(options, ctx.ui, replyMarkdown, blockRenderers, pointer, pi.getSettings().outputPad ?? 1),
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
     installedFactory = (tui, theme, keybindings) =>
@@ -67,6 +70,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         tui,
         theme,
         keybindings,
+        pointer,
         () => chainedNavigation,
         () => readStatus?.(),
         () => currentContext,
@@ -75,7 +79,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       ));
     ctx.ui.setEditorComponent(installedFactory);
     installCopyCommand(editor, ctx);
-    ctx.ui.setWidget("reply-bodies", (tui) => createReplyBodies(tui, ctx, replyMarkdown, blockRenderers));
+    ctx.ui.setWidget("reply-bodies", (tui) => createReplyBodies(tui, ctx, replyMarkdown, blockRenderers, pointer));
   });
 
   pi.on("model_select", (_event, ctx) => {

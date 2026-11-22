@@ -1,5 +1,4 @@
-// Role -> style mapping. Actions use the shared UI feedback styles; other elements retain
-// their diagram-specific focus and hover treatments.
+// Role -> style mapping. Actions use the shared UI feedback styles.
 
 import type { Palette } from "./canvas.ts";
 import type { ActionAppearance } from "@dotfiles/pi-ui/action-feedback";
@@ -68,17 +67,8 @@ export function createPalette(t: PaletteTokens): Palette {
   return (role) => {
     if (!role) return undefined;
     const parts = role.split(".");
-    let focus = false;
-    let hover = false;
-    while (parts.length > 1 && (parts[parts.length - 1] === "focus" || parts[parts.length - 1] === "hover")) {
-      if (parts.pop() === "focus") focus = true;
-      else hover = true;
-    }
-    if (parts.length === 1 && (parts[0] === "focus" || parts[0] === "hover")) {
-      if (parts[0] === "focus") focus = true;
-      else hover = true;
-      parts.length = 0;
-    }
+    const hover = parts.at(-1) === "hover";
+    if (hover) parts.pop();
     const [base, a, b] = parts;
     let f: Style | undefined;
     switch (base) {
@@ -155,7 +145,7 @@ export function createPalette(t: PaletteTokens): Palette {
               ? "pending"
               : a === "error"
                 ? "error"
-                : focus || hover
+                : hover
                   ? "active"
                   : "idle",
         );
@@ -328,11 +318,9 @@ export function createPalette(t: PaletteTokens): Palette {
                             : undefined;
         break;
     }
-    // Border characters are line art: underlining or reversing them draws a tick or a block on every row of a vertical
-    // edge. Those cells light up in the accent colour instead; text cells keep underline (hover) and reverse (focus).
+    // Underlined border characters leave a tick on every row of a vertical edge.
     const lineArt = base === "box" || base === "tile" || base === "card" || base === "zone" || a === "border";
-    if (lineArt && (focus || hover)) return (s) => t.bold(t.accent(s));
-    if (focus) return (s) => reverse(f ? f(s) : s);
+    if (lineArt && hover) return (s) => t.bold(t.accent(s));
     if (hover) return (s) => underline(f ? f(s) : s);
     return f;
   };

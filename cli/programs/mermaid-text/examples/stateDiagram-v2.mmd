@@ -1,0 +1,22 @@
+---
+title: 自助洗衣的漂洗周期
+---
+stateDiagram-v2
+    [*] --> 洗涤
+    洗涤 --> 漂洗 : 主洗排水完成
+    state 漂洗 {
+        [*] --> 注水
+        注水 --> 搅洗 : 水位达标
+        搅洗 --> 排水 : 漂洗结束
+        排水 --> 检查次数 : 排空后计数加一
+        state 检查次数 <<choice>>
+        检查次数 --> 注水 : 未达设定次数
+        检查次数 --> [*] : 达到设定次数
+    }
+    漂洗 --> 脱水 : 漂洗完成
+    脱水 --> [*] : 滚筒停稳
+
+    classDef rinse stroke:#7dd3fc
+    classDef decision stroke:#fbbf24
+    class 漂洗,注水,搅洗,排水 rinse
+    class 检查次数 decision

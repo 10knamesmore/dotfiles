@@ -1,0 +1,24 @@
+---
+title: 离线地图同步功能的发布分支
+config:
+  themeVariables:
+    gitBranchLabel0: '#7dd3fc'
+    gitBranchLabel1: '#6ee7b7'
+    gitBranchLabel2: '#fbbf24'
+---
+gitGraph LR:
+    commit id: "a1" tag: "v2.4.0" msg: "稳定版"
+    branch feature/offline
+    commit id: "b1" msg: "缓存瓦片索引"
+    commit id: "b2" msg: "断网队列与重试"
+    checkout main
+    commit id: "a2" msg: "修复登录刷新"
+    cherry-pick id: "b1"
+    checkout feature/offline
+    commit id: "b3" msg: "加入冲突检测"
+    checkout main
+    merge feature/offline id: "m1" tag: "v2.5.0"
+    branch hotfix/cache
+    commit id: "h1" msg: "限制缓存磁盘占用"
+    checkout main
+    merge hotfix/cache id: "m2"

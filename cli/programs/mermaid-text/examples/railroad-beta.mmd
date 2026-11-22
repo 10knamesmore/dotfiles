@@ -1,0 +1,39 @@
+---
+title: "命令行部署请求"
+config:
+  themeVariables:
+    titleColor: "#7dd3fc"
+    lineColor: "#94a3b8"
+    primaryBorderColor: "#7dd3fc"
+    secondaryBorderColor: "#5eead4"
+    secondaryTextColor: "#5eead4"
+---
+railroad-beta
+request = sequence(
+  nonterminal("method"),
+  terminal(" "),
+  nonterminal("service"),
+  optional(sequence(terminal("@"), nonterminal("version"))),
+  terminal(" "),
+  nonterminal("options")
+);
+method = choice(
+  terminal("deploy"),
+  terminal("rollback"),
+  terminal("status")
+);
+service = sequence(
+  choice(terminal("api"), terminal("billing"), terminal("search"))
+);
+version = sequence(
+  terminal("v"),
+  nonterminal("release")
+);
+options = zeroOrMore(choice(
+  sequence(terminal(" --region "), nonterminal("region")),
+  sequence(terminal(" --dry-run")),
+  sequence(terminal(" --tag "), nonterminal("tag"))
+));
+release = choice(terminal("1.8"), terminal("2.3"), terminal("3.0"));
+region = choice(terminal("us-east"), terminal("eu-west"));
+tag = choice(terminal("stable"), terminal("canary"), terminal("hotfix-2025"));

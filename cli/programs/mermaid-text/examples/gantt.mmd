@@ -1,0 +1,25 @@
+---
+title: 冷链仓库改造排期
+config:
+  themeVariables:
+    doneTaskBorderColor: '#6ee7b7'
+    activeTaskBorderColor: '#7dd3fc'
+    critBorderColor: '#fb7185'
+---
+gantt
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+    excludes weekends
+    section 设计与采购
+    现场测绘与需求冻结 :done, survey, 2025-03-03, 5d
+    制冷方案审查       :done, review, after survey, 4d
+    压缩机交付         :active, compressor, after review, 8d
+    section 施工与联调
+    拆除旧机组         :crit, demolition, 2025-03-24, 4d
+    管线与电控改造     :crit, piping, after demolition, 7d
+    压缩机安装         :install, after compressor, 4d
+    系统联调与温度验证 :active, commissioning, after piping install, 5d
+    温控验收           :milestone, accept, after commissioning, 0d
+    section 切换运营
+    库存分区搬迁       :move, after accept, 3d
+    新仓正式启用       :milestone, launch, after move, 0d

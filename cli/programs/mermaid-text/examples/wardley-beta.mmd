@@ -1,0 +1,32 @@
+---
+title: 机房余热供暖
+config:
+  themeVariables:
+    wardley:
+      axisColor: "#94a3b8"
+      axisTextColor: "#94a3b8"
+      componentStroke: "#5eead4"
+      componentLabelColor: "#5eead4"
+      linkStroke: "#7dd3fc"
+      evolutionStroke: "#fcd37d"
+---
+wardley-beta
+accDescr {
+  采购标准热泵保供，蓄热先按楼试点。
+  统一供回水接口后再推广调度。
+}
+size [1000, 450]
+evolution 探索 -> 定制 -> 产品 -> 通用
+
+anchor 住户取暖 [0.95, 0.48]
+component 余热调度 [0.75, 0.37] label [-1, 0]
+component 蓄热试验 [0.46, 0.12]
+component 热泵机组 [0.50, 0.65]
+component 市电 [0.18, 0.83]
+
+住户取暖 -> 余热调度
+余热调度 -> 蓄热试验
+余热调度 -> 热泵机组
+热泵机组 -> 市电
+
+evolve 余热调度 0.71

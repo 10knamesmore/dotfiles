@@ -24,9 +24,9 @@ export default function registerBtw(pi: ExtensionAPI): void {
   const request = registerSideRequests(pi);
   let thread = newThread();
   let panel: OpenPanel | undefined;
-  let createReplyBody: PromptEditorApi["createReplyBody"] | undefined;
+  let promptEditor: PromptEditorApi | undefined;
   pi.events.on(PROMPT_EDITOR_CONFIGURE, (api) => {
-    createReplyBody = (api as PromptEditorApi).createReplyBody;
+    promptEditor = api as PromptEditorApi;
   });
 
   function updateFooter(ctx: ExtensionContext): void {
@@ -83,8 +83,8 @@ export default function registerBtw(pi: ExtensionAPI): void {
         return;
       }
       if (panel) return;
-      const renderReply = createReplyBody;
-      if (!renderReply) {
+      const host = promptEditor;
+      if (!host) {
         ctx.ui.notify("/btw requires the editor extension to render replies.", "error");
         return;
       }
@@ -102,7 +102,7 @@ export default function registerBtw(pi: ExtensionAPI): void {
         await openBottomPanel(ctx.ui, (tui, theme, keys, done) => {
           current.close = done;
           current.redraw = () => tui.requestRender();
-          return createPanel(tui, theme, keys, renderReply, {
+          return createPanel(tui, theme, keys, host, {
             turns: owner.turns,
             outputPad: pi.getSettings().outputPad ?? 1,
             draft: owner.draft,

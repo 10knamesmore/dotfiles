@@ -1,0 +1,34 @@
+---
+title: 河道水位采集与校准
+---
+erDiagram
+    direction TB
+    采集接口 {
+        int 接口号 PK
+        string 主题 UK
+    }
+    水位计 {
+        int 表号 PK
+        int 接口号 FK
+        string 测点
+    }
+    水位读数 {
+        int 表号 PK,FK
+        int 序号 PK
+        datetime 采样
+        int 水位毫米
+    }
+    校准记录 {
+        int 校准号 PK
+        int 表号 FK
+        datetime 生效
+        int 偏移毫米
+    }
+    采集接口 ||..o{ 水位计 : 接收上报
+    水位计 ||--o{ 水位读数 : 产生
+    水位计 ||..o{ 校准记录 : 留存
+
+    style 采集接口 stroke:#7dd3fc
+    style 水位计 stroke:#7dd3fc
+    style 水位读数 stroke:#6ee7b7
+    style 校准记录 stroke:#fbbf24

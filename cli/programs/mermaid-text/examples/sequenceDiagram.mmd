@@ -1,0 +1,34 @@
+---
+title: 火车票锁座与支付确认
+config:
+  themeVariables:
+    actorBorder: '#7dd3fc'
+    signalColor: '#6ee7b7'
+    noteBorderColor: '#fbbf24'
+---
+sequenceDiagram
+    autonumber
+    actor Rider as 旅客
+    participant Tickets as 票务
+    participant Pay as 支付
+
+    Rider->>+Tickets: 确认购票
+    Tickets->>Tickets: 尝试锁座
+    break 座位已占
+        Tickets-->>Rider: 提示重选
+    end
+    Tickets->>+Pay: 按单号扣款
+    Pay-->>-Tickets: 支付状态
+    Note over Tickets,Pay: 结果未明时保持锁座
+    loop 支付待定
+        Tickets->>+Pay: 按单号查单
+        Pay-->>-Tickets: 支付状态
+    end
+    alt 扣款成功
+        Tickets->>Tickets: 确认占座
+        Tickets-->>Rider: 返回车票
+    else 扣款失败
+        Tickets->>Tickets: 释放座位
+        Tickets-->>Rider: 支付失败
+    end
+    deactivate Tickets

@@ -1,0 +1,21 @@
+---
+title: 城市通勤方式调查
+---
+venn-beta
+set 公交 [公交乘客]: 420
+set 地铁 [地铁乘客]: 510
+set 骑行 [骑行通勤者]: 260
+union 公交,地铁 [公交与地铁]: 180
+text 公交,地铁 交通卡月票用户 [月票用户]
+union 公交,骑行 [公交与骑行]: 95
+text 公交,骑行 末班接驳 [夜间接驳]
+union 地铁,骑行 [地铁与骑行]: 120
+text 地铁,骑行 站点共享单车 [轨道接驳]
+union 公交,地铁,骑行 [三种方式]: 48
+text 公交,地铁,骑行 多模式通勤 [每周至少三天换乘]
+
+style 公交 stroke:#7dd3fc,color:#7dd3fc
+style 地铁 stroke:#c4b5fd,color:#c4b5fd
+style 骑行 stroke:#5eead4,color:#5eead4
+style 公交,地铁,骑行 color:#fcd37d
+style 多模式通勤 color:#fcd37d

@@ -1,0 +1,25 @@
+---
+title: 演出票务平台的系统上下文
+config:
+  themeVariables:
+    personBorder: '#6ee7b7'
+---
+C4Context
+    Person(fan, "观众")
+    Person(crew, "主办方")
+    System(ticket, "演出票务平台", "售票、出票与核销")
+    System_Ext(pay, "支付网关")
+    System_Ext(gate, "场馆闸机")
+    System_Ext(sms, "短信平台")
+
+    Rel_D(fan, ticket, "选座购票")
+    Rel_D(crew, ticket, "发布场次")
+    BiRel(ticket, pay, "发起扣款 / 回传结果")
+    Rel(gate, ticket, "核销票码")
+    Rel(ticket, sms, "委托发送电子票")
+
+    UpdateElementStyle(ticket, $borderColor="#7dd3fc")
+    UpdateElementStyle(pay, $borderColor="#fbbf24")
+    UpdateElementStyle(gate, $borderColor="#fbbf24")
+    UpdateElementStyle(sms, $borderColor="#fbbf24")
+    UpdateLayoutConfig($c4ShapeInRow="2")

@@ -1,0 +1,30 @@
+---
+title: 演出票务的订单 API 组件
+---
+C4Component
+    System_Ext(pay, "支付网关")
+
+    Container_Boundary(api, "订单 API") {
+        Component(buy, "下单入口", $descr="受理选座请求")
+        Component(hold, "锁座器", $descr="限时预留座位")
+        Component(payio, "支付适配器", $descr="建单、校验回调")
+        Component(issue, "出票器", $descr="生成已付款订单的票码")
+
+        Rel_R(buy, hold, "锁座")
+        Rel_D(buy, payio, "锁座后建单")
+        Rel_R(payio, issue, "出票")
+    }
+
+    ContainerDb(db, "票务库", "PostgreSQL")
+
+    Rel_R(hold, db, "预占空座")
+    Rel(payio, pay, "创建支付单", "HTTPS")
+    Rel(issue, db, "原子写票码和待发事件")
+
+    UpdateElementStyle(api, $borderColor="#7dd3fc")
+    UpdateElementStyle(payio, $borderColor="#fbbf24")
+    UpdateElementStyle(pay, $borderColor="#fbbf24")
+    UpdateElementStyle(issue, $borderColor="#6ee7b7")
+    UpdateRelStyle(payio, pay, $lineColor="#fbbf24")
+    UpdateRelStyle(issue, db, $lineColor="#6ee7b7")
+    UpdateLayoutConfig($c4ShapeInRow="2")

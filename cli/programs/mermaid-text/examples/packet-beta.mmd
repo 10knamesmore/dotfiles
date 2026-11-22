@@ -1,0 +1,19 @@
+---
+title: 遥测上报帧：固定 64 位首部
+config:
+  themeVariables:
+    packet:
+      titleColor: '#e2e8f0'
+      blockStrokeColor: '#5eead4'
+      labelColor: '#e2e8f0'
+      startByteColor: '#7dd3fc'
+      endByteColor: '#fbbf24'
+---
+packet-beta
+    0-3: "版本"
+    4-7: "类型"
+    8-15: "标志与优先级"
+    16-27: "设备编号"
+    28-35: "序列号"
+    36-47: "载荷长度（字节）"
+    48-63: "首部校验和"

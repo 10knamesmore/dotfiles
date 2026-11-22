@@ -1,0 +1,27 @@
+---
+title: 夜间银行流水入账
+config:
+  themeVariables:
+    actorBorder: '#7dd3fc'
+    signalColor: '#6ee7b7'
+---
+zenuml
+    @Actor Clock as 调度
+    Import as 导入
+    Ledger as 账本
+    @Starter(Clock)
+
+    Import.入账(单) {
+        while (还有流水) {
+            Ledger.记(流水) {
+                if (已入账) {
+                    return 重复跳过
+                } else {
+                    写入()
+                    return 入账成功
+                }
+            }
+            汇总()
+        }
+        return 入账汇总
+    }

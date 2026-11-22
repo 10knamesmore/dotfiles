@@ -1,0 +1,20 @@
+---
+title: "结构化日志行"
+config:
+  themeVariables:
+    titleColor: "#7dd3fc"
+    lineColor: "#94a3b8"
+    primaryBorderColor: "#7dd3fc"
+    secondaryBorderColor: "#5eead4"
+    secondaryTextColor: "#5eead4"
+    tertiaryBorderColor: "#fcd37d"
+---
+railroad-peg-beta
+# The longer severity names precede their prefixes in the ordered choice.
+LogLine <- &Digit Timestamp Space Severity Space Message Newline ;
+Timestamp <- Digit Digit Digit Digit "-" Digit Digit "-" Digit Digit "T" Digit Digit ":" Digit Digit ":" Digit Digit ;
+Severity <- "WARNING" / "WARN" / "INFO" / "DEBUG" ;
+Message <- (!Newline .)+ ;
+Space <- " "+ ;
+Newline <- "\r\n" / "\n" ;
+Digit <- "0" / "1" / "2" / "3" / "4" / "5" / "6" / "7" / "8" / "9" ;

@@ -1,0 +1,33 @@
+---
+title: 演出票务平台的容器与数据流
+---
+C4Container
+    System_Ext(pay, "支付网关")
+
+    System_Boundary(ticket, "演出票务平台") {
+        Container(web, "购票网页", "SPA", "选座与订单查询")
+        Container(api, "订单 API", "Go", "锁座、收款与出票")
+        ContainerQueue(evt, "出票队列", "RabbitMQ")
+        ContainerDb(db, "票务库", "PostgreSQL", "座位、订单与票码")
+        Container(send, "通知服务", "Go", "发送电子票")
+
+        Rel_R(web, api, "提交订单", "HTTPS")
+        Rel_D(api, db, "更新订单和座位", "SQL")
+        Rel(api, evt, "发布", "AMQP")
+        Rel_D(evt, send, "投递", "AMQP")
+    }
+
+    BiRel(api, pay, "建单与回调", "HTTPS")
+
+    System_Ext(sms, "短信平台")
+    Rel(send, sms, "发送电子票", "HTTPS")
+
+    UpdateElementStyle(ticket, $borderColor="#7dd3fc")
+    UpdateElementStyle(api, $borderColor="#7dd3fc")
+    UpdateElementStyle(db, $borderColor="#6ee7b7")
+    UpdateElementStyle(evt, $borderColor="#6ee7b7")
+    UpdateElementStyle(pay, $borderColor="#fbbf24")
+    UpdateElementStyle(sms, $borderColor="#fbbf24")
+    UpdateRelStyle(api, evt, $textColor="#6ee7b7", $lineColor="#6ee7b7")
+    UpdateRelStyle(evt, send, $lineColor="#6ee7b7")
+    UpdateLayoutConfig($c4ShapeInRow="2")

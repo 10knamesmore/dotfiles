@@ -1,5 +1,6 @@
 import { getMarkdownTheme, type MarkdownTransformer } from "@earendil-works/pi-coding-agent";
 import { COPY_LABEL } from "@dotfiles/pi-ui/action-feedback";
+import type { StreamingBlockInput } from "@dotfiles/pi-ui/prompt-editor";
 import {
   Marked,
   Markdown,
@@ -30,7 +31,14 @@ export interface CodeHighlight {
   paint: (line: string) => string;
 }
 
-type ResolveReplyBlock = (block: ReplyCodeBlock) => { slot: number } | { errors: readonly string[] } | undefined;
+export interface ReplyFence extends ReplyCodeBlock, StreamingBlockInput {
+  ordinal: number;
+  isStreaming: boolean;
+}
+
+type ResolveReplyBlock = (
+  block: ReplyFence,
+) => { slot: number } | { errors: readonly string[] } | { rawSource: string } | undefined;
 
 function blockKey(block: Tokens.Code): string {
   return JSON.stringify([block.lang ?? "", block.text.replace(/\t/g, "   ")]);
@@ -57,20 +65,31 @@ function codeSpan(line: string): string {
   return `${fence} ${line} ${fence}`;
 }
 
-function borderedCode(block: Tokens.Code, width: number, paint?: (line: string) => string): string {
+function borderedCode(block: Tokens.Code, width: number, paint?: (line: string) => string, rawSource?: string): string {
   const theme = getMarkdownTheme();
   const border = theme.codeBlockBorder;
   const innerWidth = Math.max(1, width - 4);
   const button = truncateToWidth(COPY_LABEL, innerWidth + 2, "");
   const titleWidth = innerWidth + 2 - visibleWidth(button);
   const heading = truncateToWidth(block.lang ? `─ ${block.lang} ` : "─", titleWidth, "");
-  const marker = `\x1b]777;pi-code-copy;${visibleWidth(button)};${Buffer.from(block.text).toString("base64")}\x07`;
+  const marker = `\x1b]777;pi-code-copy;${visibleWidth(button)};${Buffer.from(rawSource ?? block.text).toString("base64")}\x07`;
   const top =
     border(`╭${heading}${"─".repeat(titleWidth - visibleWidth(heading))}`) + marker + theme.link(button) + border("╮");
   const bottom = border(`╰${"─".repeat(innerWidth + 2)}╯`);
   // Empty fence rows stay one line even when the language name exceeds the available width.
   // This retains Pi's highlighting, wrapping and handling of unfinished streaming fences.
-  const code = new Markdown(block.raw, 0, 0, { ...theme, codeBlockIndent: "", codeBlockBorder: () => "" });
+  let markdown = block.raw;
+  if (rawSource !== undefined) {
+    // A synthetic closer keeps Pi from hiding a partial closing run in a finished reply.
+    const marker = block.raw.trimStart()[0] === "~" ? "~" : "`";
+    let length = 3;
+    for (const run of rawSource.matchAll(marker === "~" ? /~{3,}/g : /`{3,}/g)) {
+      length = Math.max(length, run[0].length + 1);
+    }
+    const fence = marker.repeat(length);
+    markdown = `${fence}${block.lang}\n${rawSource}\n${fence}`;
+  }
+  const code = new Markdown(markdown, 0, 0, { ...theme, codeBlockIndent: "", codeBlockBorder: () => "" });
   const body = code
     .render(innerWidth)
     .slice(1, -1)
@@ -83,11 +102,25 @@ function trailingNewlines(text: string): string {
   return /\n*$/.exec(text)![0];
 }
 
-function hasClosingFence(raw: string, isStreaming: boolean): boolean {
-  const open = /^ {0,3}(`{3,}|~{3,})[^\n]*\n/u.exec(raw);
-  if (!open) return false;
-  const close = /(?:^|\n) {0,3}(`{3,}|~{3,})[ \t]*(\n*)$/u.exec(raw.slice(open[0].length));
-  return !!close && close[1]![0] === open[1]![0] && close[1]!.length >= open[1]!.length && (!isStreaming || !!close[2]);
+function readFence(raw: string, streamingTail: boolean): Omit<StreamingBlockInput, "width"> | undefined {
+  const open = /^( {0,3})(`{3,}|~{3,})[^\n]*(?:\n|$)/u.exec(raw);
+  if (!open) return undefined;
+  const body = raw.slice(open[0].length);
+  const close = /(?:^|\n) {0,3}(`+|~+)[ \t]*((?:\n[ \t]*)*)$/u.exec(body);
+  const sameMarker = close && close[1]![0] === open[2]![0];
+  const closed = sameMarker && close[1]!.length >= open[2]!.length && (!streamingTail || !!close[2]);
+  // Streaming consumers need the newline that confirms the previous source line, even when the
+  // last line may become a closer. Closed source follows Marked's code text convention.
+  const source = closed
+    ? body.slice(0, close.index)
+    : sameMarker && streamingTail && !close[2]
+      ? body.slice(0, close.index + Number(body[close.index] === "\n"))
+      : body;
+  const indent = open[1]!.length;
+  return {
+    source: indent ? source.replace(new RegExp(`^ {1,${indent}}`, "gmu"), "") : source,
+    phase: closed ? "closed" : "open",
+  };
 }
 
 function centeredTable(table: Tokens.Table, width: number): string {
@@ -125,11 +158,18 @@ function centeredTable(table: Tokens.Table, width: number): string {
 export function createReplyMarkdown() {
   let highlight: CodeHighlight | undefined;
   let resolveBlock: ResolveReplyBlock | undefined;
+  let originalMarkdown: string | undefined;
 
   const transform: MarkdownTransformer = (markdown, context) => {
     if (context.messageType !== "assistant") return markdown;
     const occurrences = new Map<string, number>();
     let renderedBlocks = 0;
+    let fenceOrdinal = 0;
+    // Pi trims each transcript text chunk. Restore its trailing whitespace for fence parsing.
+    const trailingWhitespace =
+      originalMarkdown?.trim() === markdown
+        ? originalMarkdown.slice(originalMarkdown.trimEnd().length).replace(/\r\n?/g, "\n")
+        : "";
 
     const transformList = (list: Tokens.List, width: number, depth = 0): string => {
       const before = renderedBlocks;
@@ -152,7 +192,7 @@ export function createReplyMarkdown() {
       return renderedBlocks === before ? list.raw : items.join("").replace(/\n*$/u, trailingNewlines(list.raw));
     };
 
-    const transformToken = (token: Token, width: number, topLevel = false, streamingTail = false): string => {
+    const transformToken = (token: Token, width: number, topLevel = false, isLastToken = false): string => {
       if (token.type === "table") {
         renderedBlocks++;
         return centeredTable(token as Tokens.Table, width);
@@ -164,11 +204,28 @@ export function createReplyMarkdown() {
         const occurrence = occurrences.get(key) ?? 0;
         occurrences.set(key, occurrence + 1);
         const paint = highlight?.key === key && highlight.occurrence === occurrence ? highlight.paint : undefined;
-        if (topLevel && block.lang && resolveBlock && hasClosingFence(block.raw, streamingTail)) {
-          const custom = resolveBlock({ language: block.lang, text: block.text, key, occurrence });
+        const fence =
+          topLevel &&
+          resolveBlock &&
+          readFence(block.raw + (isLastToken ? trailingWhitespace : ""), context.isStreaming && isLastToken);
+        if (fence) {
+          const ordinal = fenceOrdinal++;
+          const custom =
+            block.lang &&
+            resolveBlock?.({
+              ...fence,
+              width,
+              ordinal,
+              isStreaming: context.isStreaming,
+              language: block.lang.trim().split(/\s+/u, 1)[0]!.toLowerCase(),
+              text: block.text,
+              key,
+              occurrence,
+            });
           if (custom && "slot" in custom) {
             return `\n\n${codeSpan(`\x1b]777;pi-reply-block;${custom.slot}\x07·`)}\n\n`;
           }
+          if (custom && "rawSource" in custom) return borderedCode(block, width, paint, custom.rawSource);
           if (custom) {
             const theme = getMarkdownTheme();
             const diagnostics = custom.errors
@@ -199,25 +256,31 @@ export function createReplyMarkdown() {
 
     const rendered = parser
       .lexer(markdown)
-      .map((token, index, tokens) =>
-        transformToken(token, context.availableWidth, true, context.isStreaming && index === tokens.length - 1),
-      )
+      .map((token, index, tokens) => transformToken(token, context.availableWidth, true, index === tokens.length - 1))
       .join("");
     return renderedBlocks ? rendered.trim() : markdown;
   };
 
   return {
     transform,
-    renderBody<T>(resolve: ResolveReplyBlock, selection: CodeHighlight | undefined, render: () => T): T {
+    renderBody<T>(
+      resolve: ResolveReplyBlock,
+      selection: CodeHighlight | undefined,
+      original: string | undefined,
+      render: () => T,
+    ): T {
       const previousHighlight = highlight;
       const previousResolve = resolveBlock;
+      const previousOriginal = originalMarkdown;
       highlight = selection;
       resolveBlock = resolve;
+      originalMarkdown = original;
       try {
         return render();
       } finally {
         highlight = previousHighlight;
         resolveBlock = previousResolve;
+        originalMarkdown = previousOriginal;
       }
     },
   };

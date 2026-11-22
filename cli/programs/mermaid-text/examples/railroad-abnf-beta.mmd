@@ -1,0 +1,20 @@
+---
+title: "设备遥测记录"
+config:
+  themeVariables:
+    titleColor: "#7dd3fc"
+    lineColor: "#94a3b8"
+    primaryBorderColor: "#7dd3fc"
+    secondaryBorderColor: "#5eead4"
+    secondaryTextColor: "#5eead4"
+---
+railroad-abnf-beta
+; A record carries a device id, a bounded reading, and an optional status.
+record = device-id SP reading [SP status] CRLF ;
+device-id = 3*8ALPHA / 2*12DIGIT ;
+reading = ["-"] 1*3DIGIT "." 2DIGIT ;
+status = "ok" / "warn" / "offline" ;
+SP = %x20 ;
+CRLF = %x0D.0A ;
+ALPHA = %x41-5A / %x61-7A ;
+DIGIT = %x30-39 ;

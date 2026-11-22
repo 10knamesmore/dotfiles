@@ -1,0 +1,26 @@
+---
+title: 河口湿地复育
+config:
+  themeVariables:
+    cynefin:
+      boundaryColor: "#94a3b8"
+      cliffColor: "#fcd37d"
+      labelColor: "#7dd3fc"
+      arrowColor: "#5eead4"
+---
+cynefin-beta
+  complex
+    "分区试种芦苇"
+  complicated
+    "专家测算补水量"
+  clear
+    "按表开闸补水"
+  chaotic
+    "倒灌先封闸"
+  confusion
+    "鱼群死因未明"
+
+  confusion --> complicated : "测盐度、溶氧"
+  chaotic --> complex : "水位稳定"
+  complex --> complicated : "耐盐结果一致"
+  complicated --> clear : "定阈值"

@@ -203,7 +203,6 @@ export function itemInfo(el: El, key: string, path: string, tabs: string[], pare
   const w = itemWords(el, key);
   const tab = tabs.length ? tabs.map((t) => quiet(t, 30)).join(" > ") : undefined;
   return {
-    host: path,
     type: el.type,
     name: el.name,
     key,

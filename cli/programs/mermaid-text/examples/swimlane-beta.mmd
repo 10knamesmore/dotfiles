@@ -1,0 +1,27 @@
+---
+title: 馆藏陶器出库
+---
+swimlane-beta LR
+  subgraph storage["库管"]
+    pack([装箱])
+    pad[加衬]
+  end
+
+  subgraph conservation["修复组"]
+    stable{稳固？}
+  end
+
+  subgraph logistics["运输"]
+    load([装车])
+  end
+
+  pack --> stable
+  stable -->|是| load
+  stable -->|否| pad
+  pad --> stable
+
+  style stable stroke:#7dd3fc,color:#7dd3fc
+  style load stroke:#5eead4,color:#5eead4
+  style pad stroke:#fcd37d,color:#fcd37d
+  linkStyle 1 stroke:#5eead4,color:#5eead4
+  linkStyle 2,3 stroke:#fcd37d,color:#fcd37d

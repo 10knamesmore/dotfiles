@@ -1,40 +1,22 @@
-// pi-tui component for a compiled OpenUI tree: themed colours, hover, click, keyboard, clipboard, pictures, notes.
-import { Key, matchesKey, truncateToWidth, type TuiMouseEvent } from "@earendil-works/pi-tui";
-import { copyToClipboard } from "@earendil-works/pi-coding-agent";
-import { ACTION_STYLES, COPIED_LABEL, COPY_LABEL, FEEDBACK_DURATION_MS } from "@dotfiles/pi-ui/action-feedback";
-import type { ReplyBlockScope } from "@dotfiles/pi-ui/prompt-editor";
+// pi-tui component for a compiled OpenUI tree.
+import { truncateToWidth, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { copyToClipboard, type Theme } from "@earendil-works/pi-coding-agent";
+import { ACTION_STYLES, FEEDBACK_DURATION_MS } from "@dotfiles/pi-ui/action-feedback";
+import { CodeBlockFrame, type CodeBlockBody, type CodeBlockBodyAppearance } from "@dotfiles/pi-ui/code-block";
+import type { ReplyBlockHost, ReplyBlockScope } from "@dotfiles/pi-ui/prompt-editor";
 import { drawBubble } from "../blocks/bubble.ts";
 import { BADGE } from "../blocks/core.ts";
-import {
-  activate,
-  describe,
-  nextTarget,
-  readingOrder,
-  reveal,
-  targetAt,
-  WIDGET_COPY_ID,
-  type Env,
-  type NavKey,
-} from "../blocks/interact.ts";
+import { activate, describe, isLive, reveal, type Env } from "../blocks/interact.ts";
 import { otherLength, setOther } from "../blocks/choice.ts";
 import { buildMessage, cleanNote, NOTE_LIMITS, widgetTitle } from "../blocks/notes.ts";
 import { renderTree } from "../blocks/render.ts";
-import { codeBlock } from "../blocks/code.ts";
 import { newState, type Block, type Note, type Target, type WState } from "../blocks/types.ts";
-import { blank, cell, fromRows, padRow, textCells, vstack } from "../blocks/util.ts";
+import { cell, padRow, textCells } from "../blocks/util.ts";
 import { rowsToLines, textWidth, truncateText, type Cell } from "../diagram/canvas.ts";
 import { createPalette } from "../diagram/palette.ts";
 import { LIMITS, type El } from "../lang/library.ts";
 import { imageService } from "./images.ts";
 
-const GUTTER = 2;
-/**
- * The last column of every line is left empty. pi's fullscreen transcript paints its scrollbar over that column after the
- * component has drawn (always with `fullscreenScrollbar: "always"`, while scrolling by default), so anything there is hidden:
- * the notes chip lost its `]`, a card its right border, a chart its last axis label. pi's own text keeps a margin for the same
- * reason.
- */
-const RIGHT = 1;
 const CHIP = "notes:chip";
 const SERIES = ["accent", "success", "warning", "error", "syntaxKeyword", "syntaxString", "syntaxType", "syntaxNumber"];
 const sgr = (open: string, close: string) => (s: string) => `\x1b[${open}m${s}\x1b[${close}m`;
@@ -74,46 +56,32 @@ export function themePalette(theme: any) {
   });
 }
 
-export type Mode = "live" | "echo";
-
-interface WidgetFocus {
-  id: string | null;
-  dialog: { owner: Entry; abort: AbortController } | null;
-}
-
-export interface OverlayWidgets extends ReplyBlockScope {
-  focus: WidgetFocus;
-}
-
-type WidgetDestination = Mode | OverlayWidgets;
+type WidgetDestination = { mode: "live" | "echo"; requestRender(): void } | ReplyBlockScope;
+type WidgetHost = Pick<ReplyBlockHost, "theme" | "pointer">;
 
 interface Entry {
   root: El;
-  source: string;
-  collapsed: boolean;
-  sourceOpen: boolean;
+  frame: CodeBlockFrame<Target>;
+  theme: Theme;
+  palette: ReturnType<typeof themePalette> | undefined;
   state: WState;
   destination: WidgetDestination;
   block: Block | null;
+  body: CodeBlockBody<Target> | undefined;
   key: string;
   version: number;
-  warnings: string[];
+  dialog: AbortController | null;
   notice: { text: string; tone: "info" | "error" } | null;
   noticeTimer: ReturnType<typeof setTimeout> | null;
   /** Messages awaiting Pi's acceptance, keyed by the button or answer bar that sent them. */
   pending: Map<string, { text: string; timer: ReturnType<typeof setTimeout> | null }>;
   feedbackTimers: Map<string, ReturnType<typeof setTimeout>>;
-  /** the finished lines and what they were drawn from: pi asks for them on every frame, so an unchanged widget answers from here */
-  lines: string[] | null;
-  lineKey: string;
 }
 
 const entries = new Map<string, Entry>();
-export const active: WidgetFocus = { id: null, dialog: null };
 
 /** Services supplied by the Pi adapter. */
 export const hooks = {
-  requestRender: () => {},
   sendLive: (_text: string) => {},
   sendEcho: (_text: string) => {},
   /** Is pi holding messages for later (the agent is busy and a follow-up is queued)? Then a message it has not shown yet is not lost. */
@@ -127,51 +95,88 @@ export const hooks = {
   copy: copyToClipboard,
 };
 
-export const entryOf = (id: string): Entry | undefined => entries.get(id);
-
-const overlayOf = (e: Entry) => (typeof e.destination === "string" ? undefined : e.destination);
-const focusOf = (e: Entry) => overlayOf(e)?.focus ?? active;
-const requestRender = (e: Entry) => (overlayOf(e)?.requestRender ?? hooks.requestRender)();
+const overlayOf = (e: Entry) => ("mode" in e.destination ? undefined : e.destination);
+const redraw = (e: Entry) => e.destination.requestRender();
+function requestRender(e: Entry): void {
+  e.frame.invalidate();
+  redraw(e);
+}
 
 // pi converts JPEG, GIF and WebP lazily after startup: when a picture becomes drawable, lay every widget out again
 imageService.onLate = () => {
-  const overlays = new Set<OverlayWidgets>();
+  const renderHosts = new Set<() => void>();
   for (const e of entries.values()) {
     e.version++;
-    const overlay = overlayOf(e);
-    if (overlay) overlays.add(overlay);
+    e.frame.invalidate();
+    renderHosts.add(e.destination.requestRender);
   }
-  hooks.requestRender();
-  for (const overlay of overlays) overlay.requestRender();
+  for (const render of renderHosts) render();
 };
 
-function getEntry(id: string, root: El, destination: WidgetDestination, source: string): Entry {
-  let e = entries.get(id);
-  if (!e) {
-    e = {
-      root,
-      source,
-      collapsed: false,
-      sourceOpen: false,
-      state: newState(),
-      destination,
-      block: null,
-      key: "",
-      version: 0,
-      warnings: [],
-      notice: null,
-      noticeTimer: null,
-      pending: new Map(),
-      feedbackTimers: new Map(),
-      lines: null,
-      lineKey: "",
-    };
-    entries.set(id, e);
-  }
+function getEntry(
+  id: string,
+  root: El,
+  { theme, pointer }: WidgetHost,
+  destination: WidgetDestination,
+  source: string,
+): Entry {
+  const existing = entries.get(id);
+  if (existing) return existing;
+  const title = widgetTitle(root);
+  const e: Entry = {
+    root,
+    theme,
+    palette: undefined,
+    frame: new CodeBlockFrame<Target>({
+      title: title ? `OpenUI · ${title}` : "OpenUI",
+      theme,
+      pointer,
+      source: () => source,
+      copy: (text) => {
+        if (e.notice) {
+          setNotice(id, null);
+          e.frame.invalidate();
+        }
+        return hooks.copy(text);
+      },
+      renderBody: (width) => layout(e, width),
+      requestRender: () => redraw(e),
+      interaction: {
+        enabled: (target) => isLive(target, e.state.noteMode),
+        activate: (target, shift) => {
+          if (e.notice) setNotice(id, null);
+          if (reveal(target, e.state)) e.version++;
+          perform(id, e, target, shift);
+          e.frame.invalidate();
+        },
+        viewChanged: () => {
+          if (e.notice) setNotice(id, null);
+          if (e.state.noteMode) {
+            e.state.noteMode = false;
+            e.version++;
+          }
+          e.frame.invalidate();
+        },
+        viewNotice: () => (e.notice ? noticeLine(e.theme, e.notice) : undefined),
+      },
+    }),
+    state: newState(),
+    destination,
+    block: null,
+    body: undefined,
+    key: "",
+    version: 0,
+    dialog: null,
+    notice: null,
+    noticeTimer: null,
+    pending: new Map(),
+    feedbackTimers: new Map(),
+  };
+  entries.set(id, e);
   return e;
 }
 
-function sendFollowUp(id: string, e: Entry, overlay: OverlayWidgets, text: string): boolean {
+function sendFollowUp(id: string, e: Entry, overlay: ReplyBlockScope, text: string): boolean {
   try {
     if (overlay.sendFollowUp(text)) return true;
   } catch {
@@ -187,12 +192,12 @@ function envFor(id: string, e: Entry): Env {
     send: (t, o) => {
       const targetId = o?.targetId ?? "send";
       const destination = e.destination;
-      if (typeof destination !== "string") {
+      if (!("mode" in destination)) {
         if (!sendFollowUp(id, e, destination, t)) return false;
         if (o?.confirm && entries.get(id) === e) markDelivered(e, targetId);
         return true;
       }
-      if (destination === "echo") {
+      if (destination.mode === "echo") {
         hooks.sendEcho(t);
         if (o?.targetId) markDelivered(e, targetId);
         return true;
@@ -294,7 +299,7 @@ function watchDelivery(id: string, e: Entry, text: string, targetId: string): vo
     if (held) {
       e.state.delivery[targetId] = "queued";
       e.version++;
-      hooks.requestRender();
+      requestRender(e);
       pending.timer = later(check);
       return;
     }
@@ -306,7 +311,7 @@ function watchDelivery(id: string, e: Entry, text: string, targetId: string): vo
     }
     e.version++;
     setNotice(id, "Pi did not accept the message. Fix what it says above, then send again.", "error");
-    hooks.requestRender();
+    requestRender(e);
   };
   pending.timer = later(check);
 }
@@ -339,12 +344,11 @@ const chipLabel = (s: WState) =>
   s.noteMode ? "[ notes: on ]" : s.notes.length ? `[ notes ${s.notes.length} ]` : "[ notes ]";
 
 async function prompt(id: string, e: Entry, title: string, initial: string): Promise<string | undefined> {
-  const focus = focusOf(e);
-  const dialog = { owner: e, abort: new AbortController() };
-  focus.dialog = dialog;
+  const dialog = new AbortController();
+  e.dialog = dialog;
   try {
     const overlay = overlayOf(e);
-    return overlay ? await overlay.prompt(title, initial, dialog.abort.signal) : await hooks.prompt(title, initial);
+    return overlay ? await overlay.prompt(title, initial, dialog.signal) : await hooks.prompt(title, initial);
   } catch {
     if (entries.get(id) === e) {
       setNotice(id, "The editor could not be opened.");
@@ -352,23 +356,20 @@ async function prompt(id: string, e: Entry, title: string, initial: string): Pro
     }
     return undefined;
   } finally {
-    if (focus.dialog === dialog) focus.dialog = null;
+    if (e.dialog === dialog) e.dialog = null;
   }
 }
 
 function setMode(id: string, e: Entry, on: boolean) {
   e.state.noteMode = on;
-  e.state.focus = null;
-  e.state.hover = null;
   e.state.tip = null;
   e.version++;
-  if (on) focusOf(e).id = id;
   setNotice(id, null);
   requestRender(e);
 }
 
 async function writeNote(id: string, e: Entry, t: Target): Promise<void> {
-  if (focusOf(e).dialog || !t.item) return;
+  if (e.dialog || !t.item) return;
   const existing = e.state.notes.find((n) => n.itemId === t.id);
   if (!existing && e.state.notes.length >= NOTE_LIMITS.notes) {
     setNotice(id, `${NOTE_LIMITS.notes} notes is the most per widget.`);
@@ -380,7 +381,7 @@ async function writeNote(id: string, e: Entry, t: Target): Promise<void> {
 
 async function editNote(id: string, e: Entry, noteId: number | undefined): Promise<void> {
   const n = e.state.notes.find((x) => x.id === noteId);
-  if (n && !focusOf(e).dialog) await ask(id, e, n, { itemId: n.itemId, info: n.info });
+  if (n && !e.dialog) await ask(id, e, n, { itemId: n.itemId, info: n.info });
 }
 
 async function ask(
@@ -424,16 +425,12 @@ function addToMessage(id: string, e: Entry) {
   }
   e.state.notes = [];
   e.state.noteMode = false;
-  e.state.focus = null;
-  const focus = focusOf(e);
-  if (focus.id === id) focus.id = null;
   e.version++;
   requestRender(e);
 }
 
 function clearNotes(id: string, e: Entry) {
   e.state.notes = [];
-  e.state.focus = null;
   e.version++;
   setNotice(id, "Notes cleared.");
   requestRender(e);
@@ -441,13 +438,10 @@ function clearNotes(id: string, e: Entry) {
 
 // ---------- choices ----------
 
-/**
- * The Other row of a Choice. The user types their own answer in pi's editor (the one Notes uses), never inside the widget: an
- * armed widget must not keep letters. Saved text selects Other, empty text unselects it, Esc changes nothing.
- */
+/** Saved text selects Other; saving an empty answer unselects it. */
 async function editOther(id: string, e: Entry, t: Target): Promise<void> {
   const x = t.choice;
-  if (!x || focusOf(e).dialog || e.state.sent) return;
+  if (!x || e.dialog || e.state.sent) return;
   const text = await prompt(
     id,
     e,
@@ -461,24 +455,8 @@ async function editOther(id: string, e: Entry, t: Target): Promise<void> {
   requestRender(e);
 }
 
-/** One place for what a click or Enter does, so the mouse and the keyboard cannot drift apart. */
-function perform(id: string, e: Entry, t: Target, shift = false): void {
+function perform(id: string, e: Entry, t: Target, shift: boolean): void {
   switch (t.kind) {
-    case "fold":
-      e.collapsed = !e.collapsed;
-      e.state.hover = null;
-      e.state.focus = t.id;
-      e.state.noteMode = false;
-      e.version++;
-      return;
-    case "source":
-      e.sourceOpen = !e.sourceOpen;
-      e.collapsed = false;
-      e.state.hover = null;
-      e.state.focus = t.id;
-      e.state.noteMode = false;
-      e.version++;
-      return;
     case "notes":
       setMode(id, e, !e.state.noteMode);
       return;
@@ -505,435 +483,190 @@ function perform(id: string, e: Entry, t: Target, shift = false): void {
       break;
   }
   if (activate(t, e.state, envFor(id, e))) e.version++;
-  // The button that was pressed is gone from the next picture. Focus must not be left pointing at it: Enter would find nothing
-  // and fall through to the first element of the widget, and that can be a Button that sends a message.
-  if (t.kind === "send" && e.state.sent) {
-    // A submitted answer bar returns keyboard control to the surrounding editor.
-    e.state.focus = null;
-    const focus = focusOf(e);
-    if (focus.id === id) focus.id = null;
-  } else if (t.kind === "clear" && e.block)
-    e.state.focus = readingOrder(e.block).find((x) => x.kind === "choice")?.id ?? null;
 }
 
 // ---------- the component ----------
 
-/** Restyle one cell for hover or focus. Replaces the cell: the originals belong to the cached layout and are shared by every redraw. */
-const mark = (row: Cell[], x: number, suffix: string) => {
+/** The originals belong to the cached layout and are shared by every redraw. */
+const markHovered = (row: Cell[], x: number) => {
   const c = row[x];
   if (c.role.startsWith("note.")) return; // a tooltip badge or a pin keeps its own colour
-  if (c.role) row[x] = cell(c.ch, `${c.role}.${suffix}`);
-  else if (c.ch.trim()) row[x] = cell(c.ch, suffix);
+  if (c.role) row[x] = cell(c.ch, `${c.role}.hover`);
+  else if (c.ch.trim()) row[x] = cell(c.ch, "hover");
 };
 
+function layout(e: Entry, width: number): CodeBlockBody<Target> {
+  const key = `${width}:${e.version}`;
+  if (e.body && e.key === key) return e.body;
+  const { block: rendered, warnings } = renderTree(
+    e.root,
+    Math.max(24, width),
+    e.state,
+    { images: imageService },
+    !!overlayOf(e),
+  );
+  let block = rendered;
+  if (block.targets.some((target) => target.kind === "item")) {
+    const label = chipLabel(e.state);
+    const chipWidth = textWidth(label);
+    const x = Math.max(0, width - chipWidth);
+    const chip = textCells(label, e.state.noteMode ? "notes.on" : "btn");
+    const w = Math.max(block.w, width);
+    block = {
+      w,
+      rows: [...block.rows, padRow(padRow([], x).concat(chip), w)],
+      targets: [
+        ...block.targets,
+        { id: CHIP, kind: "notes", rect: { x, y: block.rows.length, w: chipWidth, h: 1 }, label: "notes" },
+      ],
+    };
+  }
+  e.block = block;
+  e.key = key;
+  e.body = {
+    targets: block.targets,
+    copyText: () => rowsToLines(rendered.rows).join("\n"),
+    draw: (appearance) => draw(e, block, warnings, width, appearance),
+  };
+  return e.body;
+}
+
+function noticeLine(theme: Theme, { text, tone }: NonNullable<Entry["notice"]>): string {
+  return theme.fg("accent", "▸ ") + theme.fg(tone === "error" ? "error" : "muted", text);
+}
+
+function draw(
+  e: Entry,
+  block: Block,
+  warnings: string[],
+  width: number,
+  { hovered, control }: CodeBlockBodyAppearance<Target>,
+) {
+  const notes = e.state.noteMode;
+  // Each cell belongs to the cached layout. Paint by replacing cells in a copy of the rows.
+  const rows: Cell[][] = block.rows.map((r) => r.slice());
+  const paintHover = (t: Target | undefined) => {
+    if (!t) return;
+    if (t.kind === "item" && t.item?.key === "") return;
+    if (t.kind === "image" && t.image) {
+      // The picture itself cannot be styled: light up the frame around it.
+      const r = t.rect;
+      for (let y = r.y - 1; y <= r.y + r.h; y++)
+        for (let x = r.x - 1; x <= r.x + r.w; x++) {
+          const onRing = y === r.y - 1 || y === r.y + r.h || x === r.x - 1 || x === r.x + r.w;
+          if (onRing && rows[y]?.[x]) markHovered(rows[y], x);
+        }
+      return;
+    }
+    for (let y = t.rect.y; y < t.rect.y + t.rect.h; y++)
+      for (let x = Math.max(0, t.rect.x); x < Math.min(block.w, t.rect.x + t.rect.w); x++)
+        if (rows[y]?.[x]) markHovered(rows[y], x);
+  };
+  paintHover(hovered);
+  if (hovered?.tip?.hint && !notes) drawBubble(rows, block.w, hovered);
+
+  const footerCells = (): Cell[] => {
+    if (e.notice)
+      return [
+        ...textCells("▸ ", "foot.mark"),
+        ...textCells(e.notice.text, e.notice.tone === "error" ? "action.error" : "foot.text"),
+      ];
+    if (control) return [...textCells("▸ ", "foot.mark"), ...textCells(control.label, "foot.text")];
+    if (hovered)
+      return [...textCells("▸ ", "foot.mark"), ...textCells(describe(hovered, !!overlayOf(e), notes), "foot.text")];
+    if (notes) return textCells("Click an element to add a note.", "foot.text");
+    const tips = new Set(block.targets.flatMap((x) => (x.tip ? [x.tip] : []))).size;
+    if (tips)
+      return [
+        ...textCells(BADGE, "foot.mark"),
+        ...textCells(` ${tips} tooltip${tips === 1 ? "" : "s"}: hover for hints`, "foot.text"),
+      ];
+    return [];
+  };
+  const chipT = block.targets.find((t) => t.kind === "notes");
+  const text = footerCells();
+  if (chipT && rows[chipT.rect.y]) {
+    const room = chipT.rect.x - 2;
+    const cells = textCells(truncateText(text.map((c) => c.ch).join(""), Math.max(0, room)), "foot.text");
+    text.forEach((c, i) => {
+      if (cells[i]) cells[i] = cell(cells[i].ch, c.role);
+    });
+    cells.forEach((c, i) => {
+      if (i < rows[chipT.rect.y].length) rows[chipT.rect.y][i] = c;
+    });
+  } else if (text.length) rows.push(padRow(text, Math.min(width, text.length)));
+
+  const th = e.theme;
+  const palette = (e.palette ??= themePalette(th));
+  const lines = rowsToLines(rows, palette);
+  const imageRows = new Set<number>();
+  for (const t of block.targets) {
+    if (t.kind !== "image" || !t.image) continue;
+    const seq = imageService.sequence(t.image.key);
+    const row = rows[t.rect.y];
+    if (!seq || !row || t.rect.x < 0 || t.rect.x + t.image.cols > width) continue;
+    const left = rowsToLines([row.slice(0, t.rect.x)], palette, false)[0] ?? "";
+    const rightX = t.rect.x + t.image.cols;
+    const right = truncateToWidth(rowsToLines([row.slice(rightX)], palette)[0] ?? "", width - rightX, "…", true);
+    // Kitty leaves the cursor at the image's origin: step over it before drawing the rest of the row.
+    lines[t.rect.y] = left + seq + `\x1b[${t.image.cols}C` + right;
+    imageRows.add(t.rect.y);
+  }
+  for (const warning of warnings) lines.push(th.fg("warning", `! ${warning}`));
+  return { lines, imageRows };
+}
+
 export class OpenUIWidget {
-  id: string;
-  theme: any;
-  private pal: ReturnType<typeof themePalette> | null = null;
-  private root: El;
-  private source: string;
-  private contentWidth: number | undefined;
-  private disposed = false;
+  private readonly entry: Entry;
+
   constructor(
-    id: string,
+    private readonly id: string,
     root: El,
-    theme: any,
-    private readonly destination: WidgetDestination,
+    host: WidgetHost,
+    destination: WidgetDestination,
     source: string,
   ) {
-    this.id = id;
-    this.theme = theme;
-    this.root = root;
-    this.source = source;
-    getEntry(id, root, destination, source);
+    this.entry = getEntry(id, root, host, destination, source);
   }
 
-  private header(e: Entry, width: number, body: Block): Block {
-    const controls: Array<{ text: string; role: string; target: Omit<Target, "rect"> }> = [
-      {
-        text: e.sourceOpen ? "-[widget]-" : "-[source]-",
-        role: "action",
-        target: { id: "widget:source", kind: "source", label: e.sourceOpen ? "show widget" : "view OpenUI source" },
-      },
-    ];
-    if (!e.collapsed) {
-      const copied = e.state.copied === WIDGET_COPY_ID;
-      controls.push({
-        text: copied ? COPIED_LABEL : COPY_LABEL,
-        role: copied ? "action.success" : "action",
-        target: {
-          id: WIDGET_COPY_ID,
-          kind: "copy",
-          label: e.sourceOpen ? "copy OpenUI source" : "copy rendered widget as text",
-          copy: e.sourceOpen ? e.source : rowsToLines(body.rows).join("\n"),
-        },
-      });
-    }
-    controls.push({
-      text: e.collapsed ? "-[show]-" : "-[hide]-",
-      role: "action",
-      target: { id: "widget:fold", kind: "fold", label: e.collapsed ? "expand widget" : "collapse widget" },
-    });
-    const controlsWidth = controls.reduce((n, c) => n + textWidth(c.text), 0) + controls.length - 1;
-    const inline = width >= controlsWidth + 12;
-    const title = truncateText(` OpenUI · ${widgetTitle(e.root)} `, inline ? width - controlsWidth - 3 : width - 2);
-    const rule = "─ ".repeat(Math.ceil(width / 2)).slice(0, width - 2);
-    const rows = [textCells(`╭${rule}╮`, "widget.border")];
-    textCells(title, "widget.border").forEach((c, i) => {
-      rows[0][i + 1] = c;
-    });
-    const targets: Target[] = [];
-    let x = inline ? width - controlsWidth - 1 : 1;
-    let y = inline ? 0 : 1;
-    for (const control of controls) {
-      const cells = textCells(control.text, control.role);
-      if (x + cells.length > width - 1) {
-        x = 1;
-        y++;
-      }
-      rows[y] ??= padRow([], width);
-      if (x > 1) rows[y][x - 1] = cell(" ");
-      cells.forEach((c, i) => {
-        rows[y][x + i] = c;
-      });
-      targets.push({ ...control.target, rect: { x, y, w: cells.length, h: 1 } });
-      x += cells.length + 1;
-    }
-    return fromRows(width, rows, targets);
-  }
-
-  private layout(width: number): Entry {
-    // the entry is made again if the session's state was dropped while this widget was still on screen
-    const e = getEntry(this.id, this.root, this.destination, this.source);
-    const key = `${width}:${e.version}`;
-    if (!e.block || e.key !== key) {
-      const r = e.collapsed
-        ? { block: blank(width, 0), warnings: [] }
-        : e.sourceOpen
-          ? { block: codeBlock(e.source, undefined, "OpenUI source", width, null, false), warnings: [] }
-          : renderTree(e.root, width, e.state, { images: imageService }, !!overlayOf(e));
-      let block = r.block;
-      // a footer row with the notes chip, when there is anything to attach a note to
-      if (block.targets.some((t) => t.kind === "item")) {
-        const w = Math.max(block.w, width);
-        const label = chipLabel(e.state);
-        const cw = textWidth(label);
-        const chip: Cell[] = textCells(label, e.state.noteMode ? "notes.on" : "btn");
-        const row = padRow([], w - cw).concat(chip);
-        block = {
-          w,
-          rows: [...block.rows.map((x) => padRow(x, w)), row],
-          targets: [
-            ...block.targets,
-            { id: CHIP, kind: "notes", rect: { x: w - cw, y: block.rows.length, w: cw, h: 1 }, label: "notes" },
-          ],
-        };
-      }
-      e.block = vstack([this.header(e, width, r.block), block], 0, Math.max(width, block.w));
-      e.warnings = r.warnings;
-      e.key = key;
-    }
-    return e;
-  }
-
-  /** the block as last laid out, for tests and the keyboard layer */
-  lastBlock(): Block | null {
-    return entries.get(this.id)?.block ?? null;
+  render(width: number): string[] {
+    return this.entry.frame.render(width);
   }
 
   copyRenderedText(): string | undefined {
-    const width = this.contentWidth;
-    const entry = entries.get(this.id);
-    if (width === undefined || !entry) return undefined;
-    if (!entry.collapsed && !entry.sourceOpen)
-      return this.layout(width).block?.targets.find((target) => target.id === WIDGET_COPY_ID)?.copy;
-    const { block } = renderTree(entry.root, width, entry.state, { images: imageService }, !!overlayOf(entry));
-    return rowsToLines(block.rows).join("\n");
+    return this.entry.frame.copyRenderedText();
   }
 
-  /**
-   * pi calls this for every widget in the transcript on every frame (up to 60 a second, and again for each mouse event), so
-   * the work is done once per distinct appearance. What changes the picture is in the key: the layout (width and version), the
-   * pointer and keyboard focus, whether the widget is armed or in notes mode, the notice and an open tooltip. It never throws:
-   * pi's render loop is not a place for an exception.
-   */
-  render(width: number): string[] {
-    if (this.disposed) return [];
-    try {
-      const avail = Math.max(24, width - GUTTER - RIGHT);
-      const e = this.layout(avail);
-      this.contentWidth = avail;
-      const s = e.state;
-      const key = `${e.key}|${s.hover}|${s.focus}|${s.tip}|${s.copied}|${s.noteMode}|${s.notes.length}|${e.notice?.text}|${e.notice?.tone}|${focusOf(e).id === this.id}`;
-      if (e.lines && e.lineKey === key) return e.lines;
-      const lines = this.draw(e, width, avail);
-      e.lines = lines;
-      e.lineKey = key;
-      return lines;
-    } catch (err) {
-      const msg = String((err as Error)?.message ?? err)
-        .replace(/\s+/g, " ")
-        .slice(0, 120);
-      return [truncateToWidth(this.theme.fg("error", `! the widget could not be drawn: ${msg}`), Math.max(1, width))];
-    }
-  }
-
-  private draw(e: Entry, width: number, avail: number): string[] {
-    const block = e.block!;
-    const notes = e.state.noteMode;
-    // the cells themselves are shared with the layout: a cell is replaced, never changed (see `mark`)
-    const rows: Cell[][] = block.rows.map((r) => r.slice());
-    const paint = (id: string | null, suffix: string) => {
-      if (!id) return;
-      const t = block.targets.find((x) => x.id === id);
-      if (!t) return;
-      if (t.kind === "item" && t.item?.key === "") return;
-      if (t.kind === "image" && t.image) {
-        // the picture itself cannot be styled: light up the frame around it
-        const r = t.rect;
-        for (let y = r.y - 1; y <= r.y + r.h; y++)
-          for (let x = r.x - 1; x <= r.x + r.w; x++) {
-            const onRing = y === r.y - 1 || y === r.y + r.h || x === r.x - 1 || x === r.x + r.w;
-            if (onRing && rows[y]?.[x]) mark(rows[y], x, suffix);
-          }
-        return;
-      }
-      for (let y = t.rect.y; y < t.rect.y + t.rect.h; y++)
-        for (let x = Math.max(0, t.rect.x); x < Math.min(block.w, t.rect.x + t.rect.w); x++)
-          if (rows[y]?.[x]) mark(rows[y], x, suffix);
-    };
-    paint(e.state.hover, "hover");
-    paint(e.state.focus, "focus");
-    const current = block.targets.find((x) => x.id === (e.state.hover ?? e.state.focus));
-    if (current?.tip?.hint && !notes) drawBubble(rows, block.w, current);
-
-    // the footer: what the pointer or focus is on, a notice, or how to reach tooltips and notes
-    const footerCells = (): Cell[] => {
-      const tips = new Set(block.targets.flatMap((x) => (x.tip ? [x.tip] : []))).size;
-      if (e.notice)
-        return [
-          ...textCells("▸ ", "foot.mark"),
-          ...textCells(e.notice.text, e.notice.tone === "error" ? "action.error" : "foot.text"),
-        ];
-      if (current)
-        return [...textCells("▸ ", "foot.mark"), ...textCells(describe(current, !!overlayOf(e)), "foot.text")];
-      if (notes)
-        return [...textCells("Notes: click an element, or Tab to it and press Enter. Esc leaves.", "foot.text")];
-      if (tips)
-        return [
-          ...textCells(BADGE, "foot.mark"),
-          ...textCells(
-            ` ${tips} element${tips === 1 ? " has a" : "s have"} tooltip${tips === 1 ? "" : "s"}: hover ${tips === 1 ? "it" : "one"}, or press Tab then Enter`,
-            "foot.text",
-          ),
-        ];
-      return [];
-    };
-    const chipT = block.targets.find((t) => t.kind === "notes");
-    const text = footerCells();
-    if (chipT && rows[chipT.rect.y]) {
-      const room = chipT.rect.x - 2;
-      const cells = textCells(truncateText(text.map((c) => c.ch).join(""), Math.max(0, room)), "foot.text");
-      text.forEach((c, i) => {
-        if (cells[i]) cells[i] = cell(cells[i].ch, c.role); // cells are shared: build another, never change one
-      });
-      cells.forEach((c, i) => {
-        if (i < rows[chipT.rect.y].length) rows[chipT.rect.y][i] = c;
-      });
-    } else if (text.length && (!e.collapsed || e.notice))
-      rows.push(padRow(text, Math.min(avail, Math.max(text.length, 1))));
-
-    const th = this.theme;
-    const basePalette = (this.pal ??= themePalette(th));
-    const focused = focusOf(e).id === this.id;
-    const borderStyle = { fg: focused ? "accent" : "dim", dim: !focused };
-    const palette: typeof basePalette = (role) =>
-      role === "widget.border" ? (text) => th.style(text, borderStyle) : basePalette(role);
-    const lines = rowsToLines(rows, palette);
-    // pictures: the rows are reserved and framed; the first row of each carries the terminal's image command
-    const imageRows = new Set<number>();
-    for (const t of block.targets) {
-      if (t.kind !== "image" || !t.image) continue;
-      const seq = imageService.sequence(t.image.key);
-      const row = rows[t.rect.y];
-      if (!seq || !row) continue;
-      const left = rowsToLines([row.slice(0, t.rect.x)], palette, false)[0] ?? "";
-      const right = rowsToLines([row.slice(t.rect.x + t.image.cols)], palette)[0] ?? "";
-      // Kitty places the picture at the cursor and leaves the cursor there: step over it before the rest of the row
-      lines[t.rect.y] = left + seq + `\x1b[${t.image.cols}C` + right;
-      imageRows.add(t.rect.y);
-    }
-    for (const w of e.warnings) lines.push(th.fg("warning", `! ${w}`));
-    const indent = " ".repeat(GUTTER);
-    const content = lines.map((l, i) => (imageRows.has(i) ? indent + l : truncateToWidth(indent + l, width)));
-    const ruleWidth = Math.max(0, width - GUTTER - RIGHT - 2);
-    const rule = "─ ".repeat(Math.ceil(ruleWidth / 2)).slice(0, ruleWidth);
-    return e.collapsed ? content : [...content, indent + th.style(`╰${rule}╯`, borderStyle)];
-  }
-
-  handleMouse(ev: TuiMouseEvent) {
-    try {
-      return this.mouse(ev);
-    } catch {
-      return undefined; // pi's input handling is not a place for an exception either
-    }
-  }
-
-  private mouse(ev: TuiMouseEvent) {
-    const e = entries.get(this.id);
-    if (!e || !e.block || focusOf(e).dialog) return undefined;
-    const t = targetAt(e.block, ev.x - GUTTER, ev.y, e.state.noteMode);
-    if (ev.type === "move") {
-      const id = t?.id ?? null;
-      if (id === e.state.hover) return undefined;
-      e.state.hover = id;
-      if (overlayOf(e) && !t) requestRender(e);
-      return { handled: !!t, render: true };
-    }
-    if (ev.type === "click" && ev.button === "left" && t) {
-      focusOf(e).id = this.id;
-      e.state.focus = t.id;
-      setNotice(this.id, null);
-      perform(this.id, e, t, !!ev.shift);
-      if (reveal(t, e.state)) e.version++;
-      requestRender(e);
-      return { handled: true, render: true };
-    }
-    return undefined;
-  }
-
-  handleInput(data: string): boolean {
-    const e = entries.get(this.id);
-    const focus = e?.block && overlayOf(e)?.focus;
-    if (!focus || focus.dialog) return false;
-    if (focus.id === null && (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab")))) focus.id = this.id;
-    return focus.id === this.id && handleKey(data, focus);
+  handleMouse(event: TuiMouseEvent) {
+    if (this.entry.dialog) return undefined;
+    return this.entry.frame.handleMouse(event);
   }
 
   dispose(): void {
-    this.disposed = true;
-    const e = entries.get(this.id);
-    if (e) releaseEntry(this.id, e);
+    if (entries.get(this.id) === this.entry) releaseEntry(this.id, this.entry);
   }
 
-  /** pi calls this when the theme, the cell size or a converter changes: the colours (and a picture's size) are stale. */
-  invalidate() {
-    this.pal = null;
-    const e = entries.get(this.id);
-    if (!e) return;
-    e.lines = null;
-    if (e.block?.targets.some((t) => t.kind === "image")) {
-      imageService.reset();
-      e.version++;
-    }
+  invalidate(): void {
+    const e = this.entry;
+    e.palette = undefined;
+    e.frame.invalidate();
+    if (!e.block?.targets.some((target) => target.kind === "image")) return;
+    imageService.reset();
+    e.version++;
   }
-}
-
-/** Keyboard layer while a widget is armed. Returns true when the key was used. Never throws. */
-export function handleKey(data: string, focus = active): boolean {
-  try {
-    return keyInner(data, focus);
-  } catch {
-    return false;
-  }
-}
-
-function keyInner(data: string, focus: WidgetFocus): boolean {
-  if (!focus.id || focus.dialog) return false;
-  const id = focus.id;
-  const e = entries.get(id);
-  if (!e || !e.block) return false;
-  const block = e.block;
-  const notes = e.state.noteMode;
-  if (matchesKey(data, Key.escape)) {
-    if (e.state.tip) {
-      e.state.tip = null;
-      e.version++;
-    } else if (notes) {
-      setMode(id, e, false);
-      return true;
-    } else {
-      focus.id = null;
-      e.state.focus = null;
-    }
-    requestRender(e);
-    return true;
-  }
-  let nav: NavKey | null = null;
-  if (matchesKey(data, Key.tab)) nav = "next";
-  else if (matchesKey(data, Key.shift("tab"))) nav = "prev";
-  else if (matchesKey(data, Key.left)) nav = "left";
-  else if (matchesKey(data, Key.right)) nav = "right";
-  else if (matchesKey(data, Key.up)) nav = "up";
-  else if (matchesKey(data, Key.down)) nav = "down";
-  if (nav) {
-    const t = nextTarget(block, e.state.focus, nav, notes);
-    if (!t) return false;
-    e.state.focus = t.id;
-    e.state.hover = null; // the keyboard is in charge now: a stale pointer hover must not describe another target
-    setNotice(id, null);
-    if (reveal(t, e.state)) e.version++;
-    requestRender(e);
-    return true;
-  }
-  if (matchesKey(data, Key.enter) || matchesKey(data, Key.shift("enter"))) {
-    const focused = e.state.focus ? block.targets.find((x) => x.id === e.state.focus) : undefined;
-    if (e.state.focus && !focused) {
-      // the focused element is gone (a button removes itself when it is pressed): never press another one in its place
-      e.state.focus = null;
-      e.state.hover = null;
-      requestRender(e);
-      return true;
-    }
-    const t = focused ?? nextTarget(block, null, "next", notes);
-    if (!t) return false;
-    e.state.focus = t.id;
-    e.state.hover = null;
-    perform(id, e, t, matchesKey(data, Key.shift("enter")));
-    requestRender(e);
-    return true;
-  }
-  // Delete (or Backspace) on a note in the tray removes it
-  if (matchesKey(data, Key.delete) || matchesKey(data, Key.backspace)) {
-    const t = block.targets.find((x) => x.id === e.state.focus);
-    if (t?.kind === "note") {
-      e.state.notes = e.state.notes.filter((n) => n.id !== t.noteId);
-      e.state.focus = null;
-      e.version++;
-      requestRender(e);
-      return true;
-    }
-  }
-  // The user started typing (a letter, a space, a paste): the keyboard belongs to the editor again. Without this, Enter
-  // would keep re-firing the focused button instead of sending the message being typed.
-  if ([...data].some((ch) => ch >= " " && ch !== "\x7f")) {
-    focus.id = null;
-    e.state.focus = null;
-    e.state.hover = null;
-    if (e.state.noteMode) {
-      e.state.noteMode = false;
-      e.version++;
-    }
-    requestRender(e);
-  }
-  return false;
 }
 
 function releaseEntry(id: string, e: Entry) {
   entries.delete(id);
-  const focus = focusOf(e);
-  if (focus.id === id) focus.id = null;
-  if (focus.dialog?.owner === e) {
-    const { abort } = focus.dialog;
-    focus.dialog = null;
-    abort.abort();
-  }
+  e.frame.dispose();
+  e.dialog?.abort();
+  e.dialog = null;
   if (e.noticeTimer) clearTimeout(e.noticeTimer);
   for (const pending of e.pending.values()) if (pending.timer) clearTimeout(pending.timer);
   for (const timer of e.feedbackTimers.values()) clearTimeout(timer);
 }
 
-/** Forget every widget's state (notes, focus, layouts). Called when a session ends: pi processes live for days. */
+/** Release widget state when the session ends. */
 export function resetAll() {
   for (const [id, e] of entries) releaseEntry(id, e);
   imageService.reset();

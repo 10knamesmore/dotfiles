@@ -138,6 +138,14 @@ dots.install.cargo({
   platforms = { "linux" },
 })
 
+dots.install.cargo({
+  source = {
+    path = "cli/programs/mermaid-text",
+    binary = "mermaid-text",
+  },
+  root = "~/.local",
+})
+
 local cargo_packages = {
   "matugen",
   "du-dust",

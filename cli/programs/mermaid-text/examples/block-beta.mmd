@@ -1,0 +1,30 @@
+---
+title: 图书馆旧报纸的数字化工位
+config:
+  themeVariables:
+    lineColor: "#94a3b8"
+---
+block-beta
+    columns 3
+    scan[/"批量扫描"/]:2  source[("原片")]
+
+    block:work["图像处理"]:3
+        columns 2
+        crop["裁边纠偏"]  ocr["文字识别"]
+        proof{{"抽样复核"}}:2
+    end
+
+    catalog["全文索引"]:2  archive[("馆藏库")]
+
+    scan --> source
+    source --> crop
+    crop --> ocr
+    ocr --> proof
+    proof -. "返工" .-> crop
+    proof -- "通过" --> catalog
+    proof -- "归档" --> archive
+
+    classDef storage stroke:#c4b5fd,color:#c4b5fd
+    class source,archive storage
+    style proof stroke:#fcd37d,color:#fcd37d
+    style catalog stroke:#5eead4,color:#5eead4

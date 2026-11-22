@@ -61,6 +61,21 @@ return {
   priority = 1000, -- 优先加载
   lazy = false, -- 启动时立即加载插件
   opts = function()
+    -- 显式覆盖带 ; extends 的 Snacks Markdown query，保留 math 围栏。
+    vim.treesitter.query.set(
+      "markdown",
+      "images",
+      [[
+        (fenced_code_block
+          (info_string (language) @lang)
+          (#eq? @lang "math")
+          (code_fence_content) @image.content
+          (#set! injection.language "latex")
+          (#set! image.ext "math.tex")
+        ) @image
+      ]]
+    )
+
     --- lazygit 里按 e（os.edit / os.editAtLine / os.openDirInEditor）的完整命令。
     --- snacks 内建的 os.editPreset = "nvim-remote" 用 --remote-tab，会新开 tab；这里换成：
     --- 先关掉 lazygit 浮窗（utils.lazygit.hide，lazygit 进程留后台），窗口让回打开 lazygit

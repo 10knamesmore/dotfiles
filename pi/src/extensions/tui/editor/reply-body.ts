@@ -4,7 +4,6 @@ import {
   ExtensionEditorComponent,
   getMarkdownTheme,
   type ExtensionContext,
-  type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
   Container,
@@ -24,12 +23,17 @@ import {
   type ReplyMarkdown,
 } from "./reply-markdown.js";
 import { ACTION_STYLES, COPIED_LABEL, COPY_LABEL, FEEDBACK_DURATION_MS } from "@dotfiles/pi-ui/action-feedback";
+import { PaddedCodeBlock, type CodeBlockPointer } from "@dotfiles/pi-ui/code-block";
 import type {
   ReplyBlock,
+  ReplyBlockHost,
+  ReplyBlockRegistration,
   ReplyBlockRenderer,
   ReplyBlockScope,
   ReplyBodyComponent,
   ReplyBodyOptions,
+  StreamingBlockInput,
+  StreamingReplyBlock,
 } from "@dotfiles/pi-ui/prompt-editor";
 
 interface CopyButton {
@@ -120,62 +124,102 @@ class CodeButtons implements Component {
 
 let nextReplyBlockId = 0;
 type BlockIdentity = Pick<ReplyCodeBlock, "key" | "occurrence">;
+type CachedReplyBlock =
+  ReturnType<ReplyBlockRenderer> | { component: StreamingReplyBlock; input: StreamingBlockInput | undefined };
 
-function highlightBlock(component: ReplyBlock, paint: CodeHighlight["paint"]): Component {
-  return {
-    render: (width) => component.render(width).map(paint),
-    invalidate: () => component.invalidate(),
-    handleMouse: (event) => component.handleMouse?.(event),
-  };
+interface TranscriptText {
+  text: string;
+  isStreaming: boolean;
 }
 
 export class ReplyBody extends Container {
   private sourceLines: readonly string[] | undefined;
-  private blockCache = new Map<string, ReturnType<ReplyBlockRenderer>>();
+  private readonly blockCache = new Map<string, CachedReplyBlock>();
   private inlineBlocks: { identity: BlockIdentity; component: ReplyBlock }[] = [];
   private highlight: CodeHighlight | undefined;
   private paint: CodeHighlight["paint"] | undefined;
+  private transcript: TranscriptText | undefined;
+  private disposed = false;
 
   constructor(
-    readonly markdown: Markdown,
+    public markdown: Markdown,
     private readonly feedback: ButtonFeedback,
     private readonly renderer: ReplyMarkdown,
-    private readonly blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
-    private readonly theme: Theme,
+    private readonly blockRenderers: ReadonlyMap<string, ReplyBlockRegistration>,
+    private readonly host: ReplyBlockHost,
     private readonly scope?: ReplyBlockScope,
   ) {
     super();
+    markdown.invalidate();
+  }
+
+  bindTranscript(markdown: Markdown, transcript: TranscriptText): void {
+    if (
+      this.markdown !== markdown ||
+      this.transcript?.text !== transcript.text ||
+      this.transcript.isStreaming !== transcript.isStreaming
+    ) {
+      // Trimmed Markdown can stay identical while the fence gains a newline or the reply ends.
+      markdown.setText(transcript.text.trim());
+    }
+    this.markdown = markdown;
+    this.transcript = transcript;
   }
 
   override render(width: number): readonly string[] {
+    if (this.disposed) return [];
     const nextBlocks: typeof this.inlineBlocks = [];
-    const usedKeys = this.scope && new Set<string>();
+    const usedKeys = new Set<string>();
     const lines = this.renderer.renderBody(
       (block) => {
-        const render = this.blockRenderers.get(block.language);
-        if (!render) return undefined;
-        const key = JSON.stringify([block.key, block.occurrence]);
-        usedKeys?.add(key);
+        const registration = this.blockRenderers.get(block.language);
+        if (!registration) return undefined;
+        const { phase, source, width: frameWidth } = block;
+        const closedOnly = typeof registration === "function";
+        if (closedOnly && phase === "open") return undefined;
+        if (!closedOnly && !block.isStreaming && phase === "open") return { rawSource: source };
+        if (!closedOnly && phase === "open" && !source.trim()) return undefined;
+
+        const key = JSON.stringify(closedOnly ? [block.key, block.occurrence] : [block.ordinal, block.language]);
+        usedKeys.add(key);
         let result = this.blockCache.get(key);
         if (!result) {
-          result = render(block.text, `reply-block-${++nextReplyBlockId}`, this.theme, this.scope);
+          const host: ReplyBlockHost = {
+            ...this.host,
+            requestRender: () => {
+              if (!this.disposed && result && this.blockCache.get(key) === result) this.host.requestRender();
+            },
+          };
+          result = closedOnly
+            ? registration(block.text, `reply-block-${++nextReplyBlockId}`, host, this.scope)
+            : { component: registration.createStream(host), input: undefined };
           this.blockCache.set(key, result);
         }
         if ("errors" in result) return result;
+        if ("input" in result) {
+          const previous = result.input;
+          if (previous?.source !== source || previous.width !== frameWidth || previous.phase !== phase) {
+            const input = { source, width: frameWidth, phase };
+            result.component.update(input);
+            result.input = input;
+          }
+        }
         const slot = nextBlocks.length;
-        nextBlocks.push({ identity: block, component: result.component });
+        nextBlocks.push({
+          identity: { key: block.key, occurrence: block.occurrence },
+          component: result.component,
+        });
         return { slot };
       },
       this.highlight,
+      this.transcript?.text,
       () => this.markdown.render(width),
     );
     if (lines !== this.sourceLines) {
-      if (usedKeys) {
-        for (const [key, block] of this.blockCache) {
-          if (usedKeys.has(key)) continue;
-          if ("component" in block) block.component.dispose?.();
-          this.blockCache.delete(key);
-        }
+      for (const [key, block] of this.blockCache) {
+        if (usedKeys.has(key)) continue;
+        this.blockCache.delete(key);
+        if ("component" in block) block.component.dispose?.();
       }
       this.sourceLines = lines;
       this.inlineBlocks = nextBlocks;
@@ -184,15 +228,13 @@ export class ReplyBody extends Container {
       lines.forEach((line, row) => {
         const marker = REPLY_BLOCK_MARKER.exec(line);
         const block = marker && nextBlocks[Number(marker[1])];
-        if (!block) return;
+        if (!marker || !block) return;
         if (start < row) this.addChild(new CodeButtons(lines.slice(start, row), this.feedback));
         const highlight = this.highlight;
         const { key, occurrence } = block.identity;
-        this.addChild(
-          highlight?.key === key && highlight.occurrence === occurrence
-            ? highlightBlock(block.component, highlight.paint)
-            : block.component,
-        );
+        const paint = highlight?.key === key && highlight.occurrence === occurrence ? highlight.paint : undefined;
+        const paddingX = visibleWidth(line.slice(0, marker.index));
+        this.addChild(new PaddedCodeBlock(block.component, paddingX, paint));
         start = row + 1;
       });
       if (start < lines.length) this.addChild(new CodeButtons(lines.slice(start), this.feedback));
@@ -207,8 +249,10 @@ export class ReplyBody extends Container {
 
   override handleMouse(event: TuiMouseEvent): ReturnType<Container["handleMouse"]> {
     const result = super.handleMouse(event);
-    if ((event.type === "move" || event.type === "press") && !(result?.target?.component instanceof CodeButtons))
-      this.feedback.hover(undefined);
+    if (event.type === "move" || event.type === "press") {
+      if (!(result?.target?.component instanceof CodeButtons)) this.feedback.hover(undefined);
+      if (!result || result.target.component instanceof CodeButtons) this.host.pointer.leave?.();
+    }
     return result;
   }
 
@@ -234,11 +278,9 @@ export class ReplyBody extends Container {
     super.invalidate();
   }
 
-  handleBlockInput(data: string): boolean {
-    return this.inlineBlocks.some(({ component }) => component.handleInput?.(data));
-  }
-
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     for (const block of this.blockCache.values()) {
       if ("component" in block) block.component.dispose?.();
     }
@@ -321,7 +363,8 @@ export function createReplyBody(
   options: ReplyBodyOptions,
   ui: ExtensionContext["ui"],
   renderer: ReplyMarkdown,
-  blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
+  blockRenderers: ReadonlyMap<string, ReplyBlockRegistration>,
+  pointer: CodeBlockPointer,
   outputPad: number,
 ): ReplyBodyComponent {
   let disposed = false;
@@ -344,7 +387,14 @@ export function createReplyBody(
         availableWidth,
       }),
   });
-  const body = new ReplyBody(markdown, buttons.feedback, renderer, blockRenderers, ui.theme, scope);
+  const body = new ReplyBody(
+    markdown,
+    buttons.feedback,
+    renderer,
+    blockRenderers,
+    { theme: ui.theme, pointer, requestRender: scope.requestRender },
+    scope,
+  );
   return {
     setText(next, isStreaming = false) {
       if (disposed || (next === text && isStreaming === streaming)) return;
@@ -354,7 +404,6 @@ export function createReplyBody(
       scope.requestRender();
     },
     render: (width) => (disposed ? [] : body.render(width)),
-    handleInput: (data) => !disposed && body.handleBlockInput(data),
     handleMouse: (event) => (disposed ? undefined : body.handleMouse(event)),
     invalidate: () => body.invalidate(),
     dispose() {
@@ -366,58 +415,98 @@ export function createReplyBody(
   };
 }
 
-/** An empty UI component keeps body wrappers attached as Pi creates or rebuilds assistant replies. */
+/** The widget owns the wrappers for the current transcript. */
 export function createReplyBodies(
   tui: TUI,
   ctx: ExtensionContext,
   renderer: ReplyMarkdown,
-  blockRenderers: ReadonlyMap<string, ReplyBlockRenderer>,
+  blockRenderers: ReadonlyMap<string, ReplyBlockRegistration>,
+  pointer: CodeBlockPointer,
 ) {
-  let disposed = false;
-  const wrappers = new WeakMap<Markdown, ReplyBody>();
-  const buttons = createButtonFeedback(() => tui.requestRender(), ctx.ui);
+  const requestRender = () => tui.requestRender();
+  const host: ReplyBlockHost = { theme: ctx.ui.theme, requestRender, pointer };
+  const buttons = createButtonFeedback(requestRender, ctx.ui);
+  const replies = new Map<AssistantMessageComponent, { children: Component[]; bodies: Map<number, ReplyBody> }>();
 
-  const attach = (parent: Pick<Container, "children">, body = false): boolean => {
-    let changed = false;
-    parent.children.forEach((child, index) => {
-      if (child instanceof ReplyBody) return;
-      if (body && child instanceof Markdown) {
-        let wrapper = wrappers.get(child);
-        if (!wrapper) {
-          wrapper = new ReplyBody(child, buttons.feedback, renderer, blockRenderers, ctx.ui.theme);
-          wrappers.set(child, wrapper);
-          child.invalidate();
+  const attach = (reply: AssistantMessageComponent) => {
+    const content = reply.children[0];
+    if (!(content instanceof Container)) return;
+    const previous = replies.get(reply);
+    if (previous?.children === content.children) return;
+
+    // Pi trims each text part and wraps its thinking Markdown separately.
+    type Message = Parameters<AssistantMessageComponent["updateContent"]>[0];
+    const { lastMessage: message, isStreaming } = reply as unknown as {
+      readonly lastMessage?: Message;
+      readonly isStreaming: boolean;
+    };
+    if (!message) return;
+    const bodies = new Map<number, ReplyBody>();
+    const parts = message.content.entries();
+    content.children.forEach((child, row) => {
+      const markdown = child instanceof ReplyBody ? child.markdown : child;
+      if (!(markdown instanceof Markdown)) return;
+      for (const [index, part] of parts) {
+        if (part.type !== "text" || !part.text.trim()) continue;
+        const body =
+          previous?.bodies.get(index) ?? new ReplyBody(markdown, buttons.feedback, renderer, blockRenderers, host);
+        body.bindTranscript(markdown, { text: part.text, isStreaming });
+        bodies.set(index, body);
+        content.children[row] = body;
+        return;
+      }
+    });
+    if (previous) {
+      for (const [index, body] of previous.bodies) if (!bodies.has(index)) body.dispose();
+    }
+    replies.set(reply, { children: content.children, bodies });
+  };
+
+  const detach = (reply: AssistantMessageComponent, bodies: Map<number, ReplyBody>) => {
+    const content = reply.children[0];
+    if (content instanceof Container) {
+      content.children.forEach((child, index) => {
+        if (child instanceof ReplyBody) {
+          content.children[index] = child.markdown;
+          child.markdown.invalidate();
         }
-        parent.children[index] = wrapper;
-        changed = true;
-      } else if (child instanceof Container) {
-        changed = attach(child, body || child instanceof AssistantMessageComponent) || changed;
-      }
-    });
-    return changed;
+      });
+    }
+    for (const body of bodies.values()) body.dispose();
+    replies.delete(reply);
   };
 
-  const detach = (parent: Pick<Container, "children">) => {
-    parent.children.forEach((child, index) => {
-      if (child instanceof ReplyBody) {
-        parent.children[index] = child.markdown;
-        child.markdown.invalidate();
-      } else if (child instanceof Container) {
-        detach(child);
-      }
-    });
-  };
-
-  return {
+  // Pi mounts the document first in both TUI modes. Observe it before its chat rows render:
+  // updateContent rebuilds the assistant's children even when it reuses their Markdown.
+  const document = tui.children[0];
+  const reconcile: Component = {
     render(): string[] {
-      if (!disposed && attach(tui)) tui.requestRender();
+      if (!(document instanceof Container)) return [];
+      const removed = new Set(replies.keys());
+      const visit = (parent: Container) => {
+        for (const child of parent.children) {
+          if (child instanceof AssistantMessageComponent) {
+            removed.delete(child);
+            attach(child);
+          } else if (child instanceof Container) {
+            visit(child);
+          }
+        }
+      };
+      visit(document);
+      for (const reply of removed) detach(reply, replies.get(reply)!.bodies);
       return [];
     },
     invalidate() {},
+  };
+  if (document instanceof Container) document.children.unshift(reconcile);
+  return {
+    render: () => [],
+    invalidate() {},
     dispose() {
-      disposed = true;
+      if (document instanceof Container) document.removeChild(reconcile);
       buttons.dispose();
-      detach(tui);
+      for (const [reply, { bodies }] of replies) detach(reply, bodies);
     },
   };
 }

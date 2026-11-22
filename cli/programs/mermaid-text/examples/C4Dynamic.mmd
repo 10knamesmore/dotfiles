@@ -1,0 +1,25 @@
+---
+title: 演出票务的支付回调与电子票交付
+---
+C4Dynamic
+    System_Ext(pay, "支付网关")
+    Container(api, "订单 API")
+    ContainerDb(db, "票务库")
+    ContainerQueue(evt, "出票队列")
+    Container(send, "通知服务")
+    System_Ext(sms, "短信平台")
+
+    RelIndex(1, pay, api, "支付回调")
+    RelIndex(2, api, db, "幂等写票和待发事件")
+    RelIndex(3, api, pay, "确认处理")
+    RelIndex(4, api, evt, "转发待发事件")
+    RelIndex(5, evt, send, "投递事件")
+    RelIndex(6, send, sms, "发送电子票")
+
+    UpdateRelStyle(pay, api, $lineColor="#fbbf24")
+    UpdateRelStyle(api, db, $lineColor="#7dd3fc")
+    UpdateRelStyle(api, pay, $lineColor="#fbbf24")
+    UpdateRelStyle(api, evt, $lineColor="#6ee7b7")
+    UpdateRelStyle(evt, send, $lineColor="#6ee7b7")
+    UpdateRelStyle(send, sms, $lineColor="#6ee7b7")
+    UpdateLayoutConfig($c4ShapeInRow="1")

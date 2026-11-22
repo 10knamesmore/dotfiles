@@ -1,0 +1,25 @@
+---
+title: "应用配置文件"
+config:
+  themeVariables:
+    titleColor: "#7dd3fc"
+    lineColor: "#94a3b8"
+    primaryBorderColor: "#7dd3fc"
+    secondaryBorderColor: "#5eead4"
+    secondaryTextColor: "#5eead4"
+    tertiaryBorderColor: "#fcd37d"
+---
+railroad-ebnf-beta
+(* One assignment per line; values may be quoted or plain. *)
+document ::= { assignment , line-end } ;
+assignment ::= key , [ ? horizontal space ? ] , "=" , [ ? horizontal space ? ] , value ;
+key ::= letter , { letter | digit | "_" | "-" } ;
+value ::= quoted-value | plain-value ;
+quoted-value ::= '"' , { quoted-character } , '"' ;
+quoted-character ::= ? any character except quote or line break ? ;
+(* The unquoted spelling null is reserved; "null" remains a valid quoted value. *)
+plain-value ::= plain-character , { plain-character } - "null" ;
+plain-character ::= ? any non-space, non-line-break character ? ;
+line-end ::= ? newline ? ;
+letter ::= ? ASCII letter ? ;
+digit ::= ? decimal digit ? ;

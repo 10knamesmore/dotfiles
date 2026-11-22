@@ -1,0 +1,29 @@
+---
+title: 患者预约与就诊体验
+config:
+  themeVariables:
+    faceColor: "#fcd37d"
+    actor0: "#c4b5fd"  # 医生
+    actor1: "#94a3b8"  # 导诊员
+    actor2: "#7dd3fc"  # 患者
+    actor3: "#c4b5fd"  # 护士
+    actor4: "#5eead4"  # 短信平台
+    actor5: "#c4b5fd"  # 药师
+---
+journey
+accTitle: 患者线上预约到复诊的体验旅程
+section 预约前
+查找附近门诊: 4: 患者
+查看医生出诊时间: 3: 患者
+section 线上预约
+选择就诊时段: 4: 患者
+填写既往病史: 2: 患者
+收到预约确认: 5: 患者, 短信平台
+section 到院就诊
+自助机签到: 3: 患者, 导诊员
+等待叫号: 2: 患者, 护士
+与医生沟通症状: 4: 患者, 医生
+section 诊后跟进
+查看检查结果: 3: 患者
+接收用药说明: 4: 患者, 药师
+预约复诊提醒: 5: 患者, 短信平台

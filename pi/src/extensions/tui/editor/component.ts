@@ -7,6 +7,7 @@ import {
   visibleWidth,
   type EditorTheme,
   type TUI,
+  type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 import { FAKE_CURSOR_END, FAKE_CURSOR_START } from "@earendil-works/pi-tui/dist/tui.js";
 import {
@@ -17,6 +18,7 @@ import {
   sanitizeFooterText,
 } from "@dotfiles/pi-ui/status-format";
 import { palette, separator } from "@dotfiles/pi-ui/palette";
+import type { CodeBlockPointer } from "@dotfiles/pi-ui/code-block";
 import type { EditorActivity, EditorStatus, InputNavigation } from "@dotfiles/pi-ui/prompt-editor";
 
 const FAST_MODE_ICONS: Record<FastMode, string> = {
@@ -30,6 +32,7 @@ export class PromptEditor extends CustomEditor {
     tui: TUI,
     theme: EditorTheme,
     keybindings: KeybindingsManager,
+    private readonly blockPointer: CodeBlockPointer,
     private readonly navigation: () => InputNavigation | undefined,
     private readonly status: () => EditorStatus | undefined,
     private readonly context: () => ExtensionContext | undefined,
@@ -41,6 +44,11 @@ export class PromptEditor extends CustomEditor {
   }
 
   private readonly inputKeybindings: KeybindingsManager;
+
+  override handleMouse(event: TuiMouseEvent) {
+    this.blockPointer.leave?.();
+    return super.handleMouse(event);
+  }
 
   override handleInput(data: string): void {
     const navigation = this.navigation();

@@ -1,0 +1,31 @@
+---
+title: 图书馆借阅续期
+---
+classDiagram
+    direction TB
+    class 续借服务 {
+        +int 次数上限
+        +申请(借阅号)
+    }
+    class 借阅单 {
+        +String 借阅号
+        +Date 到期日
+        +bool 可续期()
+        +void 延期(天)
+    }
+    class 馆藏册 {
+        +String 条码
+        +bool 有预约()
+    }
+    class 续借记录 {
+        +Date 原到期日
+        +Date 新到期日
+        +int 天数()
+    }
+    续借服务 ..> 借阅单 : 审核续期
+    借阅单 "0..*" --> "1" 馆藏册 : 对应
+    借阅单 "1" *-- "0..*" 续借记录 : 留存
+
+    style 续借服务 stroke:#7dd3fc
+    style 借阅单 stroke:#6ee7b7
+    style 续借记录 stroke:#fbbf24

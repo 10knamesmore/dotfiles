@@ -6,6 +6,7 @@
   "exports": {
     "./action-feedback": "./action-feedback.ts",
     "./bottom-panel": "./bottom-panel.ts",
+    "./code-block": "./code-block.ts",
     "./expandable-message": "./expandable-message.ts",
     "./prompt-editor": "./prompt-editor.ts",
     "./status-format": "./status-format.ts",

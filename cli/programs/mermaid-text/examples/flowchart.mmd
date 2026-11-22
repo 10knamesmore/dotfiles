@@ -1,0 +1,24 @@
+---
+title: 灰度发布与流量回滚
+---
+flowchart TD
+    deploy([部署候选版])
+    subgraph rollout [灰度放量]
+        引流[接入 5% 流量] --> observe[/观察 5 分钟/]
+        observe --> 错率{错误率 ≤ 1%？}
+        错率 -->|达标| 全量{已达全量？}
+        全量 -->|未到| ramp[提高流量比例]
+        ramp --> observe
+    end
+    deploy --> 引流
+    全量 -->|已全量| keep([保留新版])
+    错率 -->|超限| rollback[切回旧版]
+    rollback --> freeze([冻结本次发布])
+
+    classDef release stroke:#6ee7b7
+    classDef recovery stroke:#fb7185
+    class deploy,keep release
+    class rollback,freeze recovery
+    style rollout stroke:#7dd3fc
+    linkStyle 5,6 stroke:#6ee7b7,color:#6ee7b7
+    linkStyle 7,8 stroke:#fb7185,color:#fb7185

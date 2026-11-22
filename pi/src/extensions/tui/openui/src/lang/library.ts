@@ -1032,7 +1032,7 @@ ${SPECS.map(sig).join("\n")}
 
 \`tooltips: Tooltip[]\` is the LAST argument of Dag, Erd, InfraMap, SequenceDiagram, Table, Metric, BarChart, LineChart, AreaChart, PieChart, RadarChart, GeoMap and Image, so write null for each skipped optional argument before it, e.g. Dag(nodes, edges, null, null, [t1]).
 Targets: Dag node id; Erd entity name or entity.column; InfraMap node id, zone:<zone name> or <fromId>><toId>; SequenceDiagram participant id or SeqMessage id; Table row:3, col:status or cell:3.status; Metric its own label; BarChart a bar label; GeoMap a point label or A>B; Image the word image; LineChart and AreaChart an x label (that point) or series:<name>; PieChart a slice label; RadarChart an axis label or series:<name>.
-An element that has a tooltip shows a small ◆ on it. Hovering shows the hint; clicking (or Enter) opens the panel with detail, code and link. Use a tooltip for context the reader may want but should not have to read: why a point spiked, what a slice contains, what a node does.
+An element that has a tooltip shows a small ◆ on it. Hover to see the hint. Click the element to open or close the panel with detail, code and link. Use a tooltip for context the reader may want but should not have to read: why a point spiked, what a slice contains, what a node does.
 hint is the short text shown on hover (140 characters). detail (800), code (40 lines) and link (http/https) open in a panel when the element is clicked.
 
 ## Limits

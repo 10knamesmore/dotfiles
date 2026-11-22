@@ -1,0 +1,32 @@
+---
+title: 在线预约确认与候诊通知
+config:
+  themeVariables:
+    emCommandStroke: '#77b7ed'
+    emEventStroke: '#eab278'
+    emReadModelStroke: '#80c9aa'
+    emArrowhead: '#b4c0cc'
+---
+eventmodeling
+entity 患者
+entity 预约服务
+entity 通知服务
+entity 诊所
+data 预约详情 `json`{"bookingId":"B-7315","clinic":"河畔门诊","time":"09:30"}
+data 消息记录 `text`"预约成功，4月18日 09:30"
+data 候诊名单 `text`"09:30 号源重新开放"
+tf 1 ui 患者
+value 查找可预约时段
+tf 2 cmd 预约服务 ->> 1 `json`{"patientId":"P-2048","slotId":"S-091"}
+tf 3 evt 预约服务 ->> 2 `json`{"bookingId":"B-7315","slotId":"S-091","status":"confirmed"}
+tf 4 rmo 患者 [[预约详情]] `json`{"bookingId":"B-7315","clinic":"河畔门诊","time":"09:30"}
+tf 5 pcr 通知服务 ->> 3 `text`"预约确认短信已入队"
+tf 6 evt 通知服务 ->> 5 `json`{"messageId":"M-5602","status":"sent"}
+tf 7 rmo 患者 [[消息记录]] `text`"预约成功，4月18日 09:30"
+tf 8 ui 患者
+value 申请取消预约
+tf 9 cmd 预约服务 ->> 8 `json`{"bookingId":"B-7315","reason":"行程冲突"}
+tf 10 evt 预约服务 ->> 9 `json`{"bookingId":"B-7315","status":"cancelled"}
+tf 11 rmo 诊所 [[候诊名单]] `text`"09:30 号源重新开放"
+tf 12 pcr 通知服务 ->> 10 `text`"通知候补队首：号源可预约"
+tf 13 evt 通知服务 ->> 12 `json`{"slotId":"S-091","messageId":"W-5603","status":"sent"}

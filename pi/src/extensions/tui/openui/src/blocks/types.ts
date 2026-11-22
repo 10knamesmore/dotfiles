@@ -15,11 +15,10 @@ export interface Tip {
 
 export type TargetKind =
   | "tab"
+  | "pan"
   | "button"
   | "sort"
   | "cell"
-  | "fold"
-  | "source"
   /** one option of a Choice, or its Other row */
   | "choice"
   /** the Send answers button under a widget that has Choices */
@@ -42,8 +41,6 @@ export type TargetKind =
 
 /** What a note says about the element it is attached to. All words are already cleaned for a message the user will send. */
 export interface ItemInfo {
-  /** the element's path in the tree: items of one component share it */
-  host: string;
   type: string;
   /** the variable the component was defined under */
   name?: string;
@@ -68,7 +65,7 @@ export interface Note {
   text: string;
 }
 
-/** Something the user can click or reach with the keyboard. Rects are relative to the block that owns them. */
+/** A mouse target. Rects are relative to the block that owns them. */
 export interface Target {
   id: string;
   kind: TargetKind;
@@ -92,8 +89,10 @@ export interface Target {
   noteId?: number;
   /** for kind "image": where the picture goes and how big it is, in cells */
   image?: { key: string; cols: number; rows: number };
-  /** a diagram that may be wider than its view: focusing this target should reveal it */
+  /** The original column range in a wide component; clicking a clipped target can reveal it. */
   pan?: { key: string; x: number; w: number; view: number; total: number };
+  /** Offset selected by a pan arrow. */
+  panTo?: { key: string; offset: number };
 }
 
 export interface Block {
@@ -115,12 +114,10 @@ export interface WState {
   sending: boolean;
   pan: Record<string, number>;
   tip: string | null;
-  focus: string | null;
-  hover: string | null;
   copied: string | null;
   /** the user's notes on this widget, in the order they were written */
   notes: Note[];
-  /** notes mode: clicks and Enter write notes instead of acting */
+  /** Whether clicking an annotatable element opens its note editor. */
   noteMode: boolean;
   noteSeq: number;
 }
@@ -135,8 +132,6 @@ export const newState = (): WState => ({
   sending: false,
   pan: {},
   tip: null,
-  focus: null,
-  hover: null,
   copied: null,
   notes: [],
   noteMode: false,

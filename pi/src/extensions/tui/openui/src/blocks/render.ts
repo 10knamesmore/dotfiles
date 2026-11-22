@@ -1,4 +1,4 @@
-// Dispatcher: a compiled element tree -> a Block (rows of cells + click/focus targets).
+// Dispatcher: a compiled element tree -> a Block (rows of cells and mouse targets).
 import type { El } from "../lang/library.ts";
 import { barChart, lineArea, pieChart, radarChart } from "./charts.ts";
 import { codeBlock } from "./code.ts";

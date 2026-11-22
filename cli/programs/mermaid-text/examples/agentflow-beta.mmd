@@ -1,0 +1,31 @@
+---
+title: 戏曲录音编目
+---
+agentflow-beta TB
+  global
+    index["剧目索引"]@{ shape: refdoc }
+  end
+
+  flow catalog["编目"]
+    flow identify["辨认剧目"]
+      transcribe["提取唱词"]@{ shape: tool }
+      match["匹配可信？"]@{ shape: decision }
+      transcribe --> match
+    end
+    review["人工听辨"]@{ shape: task }
+    entry["生成条目"]@{ shape: task }
+
+    match -->|可信| entry
+    match -- 待核 --x review
+    review -->|确认| entry
+    match -.- index
+    entry -.- index
+  end
+
+  style index stroke:#c4b5fd,color:#c4b5fd
+  style match stroke:#7dd3fc,color:#7dd3fc
+  style review stroke:#fcd37d,color:#fcd37d
+  style entry stroke:#5eead4,color:#5eead4
+  linkStyle 1,3 stroke:#5eead4,color:#5eead4
+  linkStyle 2 stroke:#fcd37d,color:#fcd37d
+  linkStyle 4,5 stroke:#c4b5fd

@@ -1,0 +1,24 @@
+---
+title: 山顶观测站的影像归档
+config:
+  themeVariables:
+    archGroupBorderColor: '#7dd3fc'
+    archEdgeColor: '#6ee7b7'
+---
+architecture-beta
+    group site(cloud)[山顶观测站]
+    group hub(cloud)[中心机房]
+
+    service cam(server)[望远镜] in site
+    service relay(server)[采集机] in site
+    service spool(disk)[离线暂存] in site
+
+    service queue(server)[处理队列] in hub
+    service work(server)[校准服务] in hub
+    service store(database)[影像库] in hub
+
+    cam:L -[曝光帧]-> R:relay
+    relay:B <-[读写]-> T:spool
+    relay:L -[补传]-> T:queue
+    work:R -[取帧]-> L:queue
+    work:B -[归档]-> T:store

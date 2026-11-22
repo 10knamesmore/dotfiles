@@ -1,31 +1,29 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, type TUI } from "@earendil-works/pi-tui";
+import { PaddedCodeBlock, type CodeBlockPointer } from "@dotfiles/pi-ui/code-block";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   PROMPT_EDITOR_CONFIGURE,
   REPLY_BLOCKS_CONFIGURE,
   type PromptEditorApi,
   type RegisterReplyBlock,
-  type ReplyBlockScope,
 } from "@dotfiles/pi-ui/prompt-editor";
 import { compile, LIMITS, type Compiled, type El } from "../lang/library.ts";
 import { markdownImages } from "../lang/md.ts";
 import { LANG_SAMPLES } from "../lang/samples.ts";
 import { loadImage } from "./images.ts";
 import { syncWidths } from "./widths.ts";
-import {
-  active,
-  confirmDelivery,
-  entryOf,
-  handleKey,
-  hooks,
-  OpenUIWidget,
-  resetAll,
-  type OverlayWidgets,
-} from "./widget.ts";
+import { confirmDelivery, hooks, OpenUIWidget, resetAll } from "./widget.ts";
 
 const SHOW_ME_SKILL = fileURLToPath(new URL("../../skills/show-me/SKILL.md", import.meta.url));
+const GALLERY_RENDER_HOST = "openui-gallery-render";
+
+interface GalleryDetails {
+  id: string;
+  source: string;
+  mode: "live" | "echo";
+}
+
 const compiled = new Map<string, Compiled>();
 let compiledChars = 0;
 /** A source is the key, so the cache is bounded by size as well as count: 64 sources at the 100 KB limit would be 6 MB. */
@@ -84,27 +82,15 @@ export default function (pi: ExtensionAPI) {
     pi.sendMessage({ customType: "openui-click", content: `[widget click → assistant] ${text}`, display: true });
 
   let rendersReplyBlocks = false;
-  let editor: PromptEditorApi | undefined;
-  pi.events.on(PROMPT_EDITOR_CONFIGURE, (api) => {
-    editor = api as PromptEditorApi;
-  });
-  const overlays = new WeakMap<ReplyBlockScope, OverlayWidgets>();
   pi.events.on(REPLY_BLOCKS_CONFIGURE, (data) => {
     const register = data as RegisterReplyBlock;
-    register("openui", (source, id, theme, scope) => {
+    register("openui", (source, id, host, scope) => {
       const compiled = compileCached(source);
       if (!compiled.ok || !compiled.root) return { errors: compiled.errors };
       const errors = checkImages(compiled.root);
       if (errors.length) return { errors };
-      let overlay: OverlayWidgets | undefined;
-      if (scope) {
-        overlay = overlays.get(scope);
-        if (!overlay) {
-          overlay = { ...scope, focus: { id: null, dialog: null } };
-          overlays.set(scope, overlay);
-        }
-      }
-      return { component: new OpenUIWidget(id, compiled.root, theme, overlay ?? "live", source) };
+      const destination = scope ?? { mode: "live" as const, requestRender: host.requestRender };
+      return { component: new OpenUIWidget(id, compiled.root, host, destination, source) };
     });
     rendersReplyBlocks = true;
   });
@@ -125,22 +111,52 @@ export default function (pi: ExtensionAPI) {
     systemPromptOptions.sections.openui = guidance.join(" ");
   });
 
-  pi.registerMessageRenderer("openui-widget", (message: any, _o: any, theme: any) => {
-    const c = compileCached(String(message.details?.source ?? ""));
+  let galleryUI: ExtensionContext["ui"] | undefined;
+  let renderGallery: (() => void) | undefined;
+  let galleryPointer: CodeBlockPointer = {};
+  pi.events.on(PROMPT_EDITOR_CONFIGURE, (data) => {
+    galleryPointer = (data as PromptEditorApi).blockPointer;
+  });
+  const requestGalleryRender = () => renderGallery?.();
+  pi.registerMessageRenderer<GalleryDetails>("openui-widget", (message, options, theme) => {
+    const details = message.details;
+    if (!details) return undefined;
+    const c = compileCached(details.source);
     if (!c.ok || !c.root) return undefined;
-    return new OpenUIWidget(
-      String(message.details.id),
+    // Pi supplies the TUI to widget factories. Gallery message renderers receive only the theme.
+    if (!renderGallery) {
+      galleryUI?.setWidget(
+        GALLERY_RENDER_HOST,
+        (tui) => {
+          renderGallery = () => tui.requestRender();
+          return {
+            render: () => [],
+            invalidate() {},
+            dispose() {
+              renderGallery = undefined;
+            },
+          };
+        },
+        { placement: "belowEditor" },
+      );
+    }
+    const widget = new OpenUIWidget(
+      details.id,
       c.root,
-      theme,
-      message.details.mode === "live" ? "live" : "echo",
-      message.details.source,
+      { theme, pointer: galleryPointer },
+      {
+        mode: details.mode === "live" ? "live" : "echo",
+        requestRender: requestGalleryRender,
+      },
+      details.source,
     );
+    return new PaddedCodeBlock(widget, options.outputPad);
   });
 
-  const draw = (source: string, title: string, ctx: any) => {
+  const draw = (source: string, title: string, ctx: ExtensionContext) => {
     const c = compileCached(source);
     if (!c.ok) return ctx.ui.notify(`${title}: ${c.errors.slice(0, 3).join(" | ")}`, "error");
-    pi.sendMessage({
+    pi.sendMessage<GalleryDetails>({
       customType: "openui-widget",
       content: `[widget: ${title}]`,
       display: true,
@@ -151,7 +167,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("openui-gallery", {
     description:
       "Draw one example per OpenUI component (or a key prefix: dashboard, table, tabs, choice, line, pie, radar, image, dag, erd, infra, sequence, geo ...). Clicks echo locally.",
-    handler: async (args: string, ctx: any) => {
+    handler: async (args, ctx) => {
       const which = args.trim() || "all";
       const picked = LANG_SAMPLES.filter((s) => which === "all" || s.key.startsWith(which));
       if (!picked.length)
@@ -179,10 +195,9 @@ export default function (pi: ExtensionAPI) {
     confirmDelivery(words);
   });
 
-  let unsub: (() => void) | undefined;
   pi.on("session_start", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
-    unsub?.();
+    if (ctx.mode !== "tui") return;
+    galleryUI = ctx.ui;
     hooks.queued = () => {
       try {
         return !!ctx.hasPendingMessages();
@@ -190,34 +205,15 @@ export default function (pi: ExtensionAPI) {
         return false; // a context from a replaced session
       }
     };
-    unsub = ctx.ui.onTerminalInput((data: string) =>
-      editor?.hasEditorFocus() !== false && handleKey(data) ? { consume: true } : undefined,
-    );
     // the note editor is pi's own multi-line editor: Enter saves, Shift+Enter adds a line, Esc cancels
     hooks.prompt = (title: string, initial: string) => ctx.ui.editor(title, initial);
     hooks.toEditor = (text: string) => ctx.ui.pasteToEditor(text);
-    ctx.ui.setWidget("openui-hint", (view: TUI, theme) => {
-      hooks.requestRender = () => view.requestRender();
-      return {
-        render: (w: number) => {
-          if (editor?.hasEditorFocus() === false || !active.id) return [];
-          const e = entryOf(active.id);
-          const keys = e?.state.noteMode
-            ? "notes: click or Enter writes a note  arrows/Tab move  Shift+Enter picks the parent  Esc leaves"
-            : e?.state.focus
-              ? "arrows move  Tab next  Enter activate  Esc close/leave"
-              : "Tab or arrows select  Enter activate  Esc leave";
-          return [truncateToWidth(theme.fg("accent", " openui ") + theme.fg("dim", keys), w)];
-        },
-        invalidate() {},
-      };
-    });
   });
   pi.on("session_shutdown", async () => {
     rendersReplyBlocks = false;
-    unsub?.();
-    unsub = undefined;
-    editor = undefined;
+    if (renderGallery) galleryUI?.setWidget(GALLERY_RENDER_HOST, undefined);
+    galleryUI = undefined;
+    galleryPointer = {};
     resetAll(); // a pi process lives for days across /new and resume: each session's widgets must not pile up
   });
 }

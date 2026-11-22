@@ -1,0 +1,30 @@
+---
+title: 演出票务的上海主站与南京灾备
+---
+C4Deployment
+    System_Ext(entry, "流量入口", "副本提升后切流")
+
+    Deployment_Node(sh, "上海主站", "生产") {
+        Deployment_Node(sh_app, "应用节点池", "Kubernetes") {
+            Container(api_a, "订单 API", $descr="实例 A")
+            Container(api_b, "订单 API", $descr="实例 B")
+        }
+        ContainerDb(primary, "票务库", "PostgreSQL", "主库")
+    }
+
+    Deployment_Node(nj, "南京灾备", "热备") {
+        Container(api_c, "订单 API", $descr="备用实例")
+        ContainerDb(replica, "票务库", "PostgreSQL", "待提升副本")
+    }
+
+    Rel_D(entry, sh_app, "负载均衡", "HTTPS")
+    Rel(entry, api_c, "故障切流", "HTTPS")
+    Rel(api_a, primary, "读写")
+    Rel(api_b, primary, "读写")
+    Rel_D(primary, replica, "异步复制 WAL")
+    Rel(api_c, replica, "接管读写")
+
+    UpdateElementStyle(sh, $borderColor="#7dd3fc")
+    UpdateElementStyle(nj, $borderColor="#fbbf24")
+    UpdateRelStyle(entry, api_c, $lineColor="#fbbf24")
+    UpdateRelStyle(primary, replica, $textColor="#6ee7b7", $lineColor="#6ee7b7")

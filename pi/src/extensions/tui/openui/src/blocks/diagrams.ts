@@ -1,5 +1,5 @@
 // Adapters: DiagramResult (Dag, Erd, InfraMap) and wide blocks -> Block with targets and tooltip anchors.
-import { textWidth, type Cell } from "../diagram/canvas.ts";
+import { textWidth, truncateText, type Cell } from "../diagram/canvas.ts";
 import { dag } from "../diagram/dag.ts";
 import { erd } from "../diagram/erd.ts";
 import { infra } from "../diagram/infra.ts";
@@ -27,11 +27,24 @@ export function panBlock(inner: Block, width: number, key: string, ctx: Ctx): Bl
     rect: { ...t.rect, x: t.rect.x - pan },
     pan: { key, x: t.rect.x, w: t.rect.w, view: width, total: inner.w },
   }));
-  const hint = textCells(
-    `${pan > 0 ? "‹" : " "} columns ${pan + 1}–${pan + width} of ${inner.w} ${pan < maxPan ? "›" : " "}  select a node to pan`,
-    "text.muted",
-  );
-  return { w: width, rows: [...rows, padRow(hint, width)], targets };
+  const range = `columns ${pan + 1}–${pan + width} of ${inner.w}`;
+  const footer = padRow([cell(" "), cell(" "), ...textCells(truncateText(range, width - 4), "text.muted")], width);
+  const step = Math.max(1, Math.floor(width / 2));
+  for (const [arrow, x, offset, label] of [
+    ["‹", 0, Math.max(0, pan - step), "pan left"],
+    ["›", width - 1, Math.min(maxPan, pan + step), "pan right"],
+  ] as const) {
+    if (offset === pan) continue;
+    footer[x] = cell(arrow, "btn");
+    targets.push({
+      id: `${key}:${arrow}`,
+      kind: "pan",
+      rect: { x, y: rows.length, w: 1, h: 1 },
+      label,
+      panTo: { key, offset },
+    });
+  }
+  return { w: width, rows: [...rows, footer], targets };
 }
 
 /**

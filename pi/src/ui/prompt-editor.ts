@@ -1,6 +1,7 @@
 import type { FastMode } from "@dotfiles/pi-config";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
+import type { CodeBlockPointer } from "./code-block.ts";
 
 /** Keyboard-selectable work below the input editor or in the footer to its right. */
 export interface InputNavigation {
@@ -15,7 +16,7 @@ export interface InputNavigation {
 
 /** UI capabilities offered to other extensions for the current Pi session. */
 export interface PromptEditorApi {
-  hasEditorFocus(): boolean;
+  readonly blockPointer: CodeBlockPointer;
   useAgentNavigation(navigation: InputNavigation): void;
   /** Navigation for a status entry visited after the last below-editor agent. */
   useFooterNavigation(navigation: InputNavigation): void;
@@ -57,8 +58,6 @@ export interface ReplyBodyOptions {
 
 export interface ReplyBodyComponent extends Component {
   setText(text: string, isStreaming?: boolean): void;
-  /** Returns true when an embedded block consumed the key. */
-  handleInput(data: string): boolean;
   /** Use the width and full height from render(), with coordinates relative to the unscrolled body. */
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined;
   dispose(): void;
@@ -68,17 +67,37 @@ export type ReplyBlockScope = Required<ReplyBodyOptions>;
 
 export interface ReplyBlock extends Component {
   copyRenderedText(): string | undefined;
-  handleInput?(data: string): boolean;
   dispose?(): void;
 }
 
 export type ReplyBlockRenderer = (
   source: string,
   id: string,
-  theme: Theme,
+  host: ReplyBlockHost,
   scope?: ReplyBlockScope,
 ) => { component: ReplyBlock } | { errors: readonly string[] };
 
-export type RegisterReplyBlock = (language: string, render: ReplyBlockRenderer) => void;
+export interface StreamingBlockInput {
+  /** Open snapshots retain complete line endings; closed snapshots omit the newline before the closer. */
+  source: string;
+  /** Terminal columns allocated to the complete block, including its frame. */
+  width: number;
+  phase: "open" | "closed";
+}
+
+export interface StreamingReplyBlock extends ReplyBlock {
+  update(input: StreamingBlockInput): void;
+  dispose(): void;
+}
+
+export interface ReplyBlockHost {
+  requestRender(): void;
+  theme: Theme;
+  pointer: CodeBlockPointer;
+}
+
+export type ReplyBlockRegistration = ReplyBlockRenderer | { createStream(host: ReplyBlockHost): StreamingReplyBlock };
+
+export type RegisterReplyBlock = (language: string, registration: ReplyBlockRegistration) => void;
 
 export const REPLY_BLOCKS_CONFIGURE = "dotfiles:reply-blocks:configure";

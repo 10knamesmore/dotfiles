@@ -1,0 +1,52 @@
+---
+title: 冷链车载记录器的离线验收需求
+config:
+  themeVariables:
+    requirementBorderColor: '#74baf2'
+    relationColor: '#deb474'
+    relationLabelColor: '#eec48c'
+---
+requirementDiagram
+    requirement "离线运行" {
+        id: COLD-01
+        text: "断网后继续采温和告警"
+        risk: high
+        verifymethod: demonstration
+    }
+
+    designConstraint "本地暂存" {
+        id: COLD-02
+        text: "记录留存 72 小时"
+        risk: medium
+        verifymethod: inspection
+    }
+
+    interfaceRequirement "补传顺序" {
+        id: COLD-03
+        text: "恢复联网后按时序补传"
+        risk: low
+        verifymethod: test
+    }
+
+    performanceRequirement "告警时限" {
+        id: COLD-04
+        text: "超温 30 秒内鸣响"
+        risk: high
+        verifymethod: test
+    }
+
+    element "车载记录器" {
+        type: "设备固件"
+    }
+
+    element "断网演练" {
+        type: "验收用例"
+        docRef: "QA-01"
+    }
+
+    "车载记录器" - satisfies -> "本地暂存"
+    "本地暂存" - refines -> "离线运行"
+    "离线运行" - contains -> "补传顺序"
+    "离线运行" - contains -> "告警时限"
+    "断网演练" - verifies -> "离线运行"
+    "断网演练" - verifies -> "补传顺序"
