@@ -52,7 +52,7 @@ export class PromptEditor extends CustomEditor {
     const selected = navigation.hasSelection();
     if (
       this.inputKeybindings.matches(data, "tui.editor.cursorDown") &&
-      (selected || this.isOnLastInputLine()) &&
+      (selected || this.isAtDraftBottom()) &&
       navigation.selectNext()
     ) {
       return;
@@ -217,8 +217,8 @@ export class PromptEditor extends CustomEditor {
     );
   }
 
-  private isOnLastInputLine(): boolean {
-    const cursor = this.getCursor();
-    return cursor.line >= this.getLines().length - 1;
+  private isAtDraftBottom(): boolean {
+    // pi-tui keeps both the history position and the wrapped-line layout private.
+    return this["historyIndex"] === -1 && this["isOnLastVisualLine"]();
   }
 }
