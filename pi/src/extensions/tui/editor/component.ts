@@ -19,7 +19,8 @@ import {
 } from "@dotfiles/pi-ui/status-format";
 import { palette, separator } from "@dotfiles/pi-ui/palette";
 import type { CodeBlockPointer } from "@dotfiles/pi-ui/code-block";
-import type { EditorActivity, EditorStatus, InputNavigation } from "@dotfiles/pi-ui/prompt-editor";
+import type { EditorStatus, InputNavigation } from "@dotfiles/pi-ui/prompt-editor";
+import { createActivityLabel } from "./activity-label.js";
 
 const FAST_MODE_ICONS: Record<FastMode, string> = {
   fast: palette.yellow(" \u{F0F85}"),
@@ -44,6 +45,7 @@ export class PromptEditor extends CustomEditor {
   }
 
   private readonly inputKeybindings: KeybindingsManager;
+  private readonly activityLabel = createActivityLabel();
 
   override handleMouse(event: TuiMouseEvent) {
     this.blockPointer.leave?.();
@@ -108,7 +110,8 @@ export class PromptEditor extends CustomEditor {
     if (bottom < 0) return super.render(width);
 
     const status = this.status();
-    const top = status ? this.activityLabel(status.activity) + this.timingLabel(status) : palette.readyBadge(" READY ");
+    const activity = this.activityLabel(status?.activity ?? { kind: "ready" });
+    const top = status ? ` ${activity}${this.borderColor(" ── ")}${this.timingLabel(status)}` : ` ${activity}`;
     const ctx = this.context();
     const model = ctx?.model;
     const fastMode = this.fastMode();
@@ -140,20 +143,6 @@ export class PromptEditor extends CustomEditor {
     return `😎 ${palette.green(body)}`;
   }
 
-  private activityLabel(activity: EditorActivity): string {
-    switch (activity.kind) {
-      case "waiting":
-      case "thinking":
-      case "writing":
-      case "compacting":
-        return palette.modelBadge(` ${activity.spinner} ${activity.kind.toUpperCase()} `);
-      case "tool":
-        return palette.toolBadge(` ${activity.spinner} ${activity.label} `);
-      case "ready":
-        return palette.readyBadge(" READY ");
-    }
-  }
-
   private timingLabel(status: EditorStatus): string {
     const showLatency = status.activity.kind !== "tool" && status.activity.kind !== "compacting";
     const latency =
@@ -176,7 +165,7 @@ export class PromptEditor extends CustomEditor {
       status.tokensPerSecond === undefined
         ? ""
         : `${palette.overlay2(" · ")}${palette.sky(formatTokensPerSecond(status.tokensPerSecond))} ${palette.overlay2("t/s")}`;
-    return ` ${ttft}${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
+    return `${ttft}${idle}${palette.overlay2("session")} ${session}${palette.overlay2(" · api ")}${api}${tps}`;
   }
 
   private frameBorder(

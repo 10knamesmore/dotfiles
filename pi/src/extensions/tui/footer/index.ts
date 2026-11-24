@@ -18,9 +18,11 @@ import {
   RecentTokensPerSecondTracker,
 } from "./metrics.js";
 import { SessionMetrics } from "./session-metrics.js";
-import { SPINNER_INTERVAL_MS, spinnerFrameAt } from "./spinner.js";
+import { spinnerFrameAt } from "./spinner.js";
 
-/** Compare published activity including the animated frame, so the title follows every tick. */
+const ACTIVITY_REFRESH_MS = 50;
+
+/** Compare published activity including the terminal title's spinner frame. */
 function sameActivity(a: EditorStatus["activity"], b: EditorStatus["activity"]): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "ready") return true;
@@ -43,7 +45,7 @@ class FooterRuntime {
   private lastTurnModelMilliseconds = 0;
   private treeSummaryProviderActive = false;
   private readonly activeTools = new Map<string, string>();
-  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
+  private activityTimer: ReturnType<typeof setInterval> | undefined;
   private idleStartedAt: number | undefined;
   private idleTimer: ReturnType<typeof setInterval> | undefined;
   private lastPublishedActivity: EditorStatus["activity"] | undefined;
@@ -68,7 +70,7 @@ class FooterRuntime {
     this.treeSummaryProviderActive = false;
     this.activeTools.clear();
     this.lastPublishedActivity = undefined;
-    this.updateSpinner();
+    this.updateActivity();
     this.stopIdle();
     this.component?.dispose();
     this.component = undefined;
@@ -121,7 +123,7 @@ class FooterRuntime {
     if (this.treeSummaryProviderActive) return;
     this.modelDuration.start();
     this.modelResponse.startRequest();
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Observe generated content rather than stream-open or HTTP-header events. */
@@ -136,14 +138,14 @@ class FooterRuntime {
     this.updateContext(ctx);
     this.modelDuration.finish();
     this.modelResponse.finishRequest();
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Compaction streams have their own lifecycle and no ordinary message updates. */
   public compactionStarted(ctx: ExtensionContext): void {
     this.nextUserOperation(ctx);
     this.modelResponse.startCompaction();
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Both cancellation and success must clear the compacting badge. */
@@ -165,7 +167,7 @@ class FooterRuntime {
       event.preparation.userWantsSummary && event.preparation.entriesToSummarize.length > 0;
     if (!this.treeSummaryProviderActive) return;
     this.modelResponse.finishRequest();
-    this.updateSpinner();
+    this.updateActivity();
     event.signal.addEventListener(
       "abort",
       () => {
@@ -196,13 +198,13 @@ class FooterRuntime {
   /** Track overlapping tool calls so the editor displays tools until the last call ends. */
   public toolStarted(id: string, label: string): void {
     this.activeTools.set(id, label);
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Clear a tool's live status; completed executions are read from the transcript. */
   public toolEnded(id: string): void {
     this.activeTools.delete(id);
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Close the recent-turn metrics after the turn's messages have been persisted. */
@@ -229,7 +231,7 @@ class FooterRuntime {
       this.metrics.startRun(ctx);
     }
     this.stopIdle();
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** A settled run has no automatic continuation; the next action is up to the user. */
@@ -237,7 +239,7 @@ class FooterRuntime {
     this.metrics.finishRun();
     this.modelResponse.finishRequest();
     this.activeTools.clear();
-    this.updateSpinner();
+    this.updateActivity();
     this.stopIdle();
     this.idleStartedAt = performance.now();
     if (this.currentContext?.mode === "tui") {
@@ -254,7 +256,7 @@ class FooterRuntime {
   /** A low-level loop may be followed by a retry, so only clear its activity. */
   public agentEnded(): void {
     this.activeTools.clear();
-    this.updateSpinner();
+    this.updateActivity();
   }
 
   /** Refresh context-derived fields after a non-model session change. */
@@ -271,7 +273,7 @@ class FooterRuntime {
     this.modelResponse.reset();
     this.metrics.finishRun();
     this.activeTools.clear();
-    this.updateSpinner();
+    this.updateActivity();
     this.stopIdle();
     this.component?.dispose();
     this.component = undefined;
@@ -310,18 +312,17 @@ class FooterRuntime {
     this.onActivityChanged(next);
   }
 
-  private updateSpinner(): void {
+  private updateActivity(): void {
     const active =
       this.modelResponse.snapshot().phase !== "ready" || this.activeTools.size > 0 || this.metrics.isRunning();
-    if (active && !this.spinnerTimer && this.currentContext?.mode === "tui") {
-      this.spinnerTimer = setInterval(() => {
-        // Publishing every frame keeps the titlebar animation on the same clock.
+    if (active && !this.activityTimer && this.currentContext?.mode === "tui") {
+      this.activityTimer = setInterval(() => {
         this.publishActivity();
         this.component?.requestRender();
-      }, SPINNER_INTERVAL_MS);
-    } else if (!active && this.spinnerTimer) {
-      clearInterval(this.spinnerTimer);
-      this.spinnerTimer = undefined;
+      }, ACTIVITY_REFRESH_MS);
+    } else if (!active && this.activityTimer) {
+      clearInterval(this.activityTimer);
+      this.activityTimer = undefined;
     }
     this.publishActivity();
     this.component?.requestRender();

@@ -2,13 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { SESSION_ACTIVITY_CHANGED, type EditorActivity } from "@dotfiles/pi-ui/prompt-editor";
 import { baseTitle, busyTitle, type TitleContext } from "./title.js";
 
-/**
- * Show the editor's activity in the terminal title, restoring Pi's title when ready.
- *
- * The footer publishes one activity event per animation frame; following those
- * events keeps the title on the same clock as the footer badge instead of
- * running a second spinner timer here.
- */
+/** Animate the terminal title using the footer's published activity frames. */
 export function registerTitlebar(pi: ExtensionAPI): void {
   let activity: EditorActivity = { kind: "ready" };
   let context: ExtensionContext | undefined;

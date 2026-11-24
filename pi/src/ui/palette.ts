@@ -1,36 +1,30 @@
+import { foregroundAnsi, rgbColor, type RgbColorValue } from "@earendil-works/pi-tui";
+
 /** Catppuccin Mocha colors shared by the Pi footer and prompt editor. */
-const RGB = {
-  red: "243;139;168",
-  peach: "250;179;135",
-  yellow: "249;226;175",
-  green: "166;227;161",
-  lavender: "180;190;254",
-  sky: "137;220;235",
-  overlay2: "147;153;178",
-  mauve: "203;166;247",
+export const paletteColors = {
+  red: rgbColor(243, 139, 168),
+  peach: rgbColor(250, 179, 135),
+  yellow: rgbColor(249, 226, 175),
+  green: rgbColor(166, 227, 161),
+  lavender: rgbColor(180, 190, 254),
+  sky: rgbColor(137, 220, 235),
+  overlay2: rgbColor(147, 153, 178),
+  mauve: rgbColor(203, 166, 247),
 } as const;
 
-function foreground(rgb: string, text: string): string {
-  return `\x1b[38;2;${rgb}m${text}\x1b[0m`;
+function foreground(color: RgbColorValue, text: string): string {
+  return `${foregroundAnsi(color, "truecolor")}${text}\x1b[0m`;
 }
 
-function statusBadge(background: string, text: string): string {
-  return `\x1b[48;2;${background};38;2;17;17;27m${text}\x1b[0m`;
-}
-
-/** Apply shared Catppuccin colors to footer rows and editor status badges. */
 export const palette = {
-  red: (text: string): string => foreground(RGB.red, text),
-  peach: (text: string): string => foreground(RGB.peach, text),
-  yellow: (text: string): string => foreground(RGB.yellow, text),
-  green: (text: string): string => foreground(RGB.green, text),
-  lavender: (text: string): string => foreground(RGB.lavender, text),
-  sky: (text: string): string => foreground(RGB.sky, text),
-  overlay2: (text: string): string => foreground(RGB.overlay2, text),
-  mauve: (text: string): string => foreground(RGB.mauve, text),
-  modelBadge: (text: string): string => statusBadge(RGB.sky, text),
-  toolBadge: (text: string): string => statusBadge(RGB.peach, text),
-  readyBadge: (text: string): string => statusBadge(RGB.overlay2, text),
+  red: (text: string): string => foreground(paletteColors.red, text),
+  peach: (text: string): string => foreground(paletteColors.peach, text),
+  yellow: (text: string): string => foreground(paletteColors.yellow, text),
+  green: (text: string): string => foreground(paletteColors.green, text),
+  lavender: (text: string): string => foreground(paletteColors.lavender, text),
+  sky: (text: string): string => foreground(paletteColors.sky, text),
+  overlay2: (text: string): string => foreground(paletteColors.overlay2, text),
+  mauve: (text: string): string => foreground(paletteColors.mauve, text),
 };
 
 export const separator = ` ${palette.overlay2("|")} `;
