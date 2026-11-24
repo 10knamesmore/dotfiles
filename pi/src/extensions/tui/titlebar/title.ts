@@ -1,6 +1,5 @@
 import { basename } from "node:path";
 import type { EditorActivity } from "@dotfiles/pi-ui/prompt-editor";
-import { sanitizeFooterText } from "@dotfiles/pi-ui/status-format";
 
 /**
  * Prefix Pi writes in front of its own terminal title. Pi derives it from the
@@ -27,11 +26,6 @@ export function baseTitle(context: TitleContext): string {
 
 /** Busy title: the activity frame the footer publishes, in front of the base title. */
 export function busyTitle(activity: BusyActivity, context: TitleContext): string {
-  const label =
-    activity.kind === "tool"
-      ? activity.toolCount > 1
-        ? `TOOLS ${activity.toolCount}`
-        : `TOOL · ${sanitizeFooterText(activity.toolName)}`
-      : activity.kind.toUpperCase();
+  const label = activity.kind === "tool" ? activity.label : activity.kind.toUpperCase();
   return `${activity.spinner} ${label} · ${baseTitle(context)}`;
 }

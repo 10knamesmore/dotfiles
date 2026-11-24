@@ -148,11 +148,7 @@ export class PromptEditor extends CustomEditor {
       case "compacting":
         return palette.modelBadge(` ${activity.spinner} ${activity.kind.toUpperCase()} `);
       case "tool":
-        return palette.toolBadge(
-          activity.toolCount > 1
-            ? ` ${activity.spinner} TOOLS ${activity.toolCount} `
-            : ` ${activity.spinner} TOOL · ${sanitizeFooterText(activity.toolName)} `,
-        );
+        return palette.toolBadge(` ${activity.spinner} ${activity.label} `);
       case "ready":
         return palette.readyBadge(" READY ");
     }

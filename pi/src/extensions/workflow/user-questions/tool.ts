@@ -642,6 +642,13 @@ export function registerUserQuestionsTool(pi: ExtensionAPI): void {
           });
           return component;
         },
+        {
+          blocked: {
+            kind: "question",
+            message:
+              params.questions.length === 1 ? "Answer a question" : `Answer ${params.questions.length} questions`,
+          },
+        },
       );
 
       if (interaction === null || interaction.cancelled) {

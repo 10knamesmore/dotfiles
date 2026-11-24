@@ -28,7 +28,7 @@ export interface PromptEditorApi {
 
 export type EditorActivity =
   | { kind: "waiting" | "thinking" | "writing" | "compacting"; spinner: string }
-  | { kind: "tool"; spinner: string; toolName: string; toolCount: number }
+  | { kind: "tool"; spinner: string; label: string }
   | { kind: "ready" };
 
 export interface EditorStatus {

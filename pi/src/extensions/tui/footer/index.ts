@@ -7,6 +7,7 @@ import {
   type PromptEditorApi,
   type EditorStatus,
 } from "@dotfiles/pi-ui/prompt-editor";
+import { sanitizeFooterText } from "@dotfiles/pi-ui/status-format";
 import { ModelResponseTracker } from "./activity.js";
 import { ClaudeFooterComponent } from "./component.js";
 import { GitStatusCache } from "./git-status.js";
@@ -25,7 +26,7 @@ function sameActivity(a: EditorStatus["activity"], b: EditorStatus["activity"]):
   if (a.kind === "ready") return true;
   if (b.kind === "ready") return true;
   if (a.spinner !== b.spinner) return false;
-  if (a.kind === "tool" && b.kind === "tool") return a.toolName === b.toolName && a.toolCount === b.toolCount;
+  if (a.kind === "tool" && b.kind === "tool") return a.label === b.label;
   return true;
 }
 
@@ -193,8 +194,8 @@ class FooterRuntime {
   }
 
   /** Track overlapping tool calls so the editor displays tools until the last call ends. */
-  public toolStarted(id: string, name: string): void {
-    this.activeTools.set(id, name);
+  public toolStarted(id: string, label: string): void {
+    this.activeTools.set(id, label);
     this.updateSpinner();
   }
 
@@ -292,9 +293,10 @@ class FooterRuntime {
     const spinner = spinnerFrameAt(Date.now());
     const model = this.modelResponse.snapshot();
     if (model.phase === "compacting") return { kind: "compacting", spinner };
-    const toolNames = [...this.activeTools.values()];
-    if (toolNames.length > 0) {
-      return { kind: "tool", spinner, toolName: toolNames.at(-1)!, toolCount: toolNames.length };
+    const toolCount = this.activeTools.size;
+    if (toolCount > 0) {
+      const label = toolCount === 1 ? this.activeTools.values().next().value! : `TOOLS ${toolCount}`;
+      return { kind: "tool", spinner, label };
     }
     if (model.phase !== "ready") return { kind: model.phase, spinner };
     return this.metrics.isRunning() ? { kind: "waiting", spinner } : { kind: "ready" };
@@ -367,7 +369,11 @@ export function registerFooter(pi: ExtensionAPI): void {
   });
   pi.on("tool_execution_start", (event, ctx) => {
     runtime.updateContext(ctx);
-    runtime.toolStarted(event.toolCallId, event.toolName);
+    const label =
+      event.toolName === "agents" && event.args?.action === "wait"
+        ? "Waiting for subagent"
+        : `TOOL · ${sanitizeFooterText(event.toolName)}`;
+    runtime.toolStarted(event.toolCallId, label);
   });
   pi.on("tool_execution_end", (event, ctx) => {
     runtime.updateContext(ctx);
