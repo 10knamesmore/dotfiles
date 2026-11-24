@@ -12,6 +12,7 @@ import {
 } from "@dotfiles/pi-ui/prompt-editor";
 import { PromptEditor } from "./component.js";
 import { installCopyCommand } from "./copy.js";
+import { registerDraftStash } from "./draft-stash.js";
 import { chainInputNavigation } from "./navigation.js";
 import { createReplyMarkdown } from "./reply-markdown.js";
 import { createReplyBody, createReplyBodies } from "./reply-body.js";
@@ -20,6 +21,7 @@ type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorCom
 
 /** Sole owner of the prompt Editor: other extensions contribute behavior, not replacements. */
 export default function registerPromptEditor(pi: ExtensionAPI): void {
+  const installDraftStashShortcut = registerDraftStash(pi);
   let currentContext: ExtensionContext | undefined;
   let installedFactory: EditorFactory | undefined;
   const replyMarkdown = createReplyMarkdown();
@@ -78,6 +80,7 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         () => readWorkflowUsage?.(),
       ));
     ctx.ui.setEditorComponent(installedFactory);
+    installDraftStashShortcut(editor, ctx.ui);
     installCopyCommand(editor, ctx);
     ctx.ui.setWidget("reply-bodies", (tui) => createReplyBodies(tui, ctx, replyMarkdown, blockRenderers, pointer));
   });
