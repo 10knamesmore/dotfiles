@@ -59,7 +59,7 @@ the preview. The runtime supplies that attribute.
 
 ## Local service
 
-One service belongs to one Pi session and has one active project. Project
+One service belongs to one Pi session and can have one active project. Project
 registration is global in `<agent-dir>/design/projects.json`:
 `{ "projects": [{ "id": "...", "name": "...", "path": "..." }] }`.
 Project IDs are stable for a canonical directory.
@@ -83,7 +83,8 @@ HTTP routes:
 | GET    | `/api/preferences`     | Global editor `{ theme: "dark"                                            | "light" }`; defaults to dark   |
 | POST   | `/api/preferences`     | `{ theme: "dark"                                                          | "light" }` → saved preferences |
 | POST   | `/api/open`            | `{ path, name?, start_preview?: true }` → full state; register and select |
-| GET    | `/api/state`           | Full state                                                                |
+| POST   | `/api/disconnect`      | Stop the preview and clear the active project; return full state          |
+| GET    | `/api/state`           | Full state; optional `?since=N` includes changes from the same snapshot   |
 | GET    | `/api/changes?since=N` | `{ revision, changes: [...] }`                                            |
 | POST   | `/api/edit`            | `{ edits: [...], snapshot?: boolean }` → full state                       |
 | POST   | `/api/undo`            | Full state                                                                |
@@ -98,6 +99,7 @@ Full state:
 type State = {
   project: { id: string; name: string; path: string } | null;
   revision: number;
+  opened_revision: number | null;
   design: {
     name: string;
     elements: Record<string, { text?: string; style?: Record<string, string | number> }>;
@@ -142,6 +144,8 @@ type State = {
 };
 ```
 
+The revision advances on project switches, disconnection, and design data edits.
+`opened_revision` is the revision assigned when the active project was opened.
 Each change contains `{ revision, file, patch }`; `patch` is an RFC 6902
 JSON Patch describing actual file contents changing, including external edits.
 `read_changes` is read-only. It never marks edits as submitted.
@@ -200,7 +204,7 @@ Opening creates missing `design.json` and `.design/workspace.json` only, with
 empty elements/parameters and one default artboard. It does not scaffold React.
 If `package.json` exists and `start_preview` is true, the service launches
 `pnpm exec vite --host 127.0.0.1 --port <free-port> --strictPort` in the project.
-The preview process belongs to the service. Selecting another project stops it.
+The preview process belongs to the service. Switching or disconnecting stops it.
 
 ## Browser bridge
 

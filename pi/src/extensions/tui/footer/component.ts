@@ -257,6 +257,8 @@ function renderSecondLine(options: SecondLineRenderOptions): string {
   return fitByDropping(parts, [2, 3], width, separator);
 }
 
+const NAVIGABLE_STATUSES: readonly string[] = ["bash-background", "design"];
+
 function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string {
   const statuses = [...footerData.getExtensionStatuses().entries()]
     .filter(
@@ -265,7 +267,7 @@ function formatExtensionStatuses(footerData: ReadonlyFooterDataProvider): string
         key !== "subagent-workflow" &&
         key !== "subagent-workflow:usage" &&
         key !== "openai-service-tier" &&
-        key !== "bash-background",
+        !NAVIGABLE_STATUSES.includes(key),
     )
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([, value]) => sanitizeFooterText(value))
@@ -294,18 +296,26 @@ function renderThirdLine(options: ThirdLineRenderOptions): string {
   const { width, footerData, promptRun, hitRate, selectedBg } = options;
   const statuses = formatExtensionStatuses(footerData);
   const leftParts = [...formatPromptRun(promptRun), hitRate, statuses];
-  const rawBackground = footerData.getExtensionStatuses().get("bash-background");
-  if (!rawBackground) return fitByDropping(leftParts, [4, 3], width, separator);
+  const extensionStatuses = footerData.getExtensionStatuses();
+  const controls = NAVIGABLE_STATUSES.flatMap((key) => {
+    const text = sanitizeFooterText(extensionStatuses.get(key) ?? "");
+    if (!text) return [];
+    const selected = text.startsWith("❯");
+    return [{ selected, label: selected ? selectedBg(palette.lavender(` ${text} `)) : palette.lavender(text) }];
+  });
+  if (controls.length === 0) return fitByDropping(leftParts, [4, 3], width, separator);
 
-  const backgroundText = sanitizeFooterText(rawBackground);
-  const fullBackground = backgroundText.startsWith("❯")
-    ? `${separator}${selectedBg(palette.lavender(` ${backgroundText} `))}`
-    : `${separator}${palette.lavender(backgroundText)}`;
-  const background = truncateToWidth(fullBackground, Math.max(1, width - 1), palette.overlay2("…"));
-  const backgroundWidth = visibleWidth(background);
-  const left = fitByDropping(leftParts, [4, 3], Math.max(0, width - backgroundWidth - 1), separator);
-  const space = Math.max(1, width - visibleWidth(left) - backgroundWidth);
-  return `${left}${" ".repeat(space)}${background}`;
+  const right = fitByDropping(
+    controls.map((control) => control.label),
+    controls.some((control) => control.selected)
+      ? controls.flatMap((control, index) => (control.selected ? [] : [index]))
+      : [],
+    width,
+    separator,
+  );
+  const rightWidth = visibleWidth(right);
+  const left = fitByDropping(leftParts, [4, 3], width - rightWidth - 1, separator);
+  return `${left}${" ".repeat(Math.max(0, width - visibleWidth(left) - rightWidth))}${right}`;
 }
 
 /**

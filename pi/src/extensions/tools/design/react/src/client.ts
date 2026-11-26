@@ -11,6 +11,7 @@ export interface ConnectionSnapshot {
 }
 
 interface EditRequest {
+  projectId: string;
   edits: Edit[];
   snapshot: boolean;
 }
@@ -114,7 +115,11 @@ export class DesignConnection {
 
   private publish() {
     const state =
-      this.canonical && this.queue.reduce((state, request) => applyEdits(state, request.edits), this.canonical);
+      this.canonical &&
+      this.queue.reduce(
+        (state, request) => (state.project?.id === request.projectId ? applyEdits(state, request.edits) : state),
+        this.canonical,
+      );
     this.snapshot = {
       state,
       pending: this.queue.length,
@@ -125,14 +130,17 @@ export class DesignConnection {
     for (const listener of this.listeners) listener();
   }
 
-  async request<T>(path: string, body?: unknown): Promise<T> {
+  async request<T>(path: string, body?: unknown, projectId?: string): Promise<T> {
+    const headers = new Headers();
+    if (body !== undefined) headers.set("Content-Type", "application/json");
+    if (projectId !== undefined) headers.set("x-pi-design-project", projectId);
     const response = await fetch(
       `${this.endpoint}${path}`,
       body === undefined
         ? undefined
         : {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(body),
           },
     );
@@ -153,8 +161,7 @@ export class DesignConnection {
   }
 
   private receive(state: State) {
-    if (this.canonical && this.canonical.project?.id === state.project?.id && state.revision < this.canonical.revision)
-      return;
+    if (this.canonical && state.revision < this.canonical.revision) return;
     this.canonical = state;
     this.publish();
     void this.flush();
@@ -206,15 +213,18 @@ export class DesignConnection {
   };
 
   edit = (edits: Edit[], options: { snapshot?: boolean } = {}) => {
-    if (!edits.length) return;
-    this.queue.push({ edits, snapshot: options.snapshot ?? true });
+    const projectId = this.canonical?.project?.id;
+    if (!projectId || !edits.length) return;
+    this.queue.push({ projectId, edits, snapshot: options.snapshot ?? true });
     this.publish();
     void this.flush();
   };
 
   /** Finalize a continuous gesture after all of its saved intermediate values. */
   finishEdit = () => {
-    this.queue.push({ edits: [], snapshot: true });
+    const projectId = this.canonical?.project?.id;
+    if (!projectId) return;
+    this.queue.push({ projectId, edits: [], snapshot: true });
     this.publish();
     void this.flush();
   };
@@ -224,7 +234,8 @@ export class DesignConnection {
     this.flushing = true;
     try {
       while (this.queue.length) {
-        const state = await this.request<State>("/api/edit", this.queue[0]);
+        const { projectId, ...edit } = this.queue[0]!;
+        const state = await this.request<State>("/api/edit", edit, projectId);
         this.queue.shift();
         this.receive(state);
       }
@@ -257,30 +268,32 @@ export class DesignConnection {
   };
 
   async select(selection: Selection) {
-    if (this.canonical) {
-      this.canonical = { ...this.canonical, selection };
-      this.publish();
-    }
+    if (!this.canonical?.project) return;
+    const projectId = this.canonical.project.id;
+    this.canonical = { ...this.canonical, selection };
+    this.publish();
     try {
-      await this.request<Selection>("/api/selection", selection);
+      await this.request<Selection>("/api/selection", selection, projectId);
     } catch (error) {
       this.report(error);
     }
   }
 
   async history(direction: "undo" | "redo") {
-    if (this.queue.length) return;
+    const projectId = this.canonical?.project?.id;
+    if (!projectId || this.queue.length) return;
     try {
-      this.receive(await this.request<State>(`/api/${direction}`, {}));
+      this.receive(await this.request<State>(`/api/${direction}`, {}, projectId));
     } catch (error) {
       this.report(error);
     }
   }
 
   async restoreSnapshot(id: number) {
-    if (this.queue.length) return;
+    const projectId = this.canonical?.project?.id;
+    if (!projectId || this.queue.length) return;
     try {
-      this.receive(await this.request<State>("/api/history", { id }));
+      this.receive(await this.request<State>("/api/history", { id }, projectId));
     } catch (error) {
       this.report(error);
     }

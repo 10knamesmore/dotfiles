@@ -7,6 +7,7 @@ export interface DesignProject {
 export interface DesignState {
   project: DesignProject | null;
   revision: number;
+  opened_revision: number | null;
   design: {
     name: string;
     elements: Record<string, { text?: string; style?: Record<string, string | number> }>;
@@ -25,7 +26,6 @@ export interface DesignState {
   preview_url: string | null;
 }
 
-export interface DesignChanges {
-  revision: number;
+export interface DesignSnapshot extends DesignState {
   changes: Array<{ revision: number; file: string; patch: unknown }>;
 }

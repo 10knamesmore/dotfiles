@@ -31,14 +31,10 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
     if (ctx.mode !== "tui") return;
     currentContext = ctx;
     let navigation: InputNavigation | undefined;
-    let footerNavigation: InputNavigation | undefined;
+    const footerNavigation = new Map<string, InputNavigation>();
     let readStatus: (() => EditorStatus) | undefined;
     let readFastMode: (() => FastMode | undefined) | undefined;
     let readWorkflowUsage: (() => string | undefined) | undefined;
-    const chainedNavigation = chainInputNavigation(
-      () => navigation,
-      () => footerNavigation,
-    );
     const blockRenderers = new Map<string, ReplyBlockRegistration>();
     const registerReplyBlock: RegisterReplyBlock = (language, registration) => {
       blockRenderers.set(language.toLowerCase(), registration);
@@ -51,8 +47,8 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
       useAgentNavigation: (contribution) => {
         navigation = contribution;
       },
-      useFooterNavigation: (contribution) => {
-        footerNavigation = contribution;
+      useFooterNavigation: (key, contribution) => {
+        footerNavigation.set(key, contribution);
       },
       useStatus: (contribution) => {
         readStatus = contribution;
@@ -67,6 +63,10 @@ export default function registerPromptEditor(pi: ExtensionAPI): void {
         createReplyBody(options, ctx.ui, replyMarkdown, blockRenderers, pointer, pi.getSettings().outputPad ?? 1),
     };
     pi.events.emit(PROMPT_EDITOR_CONFIGURE, api);
+    const footerEntries = [...footerNavigation.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, entry]) => entry);
+    const chainedNavigation = chainInputNavigation(() => navigation, footerEntries);
     installedFactory = (tui, theme, keybindings) =>
       (editor = new PromptEditor(
         tui,

@@ -90,14 +90,21 @@ async fn open(
     dispatch(state, headers, Request::Open(body)).await
 }
 
-async fn current(State(state): State<HttpState>, headers: HeaderMap) -> ApiResult {
-    dispatch(state, headers, Request::State).await
+async fn disconnect(State(state): State<HttpState>, headers: HeaderMap) -> ApiResult {
+    dispatch(state, headers, Request::Disconnect).await
+}
+
+async fn current(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Query(query): Query<Since>,
+) -> ApiResult {
+    dispatch(state, headers, Request::State(query.since)).await
 }
 
 #[derive(Deserialize)]
 struct Since {
-    #[serde(default)]
-    since: u64,
+    since: Option<u64>,
 }
 
 async fn changes(
@@ -105,7 +112,7 @@ async fn changes(
     headers: HeaderMap,
     Query(query): Query<Since>,
 ) -> ApiResult {
-    dispatch(state, headers, Request::Changes(query.since)).await
+    dispatch(state, headers, Request::Changes(query.since.unwrap_or(0))).await
 }
 
 #[derive(Deserialize)]
@@ -164,7 +171,7 @@ async fn selection(
 async fn events(State(state): State<HttpState>) -> impl IntoResponse {
     let mut receiver = state.events.subscribe();
     let mut shutdown = state.shutdown;
-    let initial = actor::request(&state.actor, Request::State, None).await;
+    let initial = actor::request(&state.actor, Request::State(None), None).await;
     let stream = async_stream::stream! {
         let initial = match initial {
             Ok(value) => Event { name: "state", value },
@@ -180,7 +187,7 @@ async fn events(State(state): State<HttpState>) -> impl IntoResponse {
                 event = receiver.recv() => match event {
                     Ok(event) => yield Ok(sse_event(event)),
                     Err(broadcast::error::RecvError::Lagged(_)) => {
-                        let event = match actor::request(&state.actor, Request::State, None).await {
+                        let event = match actor::request(&state.actor, Request::State(None), None).await {
                             Ok(value) => Event { name: "state", value },
                             Err(error) => Event { name: "error", value: json!({"error": format!("{error:#}")}) },
                         };
@@ -243,6 +250,7 @@ async fn run(agent_dir: PathBuf, web_dir: PathBuf, session_id: String) -> Result
         .route("/api/projects", get(projects))
         .route("/api/preferences", get(preferences).post(set_theme))
         .route("/api/open", post(open))
+        .route("/api/disconnect", post(disconnect))
         .route("/api/state", get(current))
         .route("/api/changes", get(changes))
         .route("/api/edit", post(edit))

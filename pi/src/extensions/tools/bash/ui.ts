@@ -48,7 +48,7 @@ export function registerBackgroundUi(
   };
 
   pi.events.on(PROMPT_EDITOR_CONFIGURE, (requested) => {
-    (requested as PromptEditorApi).useFooterNavigation({
+    (requested as PromptEditorApi).useFooterNavigation(STATUS_KEY, {
       selectNext() {
         if (runningProcesses(session()).length === 0) return false;
         selected = true;

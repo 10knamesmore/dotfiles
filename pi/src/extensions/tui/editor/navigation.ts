@@ -1,7 +1,7 @@
 import type { InputNavigation } from "@dotfiles/pi-ui/prompt-editor";
 
 /**
- * Chain the below-editor agent selection into a final footer selection.
+ * Move from the below-editor agents through the available footer statuses.
  *
  * Contributors keep their own rendering and selected state. At the last agent,
  * `selectNext()` returns false without clearing it, allowing this coordinator
@@ -9,23 +9,24 @@ import type { InputNavigation } from "@dotfiles/pi-ui/prompt-editor";
  */
 export function chainInputNavigation(
   agents: () => InputNavigation | undefined,
-  footer: () => InputNavigation | undefined,
+  footer: InputNavigation[],
 ): InputNavigation {
+  const selectedFooter = () => footer.find((entry) => entry.hasSelection());
+
   return {
     selectNext() {
-      const agent = agents();
-      if (agent?.hasSelection()) {
-        if (agent.selectNext()) return true;
-        if (footer()?.selectNext()) {
-          agent.clearSelection();
-          return true;
-        }
+      const selected = footer.findIndex((entry) => entry.hasSelection());
+      if (selected >= 0) {
+        if (footer.slice(selected + 1).some((entry) => entry.selectNext())) footer[selected]!.clearSelection();
         return true;
       }
-      const status = footer();
-      if (status?.hasSelection()) return status.selectNext() || true;
+      const agent = agents();
       if (agent?.selectNext()) return true;
-      return status?.selectNext() ?? false;
+      if (footer.some((entry) => entry.selectNext())) {
+        agent?.clearSelection();
+        return true;
+      }
+      return agent?.hasSelection() ?? false;
     },
     selectPrevious() {
       const agent = agents();
@@ -33,17 +34,17 @@ export function chainInputNavigation(
         agent.selectPrevious();
         return;
       }
-      const status = footer();
-      if (!status?.hasSelection()) return;
-      status.clearSelection();
-      agent?.selectPrevious();
+      const selected = footer.findIndex((entry) => entry.hasSelection());
+      if (selected < 0) return;
+      footer[selected]!.clearSelection();
+      const previous = footer.slice(0, selected).reverse();
+      if (!previous.some((entry) => entry.selectNext())) agent?.selectPrevious();
     },
-    hasSelection: () => agents()?.hasSelection() === true || footer()?.hasSelection() === true,
+    hasSelection: () => agents()?.hasSelection() === true || selectedFooter() !== undefined,
     openSelection() {
       const agent = agents();
       if (agent?.hasSelection()) return agent.openSelection();
-      const status = footer();
-      return status?.hasSelection() === true && status.openSelection();
+      return selectedFooter()?.openSelection() ?? false;
     },
     setExpanded(expanded) {
       const agent = agents();
@@ -51,7 +52,7 @@ export function chainInputNavigation(
     },
     clearSelection() {
       agents()?.clearSelection();
-      footer()?.clearSelection();
+      for (const entry of footer) entry.clearSelection();
     },
   };
 }

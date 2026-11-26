@@ -34,7 +34,8 @@ pub enum Request {
     Preferences,
     SetTheme(String),
     Open(Open),
-    State,
+    Disconnect,
+    State(Option<u64>),
     Changes(u64),
     Edit(Vec<Edit>, Option<u64>, bool),
     Undo,
@@ -63,6 +64,7 @@ pub type Sender = mpsc::UnboundedSender<Message>;
 
 struct ActiveProject {
     project: Project,
+    opened_revision: u64,
     loaded: LoadedDocuments,
     _watcher: RecommendedWatcher,
     snapshots: Vec<Snapshot>,
@@ -189,15 +191,27 @@ impl Actor {
                 Ok(preferences)
             }
             Request::Open(open) => self.open(open).await,
-            Request::State => {
-                self.reload()?;
+            Request::Disconnect => {
+                self.stop_preview().await?;
+                self.revision += 1;
+                self.active = None;
+                self.reset_project_state();
+                self.emit_state();
                 Ok(self.state())
+            }
+            Request::State(since) => {
+                self.reload()?;
+                let mut state = self.state();
+                if let Some(since) = since {
+                    state["changes"] = json!(self.changes_since(since).collect::<Vec<_>>());
+                }
+                Ok(state)
             }
             Request::Changes(since) => {
                 self.reload()?;
                 Ok(json!({
                     "revision": self.revision,
-                    "changes": self.changes.iter().filter(|change| change["revision"].as_u64().unwrap() > since).collect::<Vec<_>>()
+                    "changes": self.changes_since(since).collect::<Vec<_>>()
                 }))
             }
             Request::Edit(edits, expected_revision, snapshot) => {
@@ -288,6 +302,7 @@ impl Actor {
             // Reload after installing the watcher so edits made while opening are not missed.
             let loaded = documents::read(&root)?;
             self.stop_preview().await?;
+            self.revision += 1;
             let initial = Snapshot {
                 id: self.revision,
                 summary: "Opened project".to_owned(),
@@ -295,14 +310,13 @@ impl Actor {
             };
             self.active = Some(ActiveProject {
                 project,
+                opened_revision: self.revision,
                 loaded,
                 _watcher: watcher,
                 snapshots: vec![initial],
                 current_snapshot: 0,
             });
-            self.changes.clear();
-            self.files_invalid = false;
-            self.selection = json!({"artboard": null, "element": null});
+            self.reset_project_state();
         }
         if !open.start_preview {
             self.stop_preview().await?;
@@ -313,6 +327,18 @@ impl Actor {
         }
         self.emit_state();
         Ok(self.state())
+    }
+
+    fn reset_project_state(&mut self) {
+        self.changes.clear();
+        self.files_invalid = false;
+        self.selection = json!({"artboard": null, "element": null});
+    }
+
+    fn changes_since(&self, since: u64) -> impl Iterator<Item = &Value> {
+        self.changes
+            .iter()
+            .filter(move |change| change["revision"].as_u64().unwrap() > since)
     }
 
     fn reload(&mut self) -> Result<()> {
@@ -444,6 +470,7 @@ impl Actor {
         });
         json!({
             "project": project, "revision": self.revision, "design": design, "workspace": workspace,
+            "opened_revision": self.active.as_ref().map(|active| active.opened_revision),
             "selection": self.selection, "preview_url": self.preview.as_ref().map(|preview| &preview.url),
             "can_undo": can_undo, "can_redo": can_redo, "history": history
         })

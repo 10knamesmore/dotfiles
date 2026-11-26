@@ -18,8 +18,8 @@ export interface InputNavigation {
 export interface PromptEditorApi {
   readonly blockPointer: CodeBlockPointer;
   useAgentNavigation(navigation: InputNavigation): void;
-  /** Navigation for a status entry visited after the last below-editor agent. */
-  useFooterNavigation(navigation: InputNavigation): void;
+  /** Register a footer status by its setStatus key, visited after the below-editor agents. */
+  useFooterNavigation(key: string, navigation: InputNavigation): void;
   useStatus(readStatus: () => EditorStatus): void;
   useFastMode(readFastMode: () => FastMode | undefined): void;
   useWorkflowUsage(readWorkflowUsage: () => string | undefined): void;

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { readPythonEnvironment } from "@dotfiles/pi-config/python-environment";
-import type { DesignChanges, DesignProject, DesignState } from "./types.js";
+import type { DesignProject, DesignSnapshot, DesignState } from "./types.js";
 
 const WEB_DIRECTORY = fileURLToPath(new URL("./web/dist/", import.meta.url));
 
@@ -75,10 +75,13 @@ export class DesignService {
     }
   }
 
-  async request<T>(path: string, body?: unknown): Promise<T> {
+  private async request<T>(path: string, body?: unknown, projectId?: string): Promise<T> {
+    const headers = new Headers();
+    if (body !== undefined) headers.set("Content-Type", "application/json");
+    if (projectId !== undefined) headers.set("x-pi-design-project", projectId);
     const response = await fetch(`${this.url}${path}`, {
       method: body === undefined ? "GET" : "POST",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
@@ -94,12 +97,16 @@ export class DesignService {
     return this.request("/api/state");
   }
 
-  changes(since: number): Promise<DesignChanges> {
-    return this.request(`/api/changes?since=${since}`);
+  snapshot(since: number): Promise<DesignSnapshot> {
+    return this.request(`/api/state?since=${since}`);
   }
 
   open(path: string): Promise<DesignState> {
     return this.request("/api/open", { path });
+  }
+
+  disconnect(projectId: string): Promise<DesignState> {
+    return this.request("/api/disconnect", {}, projectId);
   }
 
   async close(): Promise<void> {

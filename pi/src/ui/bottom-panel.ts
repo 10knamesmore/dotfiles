@@ -6,7 +6,7 @@ export interface BottomPanel extends Omit<Component, "render"> {
   render(width: number, height: number): readonly string[];
   dispose?(): void;
 }
-type PanelFactory = (tui: TUI, theme: Theme, keys: KeybindingsManager, done: () => void) => BottomPanel;
+type PanelFactory<T> = (tui: TUI, theme: Theme, keys: KeybindingsManager, done: (value: T) => void) => BottomPanel;
 
 export function fillPanelRows(lines: readonly string[], height: number): string[] {
   return Array.from({ length: height }, (_, row) => lines[row] ?? "");
@@ -18,12 +18,12 @@ function renderedRows(component: Component): number {
   return (component as Container)["childLines"].lines.length;
 }
 
-export function openBottomPanel(
+export function openBottomPanel<T = void>(
   ui: Pick<ExtensionUIContext, "custom">,
-  create: PanelFactory,
+  create: PanelFactory<T>,
   { heightPercent = 90 }: { heightPercent?: number } = {},
-): Promise<void> {
-  return ui.custom<void>(
+): Promise<T> {
+  return ui.custom<T>(
     (tui, theme, keys, done) => {
       const panel = create(tui, theme, keys, done);
       let contentTop = 0;
@@ -36,7 +36,10 @@ export function openBottomPanel(
           if (panel.focused !== undefined) panel.focused = value;
         },
         render(width) {
-          const maxRows = Math.max(1, Math.min(tui.terminal.rows, Math.floor(tui.terminal.rows * heightPercent / 100)));
+          const maxRows = Math.max(
+            1,
+            Math.min(tui.terminal.rows, Math.floor((tui.terminal.rows * heightPercent) / 100)),
+          );
           const lines = panel.render(width, maxRows);
           contentHeight = lines.length;
           const cursorRow = lines.length > maxRows ? lines.findIndex((line) => line.includes(CURSOR_MARKER)) : -1;
